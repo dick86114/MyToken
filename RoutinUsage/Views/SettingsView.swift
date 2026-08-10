@@ -19,6 +19,7 @@ struct SettingsView: View {
     typealias MoveKey = @MainActor (IndexSet, Int) -> Void
     typealias CheckForUpdates = @MainActor () async -> Void
     typealias InstallAvailableUpdate = @MainActor () async -> Void
+    typealias ReadKey = @MainActor (UUID) -> String?
 
     private enum EditorPresentation: Identifiable {
         case add
@@ -43,6 +44,7 @@ struct SettingsView: View {
     private let updateStatus: AppUpdateStatus
     private let checkForUpdates: CheckForUpdates
     private let installAvailableUpdate: InstallAvailableUpdate
+    private let readKey: ReadKey
 
     @State private var editor: EditorPresentation?
     @State private var pendingDeletion: KeyConfiguration?
@@ -51,6 +53,7 @@ struct SettingsView: View {
     @State private var highThreshold: Int
     @State private var thresholdError: String?
     @State private var operationError: String?
+    @State private var revealedKeyIDs: Set<UUID> = []
 
     init(
         store: UsageStore,
@@ -60,7 +63,8 @@ struct SettingsView: View {
         moveKey: @escaping MoveKey,
         updateStatus: AppUpdateStatus = .idle,
         checkForUpdates: @escaping CheckForUpdates = {},
-        installAvailableUpdate: @escaping InstallAvailableUpdate = {}
+        installAvailableUpdate: @escaping InstallAvailableUpdate = {},
+        readKey: @escaping ReadKey = { _ in nil }
     ) {
         self.store = store
         self.settings = settings
@@ -70,6 +74,7 @@ struct SettingsView: View {
         self.updateStatus = updateStatus
         self.checkForUpdates = checkForUpdates
         self.installAvailableUpdate = installAvailableUpdate
+        self.readKey = readKey
         _orderedKeyIDs = State(initialValue: store.orderedKeyIDs)
         _lowThreshold = State(initialValue: settings.thresholds.low)
         _highThreshold = State(initialValue: settings.thresholds.high)
@@ -88,6 +93,7 @@ struct SettingsView: View {
         }
         .padding(16)
         .frame(minWidth: 520, idealWidth: 560, minHeight: 420, idealHeight: 500)
+        .background(WindowFramePersistence())
         .onChange(of: store.orderedKeyIDs) { _, ids in
             orderedKeyIDs = ids
         }
@@ -102,6 +108,7 @@ struct SettingsView: View {
             )
         }
         .onDisappear {
+            revealedKeyIDs.removeAll()
             NSApp.setActivationPolicy(.accessory)
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -191,7 +198,7 @@ private extension SettingsView {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(configuration.displayName)
-                Text(KeyDisplayMask.masked(suffix: configuration.keySuffix))
+                Text(displayedKey(for: configuration))
                     .font(.system(.caption, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
@@ -199,6 +206,14 @@ private extension SettingsView {
             .accessibilityLabel("\(configuration.displayName)，\(KeyDisplayMask.masked(suffix: configuration.keySuffix))")
 
             Spacer()
+
+            Button {
+                toggleKeyVisibility(for: configuration.id)
+            } label: {
+                Image(systemName: revealedKeyIDs.contains(configuration.id) ? "eye.slash" : "eye")
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel(revealedKeyIDs.contains(configuration.id) ? "隐藏 \(configuration.displayName)" : "显示 \(configuration.displayName)")
 
             Button("编辑") { editor = .edit(configuration) }
                 .buttonStyle(.borderless)
@@ -220,6 +235,21 @@ private extension SettingsView {
         }
         .contentShape(Rectangle())
         .onTapGesture { store.selectKey(configuration.id) }
+    }
+
+    func displayedKey(for configuration: KeyConfiguration) -> String {
+        guard revealedKeyIDs.contains(configuration.id), let secret = readKey(configuration.id) else {
+            return KeyDisplayMask.masked(suffix: configuration.keySuffix)
+        }
+        return secret
+    }
+
+    func toggleKeyVisibility(for id: UUID) {
+        if revealedKeyIDs.contains(id) {
+            revealedKeyIDs.remove(id)
+        } else {
+            revealedKeyIDs.insert(id)
+        }
     }
 
     @ViewBuilder

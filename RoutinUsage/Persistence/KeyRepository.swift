@@ -35,6 +35,13 @@ final class KeyRepository {
         return configurations.sorted { $0.sortOrder < $1.sortOrder }
     }
 
+    func read(id: UUID) throws -> String? {
+        guard list().contains(where: { $0.id == id }) else {
+            throw KeyRepositoryError.configurationNotFound
+        }
+        return try localStore.read(for: id)
+    }
+
     @discardableResult
     func add(name: String, secret: String) throws -> KeyConfiguration {
         let normalizedName = try validate(name: name, secret: secret)

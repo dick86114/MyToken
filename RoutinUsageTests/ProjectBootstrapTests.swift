@@ -22,6 +22,21 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(onboarding.contains("5 小时"))
     }
 
+    func test设置页包含临时查看Key的眼睛按钮与窗口代理() throws {
+        let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+
+        XCTAssertTrue(settings.contains("eye.slash"))
+        XCTAssertTrue(settings.contains("WindowFramePersistence"))
+        XCTAssertTrue(settings.contains("@State private var revealedKeyIDs"))
+    }
+
+    func test设置页查看状态不从UserDefaults读取() throws {
+        let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+
+        XCTAssertFalse(settings.contains("revealedKeyIDs = State(initialValue:"))
+        XCTAssertFalse(settings.contains("UserDefaults"))
+    }
+
     func test工程规格锁定为Xcode15兼容格式() throws {
         let projectSpec = try sourceText(at: "project.yml")
 
