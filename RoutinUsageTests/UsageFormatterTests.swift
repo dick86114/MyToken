@@ -101,6 +101,77 @@ final class UsageFormatterTests: XCTestCase {
         )
     }
 
+    func test菜单栏竖条风险等级在80和95分界() {
+        XCTAssertEqual(MenuBarUsageRisk.level(for: 79.9), .normal)
+        XCTAssertEqual(MenuBarUsageRisk.level(for: 80), .warning)
+        XCTAssertEqual(MenuBarUsageRisk.level(for: 94.9), .warning)
+        XCTAssertEqual(MenuBarUsageRisk.level(for: 95), .critical)
+    }
+
+    func test菜单栏只为竖条样式的有效周期指标提供竖条数据() throws {
+        let periodicState = makeState(snapshot: makePeriodicSnapshot(fiveHourPercent: 67.5))
+
+        XCTAssertEqual(
+            try XCTUnwrap(
+                MenuBarVerticalUsage.metric(
+                    state: periodicState,
+                    dimension: .fiveHour,
+                    style: .aliasVerticalBar
+                )
+            ).percent,
+            67.5
+        )
+        XCTAssertNil(
+            MenuBarVerticalUsage.metric(
+                state: periodicState,
+                dimension: .fiveHour,
+                style: .percent
+            )
+        )
+        XCTAssertNil(
+            MenuBarVerticalUsage.metric(
+                state: makeState(snapshot: nil, isRefreshing: true),
+                dimension: .fiveHour,
+                style: .aliasVerticalBar
+            )
+        )
+        XCTAssertNil(
+            MenuBarVerticalUsage.metric(
+                state: makeState(snapshot: nil, error: .network),
+                dimension: .fiveHour,
+                style: .aliasVerticalBar
+            )
+        )
+        XCTAssertNil(
+            MenuBarVerticalUsage.metric(
+                state: makeState(snapshot: makeTokenSnapshot(percent: 92.4)),
+                dimension: .weekly,
+                style: .aliasVerticalBar
+            )
+        )
+    }
+
+    func test分组倍率合并为一行() {
+        XCTAssertEqual(
+            UsageFormatter.groupMultiplierText([
+                UsageGroupMultiplier(name: "Codex", multiplier: 1),
+                UsageGroupMultiplier(name: "Codex Pro", multiplier: 2),
+            ]),
+            "Codex ×1、Codex Pro ×2"
+        )
+    }
+
+    func test倒计时在一分钟后使用新时刻更新文本() {
+        let now = Date(timeIntervalSince1970: 1_786_320_000)
+        let end = now.addingTimeInterval(3 * 60 * 60 + 45 * 60)
+
+        XCTAssertEqual(UsageFormatter.remainingDurationText(until: end, now: now), "3h45m")
+        XCTAssertEqual(
+            UsageFormatter.remainingDurationText(until: end, now: now.addingTimeInterval(60)),
+            "3h44m"
+        )
+    }
+
     func test存在缓存且刷新失败继续显示缓存百分比() {
         let state = makeState(
             snapshot: makePeriodicSnapshot(fiveHourPercent: 81.2),

@@ -30,7 +30,7 @@ struct OnboardingView: View {
             }
             .accessibilityElement(children: .combine)
 
-            Label("Key 仅保存在这台 Mac 的系统钥匙串中", systemImage: "lock.shield")
+            Label("Key 仅保存在这台 Mac 的本地偏好设置中", systemImage: "lock.shield")
                 .font(.callout)
                 .foregroundStyle(.secondary)
 

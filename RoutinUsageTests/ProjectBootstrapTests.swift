@@ -37,6 +37,35 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(settings.contains("UserDefaults"))
     }
 
+    func test设置页与菜单栏视图真实接入三种显示样式() throws {
+        let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+        let menuBarLabel = try sourceText(at: "RoutinUsage/Views/MenuBarLabelView.swift")
+
+        XCTAssertTrue(settings.contains("Picker(\"显示样式\", selection: $settings.menuBarStyle)"))
+        XCTAssertTrue(settings.contains("MenuBarStyle.allCases"))
+        XCTAssertTrue(menuBarLabel.contains("style: settings.menuBarStyle"))
+        XCTAssertTrue(menuBarLabel.contains("VerticalUsageBar"))
+        XCTAssertTrue(menuBarLabel.contains("ZStack(alignment: .bottom)"))
+        XCTAssertTrue(menuBarLabel.contains(".frame(width: 7, height: 18)"))
+    }
+
+    func test弹窗倒计时每分钟刷新并将分组倍率合并为一行() throws {
+        let usageRowView = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
+
+        XCTAssertTrue(usageRowView.contains("TimelineView(.periodic(from: .now, by: 60))"))
+        XCTAssertTrue(usageRowView.contains("now: timeline.date"))
+        XCTAssertTrue(usageRowView.contains("UsageFormatter.groupMultiplierText"))
+        XCTAssertFalse(usageRowView.contains("ForEach(Array(groupMultipliers.enumerated())"))
+    }
+
+    func test本地Key相关文案不再声称使用系统钥匙串() throws {
+        let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+        let onboarding = try sourceText(at: "RoutinUsage/Views/OnboardingView.swift")
+
+        XCTAssertFalse(settings.contains("将同时删除系统钥匙串中的 Key"))
+        XCTAssertFalse(onboarding.contains("Key 仅保存在这台 Mac 的系统钥匙串中"))
+    }
+
     func test工程规格锁定为Xcode15兼容格式() throws {
         let projectSpec = try sourceText(at: "project.yml")
 
@@ -52,9 +81,9 @@ final class ProjectBootstrapTests: XCTestCase {
     func test弹窗详情显示剩余时长与配对分组倍率且不显示允许模型() throws {
         let usageRowView = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
 
-        XCTAssertTrue(usageRowView.contains("detailLine(\"5 小时剩余\""))
-        XCTAssertTrue(usageRowView.contains("detailLine(\"周剩余\""))
-        XCTAssertTrue(usageRowView.contains("remainingDurationText(until:"))
+        XCTAssertTrue(usageRowView.contains("\"5 小时剩余\""))
+        XCTAssertTrue(usageRowView.contains("\"周剩余\""))
+        XCTAssertTrue(usageRowView.contains("UsageFormatter.remainingDurationText"))
         XCTAssertTrue(usageRowView.contains("groupMultipliers"))
         XCTAssertFalse(usageRowView.contains("allowedModels"))
         XCTAssertFalse(usageRowView.contains("允许模型"))
@@ -73,6 +102,8 @@ final class ProjectBootstrapTests: XCTestCase {
             resource = ("OnboardingView.swift", "txt")
         case "RoutinUsage/Views/UsageRowView.swift":
             resource = ("UsageRowView.swift", "txt")
+        case "RoutinUsage/Views/MenuBarLabelView.swift":
+            resource = ("MenuBarLabelView.swift", "txt")
         default:
             throw CocoaError(.fileNoSuchFile)
         }

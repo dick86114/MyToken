@@ -153,23 +153,36 @@ private extension UsageRowView {
     /// 显示窗口剩余时长和按名称配对的分组倍率。
     @ViewBuilder
     var details: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            if state.snapshot?.kind == .periodic {
-                detailLine("5 小时剩余", value: remainingDuration(for: state.snapshot?.fiveHour))
-                detailLine("周剩余", value: remainingDuration(for: state.snapshot?.weekly))
-            }
-            if let groupMultipliers = state.snapshot?.groupMultipliers {
-                ForEach(Array(groupMultipliers.enumerated()), id: \.offset) { _, group in
+        TimelineView(.periodic(from: .now, by: 60)) { timeline in
+            VStack(alignment: .leading, spacing: 3) {
+                if state.snapshot?.kind == .periodic {
+                    detailLine(
+                        "5 小时剩余",
+                        value: remainingDuration(
+                            for: state.snapshot?.fiveHour,
+                            now: timeline.date
+                        )
+                    )
+                    detailLine(
+                        "周剩余",
+                        value: remainingDuration(
+                            for: state.snapshot?.weekly,
+                            now: timeline.date
+                        )
+                    )
+                }
+                if let groupMultipliers = state.snapshot?.groupMultipliers,
+                   !groupMultipliers.isEmpty {
                     detailLine(
                         "分组倍率",
-                        value: "\(group.name) ×\(decimalText(group.multiplier))"
+                        value: UsageFormatter.groupMultiplierText(groupMultipliers)
                     )
                 }
             }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .textSelection(.enabled)
         }
-        .font(.caption2)
-        .foregroundStyle(.secondary)
-        .textSelection(.enabled)
     }
 
     func detailLine(_ title: String, value: String) -> some View {
@@ -182,16 +195,11 @@ private extension UsageRowView {
         }
     }
 
-    func remainingDuration(for metric: UsageMetric?) -> String {
+    func remainingDuration(for metric: UsageMetric?, now: Date) -> String {
         guard let end = metric?.windowEnd else {
             return "—"
         }
-        return UsageFormatter.remainingDurationText(until: end, now: .now)
-    }
-
-    func decimalText(_ value: Decimal) -> String {
-        let number = NSDecimalNumber(decimal: value)
-        return number.stringValue
+        return UsageFormatter.remainingDurationText(until: end, now: now)
     }
 
     var subscriptionDescription: String {
