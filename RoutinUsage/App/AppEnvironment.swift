@@ -13,7 +13,6 @@ extension RefreshScheduler: RefreshScheduling {}
 
 actor AuthorizationCachingNotificationSender: NotificationSending {
     private let sender: any NotificationSending
-    private var authorizationResult: Bool?
     private var authorizationTask: Task<Bool, Error>?
 
     init(sender: any NotificationSending) {
@@ -21,9 +20,6 @@ actor AuthorizationCachingNotificationSender: NotificationSending {
     }
 
     func requestAuthorization() async throws -> Bool {
-        if let authorizationResult {
-            return authorizationResult
-        }
         if let authorizationTask {
             return try await authorizationTask.value
         }
@@ -35,7 +31,6 @@ actor AuthorizationCachingNotificationSender: NotificationSending {
         authorizationTask = task
         do {
             let result = try await task.value
-            authorizationResult = result
             authorizationTask = nil
             return result
         } catch {
@@ -157,7 +152,13 @@ final class AppEnvironment {
 
     func notificationsDidChange(enabled: Bool) async {
         synchronizeStoreSettings()
-        guard enabled, !hasRequestedNotificationAuthorization else {
+        guard enabled else {
+            hasRequestedNotificationAuthorization = false
+            notificationAuthorizationTask?.cancel()
+            notificationAuthorizationTask = nil
+            return
+        }
+        guard !hasRequestedNotificationAuthorization else {
             return
         }
         hasRequestedNotificationAuthorization = true

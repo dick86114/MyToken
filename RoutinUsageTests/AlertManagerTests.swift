@@ -943,6 +943,52 @@ final class AlertManagerTests: XCTestCase {
         XCTAssertNil(installedDelegate)
     }
 
+    func test系统授权撤回与恢复会在每次发送前重新查询() async throws {
+        let center = NotificationCenterSpy(
+            authorizationStatuses: [.denied, .authorized],
+            authorizationRequestResult: false
+        )
+        let sender = AuthorizationCachingNotificationSender(
+            sender: UserNotificationSender(center: center)
+        )
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let manager = AlertManager(evaluator: context.evaluator, sender: sender)
+        let key = makeKey()
+        let snapshot = tokenSnapshot(percent: 80)
+
+        _ = try await manager.evaluateAndNotify(
+            key: key,
+            snapshot: snapshot,
+            notificationsEnabled: true
+        )
+        XCTAssertEqual(center.requests.count, 0)
+
+        _ = try await manager.evaluateAndNotify(
+            key: key,
+            snapshot: snapshot,
+            notificationsEnabled: true
+        )
+
+        XCTAssertEqual(center.settingsRequestCount, 2)
+        XCTAssertEqual(center.authorizationRequestCount, 0)
+        XCTAssertEqual(center.requests.count, 1)
+    }
+
+    func test系统授权未决定时才请求用户授权() async throws {
+        let center = NotificationCenterSpy(
+            authorizationStatuses: [.notDetermined],
+            authorizationRequestResult: true
+        )
+        let sender = UserNotificationSender(center: center)
+
+        let authorized = try await sender.requestAuthorization()
+
+        XCTAssertTrue(authorized)
+        XCTAssertEqual(center.settingsRequestCount, 1)
+        XCTAssertEqual(center.authorizationRequestCount, 1)
+    }
+
     func test前台通知展示策略包含横幅列表与声音() {
         XCTAssertEqual(
             ForegroundNotificationDelegate.presentationOptions,
@@ -1056,9 +1102,27 @@ final class AlertManagerTests: XCTestCase {
 private final class NotificationCenterSpy: UserNotificationCenterServing, @unchecked Sendable {
     weak var delegate: (any UNUserNotificationCenterDelegate)?
     private(set) var requests: [UNNotificationRequest] = []
+    private(set) var settingsRequestCount = 0
+    private(set) var authorizationRequestCount = 0
+    private var authorizationStatuses: [UNAuthorizationStatus]
+    private let authorizationRequestResult: Bool
+
+    init(
+        authorizationStatuses: [UNAuthorizationStatus] = [.authorized],
+        authorizationRequestResult: Bool = true
+    ) {
+        self.authorizationStatuses = authorizationStatuses
+        self.authorizationRequestResult = authorizationRequestResult
+    }
+
+    func currentAuthorizationStatus() async -> UNAuthorizationStatus {
+        settingsRequestCount += 1
+        return authorizationStatuses.removeFirst()
+    }
 
     func requestAuthorization(options _: UNAuthorizationOptions) async throws -> Bool {
-        true
+        authorizationRequestCount += 1
+        return authorizationRequestResult
     }
 
     func add(_ request: UNNotificationRequest) async throws {

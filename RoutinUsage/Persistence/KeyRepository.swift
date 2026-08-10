@@ -25,13 +25,11 @@ final class KeyRepository {
     init(defaults: UserDefaults = .standard, keychain: any KeychainStoring = KeychainStore()) {
         self.defaults = defaults
         self.keychain = keychain
+        migrateLegacyMetadata()
     }
 
     func list() -> [KeyConfiguration] {
-        guard
-            let data = defaults.data(forKey: storageKey),
-            let configurations = try? JSONDecoder().decode([KeyConfiguration].self, from: data)
-        else {
+        guard let configurations = storedConfigurations() else {
             return []
         }
         return configurations.sorted { $0.sortOrder < $1.sortOrder }
@@ -128,6 +126,41 @@ final class KeyRepository {
                 sortOrder: index
             )
         }
+    }
+
+    private func migrateLegacyMetadata() {
+        guard let configurations = storedConfigurations() else {
+            return
+        }
+
+        let sanitized = configurations.map { configuration in
+            let secret: String?
+            do {
+                secret = try keychain.read(for: configuration.id)
+            } catch {
+                secret = nil
+            }
+            return KeyConfiguration(
+                id: configuration.id,
+                name: KeyCredentialPolicy.safeDisplayName(configuration.name),
+                keySuffix: KeyCredentialPolicy.sanitizedMetadataSuffix(
+                    persistedSuffix: configuration.keySuffix,
+                    keychainSecret: secret
+                ),
+                sortOrder: configuration.sortOrder
+            )
+        }
+        guard sanitized != configurations else {
+            return
+        }
+        persist(sanitized)
+    }
+
+    private func storedConfigurations() -> [KeyConfiguration]? {
+        guard let data = defaults.data(forKey: storageKey) else {
+            return nil
+        }
+        return try? JSONDecoder().decode([KeyConfiguration].self, from: data)
     }
 
     private func persist(_ configurations: [KeyConfiguration]) {

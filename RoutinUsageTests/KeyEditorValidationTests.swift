@@ -130,6 +130,15 @@ final class KeyEditorValidationTests: XCTestCase {
         XCTAssertFalse(displayText.contains(secret))
     }
 
+    func test真实旧短Key后缀在设置中全部遮掩() {
+        for legacySuffix in ["an-a", "n-ab", "-abc"] {
+            let displayText = KeyDisplayMask.masked(suffix: legacySuffix)
+
+            XCTAssertEqual(displayText, "plan-••••")
+            XCTAssertFalse(displayText.contains(legacySuffix))
+        }
+    }
+
     private func waitUntil(_ condition: @MainActor () -> Bool) async -> Bool {
         for _ in 0..<1_000 {
             if condition() {
