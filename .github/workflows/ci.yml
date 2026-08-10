@@ -9,9 +9,11 @@ permissions:
 
 jobs:
   test-and-package:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+      - name: 输出 Xcode 版本
+        run: xcodebuild -version
       - name: 安装 XcodeGen
         run: brew install xcodegen
       - name: 生成 Xcode 工程
