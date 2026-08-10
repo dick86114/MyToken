@@ -40,7 +40,7 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
     func checkForUpdate() async throws -> AppUpdate? {
         var request = URLRequest(url: Self.releasesURL)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("Routin-Usage/\(currentVersion)", forHTTPHeaderField: "User-Agent")
+        request.setValue("MyRoutin/\(currentVersion)", forHTTPHeaderField: "User-Agent")
         let data: Data
         let response: URLResponse
         do {
@@ -73,7 +73,7 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode), !data.isEmpty else {
                 throw UpdateServiceError.downloadFailed
             }
-            let url = FileManager.default.temporaryDirectory.appendingPathComponent("Routin-Usage-\(update.version).dmg")
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("MyRoutin-\(update.version).dmg")
             try data.write(to: url, options: .atomic)
             return url
         } catch is CancellationError {
@@ -113,7 +113,7 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
 
 @MainActor
 enum UpdateInstaller {
-    static func install(dmgURL: URL, appName: String = "Routin Usage") throws {
+    static func install(dmgURL: URL, appName: String = "MyRoutin") throws {
         let mountPoint = FileManager.default.temporaryDirectory.appendingPathComponent("routin-update-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: mountPoint, withIntermediateDirectories: true)
         defer {
