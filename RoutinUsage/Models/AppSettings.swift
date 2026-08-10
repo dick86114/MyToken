@@ -23,6 +23,12 @@ final class AppSettings {
         }
     }
 
+    var menuBarStyle: MenuBarStyle {
+        didSet {
+            defaults.set(menuBarStyle.rawValue, forKey: Keys.menuBarStyle)
+        }
+    }
+
     var notificationsEnabled: Bool {
         didSet {
             defaults.set(notificationsEnabled, forKey: Keys.notificationsEnabled)
@@ -57,6 +63,10 @@ final class AppSettings {
             .flatMap(DisplayDimension.init(rawValue:))
         displayDimension = storedDimension ?? .fiveHour
 
+        let storedMenuBarStyle = defaults.string(forKey: Keys.menuBarStyle)
+            .flatMap(MenuBarStyle.init(rawValue:))
+        menuBarStyle = storedMenuBarStyle ?? .percent
+
         if defaults.object(forKey: Keys.notificationsEnabled) == nil {
             notificationsEnabled = true
         } else {
@@ -79,6 +89,7 @@ private extension AppSettings {
     enum Keys {
         static let refreshMinutes = "refreshMinutes"
         static let displayDimension = "displayDimension"
+        static let menuBarStyle = "menuBarStyle"
         static let notificationsEnabled = "notificationsEnabled"
         static let lowThreshold = "notificationLowThreshold"
         static let highThreshold = "notificationHighThreshold"

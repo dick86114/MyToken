@@ -13,6 +13,29 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertTrue(settings.notificationsEnabled)
         XCTAssertEqual(settings.thresholds, AlertThresholds(low: 80, high: 95))
         XCTAssertFalse(settings.launchAtLogin)
+        XCTAssertEqual(settings.menuBarStyle, .percent)
+    }
+
+    func test菜单栏样式可持久化并重新载入() throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let settings = AppSettings(defaults: context.defaults)
+
+        settings.menuBarStyle = .aliasVerticalBar
+        XCTAssertEqual(AppSettings(defaults: context.defaults).menuBarStyle, .aliasVerticalBar)
+
+        settings.menuBarStyle = .aliasPercent
+        XCTAssertEqual(AppSettings(defaults: context.defaults).menuBarStyle, .aliasPercent)
+    }
+
+    func test缺失或未知菜单栏样式回退为百分比() throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+
+        XCTAssertEqual(AppSettings(defaults: context.defaults).menuBarStyle, .percent)
+
+        context.defaults.set("broken", forKey: "menuBarStyle")
+        XCTAssertEqual(AppSettings(defaults: context.defaults).menuBarStyle, .percent)
     }
 
     func test刷新间隔只接受固定选项并可重新载入() throws {
