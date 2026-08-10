@@ -67,10 +67,36 @@ final class KeyEditorModel {
     private(set) var isSaving = false
     private(set) var errorMessage: String?
     private(set) var saveResult: KeyEditorSaveResult?
+    @ObservationIgnored private var saveTask: Task<Void, Never>?
+    @ObservationIgnored private var saveGeneration: UUID?
 
     init(name: String = "", secret: String = "") {
         self.name = name
         self.secret = secret
+    }
+
+    func startSaving(
+        _ operation: @escaping @MainActor (String, String) async throws -> KeyEditorSaveResult
+    ) {
+        guard saveTask == nil else {
+            return
+        }
+        let generation = UUID()
+        saveGeneration = generation
+        saveTask = Task { [weak self] in
+            guard let self else {
+                return
+            }
+            await save(operation)
+            if saveGeneration == generation {
+                saveTask = nil
+                saveGeneration = nil
+            }
+        }
+    }
+
+    func cancelSaving() {
+        saveTask?.cancel()
     }
 
     func save(
@@ -94,7 +120,10 @@ final class KeyEditorModel {
         defer { isSaving = false }
 
         do {
-            saveResult = try await operation(input.name, input.secret)
+            try Task.checkCancellation()
+            let result = try await operation(input.name, input.secret)
+            try Task.checkCancellation()
+            saveResult = result
         } catch is CancellationError {
             return
         } catch {
@@ -121,6 +150,8 @@ final class KeyEditorModel {
             return "网络连接失败，请检查网络后重试"
         case .invalidResponse:
             return "接口返回的数据无法识别，请稍后重试"
+        case .server(statusCode: 401):
+            return "Key 无效"
         case let .server(statusCode):
             return "服务暂时不可用（HTTP \(statusCode)）"
         case .persistence:
@@ -185,7 +216,10 @@ struct KeyEditorView: View {
             }
 
             HStack {
-                Button("取消") { dismiss() }
+                Button("取消") {
+                    model.cancelSaving()
+                    dismiss()
+                }
                     .keyboardShortcut(.cancelAction)
 
                 Spacer()
@@ -207,6 +241,7 @@ struct KeyEditorView: View {
         .padding(24)
         .frame(width: 430)
         .onAppear { focusedField = .name }
+        .onDisappear { model.cancelSaving() }
         .onChange(of: model.saveResult) { _, result in
             guard result == .saved else {
                 return
@@ -231,10 +266,7 @@ struct KeyEditorView: View {
     }
 
     private func submit() {
-        guard !model.isSaving else {
-            return
-        }
-        Task { await model.save(save) }
+        model.startSaving(save)
     }
 
     private func finish() {
