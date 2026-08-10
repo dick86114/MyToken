@@ -150,23 +150,21 @@ private extension UsageRowView {
         }
     }
 
-    /// 显示接口返回的窗口、模型和分组倍率等补充信息。
+    /// 显示窗口剩余时长和按名称配对的分组倍率。
     @ViewBuilder
     var details: some View {
         VStack(alignment: .leading, spacing: 3) {
             if state.snapshot?.kind == .periodic {
-                if let end = state.snapshot?.fiveHour.flatMap(UsageFormatter.windowEndDescription) {
-                    detailLine("5 小时窗口结束", value: end)
-                }
-                if let end = state.snapshot?.weekly.flatMap(UsageFormatter.windowEndDescription) {
-                    detailLine("周窗口结束", value: end)
-                }
+                detailLine("5 小时剩余", value: remainingDuration(for: state.snapshot?.fiveHour))
+                detailLine("周剩余", value: remainingDuration(for: state.snapshot?.weekly))
             }
-            if let multiplier = state.snapshot?.groupMultiplier {
-                detailLine("分组倍率", value: "×\(decimalText(multiplier))")
-            }
-            if let models = state.snapshot?.allowedModels, !models.isEmpty {
-                detailLine("允许模型", value: models.joined(separator: "、"))
+            if let groupMultipliers = state.snapshot?.groupMultipliers {
+                ForEach(Array(groupMultipliers.enumerated()), id: \.offset) { _, group in
+                    detailLine(
+                        "分组倍率",
+                        value: "\(group.name) ×\(decimalText(group.multiplier))"
+                    )
+                }
             }
         }
         .font(.caption2)
@@ -182,6 +180,13 @@ private extension UsageRowView {
                 .lineLimit(2)
                 .truncationMode(.middle)
         }
+    }
+
+    func remainingDuration(for metric: UsageMetric?) -> String {
+        guard let end = metric?.windowEnd else {
+            return "—"
+        }
+        return UsageFormatter.remainingDurationText(until: end, now: .now)
     }
 
     func decimalText(_ value: Decimal) -> String {

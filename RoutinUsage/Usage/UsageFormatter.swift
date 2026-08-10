@@ -78,6 +78,23 @@ enum UsageFormatter {
         return formatter.string(from: windowEnd)
     }
 
+    /// 将窗口绝对结束时间换算为从当前时刻起的剩余时长。
+    static func remainingDurationText(until end: Date, now: Date) -> String {
+        guard end > now else {
+            return "已结束"
+        }
+
+        let totalMinutes = Int(end.timeIntervalSince(now) / 60)
+        let days = totalMinutes / (24 * 60)
+        let hours = (totalMinutes % (24 * 60)) / 60
+        let minutes = totalMinutes % 60
+
+        if days > 0 {
+            return "\(days)d\(hours)h\(minutes)m"
+        }
+        return "\(hours)h\(minutes)m"
+    }
+
     /// 用于设置页和详情面板的完整本地时间；没有时间时统一显示占位符。
     static func fullDateTime(_ date: Date?) -> String {
         guard let date else {

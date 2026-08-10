@@ -43,6 +43,17 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(projectSpec.contains("projectFormat: xcode15_3"))
     }
 
+    func test弹窗详情显示剩余时长与配对分组倍率且不显示允许模型() throws {
+        let usageRowView = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
+
+        XCTAssertTrue(usageRowView.contains("detailLine(\"5 小时剩余\""))
+        XCTAssertTrue(usageRowView.contains("detailLine(\"周剩余\""))
+        XCTAssertTrue(usageRowView.contains("remainingDurationText(until:"))
+        XCTAssertTrue(usageRowView.contains("groupMultipliers"))
+        XCTAssertFalse(usageRowView.contains("allowedModels"))
+        XCTAssertFalse(usageRowView.contains("允许模型"))
+    }
+
     private func sourceText(at relativePath: String) throws -> String {
         let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         let repositoryRoot = testsDirectory.deletingLastPathComponent()
