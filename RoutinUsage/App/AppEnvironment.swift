@@ -97,8 +97,8 @@ final class AppEnvironment {
     static func live() -> AppEnvironment {
         let defaults = UserDefaults.standard
         let settings = AppSettings(defaults: defaults)
-        let keychain = KeychainStore()
-        let keyRepository = KeyRepository(defaults: defaults, keychain: keychain)
+        let localStore = LocalKeyStore(defaults: defaults)
+        let keyRepository = KeyRepository(defaults: defaults, localStore: localStore)
         let cache = UsageCache(defaults: defaults)
         let apiClient = UsageAPIClient(session: .shared, mapper: UsageMapper())
         let alertEvaluator = AlertEvaluator(defaults: defaults)
@@ -107,7 +107,7 @@ final class AppEnvironment {
         )
         let store = UsageStore(
             keyRepository: keyRepository,
-            keychain: keychain,
+            localStore: localStore,
             apiClient: apiClient,
             cache: cache,
             alertEvaluator: alertEvaluator,

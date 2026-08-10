@@ -19,13 +19,18 @@ enum KeyRepositoryError: LocalizedError, Equatable, Sendable {
 
 final class KeyRepository {
     private let defaults: UserDefaults
-    private let keychain: any KeychainStoring
+    private let localStore: any LocalKeyStoring
     private let storageKey = "keyConfigurations"
 
-    init(defaults: UserDefaults = .standard, keychain: any KeychainStoring = KeychainStore()) {
+    init(defaults: UserDefaults = .standard, localStore: (any LocalKeyStoring)? = nil) {
         self.defaults = defaults
-        self.keychain = keychain
+        self.localStore = localStore ?? LocalKeyStore(defaults: defaults)
         migrateLegacyMetadata()
+    }
+
+    // 保留旧初始化标签，避免无关调用方一次性迁移；实际协议已统一为本地存储抽象。
+    convenience init(defaults: UserDefaults = .standard, keychain: any KeychainStoring) {
+        self.init(defaults: defaults, localStore: KeychainLocalStoreAdapter(keychain))
     }
 
     func list() -> [KeyConfiguration] {
@@ -46,7 +51,7 @@ final class KeyRepository {
             sortOrder: configurations.count
         )
 
-        try keychain.save(secret, for: configuration.id)
+        try localStore.save(secret, for: configuration.id)
         configurations.append(configuration)
         persist(configurations)
         return configuration
@@ -66,7 +71,7 @@ final class KeyRepository {
             sortOrder: configurations[index].sortOrder
         )
 
-        try keychain.save(secret, for: id)
+        try localStore.save(secret, for: id)
         configurations[index] = configuration
         persist(configurations)
         return configuration
@@ -78,7 +83,7 @@ final class KeyRepository {
             throw KeyRepositoryError.configurationNotFound
         }
 
-        try keychain.delete(for: id)
+        try localStore.delete(for: id)
         configurations.removeAll { $0.id == id }
         persist(normalized(configurations))
     }
@@ -136,7 +141,7 @@ final class KeyRepository {
         let sanitized = configurations.map { configuration in
             let secret: String?
             do {
-                secret = try keychain.read(for: configuration.id)
+                secret = try localStore.read(for: configuration.id)
             } catch {
                 secret = nil
             }
