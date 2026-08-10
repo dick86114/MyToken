@@ -86,6 +86,30 @@ final class UsageCacheTests: XCTestCase {
         ))
     }
 
+    func test旧缓存缺少新增用量字段时仍可读取() throws {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let keyID = UUID()
+        let legacySnapshots = [
+            keyID: LegacyUsageSnapshot(
+                planName: "旧缓存订阅",
+                kind: .periodic,
+                allowedModels: [],
+                fetchedAt: Date(timeIntervalSince1970: 100)
+            )
+        ]
+        context.defaults.set(
+            try JSONEncoder().encode(legacySnapshots),
+            forKey: "usageSnapshots"
+        )
+
+        let snapshot = try XCTUnwrap(context.cache.load(for: keyID))
+
+        XCTAssertEqual(snapshot.groupMultipliers, [])
+        XCTAssertNil(snapshot.subscriptionStartAt)
+        XCTAssertNil(snapshot.subscriptionEndAt)
+    }
+
     private func makeContext() -> UsageCacheTestContext {
         let suiteName = "ai.routin.usage-monitor.cache-tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -125,4 +149,11 @@ private struct UsageCacheTestContext {
     func cleanUp() {
         defaults.removePersistentDomain(forName: suiteName)
     }
+}
+
+private struct LegacyUsageSnapshot: Codable {
+    let planName: String
+    let kind: UsageKind
+    let allowedModels: [String]
+    let fetchedAt: Date
 }

@@ -30,6 +30,11 @@ struct UsageMetric: Codable, Equatable, Sendable {
     let windowEnd: Date?
 }
 
+struct UsageGroupMultiplier: Codable, Equatable, Sendable {
+    let name: String
+    let multiplier: Decimal
+}
+
 struct UsageSnapshot: Codable, Equatable, Sendable {
     let subscriptionId: String?
     let planId: String?
@@ -42,6 +47,8 @@ struct UsageSnapshot: Codable, Equatable, Sendable {
     let fetchedAt: Date
     /// 当前订阅分组的计费倍率；资源包或旧缓存可能没有该数据。
     let groupMultiplier: Decimal?
+    /// 按接口返回顺序配对的订阅分组和计费倍率；旧缓存缺少时为空。
+    let groupMultipliers: [UsageGroupMultiplier]
     let status: Int?
     let subscriptionStartAt: Date?
     let subscriptionEndAt: Date?
@@ -57,6 +64,7 @@ struct UsageSnapshot: Codable, Equatable, Sendable {
         allowedModels: [String],
         fetchedAt: Date,
         groupMultiplier: Decimal? = nil,
+        groupMultipliers: [UsageGroupMultiplier] = [],
         status: Int? = nil,
         subscriptionStartAt: Date? = nil,
         subscriptionEndAt: Date? = nil
@@ -71,6 +79,7 @@ struct UsageSnapshot: Codable, Equatable, Sendable {
         self.allowedModels = allowedModels
         self.fetchedAt = fetchedAt
         self.groupMultiplier = groupMultiplier
+        self.groupMultipliers = groupMultipliers
         self.status = status
         self.subscriptionStartAt = subscriptionStartAt
         self.subscriptionEndAt = subscriptionEndAt
@@ -87,6 +96,7 @@ struct UsageSnapshot: Codable, Equatable, Sendable {
         case allowedModels
         case fetchedAt
         case groupMultiplier
+        case groupMultipliers
         case status
         case subscriptionStartAt
         case subscriptionEndAt
@@ -104,6 +114,7 @@ struct UsageSnapshot: Codable, Equatable, Sendable {
         allowedModels = try container.decode([String].self, forKey: .allowedModels)
         fetchedAt = try container.decode(Date.self, forKey: .fetchedAt)
         groupMultiplier = try container.decodeIfPresent(Decimal.self, forKey: .groupMultiplier)
+        groupMultipliers = try container.decodeIfPresent([UsageGroupMultiplier].self, forKey: .groupMultipliers) ?? []
         status = try container.decodeIfPresent(Int.self, forKey: .status)
         subscriptionStartAt = try container.decodeIfPresent(Date.self, forKey: .subscriptionStartAt)
         subscriptionEndAt = try container.decodeIfPresent(Date.self, forKey: .subscriptionEndAt)

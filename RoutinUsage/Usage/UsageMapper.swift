@@ -13,6 +13,10 @@ struct UsageMapper: Sendable {
             hasPeriodicLimit: hasPeriodicLimit,
             hasTokenLimit: hasTokenLimit
         )
+        let groupMultipliers = pairedGroupMultipliers(
+            names: dto.groupNames,
+            multipliers: dto.groupMultipliers
+        )
 
         switch kind {
         case .periodic:
@@ -38,10 +42,11 @@ struct UsageMapper: Sendable {
                 token: nil,
                 allowedModels: dto.allowedModels ?? [],
                 fetchedAt: fetchedAt,
-                groupMultiplier: dto.groupMultiplier,
+                groupMultiplier: groupMultipliers.first?.multiplier,
+                groupMultipliers: groupMultipliers,
                 status: dto.status,
-                subscriptionStartAt: date(from: dto.subscriptionStartAt),
-                subscriptionEndAt: date(from: dto.subscriptionEndAt)
+                subscriptionStartAt: date(from: dto.startAt),
+                subscriptionEndAt: date(from: dto.endAt)
             )
         case .tokenPack:
             return UsageSnapshot(
@@ -60,10 +65,11 @@ struct UsageMapper: Sendable {
                 ),
                 allowedModels: dto.allowedModels ?? [],
                 fetchedAt: fetchedAt,
-                groupMultiplier: dto.groupMultiplier,
+                groupMultiplier: groupMultipliers.first?.multiplier,
+                groupMultipliers: groupMultipliers,
                 status: dto.status,
-                subscriptionStartAt: date(from: dto.subscriptionStartAt),
-                subscriptionEndAt: date(from: dto.subscriptionEndAt)
+                subscriptionStartAt: date(from: dto.startAt),
+                subscriptionEndAt: date(from: dto.endAt)
             )
         }
     }
@@ -124,6 +130,15 @@ struct UsageMapper: Sendable {
             return false
         }
         return value > 0
+    }
+
+    private func pairedGroupMultipliers(
+        names: [String]?,
+        multipliers: [Decimal]?
+    ) -> [UsageGroupMultiplier] {
+        zip(names ?? [], multipliers ?? []).map {
+            UsageGroupMultiplier(name: $0, multiplier: $1)
+        }
     }
 
     private func date(from value: String?) -> Date? {

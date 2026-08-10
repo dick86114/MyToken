@@ -2,21 +2,24 @@ import XCTest
 @testable import RoutinUsage
 
 final class UsageMapperTests: XCTestCase {
-    func test映射订阅基本信息与分组倍率() throws {
+    func test映射接口窗口时间订阅时间与分组倍率配对() throws {
         let dto = UsageResponseDTO(
             subscriptionId: "sub-1",
             planId: "plan-1",
             planName: "Pro",
             type: 1,
             status: 1,
-            subscriptionStartAt: "2026-08-01T00:00:00Z",
-            subscriptionEndAt: "2026-09-01T00:00:00Z",
-            dailyLimitUsd: 10, weeklyLimitUsd: nil,
-            dailyUsedUsd: 2, weeklyUsedUsd: nil,
-            dailyRemainingUsd: 8, weeklyRemainingUsd: nil,
-            dayWindowEndAt: nil, weekWindowEndAt: nil,
+            startAt: "2026-08-01T00:00:00Z",
+            endAt: "2026-09-01T00:00:00Z",
+            dailyLimitUsd: 10, weeklyLimitUsd: 50,
+            dailyUsedUsd: 2, weeklyUsedUsd: 10,
+            dailyRemainingUsd: 8, weeklyRemainingUsd: 40,
+            dayWindowEndAt: "2026-08-10T14:00:00Z",
+            weekWindowEndAt: "2026-08-15T00:00:00Z",
             totalTokens: nil, consumedTokens: nil, remainingTokens: nil,
-            allowedModels: [], groupMultiplier: 1.5
+            allowedModels: [],
+            groupNames: ["Codex", "Codex Pro", "未配对名称"],
+            groupMultipliers: [1, 2]
         )
 
         let snapshot = try UsageMapper().map(dto, fetchedAt: .now)
@@ -24,7 +27,12 @@ final class UsageMapperTests: XCTestCase {
         XCTAssertEqual(snapshot.subscriptionId, "sub-1")
         XCTAssertEqual(snapshot.planId, "plan-1")
         XCTAssertEqual(snapshot.status, 1)
-        XCTAssertEqual(snapshot.groupMultiplier, 1.5)
+        XCTAssertEqual(snapshot.groupMultipliers, [
+            UsageGroupMultiplier(name: "Codex", multiplier: 1),
+            UsageGroupMultiplier(name: "Codex Pro", multiplier: 2)
+        ])
+        XCTAssertEqual(snapshot.fiveHour?.windowEnd, Date(timeIntervalSince1970: 1_786_370_400))
+        XCTAssertEqual(snapshot.weekly?.windowEnd, Date(timeIntervalSince1970: 1_786_752_000))
         XCTAssertEqual(snapshot.subscriptionStartAt, Date(timeIntervalSince1970: 1_785_542_400))
         XCTAssertEqual(snapshot.subscriptionEndAt, Date(timeIntervalSince1970: 1_788_220_800))
     }
