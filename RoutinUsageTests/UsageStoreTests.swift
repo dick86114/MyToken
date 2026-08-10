@@ -140,6 +140,161 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertFalse(store.state(for: key.id)?.isRefreshing == true)
     }
 
+    func test取消刷新只清理刷新标记并保留缓存状态() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let secret = "plan-cancelled-0001"
+        let key = try context.addKey(name: "主账号", secret: secret)
+        let cached = makeSnapshot(planName: "缓存版", fetchedAt: context.now.addingTimeInterval(-60))
+        try context.cache.save(cached, for: key.id)
+        let fetcher = CancellationAwareUsageFetcher()
+        let store = context.makeStore(fetcher: fetcher)
+
+        let refresh = Task { await store.refresh(keyID: key.id) }
+        await fetcher.waitUntilRequested(secret)
+        refresh.cancel()
+        await refresh.value
+
+        XCTAssertEqual(store.state(for: key.id)?.snapshot, cached)
+        XCTAssertNil(store.state(for: key.id)?.error)
+        XCTAssertFalse(store.state(for: key.id)?.isRefreshing == true)
+        XCTAssertFalse(store.isRefreshing)
+        XCTAssertEqual(try context.cache.load(for: key.id), cached)
+    }
+
+    func test取消后Fetcher忽略取消并返回成功时不合并结果() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let secret = "plan-cancelled-success-0001"
+        let key = try context.addKey(name: "主账号", secret: secret)
+        let cached = makeSnapshot(planName: "缓存版", fetchedAt: context.now.addingTimeInterval(-60))
+        let unexpected = makeSnapshot(planName: "不应合并", fetchedAt: context.now)
+        try context.cache.save(cached, for: key.id)
+        let fetcher = ScriptedUsageFetcher(responses: [secret: .suspended])
+        let store = context.makeStore(fetcher: fetcher)
+
+        let refresh = Task { await store.refresh(keyID: key.id) }
+        await fetcher.waitUntilRequested(secret)
+        refresh.cancel()
+        await fetcher.resume(secret, with: .success(unexpected))
+        await refresh.value
+
+        XCTAssertEqual(store.state(for: key.id)?.snapshot, cached)
+        XCTAssertNil(store.state(for: key.id)?.error)
+        XCTAssertFalse(store.state(for: key.id)?.isRefreshing == true)
+        XCTAssertFalse(store.isRefreshing)
+        XCTAssertEqual(try context.cache.load(for: key.id), cached)
+    }
+
+    func test取消后Fetcher忽略取消并返回业务错误时不合并结果() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let secret = "plan-cancelled-failure-0001"
+        let key = try context.addKey(name: "主账号", secret: secret)
+        let cached = makeSnapshot(planName: "缓存版", fetchedAt: context.now.addingTimeInterval(-60))
+        try context.cache.save(cached, for: key.id)
+        let fetcher = ScriptedUsageFetcher(responses: [secret: .suspended])
+        let store = context.makeStore(fetcher: fetcher)
+
+        let refresh = Task { await store.refresh(keyID: key.id) }
+        await fetcher.waitUntilRequested(secret)
+        refresh.cancel()
+        await fetcher.resume(secret, with: .failure(.transport))
+        await refresh.value
+
+        XCTAssertEqual(store.state(for: key.id)?.snapshot, cached)
+        XCTAssertNil(store.state(for: key.id)?.error)
+        XCTAssertFalse(store.state(for: key.id)?.isRefreshing == true)
+        XCTAssertFalse(store.isRefreshing)
+        XCTAssertEqual(try context.cache.load(for: key.id), cached)
+    }
+
+    func test通知发送挂起时其他Key仍及时发布刷新结果() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let blockedSecret = "plan-notification-blocked-0001"
+        let otherSecret = "plan-notification-other-0002"
+        let blockedKey = try context.addKey(name: "通知挂起", secret: blockedSecret)
+        let otherKey = try context.addKey(name: "正常账号", secret: otherSecret)
+        let blockedSnapshot = makeSnapshot(planName: "高用量", percent: 96, fetchedAt: context.now)
+        let otherSnapshot = makeSnapshot(planName: "普通用量", fetchedAt: context.now)
+        let fetcher = ScriptedUsageFetcher(responses: [
+            blockedSecret: .success(blockedSnapshot),
+            otherSecret: .suspended
+        ])
+        let sender = BlockingNotificationSender(blockedKeyID: blockedKey.id)
+        let store = context.makeStore(
+            fetcher: fetcher,
+            notificationSender: sender,
+            notificationsEnabled: true
+        )
+
+        let refresh = Task { await store.refreshAll() }
+        await fetcher.waitUntilRequested(otherSecret)
+        let releaseOtherRequest = Task { @MainActor in
+            while true {
+                let notificationStarted = await sender.isSending(keyID: blockedKey.id)
+                let blockedResultPublished = store.state(for: blockedKey.id)?.snapshot == blockedSnapshot
+                    && store.state(for: blockedKey.id)?.isRefreshing == false
+                if notificationStarted || blockedResultPublished {
+                    await fetcher.resume(otherSecret, with: .success(otherSnapshot))
+                    return
+                }
+                await Task.yield()
+            }
+        }
+        await sender.waitUntilSending(keyID: blockedKey.id)
+        await releaseOtherRequest.value
+
+        let didPublishOtherKey = await waitUntil {
+            store.state(for: otherKey.id)?.snapshot == otherSnapshot
+        }
+        XCTAssertTrue(didPublishOtherKey)
+        XCTAssertFalse(store.state(for: otherKey.id)?.isRefreshing == true)
+        XCTAssertFalse(store.isRefreshing)
+
+        await sender.resume(keyID: blockedKey.id)
+        await refresh.value
+    }
+
+    func test等待其他网络结果期间删除Key会丢弃其延迟通知() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let deletedSecret = "plan-notification-deleted-0001"
+        let pendingSecret = "plan-notification-pending-0002"
+        let deletedKey = try context.addKey(name: "即将删除", secret: deletedSecret)
+        _ = try context.addKey(name: "等待账号", secret: pendingSecret)
+        let highUsage = makeSnapshot(planName: "高用量", percent: 96, fetchedAt: context.now)
+        let ordinaryUsage = makeSnapshot(planName: "普通用量", fetchedAt: context.now)
+        let fetcher = ScriptedUsageFetcher(responses: [
+            deletedSecret: .success(highUsage),
+            pendingSecret: .suspended
+        ])
+        let store = context.makeStore(fetcher: fetcher, notificationsEnabled: true)
+
+        let refresh = Task { await store.refreshAll() }
+        await fetcher.waitUntilRequested(pendingSecret)
+        let didPublishDeletedKey = await waitUntil {
+            store.state(for: deletedKey.id)?.snapshot == highUsage
+                && store.state(for: deletedKey.id)?.isRefreshing == false
+        }
+        XCTAssertTrue(didPublishDeletedKey)
+        try store.deleteKey(deletedKey.id)
+        await fetcher.resume(pendingSecret, with: .success(ordinaryUsage))
+        await refresh.value
+
+        let alerts = await context.sender.sentAlerts()
+        XCTAssertTrue(alerts.isEmpty)
+        XCTAssertEqual(
+            context.evaluator.evaluate(
+                key: deletedKey,
+                snapshot: highUsage,
+                thresholds: .init()
+            ).map(\.level),
+            [.high]
+        )
+    }
+
     func test选择Key会持久化并在重建后恢复() throws {
         let context = try makeContext()
         defer { context.cleanUp() }
@@ -279,6 +434,29 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertFalse(context.keychain.contains(secret: secret))
     }
 
+    func test取消新增Key验证时保留CancellationError且不保存() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let secret = "plan-validation-cancelled-0001"
+        let fetcher = CancellationAwareUsageFetcher()
+        let store = context.makeStore(fetcher: fetcher)
+
+        let validation = Task {
+            try await store.addValidatedKey(name: "新账号", secret: secret)
+        }
+        await fetcher.waitUntilRequested(secret)
+        validation.cancel()
+
+        do {
+            try await validation.value
+            XCTFail("预期抛出 CancellationError")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+        XCTAssertTrue(context.repository.list().isEmpty)
+        XCTAssertFalse(context.keychain.contains(secret: secret))
+    }
+
     func test新增Key验证成功后才保存并发布状态() async throws {
         let context = try makeContext()
         defer { context.cleanUp() }
@@ -299,6 +477,16 @@ final class UsageStoreTests: XCTestCase {
 }
 
 private extension UsageStoreTests {
+    func waitUntil(_ condition: @MainActor () -> Bool) async -> Bool {
+        for _ in 0..<1_000 {
+            if condition() {
+                return true
+            }
+            await Task.yield()
+        }
+        return condition()
+    }
+
     func makeContext() throws -> UsageStoreTestContext {
         let suiteName = "ai.routin.usage-monitor.store-tests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
@@ -358,6 +546,7 @@ private struct UsageStoreTestContext {
     func makeStore(
         fetcher: any UsageFetching = ScriptedUsageFetcher(responses: [:]),
         cache customCache: (any UsageCaching)? = nil,
+        notificationSender: (any NotificationSending)? = nil,
         refreshMinutes: Int = 5,
         notificationsEnabled: Bool = false
     ) -> UsageStore {
@@ -368,7 +557,7 @@ private struct UsageStoreTestContext {
             apiClient: fetcher,
             cache: customCache ?? cache,
             alertEvaluator: evaluator,
-            notificationSender: sender,
+            notificationSender: notificationSender ?? sender,
             defaults: defaults,
             refreshMinutes: refreshMinutes,
             notificationsEnabled: notificationsEnabled,

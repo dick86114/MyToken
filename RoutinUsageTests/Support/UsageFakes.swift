@@ -49,6 +49,53 @@ actor ScriptedUsageFetcher: UsageFetching {
     }
 }
 
+actor CancellationAwareUsageFetcher: UsageFetching {
+    private let suspension = CancellationSuspension()
+    private var requestCounts: [String: Int] = [:]
+
+    func fetchUsage(apiKey: String, now: Date) async throws -> UsageSnapshot? {
+        requestCounts[apiKey, default: 0] += 1
+        try await suspension.wait()
+        return nil
+    }
+
+    func waitUntilRequested(_ apiKey: String) async {
+        while requestCounts[apiKey, default: 0] == 0 {
+            await Task.yield()
+        }
+    }
+}
+
+private final class CancellationSuspension: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Error>?
+    private var isCancelled = false
+
+    func wait() async throws {
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                let shouldCancel = lock.withLock {
+                    if isCancelled {
+                        return true
+                    }
+                    self.continuation = continuation
+                    return false
+                }
+                if shouldCancel {
+                    continuation.resume(throwing: CancellationError())
+                }
+            }
+        } onCancel: {
+            let pending = self.lock.withLock {
+                self.isCancelled = true
+                defer { self.continuation = nil }
+                return self.continuation
+            }
+            pending?.resume(throwing: CancellationError())
+        }
+    }
+}
+
 final class InMemoryUsageCache: UsageCaching, @unchecked Sendable {
     private let lock = NSLock()
     private var snapshots: [UUID: UsageSnapshot]
@@ -92,6 +139,48 @@ actor NotificationSenderFake: NotificationSending {
 
     func sentAlerts() -> [UsageAlert] {
         alerts
+    }
+}
+
+actor BlockingNotificationSender: NotificationSending {
+    private let blockedKeyID: UUID
+    private var sendingKeyIDs: Set<UUID> = []
+    private var continuations: [UUID: [CheckedContinuation<Void, Never>]] = [:]
+
+    init(blockedKeyID: UUID) {
+        self.blockedKeyID = blockedKeyID
+    }
+
+    func requestAuthorization() async throws -> Bool {
+        true
+    }
+
+    func send(_ alert: UsageAlert) async throws {
+        guard alert.keyID == blockedKeyID else {
+            return
+        }
+        await withCheckedContinuation { continuation in
+            sendingKeyIDs.insert(alert.keyID)
+            continuations[alert.keyID, default: []].append(continuation)
+        }
+    }
+
+    func waitUntilSending(keyID: UUID) async {
+        while !sendingKeyIDs.contains(keyID) {
+            await Task.yield()
+        }
+    }
+
+    func isSending(keyID: UUID) -> Bool {
+        sendingKeyIDs.contains(keyID)
+    }
+
+    func resume(keyID: UUID) {
+        sendingKeyIDs.remove(keyID)
+        let pending = continuations.removeValue(forKey: keyID) ?? []
+        for continuation in pending {
+            continuation.resume()
+        }
     }
 }
 

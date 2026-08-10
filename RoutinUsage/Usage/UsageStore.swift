@@ -49,6 +49,7 @@ final class UsageStore {
     @ObservationIgnored private let notificationsEnabled: Bool
     @ObservationIgnored private let now: @Sendable () -> Date
     @ObservationIgnored private var refreshingKeyIDs: Set<UUID> = []
+    @ObservationIgnored private var refreshGenerationByKeyID: [UUID: UUID] = [:]
 
     private static let selectedKeyStorageKey = "selectedKeyID"
 
@@ -119,7 +120,13 @@ final class UsageStore {
         let result: UsageSnapshot?
         do {
             result = try await apiClient.fetchUsage(apiKey: secret, now: validationTime)
+            try Task.checkCancellation()
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
+            if Task.isCancelled {
+                throw CancellationError()
+            }
             throw Self.storeError(from: error)
         }
 
@@ -167,6 +174,7 @@ final class UsageStore {
         }
         alertEvaluator.clearState(for: id)
         refreshingKeyIDs.remove(id)
+        refreshGenerationByKeyID.removeValue(forKey: id)
         states.removeValue(forKey: id)
         orderedKeyIDs.removeAll { $0 == id }
         isRefreshing = !refreshingKeyIDs.isEmpty
@@ -214,6 +222,7 @@ final class UsageStore {
         let configurations = keyRepository.list()
         let validIDs = Set(configurations.map(\.id))
         states = states.filter { validIDs.contains($0.key) }
+        refreshGenerationByKeyID = refreshGenerationByKeyID.filter { validIDs.contains($0.key) }
         orderedKeyIDs = configurations.map(\.id)
 
         for configuration in configurations {
@@ -266,6 +275,8 @@ final class UsageStore {
         }
 
         refreshingKeyIDs.insert(keyID)
+        let refreshGeneration = UUID()
+        refreshGenerationByKeyID[keyID] = refreshGeneration
         state.isRefreshing = true
         state.error = nil
         states[keyID] = state
@@ -274,6 +285,7 @@ final class UsageStore {
             keyID: keyID,
             secret: secret,
             credentialFingerprint: CredentialFingerprint(secret: secret),
+            refreshGeneration: refreshGeneration,
             requestedAt: now()
         )
     }
@@ -285,6 +297,7 @@ final class UsageStore {
         }
 
         let apiClient = apiClient
+        var notificationWorks: [NotificationWork] = []
         await withTaskGroup(of: RefreshOutcome.self) { group in
             for request in requests {
                 group.addTask {
@@ -293,37 +306,82 @@ final class UsageStore {
                             apiKey: request.secret,
                             now: request.requestedAt
                         )
+                        try Task.checkCancellation()
                         return RefreshOutcome(
                             keyID: request.keyID,
                             credentialFingerprint: request.credentialFingerprint,
+                            refreshGeneration: request.refreshGeneration,
                             requestedAt: request.requestedAt,
                             result: .success(snapshot)
+                        )
+                    } catch is CancellationError {
+                        return RefreshOutcome(
+                            keyID: request.keyID,
+                            credentialFingerprint: request.credentialFingerprint,
+                            refreshGeneration: request.refreshGeneration,
+                            requestedAt: request.requestedAt,
+                            result: .cancelled
                         )
                     } catch let error as UsageAPIError {
                         return RefreshOutcome(
                             keyID: request.keyID,
                             credentialFingerprint: request.credentialFingerprint,
+                            refreshGeneration: request.refreshGeneration,
                             requestedAt: request.requestedAt,
-                            result: .failure(error)
+                            result: Task.isCancelled ? .cancelled : .failure(error)
                         )
                     } catch {
                         return RefreshOutcome(
                             keyID: request.keyID,
                             credentialFingerprint: request.credentialFingerprint,
+                            refreshGeneration: request.refreshGeneration,
                             requestedAt: request.requestedAt,
-                            result: .failure(.invalidResponse)
+                            result: Task.isCancelled ? .cancelled : .failure(.invalidResponse)
                         )
                     }
                 }
             }
 
             for await outcome in group {
-                await merge(outcome)
+                if let notificationWork = merge(outcome) {
+                    notificationWorks.append(notificationWork)
+                }
+            }
+        }
+
+        guard !Task.isCancelled else {
+            return
+        }
+        notificationWorks = notificationWorks.filter(isNotificationWorkCurrent)
+        let manager = AlertManager(evaluator: alertEvaluator, sender: notificationSender)
+        let thresholds = thresholds
+        let notificationsEnabled = notificationsEnabled
+        await withTaskGroup(of: Void.self) { group in
+            for work in notificationWorks {
+                group.addTask { [self] in
+                    guard !Task.isCancelled else {
+                        return
+                    }
+                    guard await isNotificationWorkCurrent(work) else {
+                        return
+                    }
+                    _ = try? await manager.evaluateAndNotify(
+                        key: work.configuration,
+                        snapshot: work.snapshot,
+                        thresholds: thresholds,
+                        notificationsEnabled: notificationsEnabled
+                    )
+                }
             }
         }
     }
 
-    private func merge(_ outcome: RefreshOutcome) async {
+    private func isNotificationWorkCurrent(_ work: NotificationWork) -> Bool {
+        refreshGenerationByKeyID[work.keyID] == work.refreshGeneration
+            && states[work.keyID] != nil
+    }
+
+    private func merge(_ outcome: RefreshOutcome) -> NotificationWork? {
         defer {
             refreshingKeyIDs.remove(outcome.keyID)
             if var state = states[outcome.keyID] {
@@ -333,14 +391,18 @@ final class UsageStore {
             isRefreshing = !refreshingKeyIDs.isEmpty
         }
 
+        if Task.isCancelled || outcome.result.isCancelled {
+            return nil
+        }
         guard var state = states[outcome.keyID] else {
-            return
+            return nil
         }
         guard
+            refreshGenerationByKeyID[outcome.keyID] == outcome.refreshGeneration,
             let currentFingerprint = credentialFingerprint(for: outcome.keyID),
             currentFingerprint == outcome.credentialFingerprint
         else {
-            return
+            return nil
         }
         switch outcome.result {
         case let .success(snapshot):
@@ -351,13 +413,21 @@ final class UsageStore {
             states[outcome.keyID] = state
             if let snapshot {
                 try? cache.save(snapshot, for: outcome.keyID)
-                await evaluateNotifications(for: state.configuration, snapshot: snapshot)
+                return NotificationWork(
+                    keyID: outcome.keyID,
+                    refreshGeneration: outcome.refreshGeneration,
+                    configuration: state.configuration,
+                    snapshot: snapshot
+                )
             } else {
                 try? cache.delete(for: outcome.keyID)
             }
         case let .failure(error):
             applyFailure(Self.displayError(from: error), to: outcome.keyID)
+        case .cancelled:
+            break
         }
+        return nil
     }
 
     private func applyFailure(_ error: UsageDisplayError, to keyID: UUID) {
@@ -445,14 +515,36 @@ private struct RefreshRequest: Sendable {
     let keyID: UUID
     let secret: String
     let credentialFingerprint: CredentialFingerprint
+    let refreshGeneration: UUID
     let requestedAt: Date
 }
 
 private struct RefreshOutcome: Sendable {
     let keyID: UUID
     let credentialFingerprint: CredentialFingerprint
+    let refreshGeneration: UUID
     let requestedAt: Date
-    let result: Result<UsageSnapshot?, UsageAPIError>
+    let result: RefreshResult
+}
+
+private enum RefreshResult: Sendable {
+    case success(UsageSnapshot?)
+    case failure(UsageAPIError)
+    case cancelled
+
+    var isCancelled: Bool {
+        if case .cancelled = self {
+            return true
+        }
+        return false
+    }
+}
+
+private struct NotificationWork: Sendable {
+    let keyID: UUID
+    let refreshGeneration: UUID
+    let configuration: KeyConfiguration
+    let snapshot: UsageSnapshot
 }
 
 private struct CredentialFingerprint: Equatable, Sendable {

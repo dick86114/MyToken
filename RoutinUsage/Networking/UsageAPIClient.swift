@@ -29,6 +29,12 @@ struct UsageAPIClient: UsageFetching {
         do {
             (data, response) = try await session.data(for: request)
         } catch {
+            let foundationError = error as NSError
+            if error is CancellationError
+                || Task.isCancelled
+                || foundationError.domain == "Swift.CancellationError" {
+                throw CancellationError()
+            }
             throw UsageAPIError.transport
         }
 

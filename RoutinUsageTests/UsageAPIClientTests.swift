@@ -84,6 +84,19 @@ final class UsageAPIClientTests: XCTestCase {
         }
     }
 
+    func test取消请求保留CancellationError语义() async {
+        let client = makeClient { _ in
+            throw CancellationError()
+        }
+
+        do {
+            _ = try await client.fetchUsage(apiKey: "plan-test", now: .distantPast)
+            XCTFail("预期抛出 CancellationError")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+    }
+
     func test并发客户端使用各自独立响应注册() async throws {
         let firstClient = makeClient(
             statusCode: 200,
