@@ -80,6 +80,90 @@ final class KeyRepositoryTests: XCTestCase {
         XCTAssertTrue(context.repository.list().isEmpty)
     }
 
+    func test启动迁移清洗真实旧短Key后缀且偏好设置不保留可还原片段() throws {
+        let legacyValues = [
+            (secret: "plan-a", suffix: "an-a"),
+            (secret: "plan-ab", suffix: "n-ab"),
+            (secret: "plan-abc", suffix: "-abc")
+        ]
+
+        for legacy in legacyValues {
+            let id = UUID()
+            let context = try makeLegacyContext(
+                configuration: KeyConfiguration(
+                    id: id,
+                    name: "旧账号",
+                    keySuffix: legacy.suffix,
+                    sortOrder: 0
+                ),
+                secret: legacy.secret
+            )
+            defer { context.cleanUp() }
+
+            let configuration = try XCTUnwrap(context.repository.list().first)
+            XCTAssertEqual(configuration.keySuffix, "")
+            XCTAssertEqual(KeyDisplayMask.masked(suffix: configuration.keySuffix), "plan-••••")
+
+            let persistedData = try XCTUnwrap(
+                context.defaults.data(forKey: "keyConfigurations")
+            )
+            let persistedText = try XCTUnwrap(String(data: persistedData, encoding: .utf8))
+            XCTAssertFalse(persistedText.contains(legacy.suffix))
+            XCTAssertFalse(persistedText.contains(legacy.secret))
+            XCTAssert密钥相等(try context.keychain.read(for: id), legacy.secret)
+        }
+    }
+
+    func test启动迁移清洗完整Key旧名称且通知不包含秘密() throws {
+        let secret = "plan-sensitive-8F2A"
+        let id = UUID()
+        let context = try makeLegacyContext(
+            configuration: KeyConfiguration(
+                id: id,
+                name: secret,
+                keySuffix: "8F2A",
+                sortOrder: 0
+            ),
+            secret: secret
+        )
+        defer { context.cleanUp() }
+
+        let configuration = try XCTUnwrap(context.repository.list().first)
+        XCTAssertEqual(configuration.name, "未命名 Key")
+        XCTAssertEqual(configuration.displayName, "未命名 Key")
+        let persistedData = try XCTUnwrap(context.defaults.data(forKey: "keyConfigurations"))
+        let persistedText = try XCTUnwrap(String(data: persistedData, encoding: .utf8))
+        XCTAssertFalse(persistedText.contains(secret))
+
+        let snapshot = UsageSnapshot(
+            planName: "Token Pack",
+            kind: .tokenPack,
+            fiveHour: nil,
+            weekly: nil,
+            token: UsageMetric(
+                used: 80,
+                limit: 100,
+                remaining: 20,
+                percent: 80,
+                unit: .token,
+                windowEnd: nil
+            ),
+            allowedModels: [],
+            fetchedAt: Date(timeIntervalSince1970: 10_000)
+        )
+        let evaluator = AlertEvaluator(
+            defaults: context.defaults,
+            deliveryCoordinator: AlertDeliveryCoordinator()
+        )
+        let alert = try XCTUnwrap(evaluator.evaluate(
+            key: configuration,
+            snapshot: snapshot,
+            thresholds: .init()
+        ).first)
+        XCTAssertFalse(alert.notificationBody().contains(secret))
+        XCTAssertTrue(alert.notificationBody().contains("未命名 Key"))
+    }
+
     func test更新配置同步更新名称后缀与Keychain() throws {
         let context = makeContext()
         defer { context.cleanUp() }
@@ -145,6 +229,29 @@ final class KeyRepositoryTests: XCTestCase {
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         let keychain = InMemoryKeychainStore()
+        return RepositoryTestContext(
+            suiteName: suiteName,
+            defaults: defaults,
+            keychain: keychain,
+            repository: KeyRepository(defaults: defaults, keychain: keychain)
+        )
+    }
+
+    private func makeLegacyContext(
+        configuration: KeyConfiguration,
+        secret: String?
+    ) throws -> RepositoryTestContext {
+        let suiteName = "ai.routin.usage-monitor.repository-legacy-tests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        let keychain = InMemoryKeychainStore()
+        if let secret {
+            try keychain.save(secret, for: configuration.id)
+        }
+        defaults.set(
+            try JSONEncoder().encode([configuration]),
+            forKey: "keyConfigurations"
+        )
         return RepositoryTestContext(
             suiteName: suiteName,
             defaults: defaults,

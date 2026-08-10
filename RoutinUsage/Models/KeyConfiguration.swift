@@ -35,6 +35,31 @@ enum KeyCredentialPolicy {
         return String(secret.suffix(minimumVisibleSuffixLength))
     }
 
+    static func sanitizedMetadataSuffix(
+        persistedSuffix: String,
+        keychainSecret: String?
+    ) -> String {
+        if let keychainSecret {
+            return metadataSuffix(for: keychainSecret)
+        }
+        guard
+            persistedSuffix.count == minimumVisibleSuffixLength,
+            !isLegacyShortSecretSuffix(persistedSuffix)
+        else {
+            return ""
+        }
+        return persistedSuffix
+    }
+
+    static func isLegacyShortSecretSuffix(_ suffix: String) -> Bool {
+        guard suffix.count == minimumVisibleSuffixLength else {
+            return false
+        }
+        return suffix.hasPrefix("an-")
+            || suffix.hasPrefix("n-")
+            || suffix.hasPrefix("-")
+    }
+
     static func safeDisplayName(_ name: String) -> String {
         isSafeDisplayName(name)
             ? name.trimmingCharacters(in: .whitespacesAndNewlines)

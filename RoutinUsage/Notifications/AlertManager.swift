@@ -585,11 +585,20 @@ struct AlertManager: Sendable {
 
 protocol UserNotificationCenterServing: AnyObject {
     var delegate: (any UNUserNotificationCenterDelegate)? { get set }
+    func currentAuthorizationStatus() async -> UNAuthorizationStatus
     func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool
     func add(_ request: UNNotificationRequest) async throws
 }
 
-extension UNUserNotificationCenter: UserNotificationCenterServing {}
+extension UNUserNotificationCenter: UserNotificationCenterServing {
+    func currentAuthorizationStatus() async -> UNAuthorizationStatus {
+        await withCheckedContinuation { continuation in
+            getNotificationSettings { settings in
+                continuation.resume(returning: settings.authorizationStatus)
+            }
+        }
+    }
+}
 
 final class ForegroundNotificationDelegate:
     NSObject,
@@ -627,7 +636,16 @@ final class UserNotificationSender: NotificationSending, @unchecked Sendable {
     }
 
     func requestAuthorization() async throws -> Bool {
-        try await center.requestAuthorization(options: [.alert, .sound])
+        switch await center.currentAuthorizationStatus() {
+        case .notDetermined:
+            return try await center.requestAuthorization(options: [.alert, .sound])
+        case .authorized, .provisional, .ephemeral:
+            return true
+        case .denied:
+            return false
+        @unknown default:
+            return false
+        }
     }
 
     func send(_ alert: UsageAlert) async throws {

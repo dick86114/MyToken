@@ -197,12 +197,12 @@ actor BlockingNotificationSender: NotificationSending {
 }
 
 actor BlockingAuthorizationNotificationSender: NotificationSending {
-    private var authorizationRequested = false
+    private var authorizationRequests = 0
     private var authorizationContinuation: CheckedContinuation<Bool, Never>?
     private var alerts: [UsageAlert] = []
 
     func requestAuthorization() async throws -> Bool {
-        authorizationRequested = true
+        authorizationRequests += 1
         return await withCheckedContinuation { continuation in
             authorizationContinuation = continuation
         }
@@ -213,9 +213,13 @@ actor BlockingAuthorizationNotificationSender: NotificationSending {
     }
 
     func waitUntilAuthorizationRequested() async {
-        while !authorizationRequested {
+        while authorizationRequests == 0 {
             await Task.yield()
         }
+    }
+
+    func authorizationRequestCount() -> Int {
+        authorizationRequests
     }
 
     func resolveAuthorization(_ authorized: Bool) {

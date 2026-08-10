@@ -283,6 +283,26 @@ final class AppLifecycleTests: XCTestCase {
         XCTAssertEqual(authorizationRequestCount, 1)
     }
 
+    func test通知关闭后重新启用会再次检查系统授权() async throws {
+        let context = try makeContext(notificationsEnabled: true)
+        defer { context.cleanUp() }
+        let environment = context.makeEnvironment()
+
+        await environment.start()
+        await 等待条件 {
+            await context.notificationSender.authorizationRequestCount == 1
+        }
+
+        await environment.notificationsDidChange(enabled: false)
+        await environment.notificationsDidChange(enabled: true)
+        await 等待条件 {
+            await context.notificationSender.authorizationRequestCount == 2
+        }
+
+        let authorizationRequestCount = await context.notificationSender.authorizationRequestCount
+        XCTAssertEqual(authorizationRequestCount, 2)
+    }
+
     func test通知授权挂起不会阻塞启动完成与刷新调度() async throws {
         let suiteName = "AppLifecycleTests.authorization-blocked-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
@@ -368,17 +388,35 @@ final class AppLifecycleTests: XCTestCase {
         XCTAssertTrue(settings.launchAtLogin)
     }
 
-    func test生命周期与用量刷新共享授权结果() async throws {
-        let sender = LifecycleNotificationSender()
+    func test并发授权检查共享同一个进行中请求() async throws {
+        let sender = BlockingAuthorizationNotificationSender()
+        let cachingSender = AuthorizationCachingNotificationSender(sender: sender)
+
+        let first = Task { try await cachingSender.requestAuthorization() }
+        await sender.waitUntilAuthorizationRequested()
+        let second = Task { try await cachingSender.requestAuthorization() }
+        await Task.yield()
+
+        let authorizationRequestCount = await sender.authorizationRequestCount()
+        XCTAssertEqual(authorizationRequestCount, 1)
+        await sender.resolveAuthorization(true)
+        let firstResult = try await first.value
+        let secondResult = try await second.value
+        XCTAssertTrue(firstResult)
+        XCTAssertTrue(secondResult)
+    }
+
+    func test完成的授权结果不会被永久缓存() async throws {
+        let sender = SequencedLifecycleNotificationSender(results: [false, true])
         let cachingSender = AuthorizationCachingNotificationSender(sender: sender)
 
         let firstResult = try await cachingSender.requestAuthorization()
         let secondResult = try await cachingSender.requestAuthorization()
 
-        let authorizationRequestCount = await sender.authorizationRequestCount
-        XCTAssertTrue(firstResult)
+        XCTAssertFalse(firstResult)
         XCTAssertTrue(secondResult)
-        XCTAssertEqual(authorizationRequestCount, 1)
+        let authorizationRequestCount = await sender.authorizationRequestCount
+        XCTAssertEqual(authorizationRequestCount, 2)
     }
 
     func test没有Key时请求引导而已有Key时不请求() async throws {
@@ -721,6 +759,22 @@ private actor LifecycleNotificationSender: NotificationSending {
     func sentAlerts() -> [UsageAlert] {
         alerts
     }
+}
+
+private actor SequencedLifecycleNotificationSender: NotificationSending {
+    private var results: [Bool]
+    private(set) var authorizationRequestCount = 0
+
+    init(results: [Bool]) {
+        self.results = results
+    }
+
+    func requestAuthorization() async throws -> Bool {
+        authorizationRequestCount += 1
+        return results.removeFirst()
+    }
+
+    func send(_: UsageAlert) async throws {}
 }
 
 @MainActor

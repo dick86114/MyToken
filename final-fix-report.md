@@ -141,3 +141,94 @@ Routin Usage.app
 Release 应用曾成功启动并保持运行，说明可执行文件能够进入菜单栏应用生命周期；随后已安全结束该本地烟测进程。
 
 当前执行环境是无可访问窗口的 headless 状态。Computer Use 对 LSUIElement 菜单栏应用调用 `sky.get_app_state` 时出现超时或 `noWindowsAvailable`，因此本报告不把菜单点击、弹窗交互或设置窗口切换描述为已完成的人工 UI 验证。对应行为由自动化测试、Release 构建与应用进程启动证据覆盖；如需点击式验收，应在有图形桌面会话的 macOS 环境进行。
+
+## 限定复审补充：通知授权与遗留 Key 元数据
+
+### 复审结论与修复
+
+#### 1. 运行期通知授权变化
+
+- 根因：`AuthorizationCachingNotificationSender` 同时缓存进行中任务和已完成的布尔结果；一旦首次得到允许或拒绝，后续发送永远不会再读取系统状态。应用层的“已请求授权”标志在关闭通知后也未复位。
+- 修复：只保留进行中任务合并，不再保存已完成结果；并发调用继续共享同一个系统请求，后续独立调用会重新检查。
+- `UserNotificationSender` 每次授权检查先通过 `UNUserNotificationCenter.getNotificationSettings` 获取当前状态：
+  - `.notDetermined` 才调用 `requestAuthorization`；
+  - `.authorized`、`.provisional`、`.ephemeral` 直接允许；
+  - `.denied` 或未知状态拒绝发送。
+- 通知关闭时复位应用层检查资格；重新启用会再次读取系统状态。通知发送前原有的授权检查也因此能够感知系统设置中的撤回与恢复。
+
+#### 2. 遗留短 Key 后缀与完整 secret 旧名称
+
+- 根因：旧版本对完整 secret 直接取末 4 位。`plan-a`、`plan-ab`、`plan-abc` 会分别留下 `an-a`、`n-ab`、`-abc`；它们虽然都有 4 位，却包含全部 payload，固定拼回 `plan-` 即可还原 secret。
+- 修复：`KeyRepository` 初始化时迁移已存配置，优先读取 Keychain 中真实 secret 并重新计算安全后缀：
+  - payload 不足 4 位的旧 secret 将元数据后缀清空；
+  - 合法 secret 只保留最后 4 位；
+  - Keychain 无法读取时，对 `an-a`、`n-ab`、`-abc` 旧格式做保守识别并清空；
+  - 空名称或以 `plan-` 开头的危险旧名称持久化改写为“未命名 Key”。
+- 设置页掩码增加防御性检查：不是恰好 4 位或命中旧短 Key 格式时，只显示 `plan-••••`。
+- 新增回归覆盖确认迁移后的 `UserDefaults` 不再保存可还原片段或完整 secret，Keychain 内容不被迁移删除，通知正文只使用“未命名 Key”。
+
+### TDD：第二轮 RED / GREEN
+
+先仅修改测试并运行 4 个相关测试类。RED 阶段结果：
+
+```text
+Executed 75 tests, with 24 failures (0 unexpected)
+** TEST FAILED **
+```
+
+失败点均对应待修行为：已完成授权结果被永久缓存、重新启用未检查、发送前不查询系统状态、`an-a/n-ab/-abc` 被回显、仓储未迁移后缀及完整 secret 旧名称。RED 日志：`/tmp/routin-important-red-2.log`。
+
+分项 GREEN：
+
+```text
+AlertManagerTests + AppLifecycleTests
+Executed 50 tests, with 0 failures
+** TEST SUCCEEDED **
+
+KeyEditorValidationTests + KeyRepositoryTests
+Executed 25 tests, with 0 failures
+** TEST SUCCEEDED **
+```
+
+分项日志：`/tmp/routin-important-auth-green.log`、`/tmp/routin-important-key-green.log`。
+
+### 第二轮最终验证
+
+完整测试：
+
+```bash
+xcodegen generate
+xcodebuild \
+  -project RoutinUsage.xcodeproj \
+  -scheme RoutinUsage \
+  -destination 'platform=macOS' \
+  -derivedDataPath build/DerivedData \
+  test CODE_SIGNING_ALLOWED=NO
+```
+
+结果：
+
+```text
+Executed 161 tests, with 0 failures (0 unexpected)
+** TEST SUCCEEDED **
+```
+
+完整日志：`/tmp/routin-important-full-test.log`。
+
+DMG 验证：
+
+```text
+bash -n scripts/build-dmg.sh：通过
+仓库外 ROUTIN_DMG_DRY_RUN=1：正确定位当前工作树
+** BUILD SUCCEEDED **
+hdiutil verify：checksum VALID
+```
+
+只读挂载内容：
+
+```text
+Routin Usage.app
+首次运行说明.md
+```
+
+DMG 构建日志：`/tmp/routin-important-dmg-build.log`。
