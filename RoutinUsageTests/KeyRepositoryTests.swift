@@ -3,7 +3,7 @@ import XCTest
 @testable import RoutinUsage
 
 final class KeyRepositoryTests: XCTestCase {
-    func test添加配置只把非敏感元数据写入偏好设置() throws {
+    func test添加配置将完整Key写入本地存储且元数据不含明文() throws {
         let context = makeContext()
         defer { context.cleanUp() }
 
@@ -14,7 +14,7 @@ final class KeyRepositoryTests: XCTestCase {
         let persistedData = try XCTUnwrap(context.defaults.data(forKey: "keyConfigurations"))
         let persistedText = try XCTUnwrap(String(data: persistedData, encoding: .utf8))
         XCTAssertFalse(persistedText.contains("plan-secret"))
-        XCTAssert密钥相等(try context.keychain.read(for: saved.id), "plan-secret-8F2A")
+        XCTAssertEqual(try context.localStore.read(for: saved.id), "plan-secret-8F2A")
     }
 
     func test添加配置会去除名称首尾空白() throws {
@@ -110,7 +110,7 @@ final class KeyRepositoryTests: XCTestCase {
             let persistedText = try XCTUnwrap(String(data: persistedData, encoding: .utf8))
             XCTAssertFalse(persistedText.contains(legacy.suffix))
             XCTAssertFalse(persistedText.contains(legacy.secret))
-            XCTAssert密钥相等(try context.keychain.read(for: id), legacy.secret)
+            XCTAssertEqual(try context.localStore.read(for: id), legacy.secret)
         }
     }
 
@@ -164,7 +164,7 @@ final class KeyRepositoryTests: XCTestCase {
         XCTAssertTrue(alert.notificationBody().contains("未命名 Key"))
     }
 
-    func test更新配置同步更新名称后缀与Keychain() throws {
+    func test更新配置同步更新名称后缀与本地Key() throws {
         let context = makeContext()
         defer { context.cleanUp() }
         let saved = try context.repository.add(name: "旧名称", secret: "plan-key-1234")
@@ -179,7 +179,7 @@ final class KeyRepositoryTests: XCTestCase {
         XCTAssertEqual(updated.name, "新名称")
         XCTAssertEqual(updated.keySuffix, "9ABC")
         XCTAssertEqual(updated.sortOrder, saved.sortOrder)
-        XCTAssert密钥相等(try context.keychain.read(for: saved.id), "plan-updated-9ABC")
+        XCTAssertEqual(try context.localStore.read(for: saved.id), "plan-updated-9ABC")
         XCTAssertEqual(context.repository.list(), [updated])
     }
 
@@ -193,7 +193,7 @@ final class KeyRepositoryTests: XCTestCase {
         ) { error in
             XCTAssertEqual(error as? KeyRepositoryError, .configurationNotFound)
         }
-        XCTAssert密钥相等(try context.keychain.read(for: missingID), nil)
+        XCTAssertNil(try context.localStore.read(for: missingID))
     }
 
     func test移动配置后排序会持久化() throws {
@@ -205,12 +205,12 @@ final class KeyRepositoryTests: XCTestCase {
 
         context.repository.move(fromOffsets: IndexSet(integer: 0), toOffset: 3)
 
-        let reloaded = KeyRepository(defaults: context.defaults, keychain: context.keychain).list()
+        let reloaded = KeyRepository(defaults: context.defaults, localStore: context.localStore).list()
         XCTAssertEqual(reloaded.map(\.id), [second.id, third.id, first.id])
         XCTAssertEqual(reloaded.map(\.sortOrder), [0, 1, 2])
     }
 
-    func test删除配置同步清除Keychain并重排剩余配置() throws {
+    func test删除配置同步清除本地Key并重排剩余配置() throws {
         let context = makeContext()
         defer { context.cleanUp() }
         let first = try context.repository.add(name: "一", secret: "plan-key-0001")
@@ -218,7 +218,7 @@ final class KeyRepositoryTests: XCTestCase {
 
         try context.repository.delete(id: first.id)
 
-        XCTAssert密钥相等(try context.keychain.read(for: first.id), nil)
+        XCTAssertNil(try context.localStore.read(for: first.id))
         XCTAssertEqual(context.repository.list(), [
             KeyConfiguration(id: second.id, name: "二", keySuffix: "0002", sortOrder: 0)
         ])
@@ -228,12 +228,12 @@ final class KeyRepositoryTests: XCTestCase {
         let suiteName = "ai.routin.usage-monitor.repository-tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
-        let keychain = InMemoryKeychainStore()
+        let localStore = LocalKeyStore(defaults: defaults)
         return RepositoryTestContext(
             suiteName: suiteName,
             defaults: defaults,
-            keychain: keychain,
-            repository: KeyRepository(defaults: defaults, keychain: keychain)
+            localStore: localStore,
+            repository: KeyRepository(defaults: defaults, localStore: localStore)
         )
     }
 
@@ -244,9 +244,9 @@ final class KeyRepositoryTests: XCTestCase {
         let suiteName = "ai.routin.usage-monitor.repository-legacy-tests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         defaults.removePersistentDomain(forName: suiteName)
-        let keychain = InMemoryKeychainStore()
+        let localStore = LocalKeyStore(defaults: defaults)
         if let secret {
-            try keychain.save(secret, for: configuration.id)
+            try localStore.save(secret, for: configuration.id)
         }
         defaults.set(
             try JSONEncoder().encode([configuration]),
@@ -255,8 +255,8 @@ final class KeyRepositoryTests: XCTestCase {
         return RepositoryTestContext(
             suiteName: suiteName,
             defaults: defaults,
-            keychain: keychain,
-            repository: KeyRepository(defaults: defaults, keychain: keychain)
+            localStore: localStore,
+            repository: KeyRepository(defaults: defaults, localStore: localStore)
         )
     }
 }
@@ -264,45 +264,10 @@ final class KeyRepositoryTests: XCTestCase {
 private struct RepositoryTestContext {
     let suiteName: String
     let defaults: UserDefaults
-    let keychain: InMemoryKeychainStore
+    let localStore: LocalKeyStore
     let repository: KeyRepository
 
     func cleanUp() {
         defaults.removePersistentDomain(forName: suiteName)
-    }
-}
-
-private final class InMemoryKeychainStore: KeychainStoring, @unchecked Sendable {
-    private let lock = NSLock()
-    private var secrets: [UUID: String] = [:]
-
-    func save(_ secret: String, for id: UUID) throws {
-        lock.withLock {
-            secrets[id] = secret
-        }
-    }
-
-    func read(for id: UUID) throws -> String? {
-        lock.withLock {
-            secrets[id]
-        }
-    }
-
-    func delete(for id: UUID) throws {
-        _ = lock.withLock {
-            secrets.removeValue(forKey: id)
-        }
-    }
-}
-
-func XCTAssert密钥相等(
-    _ actual: String?,
-    _ expected: String?,
-    file: StaticString = #filePath,
-    line: UInt = #line
-) {
-    guard actual == expected else {
-        XCTFail("Keychain 密钥状态与预期不一致", file: file, line: line)
-        return
     }
 }
