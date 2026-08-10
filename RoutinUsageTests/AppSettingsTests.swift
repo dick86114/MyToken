@@ -1,0 +1,146 @@
+import XCTest
+@testable import RoutinUsage
+
+final class AppSettingsTests: XCTestCase {
+    func test全新设置使用产品默认值() throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+
+        let settings = AppSettings(defaults: context.defaults)
+
+        XCTAssertEqual(settings.refreshMinutes, 5)
+        XCTAssertEqual(settings.displayDimension, .fiveHour)
+        XCTAssertTrue(settings.notificationsEnabled)
+        XCTAssertEqual(settings.thresholds, AlertThresholds(low: 80, high: 95))
+        XCTAssertFalse(settings.launchAtLogin)
+    }
+
+    func test刷新间隔只接受固定选项并可重新载入() throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let settings = AppSettings(defaults: context.defaults)
+
+        for minutes in [1, 5, 15, 30] {
+            settings.refreshMinutes = minutes
+            XCTAssertEqual(settings.refreshMinutes, minutes)
+            XCTAssertEqual(
+                AppSettings(defaults: context.defaults).refreshMinutes,
+                minutes
+            )
+        }
+
+        settings.refreshMinutes = 7
+
+        XCTAssertEqual(settings.refreshMinutes, 30)
+        XCTAssertEqual(AppSettings(defaults: context.defaults).refreshMinutes, 30)
+    }
+
+    func test损坏的持久化值恢复为安全默认值() throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        context.defaults.set(7, forKey: "refreshMinutes")
+        context.defaults.set("token", forKey: "displayDimension")
+        context.defaults.set(0, forKey: "notificationLowThreshold")
+        context.defaults.set(101, forKey: "notificationHighThreshold")
+
+        let settings = AppSettings(defaults: context.defaults)
+
+        XCTAssertEqual(settings.refreshMinutes, 5)
+        XCTAssertEqual(settings.displayDimension, .fiveHour)
+        XCTAssertEqual(settings.thresholds, AlertThresholds(low: 80, high: 95))
+    }
+
+    func test用户设置以基础值持久化并可重新载入() throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let settings = AppSettings(defaults: context.defaults)
+
+        settings.displayDimension = .weekly
+        settings.notificationsEnabled = false
+        settings.thresholds = AlertThresholds(low: 70, high: 90)
+        settings.launchAtLogin = true
+
+        let reloaded = AppSettings(defaults: context.defaults)
+        XCTAssertEqual(reloaded.displayDimension, .weekly)
+        XCTAssertFalse(reloaded.notificationsEnabled)
+        XCTAssertEqual(reloaded.thresholds, AlertThresholds(low: 70, high: 90))
+        XCTAssertTrue(reloaded.launchAtLogin)
+    }
+}
+
+final class LoginItemManagerTests: XCTestCase {
+    func test重复设置当前登录启动状态不会调用系统服务() throws {
+        let enabledService = LoginItemServiceSpy(status: .enabled)
+        let disabledService = LoginItemServiceSpy(status: .notRegistered)
+
+        try LoginItemManager(service: enabledService).setEnabled(true)
+        try LoginItemManager(service: disabledService).setEnabled(false)
+
+        XCTAssertEqual(enabledService.registerCount, 0)
+        XCTAssertEqual(enabledService.unregisterCount, 0)
+        XCTAssertEqual(disabledService.registerCount, 0)
+        XCTAssertEqual(disabledService.unregisterCount, 0)
+    }
+
+    func test登录启动状态变化时调用对应系统操作() throws {
+        let disabledService = LoginItemServiceSpy(status: .notRegistered)
+        let enabledService = LoginItemServiceSpy(status: .enabled)
+
+        try LoginItemManager(service: disabledService).setEnabled(true)
+        try LoginItemManager(service: enabledService).setEnabled(false)
+
+        XCTAssertEqual(disabledService.registerCount, 1)
+        XCTAssertEqual(disabledService.unregisterCount, 0)
+        XCTAssertEqual(enabledService.registerCount, 0)
+        XCTAssertEqual(enabledService.unregisterCount, 1)
+    }
+}
+
+private extension AppSettingsTests {
+    struct Context {
+        let suiteName: String
+        let defaults: UserDefaults
+
+        func cleanUp() {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+    }
+
+    func makeContext() throws -> Context {
+        let suiteName = "AppSettingsTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        return Context(suiteName: suiteName, defaults: defaults)
+    }
+}
+
+private final class LoginItemServiceSpy: LoginItemServicing, @unchecked Sendable {
+    private let lock = NSLock()
+    let status: LoginItemStatus
+    private var storedRegisterCount = 0
+    private var storedUnregisterCount = 0
+
+    var registerCount: Int {
+        lock.withLock { storedRegisterCount }
+    }
+
+    var unregisterCount: Int {
+        lock.withLock { storedUnregisterCount }
+    }
+
+    init(status: LoginItemStatus) {
+        self.status = status
+    }
+
+    func register() throws {
+        lock.withLock {
+            storedRegisterCount += 1
+        }
+    }
+
+    func unregister() throws {
+        lock.withLock {
+            storedUnregisterCount += 1
+        }
+    }
+}
