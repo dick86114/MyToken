@@ -3,10 +3,26 @@ import SwiftUI
 
 @MainActor
 struct UsagePopoverView: View {
+    typealias InstallAvailableUpdate = @MainActor () async -> Void
+
     @Bindable var store: UsageStore
     @Bindable var settings: AppSettings
+    let updateStatus: AppUpdateStatus
+    let installAvailableUpdate: InstallAvailableUpdate
 
     @Environment(\.openSettings) private var openSettings
+
+    init(
+        store: UsageStore,
+        settings: AppSettings,
+        updateStatus: AppUpdateStatus = .idle,
+        installAvailableUpdate: @escaping InstallAvailableUpdate = {}
+    ) {
+        self.store = store
+        self.settings = settings
+        self.updateStatus = updateStatus
+        self.installAvailableUpdate = installAvailableUpdate
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -22,8 +38,9 @@ struct UsagePopoverView: View {
             footer
                 .padding(12)
         }
-        .frame(width: 360)
-        .frame(maxHeight: 520)
+        // 让窗口按内容自然撑开，避免固定高度造成不必要的竖向滚动条。
+        .frame(width: 440)
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
 
@@ -74,29 +91,41 @@ private extension UsagePopoverView {
             .accessibilityElement(children: .combine)
             .accessibilityLabel("空配置，尚未配置 Key")
         } else {
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(store.orderedKeyIDs, id: \.self) { id in
-                        if let state = store.state(for: id) {
-                            UsageRowView(
-                                store: store,
-                                state: state,
-                                dimension: settings.displayDimension
-                            )
-                            if id != store.orderedKeyIDs.last {
-                                Divider()
-                            }
+            VStack(spacing: 0) {
+                ForEach(store.orderedKeyIDs, id: \.self) { id in
+                    if let state = store.state(for: id) {
+                        UsageRowView(
+                            store: store,
+                            state: state,
+                            dimension: settings.displayDimension
+                        )
+                        if id != store.orderedKeyIDs.last {
+                            Divider()
                         }
                     }
                 }
-                .padding(.horizontal, 12)
             }
-            .frame(maxHeight: 380)
+            .padding(.horizontal, 12)
         }
     }
 
     var footer: some View {
         VStack(alignment: .leading, spacing: 9) {
+            if case let .available(update) = updateStatus {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .foregroundStyle(.blue)
+                    Text("发现新版本 \(update.version)")
+                    Spacer(minLength: 4)
+                    Button("安装") {
+                        Task { await installAvailableUpdate() }
+                    }
+                    .buttonStyle(.borderless)
+                }
+                .font(.caption)
+                .accessibilityElement(children: .combine)
+            }
+
             HStack(spacing: 6) {
                 Image(systemName: store.isRefreshing ? "arrow.triangle.2.circlepath" : "clock")
                     .accessibilityHidden(true)
@@ -135,7 +164,11 @@ private extension UsagePopoverView {
         guard let latestRefreshDate else {
             return "尚未刷新"
         }
-        return "最后刷新 \(latestRefreshDate.formatted(date: .abbreviated, time: .shortened))"
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return "最后刷新 \(formatter.string(from: latestRefreshDate))"
     }
 
     var refreshAccessibilityLabel: String {

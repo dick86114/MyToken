@@ -9,6 +9,14 @@ protocol RefreshScheduling: AnyObject {
     func stop()
 }
 
+enum AppUpdateStatus: Equatable {
+    case idle
+    case checking
+    case available(AppUpdate)
+    case downloading
+    case failed(String)
+}
+
 extension RefreshScheduler: RefreshScheduling {}
 
 actor AuthorizationCachingNotificationSender: NotificationSending {
@@ -51,11 +59,13 @@ final class AppEnvironment {
     let store: UsageStore
     let loginItemManager: any LoginItemManaging
     var showsOnboarding = false
+    private(set) var updateStatus: AppUpdateStatus = .idle
 
     @ObservationIgnored private let refreshScheduler: any RefreshScheduling
     @ObservationIgnored private let keyRepository: KeyRepository
     @ObservationIgnored private let apiClient: any UsageFetching
     @ObservationIgnored private let notificationSender: any NotificationSending
+    @ObservationIgnored private let updateService: any UpdateChecking
     @ObservationIgnored private let applicationNotificationCenter: NotificationCenter
     @ObservationIgnored private var terminationObservation: ApplicationTerminationObservation?
     @ObservationIgnored private var isStarted = false
@@ -70,7 +80,8 @@ final class AppEnvironment {
         keyRepository: KeyRepository,
         apiClient: any UsageFetching,
         notificationSender: any NotificationSending,
-        applicationNotificationCenter: NotificationCenter = .default
+        applicationNotificationCenter: NotificationCenter = .default,
+        updateService: any UpdateChecking = NoUpdateService()
     ) {
         self.settings = settings
         self.store = store
@@ -80,6 +91,7 @@ final class AppEnvironment {
         self.apiClient = apiClient
         self.notificationSender = notificationSender
         self.applicationNotificationCenter = applicationNotificationCenter
+        self.updateService = updateService
     }
 
     static func live() -> AppEnvironment {
@@ -113,7 +125,8 @@ final class AppEnvironment {
             loginItemManager: LoginItemManager(),
             keyRepository: keyRepository,
             apiClient: apiClient,
-            notificationSender: notificationSender
+            notificationSender: notificationSender,
+            updateService: GitHubUpdateService()
         )
     }
 
@@ -140,6 +153,10 @@ final class AppEnvironment {
             }
         }
         await notificationsDidChange(enabled: settings.notificationsEnabled)
+        // 更新检查不应阻塞首次显示菜单栏或用量刷新。
+        Task { [weak self] in
+            await self?.checkForUpdates()
+        }
     }
 
     func refreshIntervalDidChange(to minutes: Int) {
@@ -186,6 +203,33 @@ final class AppEnvironment {
 
     func dismissOnboarding() {
         showsOnboarding = false
+    }
+
+    func checkForUpdates() async {
+        guard updateStatus != .checking, updateStatus != .downloading else { return }
+        updateStatus = .checking
+        do {
+            updateStatus = try await updateService.checkForUpdate().map(AppUpdateStatus.available) ?? .idle
+        } catch is CancellationError {
+            updateStatus = .idle
+        } catch {
+            updateStatus = .failed("检查更新失败，请稍后重试")
+        }
+    }
+
+    func installAvailableUpdate() async {
+        guard case let .available(update) = updateStatus else { return }
+        updateStatus = .downloading
+        do {
+            let dmgURL = try await updateService.download(update)
+            try UpdateInstaller.install(dmgURL: dmgURL)
+        } catch is CancellationError {
+            updateStatus = .available(update)
+        } catch let error as UpdateServiceError {
+            updateStatus = .failed(updateErrorDescription(error))
+        } catch {
+            updateStatus = .failed("安装更新失败，请下载后手动安装")
+        }
     }
 
     func updateValidatedKey(
@@ -267,6 +311,19 @@ private extension AppEnvironment {
             return .invalidKey
         case let .server(statusCode):
             return .server(statusCode: statusCode)
+        }
+    }
+
+    func updateErrorDescription(_ error: UpdateServiceError) -> String {
+        switch error {
+        case .unavailable:
+            return "更新服务暂时不可用，请稍后重试"
+        case .invalidResponse:
+            return "更新信息不完整，请前往 GitHub 手动下载"
+        case .downloadFailed:
+            return "下载更新失败，请检查网络后重试"
+        case let .installFailed(message):
+            return "安装更新失败：\(message)。请从 GitHub 手动安装"
         }
     }
 }

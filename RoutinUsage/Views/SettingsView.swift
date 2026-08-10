@@ -17,6 +17,8 @@ enum KeyDisplayMask {
 struct SettingsView: View {
     typealias UpdateValidatedKey = @MainActor (UUID, String, String) async throws -> KeyEditorSaveResult
     typealias MoveKey = @MainActor (IndexSet, Int) -> Void
+    typealias CheckForUpdates = @MainActor () async -> Void
+    typealias InstallAvailableUpdate = @MainActor () async -> Void
 
     private enum EditorPresentation: Identifiable {
         case add
@@ -38,6 +40,9 @@ struct SettingsView: View {
     private let loginItemManager: any LoginItemManaging
     private let updateValidatedKey: UpdateValidatedKey
     private let moveKey: MoveKey
+    private let updateStatus: AppUpdateStatus
+    private let checkForUpdates: CheckForUpdates
+    private let installAvailableUpdate: InstallAvailableUpdate
 
     @State private var editor: EditorPresentation?
     @State private var pendingDeletion: KeyConfiguration?
@@ -52,13 +57,19 @@ struct SettingsView: View {
         settings: AppSettings,
         loginItemManager: any LoginItemManaging,
         updateValidatedKey: @escaping UpdateValidatedKey,
-        moveKey: @escaping MoveKey
+        moveKey: @escaping MoveKey,
+        updateStatus: AppUpdateStatus = .idle,
+        checkForUpdates: @escaping CheckForUpdates = {},
+        installAvailableUpdate: @escaping InstallAvailableUpdate = {}
     ) {
         self.store = store
         self.settings = settings
         self.loginItemManager = loginItemManager
         self.updateValidatedKey = updateValidatedKey
         self.moveKey = moveKey
+        self.updateStatus = updateStatus
+        self.checkForUpdates = checkForUpdates
+        self.installAvailableUpdate = installAvailableUpdate
         _orderedKeyIDs = State(initialValue: store.orderedKeyIDs)
         _lowThreshold = State(initialValue: settings.thresholds.low)
         _highThreshold = State(initialValue: settings.thresholds.high)
@@ -81,10 +92,17 @@ struct SettingsView: View {
             orderedKeyIDs = ids
         }
         .onAppear {
+            // 应用以 LSUIElement 菜单栏模式启动。打开独立设置窗口时切换为普通应用，
+            // 让程序坞显示图标并允许用户在多个窗口间切换；窗口关闭后恢复菜单栏模式。
+            NSApp.setActivationPolicy(.regular)
+            NSApp.activate(ignoringOtherApps: true)
             LoginItemSettingSynchronizer.synchronize(
                 settings: settings,
                 manager: loginItemManager
             )
+        }
+        .onDisappear {
+            NSApp.setActivationPolicy(.accessory)
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             LoginItemSettingSynchronizer.synchronize(
@@ -165,7 +183,8 @@ private extension SettingsView {
     }
 
     func keyRow(_ configuration: KeyConfiguration) -> some View {
-        HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
             Image(systemName: store.selectedKeyID == configuration.id ? "circle.inset.filled" : "circle")
                 .foregroundStyle(store.selectedKeyID == configuration.id ? Color.accentColor : Color.secondary)
                 .accessibilityHidden(true)
@@ -192,9 +211,105 @@ private extension SettingsView {
             }
             .buttonStyle(.borderless)
             .accessibilityLabel("删除 \(configuration.displayName)")
+            }
+
+            if let state = store.state(for: configuration.id) {
+                keyUsageDetails(state)
+                    .padding(.leading, 24)
+            }
         }
         .contentShape(Rectangle())
         .onTapGesture { store.selectKey(configuration.id) }
+    }
+
+    @ViewBuilder
+    func keyUsageDetails(_ state: KeyUsageState) -> some View {
+        if let snapshot = state.snapshot {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 12) {
+                    detailItem("套餐", snapshot.planName.isEmpty ? "未命名套餐" : snapshot.planName)
+                    detailItem("类型", snapshot.kind == .periodic ? "周期订阅" : "Token 资源包")
+                    detailItem("状态", subscriptionStatus(snapshot.status, state: state))
+                }
+
+                HStack(spacing: 12) {
+                    detailItem("订阅开始", UsageFormatter.fullDateTime(snapshot.subscriptionStartAt))
+                    detailItem("订阅结束", UsageFormatter.fullDateTime(snapshot.subscriptionEndAt))
+                }
+
+                if snapshot.kind == .periodic {
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let metric = snapshot.fiveHour {
+                            HStack(spacing: 12) {
+                            usageDetailItem("5 小时用量", metric)
+                            detailItem("5 小时结束", UsageFormatter.fullDateTime(metric.windowEnd))
+                            }
+                        }
+                        if let metric = snapshot.weekly {
+                            HStack(spacing: 12) {
+                            usageDetailItem("周用量", metric)
+                            detailItem("周结束", UsageFormatter.fullDateTime(metric.windowEnd))
+                            }
+                        }
+                    }
+                } else if let token = snapshot.token {
+                    usageDetailItem("Token 用量", token)
+                }
+
+                detailItem("分组倍率", groupMultiplierText(snapshot.groupMultiplier))
+
+                if !snapshot.allowedModels.isEmpty {
+                    detailItem("允许模型", snapshot.allowedModels.joined(separator: "、"))
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        } else {
+            Text(UsageFormatter.statusText(state: state))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    func detailItem(_ title: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 3) {
+            Text(title + "：")
+                .foregroundStyle(.tertiary)
+            Text(value)
+                .lineLimit(2)
+                .textSelection(.enabled)
+        }
+    }
+
+    func usageDetailItem(_ title: String, _ metric: UsageMetric) -> some View {
+        detailItem(
+            title,
+            "\(UsageFormatter.amount(metric))（\(UsageFormatter.percentText(metric) ?? "—")）"
+        )
+    }
+
+    func subscriptionStatus(_ status: Int?, state: KeyUsageState) -> String {
+        if state.error == nil, state.snapshot != nil {
+            if state.isStale {
+                return "已过期"
+            }
+            switch status {
+            case 1:
+                return "正常"
+            case let status?:
+                return "状态 \(status)"
+            case nil:
+                return "正常"
+            }
+        }
+        return UsageFormatter.statusText(state: state)
+    }
+
+    func groupMultiplierText(_ multiplier: Decimal?) -> String {
+        guard let multiplier else {
+            return "—"
+        }
+        return "×\(NSDecimalNumber(decimal: multiplier).stringValue)"
     }
 
     var displayAndRefresh: some View {
@@ -257,6 +372,10 @@ private extension SettingsView {
                 Toggle("登录时启动", isOn: launchAtLoginBinding)
                     .accessibilityLabel("登录时启动")
             }
+
+            Section("软件更新") {
+                updateControls
+            }
         }
         .formStyle(.grouped)
     }
@@ -287,6 +406,38 @@ private extension SettingsView {
                 }
             }
         )
+    }
+
+    @ViewBuilder
+    var updateControls: some View {
+        switch updateStatus {
+        case .idle:
+            Button("检查更新") { Task { await checkForUpdates() } }
+        case .checking:
+            LabeledContent("正在检查更新") { ProgressView().controlSize(.small) }
+        case let .available(update):
+            VStack(alignment: .leading, spacing: 6) {
+                Text("发现新版本 \(update.version)")
+                    .fontWeight(.medium)
+                if !update.notes.isEmpty {
+                    Text(update.notes)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                }
+                HStack {
+                    Button("安装更新") { Task { await installAvailableUpdate() } }
+                    Link("查看发布说明", destination: update.releaseURL)
+                }
+            }
+        case .downloading:
+            LabeledContent("正在下载并安装更新") { ProgressView().controlSize(.small) }
+        case let .failed(message):
+            VStack(alignment: .leading, spacing: 6) {
+                Text(message).foregroundStyle(.red)
+                Button("重试") { Task { await checkForUpdates() } }
+            }
+        }
     }
 
     @ViewBuilder

@@ -135,6 +135,8 @@ private extension UsageRowView {
             .foregroundStyle(.secondary)
             .monospacedDigit()
 
+            details
+
             if state.isStale {
                 Label(
                     UsageFormatter.statusText(state: state, dimension: dimension),
@@ -146,6 +148,45 @@ private extension UsageRowView {
         } else {
             statusLabel
         }
+    }
+
+    /// 显示接口返回的窗口、模型和分组倍率等补充信息。
+    @ViewBuilder
+    var details: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            if state.snapshot?.kind == .periodic {
+                if let end = state.snapshot?.fiveHour.flatMap(UsageFormatter.windowEndDescription) {
+                    detailLine("5 小时窗口结束", value: end)
+                }
+                if let end = state.snapshot?.weekly.flatMap(UsageFormatter.windowEndDescription) {
+                    detailLine("周窗口结束", value: end)
+                }
+            }
+            if let multiplier = state.snapshot?.groupMultiplier {
+                detailLine("分组倍率", value: "×\(decimalText(multiplier))")
+            }
+            if let models = state.snapshot?.allowedModels, !models.isEmpty {
+                detailLine("允许模型", value: models.joined(separator: "、"))
+            }
+        }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .textSelection(.enabled)
+    }
+
+    func detailLine(_ title: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text(title + "：")
+                .foregroundStyle(.tertiary)
+            Text(value)
+                .lineLimit(2)
+                .truncationMode(.middle)
+        }
+    }
+
+    func decimalText(_ value: Decimal) -> String {
+        let number = NSDecimalNumber(decimal: value)
+        return number.stringValue
     }
 
     var subscriptionDescription: String {

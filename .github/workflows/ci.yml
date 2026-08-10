@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-package:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: 安装 XcodeGen
+        run: brew install xcodegen
+      - name: 生成 Xcode 工程
+        run: xcodegen generate
+      - name: 执行单元测试
+        run: xcodebuild -project RoutinUsage.xcodeproj -scheme RoutinUsage -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO test
+      - name: 构建 DMG
+        run: scripts/build-dmg.sh
+      - name: 上传 DMG 构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: Routin-Usage-dmg
+          path: build/dist/Routin-Usage.dmg
+          if-no-files-found: error

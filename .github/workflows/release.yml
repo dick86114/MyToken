@@ -1,0 +1,42 @@
+name: 发布版本
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（例如 1.2.0，将创建 v1.2.0 标签）'
+        required: true
+        type: string
+      notes:
+        description: '发布说明（可选）'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: 校验版本号
+        run: |
+          [[ "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+      - name: 安装 XcodeGen
+        run: brew install xcodegen
+      - name: 写入应用版本
+        run: |
+          sed -i '' "s/MARKETING_VERSION: \"[^\"]*\"/MARKETING_VERSION: \"${{ inputs.version }}\"/" project.yml
+      - name: 构建 DMG
+        run: scripts/build-dmg.sh
+      - name: 创建 GitHub Release 并上传 DMG
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: Routin Usage v${{ inputs.version }}
+          body: ${{ inputs.notes }}
+          generate_release_notes: ${{ inputs.notes == '' }}
+          files: build/dist/Routin-Usage.dmg

@@ -105,6 +105,18 @@ final class UsageFormatterTests: XCTestCase {
         XCTAssertEqual(UsageFormatter.resetTime(metric), "--")
     }
 
+    func test完整时间使用统一的本地日期格式() {
+        let 原时区 = NSTimeZone.default
+        NSTimeZone.default = TimeZone(secondsFromGMT: 8 * 60 * 60)!
+        defer { NSTimeZone.default = 原时区 }
+
+        XCTAssertEqual(
+            UsageFormatter.fullDateTime(Date(timeIntervalSince1970: 1_786_341_600)),
+            "2026-08-10 14:00:00"
+        )
+        XCTAssertEqual(UsageFormatter.fullDateTime(nil), "—")
+    }
+
     func test过期缓存同时说明具体请求错误() {
         let state = makeState(
             snapshot: makePeriodicSnapshot(fiveHourPercent: 68),
