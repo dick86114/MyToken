@@ -162,6 +162,33 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertEqual(try context.cache.load(for: key.id), cached)
     }
 
+    func test已有网络错误时取消下一次刷新会完整保留旧状态() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let secret = "plan-cancelled-preserves-error-0001"
+        let key = try context.addKey(name: "主账号", secret: secret)
+        let cached = makeSnapshot(planName: "缓存版", fetchedAt: context.now.addingTimeInterval(-60))
+        try context.cache.save(cached, for: key.id)
+        let fetcher = CancellationAwareUsageFetcher(initialFailureCount: 1)
+        let store = context.makeStore(fetcher: fetcher)
+
+        await store.refresh(keyID: key.id)
+        XCTAssertEqual(store.state(for: key.id)?.error, .network)
+
+        let refresh = Task { await store.refresh(keyID: key.id) }
+        await fetcher.waitUntilRequested(secret, count: 2)
+        refresh.cancel()
+        await refresh.value
+
+        XCTAssertEqual(store.state(for: key.id)?.snapshot, cached)
+        XCTAssertEqual(store.state(for: key.id)?.lastSuccessAt, cached.fetchedAt)
+        XCTAssertEqual(store.state(for: key.id)?.error, .network)
+        XCTAssertTrue(store.state(for: key.id)?.isStale == true)
+        XCTAssertFalse(store.state(for: key.id)?.isRefreshing == true)
+        XCTAssertFalse(store.isRefreshing)
+        XCTAssertEqual(try context.cache.load(for: key.id), cached)
+    }
+
     func test取消后Fetcher忽略取消并返回成功时不合并结果() async throws {
         let context = try makeContext()
         defer { context.cleanUp() }

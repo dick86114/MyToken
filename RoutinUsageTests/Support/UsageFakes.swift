@@ -51,16 +51,24 @@ actor ScriptedUsageFetcher: UsageFetching {
 
 actor CancellationAwareUsageFetcher: UsageFetching {
     private let suspension = CancellationSuspension()
+    private let initialFailureCount: Int
     private var requestCounts: [String: Int] = [:]
+
+    init(initialFailureCount: Int = 0) {
+        self.initialFailureCount = initialFailureCount
+    }
 
     func fetchUsage(apiKey: String, now: Date) async throws -> UsageSnapshot? {
         requestCounts[apiKey, default: 0] += 1
+        if requestCounts[apiKey, default: 0] <= initialFailureCount {
+            throw UsageAPIError.transport
+        }
         try await suspension.wait()
         return nil
     }
 
-    func waitUntilRequested(_ apiKey: String) async {
-        while requestCounts[apiKey, default: 0] == 0 {
+    func waitUntilRequested(_ apiKey: String, count expectedCount: Int = 1) async {
+        while requestCounts[apiKey, default: 0] < expectedCount {
             await Task.yield()
         }
     }

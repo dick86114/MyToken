@@ -278,7 +278,6 @@ final class UsageStore {
         let refreshGeneration = UUID()
         refreshGenerationByKeyID[keyID] = refreshGeneration
         state.isRefreshing = true
-        state.error = nil
         states[keyID] = state
         isRefreshing = true
         return RefreshRequest(
