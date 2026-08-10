@@ -265,6 +265,10 @@ final class AppEnvironment {
         store.reloadConfigurations()
     }
 
+    func readKey(id: UUID) -> String? {
+        try? keyRepository.read(id: id)
+    }
+
     func stop() {
         guard isStarted else {
             return

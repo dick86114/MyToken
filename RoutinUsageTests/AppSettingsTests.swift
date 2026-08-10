@@ -2,6 +2,27 @@ import XCTest
 @testable import RoutinUsage
 
 final class AppSettingsTests: XCTestCase {
+    @MainActor
+    func test设置窗口尺寸默认值并可持久化重载() throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+
+        XCTAssertEqual(
+            WindowFramePersistence.loadSize(defaults: context.defaults),
+            WindowFramePersistence.defaultSize
+        )
+
+        WindowFramePersistence.saveSize(
+            CGSize(width: 720, height: 640),
+            defaults: context.defaults
+        )
+
+        XCTAssertEqual(
+            WindowFramePersistence.loadSize(defaults: context.defaults),
+            CGSize(width: 720, height: 640)
+        )
+    }
+
     func test全新设置使用产品默认值() throws {
         let context = try makeContext()
         defer { context.cleanUp() }

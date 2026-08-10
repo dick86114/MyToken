@@ -38,7 +38,8 @@ struct RoutinUsageApp: App {
                 moveKey: environment.moveKey(fromOffsets:toOffset:),
                 updateStatus: environment.updateStatus,
                 checkForUpdates: environment.checkForUpdates,
-                installAvailableUpdate: environment.installAvailableUpdate
+                installAvailableUpdate: environment.installAvailableUpdate,
+                readKey: environment.readKey(id:)
             )
         }
     }
