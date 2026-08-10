@@ -3,33 +3,17 @@ import XCTest
 @testable import RoutinUsage
 
 final class UsageAPIClientTests: XCTestCase {
-    override func tearDown() {
-        URLProtocolStub.reset()
-        super.tearDown()
-    }
-
     func test请求固定端点并映射订阅用量() async throws {
-        URLProtocolStub.setHandler { request in
-            let response = try XCTUnwrap(
-                HTTPURLResponse(
-                    url: try XCTUnwrap(request.url),
-                    statusCode: 200,
-                    httpVersion: nil,
-                    headerFields: ["Content-Type": "application/json"]
-                )
-            )
-            return (response, Data(Self.periodicUsageJSON.utf8))
-        }
-        let client = makeClient()
+        let client = makeClient(statusCode: 200, body: Self.periodicUsageJSON)
         let fixedDate = Date(timeIntervalSince1970: 1_786_370_400)
 
         let result = try await client.fetchUsage(apiKey: "plan-test", now: fixedDate)
 
-        XCTAssertEqual(URLProtocolStub.lastRequest?.url?.absoluteString, "https://api.routin.ai/plan/v1/usage")
-        XCTAssertEqual(URLProtocolStub.lastRequest?.httpMethod, "GET")
-        XCTAssertEqual(URLProtocolStub.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer plan-test")
-        XCTAssertEqual(URLProtocolStub.lastRequest?.value(forHTTPHeaderField: "Accept"), "application/json")
-        XCTAssertEqual(URLProtocolStub.lastRequest?.timeoutInterval, 15)
+        XCTAssertEqual(client.lastRequest?.url?.absoluteString, "https://api.routin.ai/plan/v1/usage")
+        XCTAssertEqual(client.lastRequest?.httpMethod, "GET")
+        XCTAssertEqual(client.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer plan-test")
+        XCTAssertEqual(client.lastRequest?.value(forHTTPHeaderField: "Accept"), "application/json")
+        XCTAssertEqual(client.lastRequest?.timeoutInterval, 15)
         XCTAssertEqual(result?.planName, "Pro")
         XCTAssertEqual(result?.fetchedAt, fixedDate)
     }
@@ -91,18 +75,43 @@ final class UsageAPIClientTests: XCTestCase {
     }
 
     func test传输失败映射为通用Transport错误() async {
-        URLProtocolStub.setHandler { _ in
+        let client = makeClient { _ in
             throw URLError(.notConnectedToInternet)
         }
-        let client = makeClient()
 
         await XCTAssert抛出API错误(.transport) {
             _ = try await client.fetchUsage(apiKey: "plan-test", now: .distantPast)
         }
     }
 
-    private func makeClient(statusCode: Int, body: String) -> UsageAPIClient {
-        URLProtocolStub.setHandler { request in
+    func test并发客户端使用各自独立响应注册() async throws {
+        let firstClient = makeClient(
+            statusCode: 200,
+            body: Self.periodicUsageJSON.replacingOccurrences(of: "\"Pro\"", with: "\"First\"")
+        )
+        let secondClient = makeClient(
+            statusCode: 200,
+            body: Self.periodicUsageJSON.replacingOccurrences(of: "\"Pro\"", with: "\"Second\"")
+        )
+
+        async let firstResult = firstClient.fetchUsage(apiKey: "plan-first", now: .distantPast)
+        async let secondResult = secondClient.fetchUsage(apiKey: "plan-second", now: .distantPast)
+        let (first, second) = try await (firstResult, secondResult)
+
+        XCTAssertEqual(first?.planName, "First")
+        XCTAssertEqual(second?.planName, "Second")
+        XCTAssertEqual(
+            firstClient.lastRequest?.value(forHTTPHeaderField: "Authorization"),
+            "Bearer plan-first"
+        )
+        XCTAssertEqual(
+            secondClient.lastRequest?.value(forHTTPHeaderField: "Authorization"),
+            "Bearer plan-second"
+        )
+    }
+
+    private func makeClient(statusCode: Int, body: String) -> StubbedUsageClient {
+        makeClient { request in
             let response = try XCTUnwrap(
                 HTTPURLResponse(
                     url: try XCTUnwrap(request.url),
@@ -113,13 +122,16 @@ final class UsageAPIClientTests: XCTestCase {
             )
             return (response, Data(body.utf8))
         }
-        return makeClient()
     }
 
-    private func makeClient() -> UsageAPIClient {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [URLProtocolStub.self]
-        return UsageAPIClient(session: URLSession(configuration: configuration), mapper: UsageMapper())
+    private func makeClient(
+        handler: @escaping URLProtocolStub.Handler
+    ) -> StubbedUsageClient {
+        let stub = URLProtocolStub.makeSession(handler: handler)
+        return StubbedUsageClient(
+            client: UsageAPIClient(session: stub.session, mapper: UsageMapper()),
+            registration: stub.registration
+        )
     }
 
     private static let periodicUsageJSON = #"""
@@ -140,6 +152,19 @@ final class UsageAPIClientTests: XCTestCase {
         "allowedModels": ["gpt-4.1"]
     }
     """#
+}
+
+private struct StubbedUsageClient: Sendable {
+    let client: UsageAPIClient
+    let registration: URLProtocolStub.Registration
+
+    var lastRequest: URLRequest? {
+        registration.lastRequest
+    }
+
+    func fetchUsage(apiKey: String, now: Date) async throws -> UsageSnapshot? {
+        try await client.fetchUsage(apiKey: apiKey, now: now)
+    }
 }
 
 private func XCTAssert抛出API错误(
