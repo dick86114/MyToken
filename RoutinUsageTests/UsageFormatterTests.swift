@@ -158,6 +158,55 @@ final class UsageFormatterTests: XCTestCase {
         XCTAssertEqual(UsageFormatter.resetTime(metric), "--")
     }
 
+    func test剩余时长在一天内显示小时和分钟() {
+        let now = Date(timeIntervalSince1970: 1_786_320_000)
+        let end = now.addingTimeInterval(3 * 60 * 60 + 45 * 60)
+
+        XCTAssertEqual(
+            UsageFormatter.remainingDurationText(until: end, now: now),
+            "3h45m"
+        )
+    }
+
+    func test剩余时长跨天显示天小时和分钟() {
+        let now = Date(timeIntervalSince1970: 1_786_320_000)
+        let end = now.addingTimeInterval(4 * 24 * 60 * 60 + 3 * 60 * 60 + 45 * 60)
+
+        XCTAssertEqual(
+            UsageFormatter.remainingDurationText(until: end, now: now),
+            "4d3h45m"
+        )
+    }
+
+    func test剩余时长在结束或过期时显示已结束() {
+        let now = Date(timeIntervalSince1970: 1_786_320_000)
+
+        XCTAssertEqual(
+            UsageFormatter.remainingDurationText(until: now, now: now),
+            "已结束"
+        )
+        XCTAssertEqual(
+            UsageFormatter.remainingDurationText(
+                until: now.addingTimeInterval(-60),
+                now: now
+            ),
+            "已结束"
+        )
+    }
+
+    func test剩余时长按绝对时间计算而不受时区影响() {
+        let 原时区 = NSTimeZone.default
+        NSTimeZone.default = TimeZone(secondsFromGMT: -7 * 60 * 60)!
+        defer { NSTimeZone.default = 原时区 }
+        let now = Date(timeIntervalSince1970: 1_786_320_000)
+        let end = Date(timeIntervalSince1970: 1_786_333_500)
+
+        XCTAssertEqual(
+            UsageFormatter.remainingDurationText(until: end, now: now),
+            "3h45m"
+        )
+    }
+
     func test完整时间使用统一的本地日期格式() {
         let 原时区 = NSTimeZone.default
         NSTimeZone.default = TimeZone(secondsFromGMT: 8 * 60 * 60)!
