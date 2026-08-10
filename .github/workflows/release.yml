@@ -39,4 +39,4 @@ jobs:
           name: Routin Usage v${{ inputs.version }}
           body: ${{ inputs.notes }}
           generate_release_notes: ${{ inputs.notes == '' }}
-          files: build/dist/Routin-Usage.dmg
+          files: build/dist/MyRoutin.dmg

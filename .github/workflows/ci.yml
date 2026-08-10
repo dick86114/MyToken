@@ -23,6 +23,6 @@ jobs:
       - name: 上传 DMG 构建产物
         uses: actions/upload-artifact@v4
         with:
-          name: Routin-Usage-dmg
-          path: build/dist/Routin-Usage.dmg
+          name: MyRoutin-dmg
+          path: build/dist/MyRoutin.dmg
           if-no-files-found: error

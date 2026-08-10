@@ -80,17 +80,17 @@ xcodebuild \
   clean build
 
 ditto \
-  "$derived_data_dir/Build/Products/Release/Routin Usage.app" \
-  "$dist_dir/Routin Usage.app"
+  "$derived_data_dir/Build/Products/Release/MyRoutin.app" \
+  "$dist_dir/MyRoutin.app"
 
-ditto "$dist_dir/Routin Usage.app" "$staging_dir/Routin Usage.app"
+ditto "$dist_dir/MyRoutin.app" "$staging_dir/MyRoutin.app"
 ditto "$repo_root/docs/首次运行说明.md" "$staging_dir/首次运行说明.md"
 
 hdiutil create \
-  -volname "Routin Usage" \
+  -volname "MyRoutin" \
   -srcfolder "$staging_dir" \
   -ov \
   -format UDZO \
-  "$dist_dir/Routin-Usage.dmg"
+  "$dist_dir/MyRoutin.dmg"
 
 rm -rf -- "$staging_dir"

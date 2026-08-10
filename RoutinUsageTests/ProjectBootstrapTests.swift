@@ -3,7 +3,7 @@ import XCTest
 
 final class ProjectBootstrapTests: XCTestCase {
     func test应用标识稳定() {
-        XCTAssertEqual(RoutinUsageApp.applicationName, "Routin Usage")
+        XCTAssertEqual(RoutinUsageApp.applicationName, "MyRoutin")
     }
 
     func test菜单栏场景使用可承载总览面板的Window样式() throws {

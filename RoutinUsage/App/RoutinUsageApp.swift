@@ -3,7 +3,7 @@ import SwiftUI
 @main
 @MainActor
 struct RoutinUsageApp: App {
-    nonisolated static let applicationName = "Routin Usage"
+    nonisolated static let applicationName = "MyRoutin"
 
     @State private var environment: AppEnvironment
 

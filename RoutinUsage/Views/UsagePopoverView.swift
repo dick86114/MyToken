@@ -145,7 +145,7 @@ private extension UsagePopoverView {
 
                 Spacer()
 
-                Button("退出 Routin Usage") {
+                Button("退出 MyRoutin") {
                     NSApplication.shared.terminate(nil)
                 }
                 .keyboardShortcut("q")
