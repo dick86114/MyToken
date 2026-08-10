@@ -2,6 +2,13 @@ import Foundation
 import XCTest
 
 final class DeliveryScriptTests: XCTestCase {
+    func test构建脚本已打包为测试资源() {
+        XCTAssertNotNil(
+            Bundle(for: DeliveryScriptTests.self)
+                .url(forResource: "build-dmg", withExtension: "sh")
+        )
+    }
+
     func test构建脚本从仓库外调用仍固定使用脚本所在仓库() throws {
         let fixture = try makeFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
@@ -54,10 +61,11 @@ final class DeliveryScriptTests: XCTestCase {
             to: repository.appendingPathComponent("project.yml")
         )
 
-        let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-        let sourceScript = testsDirectory
-            .deletingLastPathComponent()
-            .appendingPathComponent("scripts/build-dmg.sh")
+        guard let sourceScript = Bundle(for: DeliveryScriptTests.self)
+            .url(forResource: "build-dmg", withExtension: "sh")
+        else {
+            throw CocoaError(.fileNoSuchFile)
+        }
         let copiedScript = scripts.appendingPathComponent("build-dmg.sh")
         try FileManager.default.copyItem(at: sourceScript, to: copiedScript)
         try FileManager.default.setAttributes(
