@@ -1,4 +1,5 @@
 import Foundation
+@preconcurrency import UserNotifications
 import XCTest
 @testable import RoutinUsage
 
@@ -189,17 +190,19 @@ final class AlertManagerTests: XCTestCase {
         let key = makeKey()
 
         for windowIndex in 1...10 {
+            let alerts = context.evaluator.evaluate(
+                key: key,
+                snapshot: periodicSnapshot(
+                    fiveHourPercent: 96,
+                    windowEnd: Date(timeIntervalSince1970: Double(windowIndex * 10_000))
+                ),
+                thresholds: .init()
+            )
             XCTAssertEqual(
-                context.evaluator.evaluate(
-                    key: key,
-                    snapshot: periodicSnapshot(
-                        fiveHourPercent: 96,
-                        windowEnd: Date(timeIntervalSince1970: Double(windowIndex * 10_000))
-                    ),
-                    thresholds: .init()
-                ).map(\.level),
+                alerts.map(\.level),
                 [.high]
             )
+            markDelivered(alerts, evaluator: context.evaluator)
         }
 
         var persistedKeys = try persistedWindowKeys(from: context.defaults)
@@ -210,17 +213,19 @@ final class AlertManagerTests: XCTestCase {
         XCTAssertEqual(Set(currentKeys.map(\.windowIdentifier)), ["100000.0"])
         XCTAssertEqual(Set(currentKeys.map(\.threshold)), [80, 95])
 
+        let changedThresholdAlerts = context.evaluator.evaluate(
+            key: key,
+            snapshot: periodicSnapshot(
+                fiveHourPercent: 99,
+                windowEnd: Date(timeIntervalSince1970: 100_000)
+            ),
+            thresholds: .init(low: 85, high: 98)
+        )
         XCTAssertEqual(
-            context.evaluator.evaluate(
-                key: key,
-                snapshot: periodicSnapshot(
-                    fiveHourPercent: 99,
-                    windowEnd: Date(timeIntervalSince1970: 100_000)
-                ),
-                thresholds: .init(low: 85, high: 98)
-            ).map(\.level),
+            changedThresholdAlerts.map(\.level),
             [.high]
         )
+        markDelivered(changedThresholdAlerts, evaluator: context.evaluator)
 
         persistedKeys = try persistedWindowKeys(from: context.defaults)
         currentKeys = persistedKeys.filter {
@@ -244,22 +249,20 @@ final class AlertManagerTests: XCTestCase {
             windowEnd: Date(timeIntervalSince1970: 10_000)
         )
 
-        XCTAssertEqual(
-            firstEvaluator.evaluate(
-                key: firstKey,
-                snapshot: snapshot,
-                thresholds: .init()
-            ).map(\.level),
-            [.low]
+        let firstAlerts = firstEvaluator.evaluate(
+            key: firstKey,
+            snapshot: snapshot,
+            thresholds: .init()
         )
-        XCTAssertEqual(
-            secondEvaluator.evaluate(
-                key: secondKey,
-                snapshot: snapshot,
-                thresholds: .init()
-            ).map(\.level),
-            [.low]
+        XCTAssertEqual(firstAlerts.map(\.level), [.low])
+        markDelivered(firstAlerts, evaluator: firstEvaluator)
+        let secondAlerts = secondEvaluator.evaluate(
+            key: secondKey,
+            snapshot: snapshot,
+            thresholds: .init()
         )
+        XCTAssertEqual(secondAlerts.map(\.level), [.low])
+        markDelivered(secondAlerts, evaluator: secondEvaluator)
 
         let reloadedDefaults = try XCTUnwrap(UserDefaults(suiteName: context.suiteName))
         let reloadedEvaluator = AlertEvaluator(defaults: reloadedDefaults)
@@ -305,6 +308,61 @@ final class AlertManagerTests: XCTestCase {
                 snapshot: snapshot,
                 thresholds: .init()
             ),
+            []
+        )
+    }
+
+    func test未完成投递在进程重启后恢复通知资格() {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let key = makeKey()
+        let snapshot = tokenSnapshot(percent: 96)
+        let firstProcess = AlertEvaluator(
+            defaults: context.defaults,
+            deliveryCoordinator: AlertDeliveryCoordinator()
+        )
+
+        XCTAssertEqual(
+            firstProcess.evaluate(key: key, snapshot: snapshot, thresholds: .init()).map(\.level),
+            [.high]
+        )
+
+        let restartedProcess = AlertEvaluator(
+            defaults: context.defaults,
+            deliveryCoordinator: AlertDeliveryCoordinator()
+        )
+        XCTAssertEqual(
+            restartedProcess.evaluate(key: key, snapshot: snapshot, thresholds: .init()).map(\.level),
+            [.high]
+        )
+    }
+
+    func test成功投递后在进程重启仍保持去重() async throws {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let key = makeKey()
+        let snapshot = tokenSnapshot(percent: 96)
+        let firstProcess = AlertEvaluator(
+            defaults: context.defaults,
+            deliveryCoordinator: AlertDeliveryCoordinator()
+        )
+        let manager = AlertManager(
+            evaluator: firstProcess,
+            sender: NotificationSenderSpy(authorizationGranted: true)
+        )
+
+        _ = try await manager.evaluateAndNotify(
+            key: key,
+            snapshot: snapshot,
+            notificationsEnabled: true
+        )
+
+        let restartedProcess = AlertEvaluator(
+            defaults: context.defaults,
+            deliveryCoordinator: AlertDeliveryCoordinator()
+        )
+        XCTAssertEqual(
+            restartedProcess.evaluate(key: key, snapshot: snapshot, thresholds: .init()),
             []
         )
     }
@@ -388,6 +446,43 @@ final class AlertManagerTests: XCTestCase {
         let enabledSenderState = await sender.state
         XCTAssertEqual(enabledSenderState.authorizationRequestCount, 1)
         XCTAssertEqual(enabledSenderState.sentAlerts.map(\.level), [.high])
+    }
+
+    func test异常百分比不会请求授权发送通知或消耗提醒资格() async throws {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let sender = NotificationSenderSpy(authorizationResults: Array(repeating: true, count: 5))
+        let manager = AlertManager(evaluator: context.evaluator, sender: sender)
+        let key = makeKey()
+
+        for percent in [
+            Double.nan,
+            Double.infinity,
+            -Double.infinity,
+            Double.greatestFiniteMagnitude,
+            -1
+        ] {
+            let alerts = try await manager.evaluateAndNotify(
+                key: key,
+                snapshot: malformedTokenSnapshot(percent: percent),
+                thresholds: .init(),
+                notificationsEnabled: true
+            )
+            XCTAssertEqual(alerts, [], "异常百分比不应生成通知：\(percent)")
+        }
+
+        let senderState = await sender.state
+        XCTAssertEqual(senderState.authorizationRequestCount, 0)
+        XCTAssertEqual(senderState.sentAlerts, [])
+
+        XCTAssertEqual(
+            context.evaluator.evaluate(
+                key: key,
+                snapshot: tokenSnapshot(percent: 80),
+                thresholds: .init()
+            ).map(\.level),
+            [.low]
+        )
     }
 
     func test授权未通过时不发送通知且下次授权后仍可提醒() async throws {
@@ -801,6 +896,60 @@ final class AlertManagerTests: XCTestCase {
         XCTAssertEqual(tokenAlert.notificationBody(timeZone: timeZone), "主账号 · Token 用量已达 80%")
     }
 
+    func test遗留Plan秘密名称不会进入通知文案() throws {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let secret = "plan-sensitive-8F2A"
+        let key = KeyConfiguration(
+            id: UUID(),
+            name: secret,
+            keySuffix: "8F2A",
+            sortOrder: 0
+        )
+
+        let alert = try XCTUnwrap(context.evaluator.evaluate(
+            key: key,
+            snapshot: tokenSnapshot(percent: 80),
+            thresholds: .init()
+        ).first)
+        let body = alert.notificationBody()
+
+        XCTAssertFalse(body.contains(secret))
+        XCTAssertTrue(body.contains("未命名 Key"))
+    }
+
+    func test系统发送器安装并持有前台通知代理() async throws {
+        let center = NotificationCenterSpy()
+        weak var installedDelegate: AnyObject?
+
+        do {
+            let sender = UserNotificationSender(center: center)
+            installedDelegate = center.delegate
+            XCTAssertNotNil(installedDelegate)
+
+            let context = makeContext()
+            defer { context.cleanUp() }
+            let alert = try XCTUnwrap(context.evaluator.evaluate(
+                key: makeKey(),
+                snapshot: tokenSnapshot(percent: 80),
+                thresholds: .init()
+            ).first)
+            try await sender.send(alert)
+            XCTAssertEqual(center.requests.count, 1)
+            withExtendedLifetime(sender) {}
+            XCTAssertNotNil(installedDelegate)
+        }
+
+        XCTAssertNil(installedDelegate)
+    }
+
+    func test前台通知展示策略包含横幅列表与声音() {
+        XCTAssertEqual(
+            ForegroundNotificationDelegate.presentationOptions,
+            [.banner, .list, .sound]
+        )
+    }
+
     private func makeContext() -> AlertEvaluatorTestContext {
         let suiteName = "ai.routin.usage-monitor.alert-tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -857,6 +1006,25 @@ final class AlertManagerTests: XCTestCase {
         )
     }
 
+    private func malformedTokenSnapshot(percent: Double) -> UsageSnapshot {
+        UsageSnapshot(
+            planName: "异常资源包",
+            kind: .tokenPack,
+            fiveHour: nil,
+            weekly: nil,
+            token: UsageMetric(
+                used: 0,
+                limit: 100,
+                remaining: 100,
+                percent: percent,
+                unit: .token,
+                windowEnd: nil
+            ),
+            allowedModels: [],
+            fetchedAt: .now
+        )
+    }
+
     private func metric(
         percent: Double,
         windowEnd: Date?,
@@ -875,6 +1043,26 @@ final class AlertManagerTests: XCTestCase {
     private func persistedWindowKeys(from defaults: UserDefaults) throws -> Set<AlertWindowKey> {
         let data = try XCTUnwrap(defaults.data(forKey: "usageAlertTriggeredWindows"))
         return try JSONDecoder().decode(Set<AlertWindowKey>.self, from: data)
+    }
+
+    private func markDelivered(_ alerts: [UsageAlert], evaluator: AlertEvaluator) {
+        for alert in alerts {
+            XCTAssertTrue(evaluator.beginDelivery(of: alert))
+            evaluator.finishDelivery(of: alert)
+        }
+    }
+}
+
+private final class NotificationCenterSpy: UserNotificationCenterServing, @unchecked Sendable {
+    weak var delegate: (any UNUserNotificationCenterDelegate)?
+    private(set) var requests: [UNNotificationRequest] = []
+
+    func requestAuthorization(options _: UNAuthorizationOptions) async throws -> Bool {
+        true
+    }
+
+    func add(_ request: UNNotificationRequest) async throws {
+        requests.append(request)
     }
 }
 

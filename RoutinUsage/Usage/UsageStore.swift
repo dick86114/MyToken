@@ -149,7 +149,12 @@ final class UsageStore {
 
         if let snapshot {
             try? cache.save(snapshot, for: keyID)
-            await evaluateNotifications(for: state.configuration, snapshot: snapshot)
+            scheduleNotification(NotificationWork(
+                keyID: keyID,
+                refreshGeneration: refreshGenerationByKeyID[keyID]!,
+                configuration: state.configuration,
+                snapshot: snapshot
+            ))
         } else {
             try? cache.delete(for: keyID)
         }
@@ -168,7 +173,13 @@ final class UsageStore {
         guard !normalizedName.isEmpty else {
             throw UsageStoreError.invalidName
         }
-        guard secret.hasPrefix("plan-"), secret.count > "plan-".count else {
+        guard KeyCredentialPolicy.isSafeDisplayName(normalizedName) else {
+            throw UsageStoreError.invalidName
+        }
+        guard
+            KeyCredentialPolicy.hasValidPrefix(secret),
+            KeyCredentialPolicy.hasSufficientSecretPayload(secret)
+        else {
             throw UsageStoreError.invalidSecret
         }
 
@@ -209,7 +220,14 @@ final class UsageStore {
 
         if let result {
             try? cache.save(result, for: configuration.id)
-            await evaluateNotifications(for: configuration, snapshot: result)
+            let refreshGeneration = UUID()
+            refreshGenerationByKeyID[configuration.id] = refreshGeneration
+            scheduleNotification(NotificationWork(
+                keyID: configuration.id,
+                refreshGeneration: refreshGeneration,
+                configuration: configuration,
+                snapshot: result
+            ))
         } else {
             try? cache.delete(for: configuration.id)
         }
@@ -407,33 +425,18 @@ final class UsageStore {
         guard !Task.isCancelled else {
             return
         }
-        notificationWorks = notificationWorks.filter(isNotificationWorkCurrent)
-        let manager = AlertManager(evaluator: alertEvaluator, sender: notificationSender)
-        let thresholds = thresholds
-        let notificationsEnabled = notificationsEnabled
-        await withTaskGroup(of: Void.self) { group in
-            for work in notificationWorks {
-                group.addTask { [self] in
-                    guard !Task.isCancelled else {
-                        return
-                    }
-                    guard await isNotificationWorkCurrent(work) else {
-                        return
-                    }
-                    _ = try? await manager.evaluateAndNotify(
-                        key: work.configuration,
-                        snapshot: work.snapshot,
-                        thresholds: thresholds,
-                        notificationsEnabled: notificationsEnabled
-                    )
-                }
-            }
+        for work in notificationWorks where isNotificationWorkCurrent(work) {
+            scheduleNotification(work)
         }
     }
 
     private func isNotificationWorkCurrent(_ work: NotificationWork) -> Bool {
         refreshGenerationByKeyID[work.keyID] == work.refreshGeneration
             && states[work.keyID] != nil
+    }
+
+    private func shouldDeliverNotification(_ work: NotificationWork) -> Bool {
+        notificationsEnabled && isNotificationWorkCurrent(work)
     }
 
     private func merge(_ outcome: RefreshOutcome) -> NotificationWork? {
@@ -505,17 +508,27 @@ final class UsageStore {
         }
     }
 
-    private func evaluateNotifications(
-        for configuration: KeyConfiguration,
-        snapshot: UsageSnapshot
-    ) async {
+    private func scheduleNotification(_ work: NotificationWork) {
         let manager = AlertManager(evaluator: alertEvaluator, sender: notificationSender)
-        _ = try? await manager.evaluateAndNotify(
-            key: configuration,
-            snapshot: snapshot,
-            thresholds: thresholds,
-            notificationsEnabled: notificationsEnabled
-        )
+        let thresholds = thresholds
+        let notificationsEnabled = notificationsEnabled
+        Task { [weak self] in
+            guard let self, self.isNotificationWorkCurrent(work) else {
+                return
+            }
+            _ = try? await manager.evaluateAndNotify(
+                key: work.configuration,
+                snapshot: work.snapshot,
+                thresholds: thresholds,
+                notificationsEnabled: notificationsEnabled,
+                shouldDeliver: { [weak self] in
+                    guard let self else {
+                        return false
+                    }
+                    return await self.shouldDeliverNotification(work)
+                }
+            )
+        }
     }
 
     private func persistSelection() {

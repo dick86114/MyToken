@@ -68,6 +68,10 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertEqual(store.state(for: key.id)?.snapshot, fresh)
         XCTAssertEqual(store.state(for: key.id)?.lastSuccessAt, context.now)
         XCTAssertFalse(store.state(for: key.id)?.isStale == true)
+        let didSendAlert = await waitUntilAsync {
+            await context.sender.sentAlerts().count == 1
+        }
+        XCTAssertTrue(didSendAlert)
         let alerts = await context.sender.sentAlerts()
         XCTAssertEqual(alerts.map(\.keyID), [key.id])
         XCTAssertEqual(store.state(for: failedKey.id)?.snapshot, failedCache)
@@ -284,6 +288,106 @@ final class UsageStoreTests: XCTestCase {
         await refresh.value
     }
 
+    func test刷新全部提交状态后不等待通知授权完成() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let secret = "plan-refresh-notification-0001"
+        let key = try context.addKey(name: "主账号", secret: secret)
+        let snapshot = makeSnapshot(planName: "高用量", percent: 96, fetchedAt: context.now)
+        let sender = BlockingAuthorizationNotificationSender()
+        let store = context.makeStore(
+            fetcher: ScriptedUsageFetcher(responses: [secret: .success(snapshot)]),
+            notificationSender: sender,
+            notificationsEnabled: true
+        )
+        var didReturn = false
+
+        let refresh = Task { @MainActor in
+            await store.refreshAll()
+            didReturn = true
+        }
+        await sender.waitUntilAuthorizationRequested()
+
+        let returnedBeforeAuthorization = await waitUntil { didReturn }
+        XCTAssertTrue(returnedBeforeAuthorization)
+        XCTAssertEqual(store.state(for: key.id)?.snapshot, snapshot)
+        XCTAssertFalse(store.isRefreshing)
+
+        await sender.resolveAuthorization(true)
+        await refresh.value
+    }
+
+    func test新增Key落库发布后不等待通知授权完成() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let secret = "plan-add-notification-0001"
+        let snapshot = makeSnapshot(planName: "高用量", percent: 96, fetchedAt: context.now)
+        let sender = BlockingAuthorizationNotificationSender()
+        let store = context.makeStore(
+            fetcher: ScriptedUsageFetcher(responses: [secret: .success(snapshot)]),
+            notificationSender: sender,
+            notificationsEnabled: true
+        )
+        var result: Result<Void, Error>?
+
+        let addition = Task { @MainActor in
+            do {
+                try await store.addValidatedKey(name: "新账号", secret: secret)
+                result = .success(())
+            } catch {
+                result = .failure(error)
+            }
+        }
+        await sender.waitUntilAuthorizationRequested()
+
+        let returnedBeforeAuthorization = await waitUntil { result != nil }
+        XCTAssertTrue(returnedBeforeAuthorization)
+        let saved = try XCTUnwrap(context.repository.list().first)
+        XCTAssertEqual(store.state(for: saved.id)?.snapshot, snapshot)
+        XCTAssertEqual(try context.cache.load(for: saved.id), snapshot)
+
+        await sender.resolveAuthorization(true)
+        await addition.value
+        _ = try result?.get()
+    }
+
+    func test旧代际通知授权完成时不会发送已过时高用量提醒() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let secret = "plan-generation-notification-0001"
+        let key = try context.addKey(name: "主账号", secret: secret)
+        let highSnapshot = makeSnapshot(planName: "高用量", percent: 96, fetchedAt: context.now)
+        let lowSnapshot = makeSnapshot(planName: "低用量", percent: 20, fetchedAt: context.now)
+        let fetcher = ScriptedUsageFetcher(responses: [secret: .success(highSnapshot)])
+        let sender = BlockingAuthorizationNotificationSender()
+        let store = context.makeStore(
+            fetcher: fetcher,
+            notificationSender: sender,
+            notificationsEnabled: true
+        )
+
+        await store.refresh(keyID: key.id)
+        await sender.waitUntilAuthorizationRequested()
+        await fetcher.setResponse(.success(lowSnapshot), for: secret)
+        await store.refresh(keyID: key.id)
+        await sender.resolveAuthorization(true)
+        for _ in 0..<100 {
+            await Task.yield()
+        }
+
+        let sentAlerts = await sender.sentAlerts()
+        XCTAssertEqual(sentAlerts, [])
+        XCTAssertEqual(store.state(for: key.id)?.snapshot, lowSnapshot)
+        XCTAssertEqual(
+            context.evaluator.evaluate(
+                key: key,
+                snapshot: highSnapshot,
+                thresholds: .init()
+            ).map(\.level),
+            [.high]
+        )
+    }
+
     func test等待其他网络结果期间删除Key会丢弃其延迟通知() async throws {
         let context = try makeContext()
         defer { context.cleanUp() }
@@ -345,6 +449,10 @@ final class UsageStoreTests: XCTestCase {
         let fetcher = ScriptedUsageFetcher(responses: [secret: .success(snapshot)])
         let store = context.makeStore(fetcher: fetcher, notificationsEnabled: true)
         await store.refresh(keyID: key.id)
+        let didSendAlert = await waitUntilAsync {
+            await context.sender.sentAlerts().count == 1
+        }
+        XCTAssertTrue(didSendAlert)
         XCTAssertTrue(context.evaluator.evaluate(
             key: key,
             snapshot: snapshot,
@@ -512,6 +620,16 @@ private extension UsageStoreTests {
             await Task.yield()
         }
         return condition()
+    }
+
+    func waitUntilAsync(_ condition: () async -> Bool) async -> Bool {
+        for _ in 0..<1_000 {
+            if await condition() {
+                return true
+            }
+            await Task.yield()
+        }
+        return await condition()
     }
 
     func makeContext() throws -> UsageStoreTestContext {

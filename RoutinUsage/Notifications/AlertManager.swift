@@ -51,6 +51,9 @@ struct UsageAlert: Equatable, Sendable {
     }
 
     private var formattedPercent: String {
+        guard percent.isSafeNotificationPercent else {
+            return "—"
+        }
         let rounded = percent.rounded()
         if abs(percent - rounded) < 0.000_001 {
             return String(Int(rounded))
@@ -85,7 +88,9 @@ private struct AlertPeriodicWindowWatermark: Codable, Hashable, Sendable {
     let windowIdentifier: String
 }
 
-private final class AlertEvaluatorSharedState: @unchecked Sendable {
+final class AlertDeliveryCoordinator: @unchecked Sendable {
+    static let processShared = AlertDeliveryCoordinator()
+
     let lock = NSLock()
     var reservationOwners: [AlertWindowKey: UUID] = [:]
     var inFlightReservations: Set<UUID> = []
@@ -96,12 +101,15 @@ private final class AlertEvaluatorSharedState: @unchecked Sendable {
 final class AlertEvaluator: @unchecked Sendable {
     private static let persistedKey = "usageAlertTriggeredWindows"
     private static let periodicWatermarksKey = "usageAlertLatestPeriodicWindows"
-    private static let sharedState = AlertEvaluatorSharedState()
-
     private let defaults: UserDefaults
+    private let deliveryCoordinator: AlertDeliveryCoordinator
 
-    init(defaults: UserDefaults = .standard) {
+    init(
+        defaults: UserDefaults = .standard,
+        deliveryCoordinator: AlertDeliveryCoordinator = .processShared
+    ) {
         self.defaults = defaults
+        self.deliveryCoordinator = deliveryCoordinator
     }
 
     func evaluate(
@@ -109,10 +117,11 @@ final class AlertEvaluator: @unchecked Sendable {
         snapshot: UsageSnapshot,
         thresholds: AlertThresholds
     ) -> [UsageAlert] {
-        Self.sharedState.lock.lock()
-        defer { Self.sharedState.lock.unlock() }
+        deliveryCoordinator.lock.lock()
+        defer { deliveryCoordinator.lock.unlock() }
 
-        var triggeredWindows = Self.loadTriggeredWindows(from: defaults)
+        let deliveredWindows = Self.loadTriggeredWindows(from: defaults)
+        var triggeredWindows = deliveredWindows.union(deliveryCoordinator.reservationOwners.keys)
         var periodicWatermarks = Self.loadPeriodicWatermarks(from: defaults)
         var alerts: [UsageAlert] = []
         switch snapshot.kind {
@@ -156,64 +165,65 @@ final class AlertEvaluator: @unchecked Sendable {
             }
         }
 
-        persistTriggeredWindows(triggeredWindows)
+        persistTriggeredWindows(deliveredWindows.intersection(triggeredWindows))
         persistPeriodicWatermarks(periodicWatermarks)
         return alerts
     }
 
     func restoreEligibility(for alerts: ArraySlice<UsageAlert>) {
-        Self.sharedState.lock.lock()
-        defer { Self.sharedState.lock.unlock() }
+        deliveryCoordinator.lock.lock()
+        defer { deliveryCoordinator.lock.unlock() }
 
-        var triggeredWindows = Self.loadTriggeredWindows(from: defaults)
+        let deliveredWindows = Self.loadTriggeredWindows(from: defaults)
+        var triggeredWindows = deliveredWindows.union(deliveryCoordinator.reservationOwners.keys)
         for alert in alerts {
-            Self.sharedState.inFlightReservations.remove(alert.reservationID)
+            deliveryCoordinator.inFlightReservations.remove(alert.reservationID)
             let wasSuperseded = alert.triggeredWindows.contains { windowKey in
-                guard let owner = Self.sharedState.reservationOwners[windowKey] else {
+                guard let owner = deliveryCoordinator.reservationOwners[windowKey] else {
                     return false
                 }
                 return owner != alert.reservationID
             }
             if wasSuperseded {
-                Self.sharedState.failedSupersededReservations.insert(alert.reservationID)
+                deliveryCoordinator.failedSupersededReservations.insert(alert.reservationID)
             }
             for windowKey in alert.triggeredWindows
-                where Self.sharedState.reservationOwners[windowKey] == alert.reservationID {
+                where deliveryCoordinator.reservationOwners[windowKey] == alert.reservationID {
                 guard let previousOwner = alert.replacedReservationOwners[windowKey] else {
                     triggeredWindows.remove(windowKey)
-                    Self.sharedState.reservationOwners.removeValue(forKey: windowKey)
-                    Self.sharedState.pendingResetWindows.removeValue(forKey: windowKey)
+                    deliveryCoordinator.reservationOwners.removeValue(forKey: windowKey)
+                    deliveryCoordinator.pendingResetWindows.removeValue(forKey: windowKey)
                     continue
                 }
 
-                if Self.sharedState.failedSupersededReservations.contains(previousOwner) {
+                if deliveryCoordinator.failedSupersededReservations.contains(previousOwner) {
                     triggeredWindows.remove(windowKey)
-                    Self.sharedState.reservationOwners.removeValue(forKey: windowKey)
-                    Self.sharedState.pendingResetWindows.removeValue(forKey: windowKey)
+                    deliveryCoordinator.reservationOwners.removeValue(forKey: windowKey)
+                    deliveryCoordinator.pendingResetWindows.removeValue(forKey: windowKey)
                     continue
                 }
 
-                let pendingResetOwner = Self.sharedState.pendingResetWindows[windowKey]
+                let pendingResetOwner = deliveryCoordinator.pendingResetWindows[windowKey]
                 if
                     pendingResetOwner != nil,
-                    !Self.sharedState.inFlightReservations.contains(previousOwner)
+                    !deliveryCoordinator.inFlightReservations.contains(previousOwner)
                 {
                     triggeredWindows.remove(windowKey)
-                    Self.sharedState.reservationOwners.removeValue(forKey: windowKey)
-                    Self.sharedState.pendingResetWindows.removeValue(forKey: windowKey)
+                    deliveryCoordinator.reservationOwners.removeValue(forKey: windowKey)
+                    deliveryCoordinator.pendingResetWindows.removeValue(forKey: windowKey)
                     continue
                 }
 
-                Self.sharedState.reservationOwners[windowKey] = previousOwner
+                deliveryCoordinator.reservationOwners[windowKey] = previousOwner
                 if pendingResetOwner == alert.reservationID {
-                    Self.sharedState.pendingResetWindows[windowKey] = previousOwner
+                    deliveryCoordinator.pendingResetWindows[windowKey] = previousOwner
                 }
             }
-            Self.sharedState.failedSupersededReservations.subtract(
+            deliveryCoordinator.failedSupersededReservations.subtract(
                 alert.replacedReservationOwners.values
             )
         }
-        persistTriggeredWindows(triggeredWindows)
+        persistTriggeredWindows(deliveredWindows.intersection(triggeredWindows))
     }
 
     func restoreEligibility(for alerts: [UsageAlert]) {
@@ -221,63 +231,68 @@ final class AlertEvaluator: @unchecked Sendable {
     }
 
     func beginDelivery(of alert: UsageAlert) -> Bool {
-        Self.sharedState.lock.lock()
-        defer { Self.sharedState.lock.unlock() }
+        deliveryCoordinator.lock.lock()
+        defer { deliveryCoordinator.lock.unlock() }
 
         let triggeredWindows = Self.loadTriggeredWindows(from: defaults)
+            .union(deliveryCoordinator.reservationOwners.keys)
         let isCurrent = alert.triggeredWindows.allSatisfy { windowKey in
             triggeredWindows.contains(windowKey)
-                && Self.sharedState.reservationOwners[windowKey] == alert.reservationID
+                && deliveryCoordinator.reservationOwners[windowKey] == alert.reservationID
         }
         guard isCurrent else {
             return false
         }
 
-        Self.sharedState.inFlightReservations.insert(alert.reservationID)
+        deliveryCoordinator.inFlightReservations.insert(alert.reservationID)
         return true
     }
 
     func finishDelivery(of alert: UsageAlert) {
-        Self.sharedState.lock.lock()
-        defer { Self.sharedState.lock.unlock() }
+        deliveryCoordinator.lock.lock()
+        defer { deliveryCoordinator.lock.unlock() }
 
         var triggeredWindows = Self.loadTriggeredWindows(from: defaults)
-        Self.sharedState.inFlightReservations.remove(alert.reservationID)
+        deliveryCoordinator.inFlightReservations.remove(alert.reservationID)
         for windowKey in alert.triggeredWindows
-            where Self.sharedState.reservationOwners[windowKey] == alert.reservationID {
-            if Self.sharedState.pendingResetWindows[windowKey] == alert.reservationID {
+            where deliveryCoordinator.reservationOwners[windowKey] == alert.reservationID {
+            if deliveryCoordinator.pendingResetWindows[windowKey] == alert.reservationID {
                 triggeredWindows.remove(windowKey)
+            } else {
+                triggeredWindows.insert(windowKey)
             }
-            Self.sharedState.pendingResetWindows.removeValue(forKey: windowKey)
-            Self.sharedState.reservationOwners.removeValue(forKey: windowKey)
+            deliveryCoordinator.pendingResetWindows.removeValue(forKey: windowKey)
+            deliveryCoordinator.reservationOwners.removeValue(forKey: windowKey)
         }
-        Self.sharedState.failedSupersededReservations.subtract(
+        deliveryCoordinator.failedSupersededReservations.subtract(
             alert.replacedReservationOwners.values
         )
         persistTriggeredWindows(triggeredWindows)
     }
 
     func clearState(for keyID: UUID) {
-        Self.sharedState.lock.lock()
-        defer { Self.sharedState.lock.unlock() }
+        deliveryCoordinator.lock.lock()
+        defer { deliveryCoordinator.lock.unlock() }
 
         var triggeredWindows = Self.loadTriggeredWindows(from: defaults)
-        let removedWindows = triggeredWindows.filter { $0.keyID == keyID }
+        let removedWindows = Set(triggeredWindows.filter { $0.keyID == keyID }).union(
+            deliveryCoordinator.reservationOwners.keys.filter { $0.keyID == keyID }
+        )
         triggeredWindows.subtract(removedWindows)
 
         var periodicWatermarks = Self.loadPeriodicWatermarks(from: defaults)
         periodicWatermarks = periodicWatermarks.filter { $0.keyID != keyID }
 
         let removedReservations = Set(removedWindows.compactMap {
-            Self.sharedState.reservationOwners.removeValue(forKey: $0)
+            deliveryCoordinator.reservationOwners.removeValue(forKey: $0)
         })
         for window in removedWindows {
-            Self.sharedState.pendingResetWindows.removeValue(forKey: window)
+            deliveryCoordinator.pendingResetWindows.removeValue(forKey: window)
         }
-        let remainingReservations = Set(Self.sharedState.reservationOwners.values)
+        let remainingReservations = Set(deliveryCoordinator.reservationOwners.values)
         for reservationID in removedReservations where !remainingReservations.contains(reservationID) {
-            Self.sharedState.inFlightReservations.remove(reservationID)
-            Self.sharedState.failedSupersededReservations.remove(reservationID)
+            deliveryCoordinator.inFlightReservations.remove(reservationID)
+            deliveryCoordinator.failedSupersededReservations.remove(reservationID)
         }
 
         persistTriggeredWindows(triggeredWindows)
@@ -294,6 +309,9 @@ final class AlertEvaluator: @unchecked Sendable {
         triggeredWindows: inout Set<AlertWindowKey>,
         periodicWatermarks: inout Set<AlertPeriodicWindowWatermark>
     ) -> [UsageAlert] {
+        guard metric.percent.isSafeNotificationPercent else {
+            return []
+        }
         let levels: [(threshold: Int, level: AlertLevel)] = [
             (thresholds.low, .low),
             (thresholds.high, .high)
@@ -320,10 +338,10 @@ final class AlertEvaluator: @unchecked Sendable {
                     threshold: item.threshold
                 )
                 if
-                    let reservationID = Self.sharedState.reservationOwners[windowKey],
-                    Self.sharedState.inFlightReservations.contains(reservationID)
+                    let reservationID = deliveryCoordinator.reservationOwners[windowKey],
+                    deliveryCoordinator.inFlightReservations.contains(reservationID)
                 {
-                    Self.sharedState.pendingResetWindows[windowKey] = reservationID
+                    deliveryCoordinator.pendingResetWindows[windowKey] = reservationID
                     continue
                 }
                 removeState(for: [windowKey], triggeredWindows: &triggeredWindows)
@@ -368,22 +386,22 @@ final class AlertEvaluator: @unchecked Sendable {
             )
             if
                 !newlyTriggeredWindows.contains(lowerWindowKey),
-                let previousOwner = Self.sharedState.reservationOwners[lowerWindowKey]
+                let previousOwner = deliveryCoordinator.reservationOwners[lowerWindowKey]
             {
                 reservedWindows.insert(lowerWindowKey)
                 replacedReservationOwners[lowerWindowKey] = previousOwner
             }
         }
         for windowKey in reservedWindows {
-            Self.sharedState.reservationOwners[windowKey] = reservationID
+            deliveryCoordinator.reservationOwners[windowKey] = reservationID
             if replacedReservationOwners[windowKey] == nil {
-                Self.sharedState.pendingResetWindows.removeValue(forKey: windowKey)
+                deliveryCoordinator.pendingResetWindows.removeValue(forKey: windowKey)
             }
         }
 
         return [UsageAlert(
             keyID: key.id,
-            keyName: key.name,
+            keyName: key.displayName,
             dimension: dimension,
             level: highest.level,
             percent: metric.percent,
@@ -441,14 +459,14 @@ final class AlertEvaluator: @unchecked Sendable {
         var affectedReservations: Set<UUID> = []
         for windowKey in windowKeys {
             triggeredWindows.remove(windowKey)
-            Self.sharedState.pendingResetWindows.removeValue(forKey: windowKey)
-            if let reservationID = Self.sharedState.reservationOwners.removeValue(forKey: windowKey) {
+            deliveryCoordinator.pendingResetWindows.removeValue(forKey: windowKey)
+            if let reservationID = deliveryCoordinator.reservationOwners.removeValue(forKey: windowKey) {
                 affectedReservations.insert(reservationID)
             }
         }
-        let remainingReservations = Set(Self.sharedState.reservationOwners.values)
+        let remainingReservations = Set(deliveryCoordinator.reservationOwners.values)
         for reservationID in affectedReservations where !remainingReservations.contains(reservationID) {
-            Self.sharedState.inFlightReservations.remove(reservationID)
+            deliveryCoordinator.inFlightReservations.remove(reservationID)
         }
     }
 
@@ -494,6 +512,12 @@ final class AlertEvaluator: @unchecked Sendable {
     }
 }
 
+private extension Double {
+    var isSafeNotificationPercent: Bool {
+        isFinite && self >= 0 && rounded() < Double(Int.max)
+    }
+}
+
 protocol NotificationSending: Sendable {
     func requestAuthorization() async throws -> Bool
     func send(_ alert: UsageAlert) async throws
@@ -512,7 +536,8 @@ struct AlertManager: Sendable {
         key: KeyConfiguration,
         snapshot: UsageSnapshot,
         thresholds: AlertThresholds = AlertThresholds(),
-        notificationsEnabled: Bool
+        notificationsEnabled: Bool,
+        shouldDeliver: @escaping @Sendable () async -> Bool = { true }
     ) async throws -> [UsageAlert] {
         guard notificationsEnabled else {
             return []
@@ -521,6 +546,10 @@ struct AlertManager: Sendable {
         let alerts = evaluator.evaluate(key: key, snapshot: snapshot, thresholds: thresholds)
         guard !alerts.isEmpty else {
             return []
+        }
+        guard !Task.isCancelled, await shouldDeliver() else {
+            evaluator.restoreEligibility(for: alerts)
+            return alerts
         }
         let authorized: Bool
         do {
@@ -534,6 +563,10 @@ struct AlertManager: Sendable {
             return alerts
         }
         for (index, alert) in alerts.enumerated() {
+            guard !Task.isCancelled, await shouldDeliver() else {
+                evaluator.restoreEligibility(for: alerts[index...])
+                return alerts
+            }
             guard evaluator.beginDelivery(of: alert) else {
                 evaluator.restoreEligibility(for: [alert])
                 continue
@@ -550,16 +583,47 @@ struct AlertManager: Sendable {
     }
 }
 
+protocol UserNotificationCenterServing: AnyObject {
+    var delegate: (any UNUserNotificationCenterDelegate)? { get set }
+    func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool
+    func add(_ request: UNNotificationRequest) async throws
+}
+
+extension UNUserNotificationCenter: UserNotificationCenterServing {}
+
+final class ForegroundNotificationDelegate:
+    NSObject,
+    UNUserNotificationCenterDelegate,
+    @unchecked Sendable
+{
+    static let presentationOptions: UNNotificationPresentationOptions = [
+        .banner,
+        .list,
+        .sound
+    ]
+
+    func userNotificationCenter(
+        _: UNUserNotificationCenter,
+        willPresent _: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        Self.presentationOptions
+    }
+}
+
 final class UserNotificationSender: NotificationSending, @unchecked Sendable {
-    private let center: UNUserNotificationCenter
+    private let center: any UserNotificationCenterServing
     private let timeZone: TimeZone
+    private let foregroundDelegate: ForegroundNotificationDelegate
 
     init(
-        center: UNUserNotificationCenter = .current(),
+        center: any UserNotificationCenterServing = UNUserNotificationCenter.current(),
         timeZone: TimeZone = .autoupdatingCurrent
     ) {
         self.center = center
         self.timeZone = timeZone
+        let foregroundDelegate = ForegroundNotificationDelegate()
+        self.foregroundDelegate = foregroundDelegate
+        center.delegate = foregroundDelegate
     }
 
     func requestAuthorization() async throws -> Bool {

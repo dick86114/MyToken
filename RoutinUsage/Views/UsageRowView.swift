@@ -42,7 +42,7 @@ enum UsageRowAccessibility {
         isSelected: Bool
     ) -> String {
         let currentPrefix = isSelected ? "当前，" : ""
-        let prefix = "\(currentPrefix)\(state.configuration.name)，"
+        let prefix = "\(currentPrefix)\(state.configuration.displayName)，"
         if state.isStale, metric != nil {
             return prefix + UsageFormatter.statusText(state: state, dimension: dimension)
                 + "，当前显示上次成功数据"
@@ -95,7 +95,7 @@ private extension UsageRowView {
     var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(state.configuration.name)
+                Text(state.configuration.displayName)
                     .font(.headline)
                     .lineLimit(1)
                 Text(subscriptionDescription)

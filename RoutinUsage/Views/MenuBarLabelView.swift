@@ -25,7 +25,7 @@ private extension MenuBarLabelView {
         guard let state = selectedState else {
             return "尚未配置 Key"
         }
-        var parts = [state.configuration.name]
+        var parts = [state.configuration.displayName]
         if let lastSuccessAt = state.lastSuccessAt {
             parts.append("最后更新 \(lastSuccessAt.formatted(date: .omitted, time: .shortened))")
         } else {

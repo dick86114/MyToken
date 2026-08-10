@@ -6,6 +6,30 @@ protocol LoginItemManaging: Sendable {
     func setEnabled(_ enabled: Bool) throws
 }
 
+@MainActor
+enum LoginItemSettingSynchronizer {
+    static func synchronize(
+        settings: AppSettings,
+        manager: any LoginItemManaging
+    ) {
+        settings.launchAtLogin = manager.isEnabled
+    }
+
+    static func setEnabled(
+        _ enabled: Bool,
+        settings: AppSettings,
+        manager: any LoginItemManaging
+    ) throws {
+        do {
+            try manager.setEnabled(enabled)
+        } catch {
+            synchronize(settings: settings, manager: manager)
+            throw error
+        }
+        synchronize(settings: settings, manager: manager)
+    }
+}
+
 enum LoginItemStatus: Sendable {
     case notRegistered
     case enabled

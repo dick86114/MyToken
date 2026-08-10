@@ -20,6 +20,7 @@ struct RoutinUsageApp: App {
         } label: {
             AppMenuBarLabel(environment: environment)
         }
+        .menuBarExtraStyle(.window)
         Settings {
             SettingsView(
                 store: environment.store,
