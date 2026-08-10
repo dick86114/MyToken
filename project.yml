@@ -5,7 +5,7 @@ options:
     macOS: "14.0"
 settings:
   base:
-    SWIFT_VERSION: "6.0"
+    SWIFT_VERSION: "5.0"
     PRODUCT_BUNDLE_IDENTIFIER: ai.routin.usage-monitor
     MARKETING_VERSION: "1.0.0"
     CURRENT_PROJECT_VERSION: 1

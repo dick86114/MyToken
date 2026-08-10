@@ -43,6 +43,12 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(projectSpec.contains("projectFormat: xcode15_3"))
     }
 
+    func test工程锁定Xcode15兼容的Swift版本() throws {
+        let projectSpec = try sourceText(at: "project.yml")
+
+        XCTAssertTrue(projectSpec.contains("SWIFT_VERSION: \"5.0\""))
+    }
+
     func test弹窗详情显示剩余时长与配对分组倍率且不显示允许模型() throws {
         let usageRowView = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
 
