@@ -131,7 +131,7 @@ struct SettingsView: View {
             Button("删除", role: .destructive) { deletePendingKey() }
             Button("取消", role: .cancel) { pendingDeletion = nil }
         } message: {
-            Text("将同时删除系统钥匙串中的 Key 和本地缓存，此操作无法撤销。")
+            Text("将同时删除本地保存的 Key 和用量缓存，此操作无法撤销。")
         }
         .alert(
             "无法完成操作",
@@ -360,6 +360,13 @@ private extension SettingsView {
                     Text("周").tag(DisplayDimension.weekly)
                 }
                 .accessibilityLabel("周期订阅显示维度")
+
+                Picker("显示样式", selection: $settings.menuBarStyle) {
+                    ForEach(MenuBarStyle.allCases, id: \.rawValue) { style in
+                        Text(style.title).tag(style)
+                    }
+                }
+                .accessibilityLabel("菜单栏显示样式")
             }
 
             Section("自动刷新") {

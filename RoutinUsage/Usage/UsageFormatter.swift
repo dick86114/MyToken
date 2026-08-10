@@ -107,6 +107,14 @@ enum UsageFormatter {
         return formatter.string(from: date)
     }
 
+    /// 将已按名称配对的分组倍率合并为单行文本。
+    static func groupMultiplierText(_ groups: [UsageGroupMultiplier]) -> String {
+        groups.map { group in
+            "\(group.name) ×\(NSDecimalNumber(decimal: group.multiplier).stringValue)"
+        }
+        .joined(separator: "、")
+    }
+
     /// 以完整日期时间显示窗口结束时刻，便于跨天查看。
     static func windowEndDescription(_ metric: UsageMetric) -> String? {
         guard let windowEnd = metric.windowEnd else { return nil }
