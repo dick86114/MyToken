@@ -1,16 +1,72 @@
 import SwiftUI
 
 @main
+@MainActor
 struct RoutinUsageApp: App {
-    static let applicationName = "Routin Usage"
+    nonisolated static let applicationName = "Routin Usage"
+
+    @State private var environment: AppEnvironment
+
+    init() {
+        _environment = State(initialValue: AppEnvironment.live())
+    }
 
     var body: some Scene {
-        MenuBarExtra("…") {
-            Text("尚未配置 Key")
+        MenuBarExtra {
+            UsagePopoverView(
+                store: environment.store,
+                settings: environment.settings
+            )
+        } label: {
+            AppMenuBarLabel(environment: environment)
         }
         Settings {
-            Text("设置")
-                .frame(width: 520, height: 420)
+            SettingsView(
+                store: environment.store,
+                settings: environment.settings,
+                loginItemManager: environment.loginItemManager,
+                updateValidatedKey: { id, name, secret in
+                    try await environment.updateValidatedKey(
+                        id: id,
+                        name: name,
+                        secret: secret
+                    )
+                },
+                moveKey: environment.moveKey(fromOffsets:toOffset:)
+            )
+        }
+    }
+}
+
+@MainActor
+private struct AppMenuBarLabel: View {
+    @Bindable var environment: AppEnvironment
+
+    var body: some View {
+        MenuBarLabelView(
+            store: environment.store,
+            settings: environment.settings
+        )
+        .task {
+            await environment.start()
+        }
+        .onChange(of: environment.settings.refreshMinutes) { _, minutes in
+            environment.refreshIntervalDidChange(to: minutes)
+        }
+        .onChange(of: environment.settings.notificationsEnabled) { _, enabled in
+            Task {
+                await environment.notificationsDidChange(enabled: enabled)
+            }
+        }
+        .onChange(of: environment.store.selectedKeyID) { _, keyID in
+            Task {
+                await environment.selectedKeyDidChange(to: keyID)
+            }
+        }
+        .sheet(isPresented: $environment.showsOnboarding) {
+            OnboardingView(store: environment.store) {
+                environment.dismissOnboarding()
+            }
         }
     }
 }
