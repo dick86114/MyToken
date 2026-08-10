@@ -155,13 +155,13 @@ final class AppLifecycleTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let keychain = LifecycleKeychainFake()
-        let repository = KeyRepository(defaults: defaults, keychain: keychain)
+        let repository = KeyRepository(defaults: defaults, localStore: keychain)
         let key = try repository.add(name: "主账号", secret: "plan-gated-0001")
         let fetcher = ScriptedUsageFetcher(responses: ["plan-gated-0001": .suspended])
         let sender = LifecycleNotificationSender()
         let store = UsageStore(
             keyRepository: repository,
-            keychain: keychain,
+            localStore: keychain,
             apiClient: fetcher,
             cache: LifecycleUsageCache(),
             alertEvaluator: AlertEvaluator(defaults: defaults),
@@ -198,7 +198,7 @@ final class AppLifecycleTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let keychain = LifecycleKeychainFake()
-        let repository = KeyRepository(defaults: defaults, keychain: keychain)
+        let repository = KeyRepository(defaults: defaults, localStore: keychain)
         let key = try repository.add(name: "旧名称", secret: "plan-old-0001")
         let oldSnapshot = makeSnapshot(planName: "旧数据", percent: 96)
         let newSnapshot = makeSnapshot(planName: "新数据", percent: 20)
@@ -209,7 +209,7 @@ final class AppLifecycleTests: XCTestCase {
         let sender = LifecycleNotificationSender()
         let store = UsageStore(
             keyRepository: repository,
-            keychain: keychain,
+            localStore: keychain,
             apiClient: fetcher,
             cache: LifecycleUsageCache(),
             alertEvaluator: AlertEvaluator(defaults: defaults),
@@ -309,7 +309,7 @@ final class AppLifecycleTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let keychain = LifecycleKeychainFake()
-        let repository = KeyRepository(defaults: defaults, keychain: keychain)
+        let repository = KeyRepository(defaults: defaults, localStore: keychain)
         let key = try repository.add(name: "主账号", secret: "plan-main-0001")
         let snapshot = makeSnapshot(percent: 96)
         let fetcher = ScriptedUsageFetcher(responses: ["plan-main-0001": .success(snapshot)])
@@ -319,7 +319,7 @@ final class AppLifecycleTests: XCTestCase {
         settings.notificationsEnabled = true
         let store = UsageStore(
             keyRepository: repository,
-            keychain: keychain,
+            localStore: keychain,
             apiClient: fetcher,
             cache: LifecycleUsageCache(),
             alertEvaluator: AlertEvaluator(defaults: defaults),
@@ -363,7 +363,7 @@ final class AppLifecycleTests: XCTestCase {
         let settings = AppSettings(defaults: context.defaults)
         let store = UsageStore(
             keyRepository: context.repository,
-            keychain: context.keychain,
+            localStore: context.keychain,
             apiClient: context.fetcher,
             cache: context.cache,
             alertEvaluator: AlertEvaluator(defaults: context.defaults),
@@ -539,7 +539,7 @@ private extension AppLifecycleTests {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         defaults.removePersistentDomain(forName: suiteName)
         let keychain = LifecycleKeychainFake()
-        let repository = KeyRepository(defaults: defaults, keychain: keychain)
+        let repository = KeyRepository(defaults: defaults, localStore: keychain)
         let cache = LifecycleUsageCache()
         let fetcher = LifecycleUsageFetcher()
         let notificationSender = LifecycleNotificationSender()
@@ -653,7 +653,7 @@ private struct AppLifecycleTestContext {
         settings.notificationsEnabled = notificationsEnabled
         let store = UsageStore(
             keyRepository: repository,
-            keychain: keychain,
+            localStore: keychain,
             apiClient: fetcher,
             cache: cache,
             alertEvaluator: AlertEvaluator(defaults: defaults),
@@ -709,7 +709,7 @@ private actor LifecycleUsageFetcher: UsageFetching {
     }
 }
 
-private final class LifecycleKeychainFake: KeychainStoring, @unchecked Sendable {
+private final class LifecycleKeychainFake: LocalKeyStoring, @unchecked Sendable {
     private let lock = NSLock()
     private var secrets: [UUID: String] = [:]
 

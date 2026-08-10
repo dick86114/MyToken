@@ -81,35 +81,6 @@ final class UsageStore {
         restoreState()
     }
 
-    // 兼容现有调用方的旧标签；底层已切换到本地存储协议。
-    convenience init(
-        keyRepository: KeyRepository,
-        keychain: any KeychainStoring,
-        apiClient: any UsageFetching,
-        cache: any UsageCaching,
-        alertEvaluator: AlertEvaluator,
-        notificationSender: any NotificationSending,
-        defaults: UserDefaults = .standard,
-        refreshMinutes: Int = 5,
-        thresholds: AlertThresholds = AlertThresholds(),
-        notificationsEnabled: Bool = true,
-        now: @escaping @Sendable () -> Date = Date.init
-    ) {
-        self.init(
-            keyRepository: keyRepository,
-            localStore: KeychainLocalStoreAdapter(keychain),
-            apiClient: apiClient,
-            cache: cache,
-            alertEvaluator: alertEvaluator,
-            notificationSender: notificationSender,
-            defaults: defaults,
-            refreshMinutes: refreshMinutes,
-            thresholds: thresholds,
-            notificationsEnabled: notificationsEnabled,
-            now: now
-        )
-    }
-
     func state(for keyID: UUID) -> KeyUsageState? {
         states[keyID]
     }

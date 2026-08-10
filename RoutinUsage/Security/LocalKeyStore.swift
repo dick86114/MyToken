@@ -31,24 +31,3 @@ final class LocalKeyStore: LocalKeyStoring, @unchecked Sendable {
         "\(keyPrefix)\(id.uuidString)"
     }
 }
-
-// 仅用于兼容尚未迁移的测试注入点，生产构造不会使用此适配器。
-struct KeychainLocalStoreAdapter: LocalKeyStoring {
-    private let keychain: any KeychainStoring
-
-    init(_ keychain: any KeychainStoring) {
-        self.keychain = keychain
-    }
-
-    func save(_ secret: String, for id: UUID) throws {
-        try keychain.save(secret, for: id)
-    }
-
-    func read(for id: UUID) throws -> String? {
-        try keychain.read(for: id)
-    }
-
-    func delete(for id: UUID) throws {
-        try keychain.delete(for: id)
-    }
-}

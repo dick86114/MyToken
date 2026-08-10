@@ -37,10 +37,10 @@ enum KeyCredentialPolicy {
 
     static func sanitizedMetadataSuffix(
         persistedSuffix: String,
-        keychainSecret: String?
+        storedSecret: String?
     ) -> String {
-        if let keychainSecret {
-            return metadataSuffix(for: keychainSecret)
+        if let storedSecret {
+            return metadataSuffix(for: storedSecret)
         }
         guard
             persistedSuffix.count == minimumVisibleSuffixLength,
