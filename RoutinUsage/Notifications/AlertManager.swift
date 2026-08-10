@@ -78,18 +78,21 @@ struct AlertWindowKey: Codable, Hashable, Sendable {
     let threshold: Int
 }
 
+private final class AlertEvaluatorSharedState: @unchecked Sendable {
+    let lock = NSLock()
+    var reservationOwners: [AlertWindowKey: UUID] = [:]
+    var inFlightReservations: Set<UUID> = []
+    var pendingResetWindows: Set<AlertWindowKey> = []
+}
+
 final class AlertEvaluator: @unchecked Sendable {
     private static let persistedKey = "usageAlertTriggeredWindows"
+    private static let sharedState = AlertEvaluatorSharedState()
 
     private let defaults: UserDefaults
-    private let lock = NSLock()
-    private var triggeredWindows: Set<AlertWindowKey>
-    private var reservationOwners: [AlertWindowKey: UUID] = [:]
-    private var inFlightReservations: Set<UUID> = []
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        triggeredWindows = Self.loadTriggeredWindows(from: defaults)
     }
 
     func evaluate(
@@ -97,9 +100,10 @@ final class AlertEvaluator: @unchecked Sendable {
         snapshot: UsageSnapshot,
         thresholds: AlertThresholds
     ) -> [UsageAlert] {
-        lock.lock()
-        defer { lock.unlock() }
+        Self.sharedState.lock.lock()
+        defer { Self.sharedState.lock.unlock() }
 
+        var triggeredWindows = Self.loadTriggeredWindows(from: defaults)
         var alerts: [UsageAlert] = []
         switch snapshot.kind {
         case .periodic:
@@ -110,7 +114,8 @@ final class AlertEvaluator: @unchecked Sendable {
                     dimension: .fiveHour,
                     windowIdentifier: String(windowEnd.timeIntervalSince1970),
                     thresholds: thresholds,
-                    clearsWhenBelowThreshold: false
+                    clearsWhenBelowThreshold: false,
+                    triggeredWindows: &triggeredWindows
                 )
             }
             if let metric = snapshot.weekly, let windowEnd = metric.windowEnd {
@@ -120,7 +125,8 @@ final class AlertEvaluator: @unchecked Sendable {
                     dimension: .weekly,
                     windowIdentifier: String(windowEnd.timeIntervalSince1970),
                     thresholds: thresholds,
-                    clearsWhenBelowThreshold: false
+                    clearsWhenBelowThreshold: false,
+                    triggeredWindows: &triggeredWindows
                 )
             }
         case .tokenPack:
@@ -131,28 +137,31 @@ final class AlertEvaluator: @unchecked Sendable {
                     dimension: .token,
                     windowIdentifier: "token-pack",
                     thresholds: thresholds,
-                    clearsWhenBelowThreshold: true
+                    clearsWhenBelowThreshold: true,
+                    triggeredWindows: &triggeredWindows
                 )
             }
         }
 
-        persistTriggeredWindows()
+        persistTriggeredWindows(triggeredWindows)
         return alerts
     }
 
     func restoreEligibility(for alerts: ArraySlice<UsageAlert>) {
-        lock.lock()
-        defer { lock.unlock() }
+        Self.sharedState.lock.lock()
+        defer { Self.sharedState.lock.unlock() }
 
+        var triggeredWindows = Self.loadTriggeredWindows(from: defaults)
         for alert in alerts {
-            inFlightReservations.remove(alert.reservationID)
+            Self.sharedState.inFlightReservations.remove(alert.reservationID)
             for windowKey in alert.triggeredWindows
-                where reservationOwners[windowKey] == alert.reservationID {
+                where Self.sharedState.reservationOwners[windowKey] == alert.reservationID {
                 triggeredWindows.remove(windowKey)
-                reservationOwners.removeValue(forKey: windowKey)
+                Self.sharedState.reservationOwners.removeValue(forKey: windowKey)
+                Self.sharedState.pendingResetWindows.remove(windowKey)
             }
         }
-        persistTriggeredWindows()
+        persistTriggeredWindows(triggeredWindows)
     }
 
     func restoreEligibility(for alerts: [UsageAlert]) {
@@ -160,30 +169,36 @@ final class AlertEvaluator: @unchecked Sendable {
     }
 
     func beginDelivery(of alert: UsageAlert) -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
+        Self.sharedState.lock.lock()
+        defer { Self.sharedState.lock.unlock() }
 
+        let triggeredWindows = Self.loadTriggeredWindows(from: defaults)
         let isCurrent = alert.triggeredWindows.allSatisfy { windowKey in
             triggeredWindows.contains(windowKey)
-                && reservationOwners[windowKey] == alert.reservationID
+                && Self.sharedState.reservationOwners[windowKey] == alert.reservationID
         }
         guard isCurrent else {
             return false
         }
 
-        inFlightReservations.insert(alert.reservationID)
+        Self.sharedState.inFlightReservations.insert(alert.reservationID)
         return true
     }
 
     func finishDelivery(of alert: UsageAlert) {
-        lock.lock()
-        defer { lock.unlock() }
+        Self.sharedState.lock.lock()
+        defer { Self.sharedState.lock.unlock() }
 
-        inFlightReservations.remove(alert.reservationID)
+        var triggeredWindows = Self.loadTriggeredWindows(from: defaults)
+        Self.sharedState.inFlightReservations.remove(alert.reservationID)
         for windowKey in alert.triggeredWindows
-            where reservationOwners[windowKey] == alert.reservationID {
-            reservationOwners.removeValue(forKey: windowKey)
+            where Self.sharedState.reservationOwners[windowKey] == alert.reservationID {
+            if Self.sharedState.pendingResetWindows.remove(windowKey) != nil {
+                triggeredWindows.remove(windowKey)
+            }
+            Self.sharedState.reservationOwners.removeValue(forKey: windowKey)
         }
+        persistTriggeredWindows(triggeredWindows)
     }
 
     private func evaluate(
@@ -192,12 +207,24 @@ final class AlertEvaluator: @unchecked Sendable {
         dimension: UsageDimension,
         windowIdentifier: String,
         thresholds: AlertThresholds,
-        clearsWhenBelowThreshold: Bool
+        clearsWhenBelowThreshold: Bool,
+        triggeredWindows: inout Set<AlertWindowKey>
     ) -> [UsageAlert] {
         let levels: [(threshold: Int, level: AlertLevel)] = [
             (thresholds.low, .low),
             (thresholds.high, .high)
         ]
+
+        guard prepareCurrentWindow(
+            keyID: key.id,
+            dimension: dimension,
+            windowIdentifier: windowIdentifier,
+            activeThresholds: Set(levels.map(\.threshold)),
+            isPeriodic: !clearsWhenBelowThreshold,
+            triggeredWindows: &triggeredWindows
+        ) else {
+            return []
+        }
 
         if clearsWhenBelowThreshold {
             for item in levels where metric.percent < Double(item.threshold) {
@@ -208,13 +235,13 @@ final class AlertEvaluator: @unchecked Sendable {
                     threshold: item.threshold
                 )
                 if
-                    let reservationID = reservationOwners[windowKey],
-                    inFlightReservations.contains(reservationID)
+                    let reservationID = Self.sharedState.reservationOwners[windowKey],
+                    Self.sharedState.inFlightReservations.contains(reservationID)
                 {
+                    Self.sharedState.pendingResetWindows.insert(windowKey)
                     continue
                 }
-                triggeredWindows.remove(windowKey)
-                reservationOwners.removeValue(forKey: windowKey)
+                removeState(for: [windowKey], triggeredWindows: &triggeredWindows)
             }
         }
 
@@ -255,13 +282,13 @@ final class AlertEvaluator: @unchecked Sendable {
             )
             if
                 !newlyTriggeredWindows.contains(lowerWindowKey),
-                reservationOwners[lowerWindowKey] != nil
+                Self.sharedState.reservationOwners[lowerWindowKey] != nil
             {
                 reservedWindows.insert(lowerWindowKey)
             }
         }
         for windowKey in reservedWindows {
-            reservationOwners[windowKey] = reservationID
+            Self.sharedState.reservationOwners[windowKey] = reservationID
         }
 
         return [UsageAlert(
@@ -276,7 +303,53 @@ final class AlertEvaluator: @unchecked Sendable {
         )]
     }
 
-    private func persistTriggeredWindows() {
+    private func prepareCurrentWindow(
+        keyID: UUID,
+        dimension: UsageDimension,
+        windowIdentifier: String,
+        activeThresholds: Set<Int>,
+        isPeriodic: Bool,
+        triggeredWindows: inout Set<AlertWindowKey>
+    ) -> Bool {
+        let matchingKeys = triggeredWindows.filter {
+            $0.keyID == keyID && $0.dimension == dimension
+        }
+        if
+            isPeriodic,
+            let currentWindow = Double(windowIdentifier),
+            let latestWindow = matchingKeys.compactMap({ Double($0.windowIdentifier) }).max(),
+            currentWindow < latestWindow
+        {
+            return false
+        }
+
+        let obsoleteKeys = matchingKeys.filter {
+            $0.windowIdentifier != windowIdentifier
+                || !activeThresholds.contains($0.threshold)
+        }
+        removeState(for: obsoleteKeys, triggeredWindows: &triggeredWindows)
+        return true
+    }
+
+    private func removeState(
+        for windowKeys: some Sequence<AlertWindowKey>,
+        triggeredWindows: inout Set<AlertWindowKey>
+    ) {
+        var affectedReservations: Set<UUID> = []
+        for windowKey in windowKeys {
+            triggeredWindows.remove(windowKey)
+            Self.sharedState.pendingResetWindows.remove(windowKey)
+            if let reservationID = Self.sharedState.reservationOwners.removeValue(forKey: windowKey) {
+                affectedReservations.insert(reservationID)
+            }
+        }
+        let remainingReservations = Set(Self.sharedState.reservationOwners.values)
+        for reservationID in affectedReservations where !remainingReservations.contains(reservationID) {
+            Self.sharedState.inFlightReservations.remove(reservationID)
+        }
+    }
+
+    private func persistTriggeredWindows(_ triggeredWindows: Set<AlertWindowKey>) {
         guard let data = try? JSONEncoder().encode(triggeredWindows) else {
             return
         }

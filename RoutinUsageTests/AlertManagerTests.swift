@@ -139,6 +139,132 @@ final class AlertManagerTests: XCTestCase {
         )
     }
 
+    func test周期窗口和阈值变化后只保留当前去重记录() throws {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let key = makeKey()
+
+        for windowIndex in 1...10 {
+            XCTAssertEqual(
+                context.evaluator.evaluate(
+                    key: key,
+                    snapshot: periodicSnapshot(
+                        fiveHourPercent: 96,
+                        windowEnd: Date(timeIntervalSince1970: Double(windowIndex * 10_000))
+                    ),
+                    thresholds: .init()
+                ).map(\.level),
+                [.high]
+            )
+        }
+
+        var persistedKeys = try persistedWindowKeys(from: context.defaults)
+        var currentKeys = persistedKeys.filter {
+            $0.keyID == key.id && $0.dimension == .fiveHour
+        }
+        XCTAssertEqual(currentKeys.count, 2)
+        XCTAssertEqual(Set(currentKeys.map(\.windowIdentifier)), ["100000.0"])
+        XCTAssertEqual(Set(currentKeys.map(\.threshold)), [80, 95])
+
+        XCTAssertEqual(
+            context.evaluator.evaluate(
+                key: key,
+                snapshot: periodicSnapshot(
+                    fiveHourPercent: 99,
+                    windowEnd: Date(timeIntervalSince1970: 100_000)
+                ),
+                thresholds: .init(low: 85, high: 98)
+            ).map(\.level),
+            [.high]
+        )
+
+        persistedKeys = try persistedWindowKeys(from: context.defaults)
+        currentKeys = persistedKeys.filter {
+            $0.keyID == key.id && $0.dimension == .fiveHour
+        }
+        XCTAssertEqual(currentKeys.count, 2)
+        XCTAssertEqual(Set(currentKeys.map(\.windowIdentifier)), ["100000.0"])
+        XCTAssertEqual(Set(currentKeys.map(\.threshold)), [85, 98])
+    }
+
+    func test跨评估器写入不同Key不会覆盖既有去重记录() throws {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let firstEvaluator = context.evaluator
+        let secondDefaults = try XCTUnwrap(UserDefaults(suiteName: context.suiteName))
+        let secondEvaluator = AlertEvaluator(defaults: secondDefaults)
+        let firstKey = makeKey()
+        let secondKey = makeKey()
+        let snapshot = periodicSnapshot(
+            fiveHourPercent: 80,
+            windowEnd: Date(timeIntervalSince1970: 10_000)
+        )
+
+        XCTAssertEqual(
+            firstEvaluator.evaluate(
+                key: firstKey,
+                snapshot: snapshot,
+                thresholds: .init()
+            ).map(\.level),
+            [.low]
+        )
+        XCTAssertEqual(
+            secondEvaluator.evaluate(
+                key: secondKey,
+                snapshot: snapshot,
+                thresholds: .init()
+            ).map(\.level),
+            [.low]
+        )
+
+        let reloadedDefaults = try XCTUnwrap(UserDefaults(suiteName: context.suiteName))
+        let reloadedEvaluator = AlertEvaluator(defaults: reloadedDefaults)
+        XCTAssertEqual(
+            reloadedEvaluator.evaluate(
+                key: firstKey,
+                snapshot: snapshot,
+                thresholds: .init()
+            ),
+            []
+        )
+        XCTAssertEqual(
+            reloadedEvaluator.evaluate(
+                key: secondKey,
+                snapshot: snapshot,
+                thresholds: .init()
+            ),
+            []
+        )
+        XCTAssertEqual(try persistedWindowKeys(from: context.defaults).count, 2)
+    }
+
+    func test跨评估器评估同一窗口只产生一次通知() throws {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let firstEvaluator = context.evaluator
+        let secondDefaults = try XCTUnwrap(UserDefaults(suiteName: context.suiteName))
+        let secondEvaluator = AlertEvaluator(defaults: secondDefaults)
+        let key = makeKey()
+        let snapshot = tokenSnapshot(percent: 96)
+
+        XCTAssertEqual(
+            firstEvaluator.evaluate(
+                key: key,
+                snapshot: snapshot,
+                thresholds: .init()
+            ).map(\.level),
+            [.high]
+        )
+        XCTAssertEqual(
+            secondEvaluator.evaluate(
+                key: key,
+                snapshot: snapshot,
+                thresholds: .init()
+            ),
+            []
+        )
+    }
+
     func test资源包只评估Token且回落到阈值以下后可再次通知() {
         let context = makeContext()
         defer { context.cleanUp() }
@@ -375,14 +501,47 @@ final class AlertManagerTests: XCTestCase {
 
         await delayedSender.resolveNextSend()
         _ = try await delayedTask.value
+    }
+
+    func test发送挂起期间Token回落会在发送完成后恢复高阈值资格() async throws {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let key = makeKey()
+        let highSnapshot = tokenSnapshot(percent: 96)
+        let delayedSender = ControlledSendingSender()
+        let delayedManager = AlertManager(evaluator: context.evaluator, sender: delayedSender)
+        let delayedTask = Task {
+            try await delayedManager.evaluateAndNotify(
+                key: key,
+                snapshot: highSnapshot,
+                thresholds: .init(),
+                notificationsEnabled: true
+            )
+        }
+        await delayedSender.waitUntilSendCount(1)
+
         XCTAssertEqual(
             context.evaluator.evaluate(
                 key: key,
-                snapshot: highSnapshot,
+                snapshot: tokenSnapshot(percent: 94),
                 thresholds: .init()
             ),
             []
         )
+        await delayedSender.resolveNextSend()
+        _ = try await delayedTask.value
+
+        let retrySender = NotificationSenderSpy(authorizationGranted: true)
+        let retryManager = AlertManager(evaluator: context.evaluator, sender: retrySender)
+        let retryAlerts = try await retryManager.evaluateAndNotify(
+            key: key,
+            snapshot: highSnapshot,
+            thresholds: .init(),
+            notificationsEnabled: true
+        )
+        XCTAssertEqual(retryAlerts.map(\.level), [.high])
+        let retryState = await retrySender.state
+        XCTAssertEqual(retryState.sentAlerts.map(\.level), [.high])
     }
 
     func test周期额度缺少窗口结束时间时不产生无法去重的通知() {
@@ -511,6 +670,11 @@ final class AlertManagerTests: XCTestCase {
             unit: unit,
             windowEnd: windowEnd
         )
+    }
+
+    private func persistedWindowKeys(from defaults: UserDefaults) throws -> Set<AlertWindowKey> {
+        let data = try XCTUnwrap(defaults.data(forKey: "usageAlertTriggeredWindows"))
+        return try JSONDecoder().decode(Set<AlertWindowKey>.self, from: data)
     }
 }
 
