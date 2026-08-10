@@ -641,7 +641,7 @@ private extension UsageStoreTests {
             suiteName: suiteName,
             defaults: defaults,
             keychain: keychain,
-            repository: KeyRepository(defaults: defaults, keychain: keychain),
+            repository: KeyRepository(defaults: defaults, localStore: keychain),
             cache: InMemoryUsageCache(),
             evaluator: AlertEvaluator(defaults: defaults),
             sender: NotificationSenderFake(),
@@ -698,7 +698,7 @@ private struct UsageStoreTestContext {
         let currentTime = now
         return UsageStore(
             keyRepository: repository,
-            keychain: keychain,
+            localStore: keychain,
             apiClient: fetcher,
             cache: customCache ?? cache,
             alertEvaluator: evaluator,
@@ -715,7 +715,7 @@ private struct UsageStoreTestContext {
     }
 }
 
-private final class StoreKeychainFake: KeychainStoring, @unchecked Sendable {
+private final class StoreKeychainFake: LocalKeyStoring, @unchecked Sendable {
     private let lock = NSLock()
     private var secrets: [UUID: String] = [:]
 

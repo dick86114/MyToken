@@ -28,11 +28,6 @@ final class KeyRepository {
         migrateLegacyMetadata()
     }
 
-    // 保留旧初始化标签，避免无关调用方一次性迁移；实际协议已统一为本地存储抽象。
-    convenience init(defaults: UserDefaults = .standard, keychain: any KeychainStoring) {
-        self.init(defaults: defaults, localStore: KeychainLocalStoreAdapter(keychain))
-    }
-
     func list() -> [KeyConfiguration] {
         guard let configurations = storedConfigurations() else {
             return []
@@ -150,7 +145,7 @@ final class KeyRepository {
                 name: KeyCredentialPolicy.safeDisplayName(configuration.name),
                 keySuffix: KeyCredentialPolicy.sanitizedMetadataSuffix(
                     persistedSuffix: configuration.keySuffix,
-                    keychainSecret: secret
+                    storedSecret: secret
                 ),
                 sortOrder: configuration.sortOrder
             )

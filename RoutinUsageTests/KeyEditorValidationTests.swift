@@ -79,19 +79,19 @@ final class KeyEditorValidationTests: XCTestCase {
         XCTAssertEqual(model.errorMessage, "Key 无效")
     }
 
-    func test取消正在验证的表单不会保存配置或Keychain() async throws {
+    func test取消正在验证的表单不会保存配置或本地Key() async throws {
         let suiteName = "ai.routin.usage-monitor.key-editor-tests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let secret = "plan-cancelled-8F2A"
-        let keychain = KeyEditorKeychainFake()
-        let repository = KeyRepository(defaults: defaults, keychain: keychain)
+        let localStore = LocalKeyStore(defaults: defaults)
+        let repository = KeyRepository(defaults: defaults, localStore: localStore)
         let fetcher = ScriptedUsageFetcher(responses: [secret: .suspended])
         let store = UsageStore(
             keyRepository: repository,
-            keychain: keychain,
+            localStore: localStore,
             apiClient: fetcher,
             cache: InMemoryUsageCache(),
             alertEvaluator: AlertEvaluator(defaults: defaults),
@@ -112,7 +112,8 @@ final class KeyEditorValidationTests: XCTestCase {
 
         XCTAssertTrue(didFinishCancellation)
         XCTAssertTrue(repository.list().isEmpty)
-        XCTAssertFalse(keychain.contains(secret: secret))
+        let persistedValues = defaults.dictionaryRepresentation().values
+        XCTAssertFalse(persistedValues.contains { ($0 as? String) == secret })
         XCTAssertNil(model.saveResult)
         XCTAssertNil(model.errorMessage)
     }
@@ -147,26 +148,5 @@ final class KeyEditorValidationTests: XCTestCase {
             await Task.yield()
         }
         return condition()
-    }
-}
-
-private final class KeyEditorKeychainFake: KeychainStoring, @unchecked Sendable {
-    private let lock = NSLock()
-    private var secrets: [UUID: String] = [:]
-
-    func save(_ secret: String, for id: UUID) throws {
-        lock.withLock { secrets[id] = secret }
-    }
-
-    func read(for id: UUID) throws -> String? {
-        lock.withLock { secrets[id] }
-    }
-
-    func delete(for id: UUID) throws {
-        _ = lock.withLock { secrets.removeValue(forKey: id) }
-    }
-
-    func contains(secret: String) -> Bool {
-        lock.withLock { secrets.values.contains(secret) }
     }
 }
