@@ -5,6 +5,14 @@ enum UsageFormatter {
         state: KeyUsageState?,
         dimension: DisplayDimension
     ) -> String {
+        menuBarText(state: state, dimension: dimension, style: .percent)
+    }
+
+    static func menuBarText(
+        state: KeyUsageState?,
+        dimension: DisplayDimension,
+        style: MenuBarStyle
+    ) -> String {
         guard let state else {
             return "--"
         }
@@ -20,7 +28,27 @@ enum UsageFormatter {
         guard let metric = metric(in: snapshot, dimension: dimension) else {
             return "--"
         }
-        return percentText(metric) ?? "!"
+        guard let percent = percentText(metric) else {
+            return "!"
+        }
+        if snapshot.kind == .tokenPack {
+            return percent
+        }
+        switch style {
+        case .percent:
+            return percent
+        case .aliasPercent:
+            return "\(truncatedMenuBarAlias(state.configuration.displayName)) \(percent)"
+        case .aliasVerticalBar:
+            return truncatedMenuBarAlias(state.configuration.displayName)
+        }
+    }
+
+    static func truncatedMenuBarAlias(_ alias: String) -> String {
+        guard alias.count > 5 else {
+            return alias
+        }
+        return String(alias.prefix(5)) + "…"
     }
 
     static func amount(_ metric: UsageMetric) -> String {
