@@ -145,6 +145,12 @@ struct UsageMapper: Sendable {
         guard let value else {
             return nil
         }
+
+        let fractionalSecondsFormatter = ISO8601DateFormatter()
+        fractionalSecondsFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = fractionalSecondsFormatter.date(from: value) {
+            return date
+        }
         return ISO8601DateFormatter().date(from: value)
     }
 }
