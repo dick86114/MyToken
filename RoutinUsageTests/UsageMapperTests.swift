@@ -2,6 +2,33 @@ import XCTest
 @testable import RoutinUsage
 
 final class UsageMapperTests: XCTestCase {
+    func test映射订阅基本信息与分组倍率() throws {
+        let dto = UsageResponseDTO(
+            subscriptionId: "sub-1",
+            planId: "plan-1",
+            planName: "Pro",
+            type: 1,
+            status: 1,
+            subscriptionStartAt: "2026-08-01T00:00:00Z",
+            subscriptionEndAt: "2026-09-01T00:00:00Z",
+            dailyLimitUsd: 10, weeklyLimitUsd: nil,
+            dailyUsedUsd: 2, weeklyUsedUsd: nil,
+            dailyRemainingUsd: 8, weeklyRemainingUsd: nil,
+            dayWindowEndAt: nil, weekWindowEndAt: nil,
+            totalTokens: nil, consumedTokens: nil, remainingTokens: nil,
+            allowedModels: [], groupMultiplier: 1.5
+        )
+
+        let snapshot = try UsageMapper().map(dto, fetchedAt: .now)
+
+        XCTAssertEqual(snapshot.subscriptionId, "sub-1")
+        XCTAssertEqual(snapshot.planId, "plan-1")
+        XCTAssertEqual(snapshot.status, 1)
+        XCTAssertEqual(snapshot.groupMultiplier, 1.5)
+        XCTAssertEqual(snapshot.subscriptionStartAt, Date(timeIntervalSince1970: 1_785_542_400))
+        XCTAssertEqual(snapshot.subscriptionEndAt, Date(timeIntervalSince1970: 1_788_220_800))
+    }
+
     func test周期订阅把Daily映射为五小时窗口() throws {
         let dto = UsageResponseDTO(
             planName: "Pro", type: 1,

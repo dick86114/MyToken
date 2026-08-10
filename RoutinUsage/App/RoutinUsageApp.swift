@@ -15,7 +15,9 @@ struct RoutinUsageApp: App {
         MenuBarExtra {
             UsagePopoverView(
                 store: environment.store,
-                settings: environment.settings
+                settings: environment.settings,
+                updateStatus: environment.updateStatus,
+                installAvailableUpdate: environment.installAvailableUpdate
             )
         } label: {
             AppMenuBarLabel(environment: environment)
@@ -33,7 +35,10 @@ struct RoutinUsageApp: App {
                         secret: secret
                     )
                 },
-                moveKey: environment.moveKey(fromOffsets:toOffset:)
+                moveKey: environment.moveKey(fromOffsets:toOffset:),
+                updateStatus: environment.updateStatus,
+                checkForUpdates: environment.checkForUpdates,
+                installAvailableUpdate: environment.installAvailableUpdate
             )
         }
     }

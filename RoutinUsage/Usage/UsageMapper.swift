@@ -18,6 +18,8 @@ struct UsageMapper: Sendable {
         case .periodic:
             return UsageSnapshot(
                 planName: dto.planName ?? "",
+                subscriptionId: dto.subscriptionId,
+                planId: dto.planId,
                 kind: .periodic,
                 fiveHour: try metric(
                     limit: dto.dailyLimitUsd,
@@ -35,11 +37,17 @@ struct UsageMapper: Sendable {
                 ),
                 token: nil,
                 allowedModels: dto.allowedModels ?? [],
-                fetchedAt: fetchedAt
+                fetchedAt: fetchedAt,
+                groupMultiplier: dto.groupMultiplier,
+                status: dto.status,
+                subscriptionStartAt: date(from: dto.subscriptionStartAt),
+                subscriptionEndAt: date(from: dto.subscriptionEndAt)
             )
         case .tokenPack:
             return UsageSnapshot(
                 planName: dto.planName ?? "",
+                subscriptionId: dto.subscriptionId,
+                planId: dto.planId,
                 kind: .tokenPack,
                 fiveHour: nil,
                 weekly: nil,
@@ -51,7 +59,11 @@ struct UsageMapper: Sendable {
                     windowEnd: nil
                 ),
                 allowedModels: dto.allowedModels ?? [],
-                fetchedAt: fetchedAt
+                fetchedAt: fetchedAt,
+                groupMultiplier: dto.groupMultiplier,
+                status: dto.status,
+                subscriptionStartAt: date(from: dto.subscriptionStartAt),
+                subscriptionEndAt: date(from: dto.subscriptionEndAt)
             )
         }
     }

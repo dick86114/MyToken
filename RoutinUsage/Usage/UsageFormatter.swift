@@ -50,6 +50,28 @@ enum UsageFormatter {
         return formatter.string(from: windowEnd)
     }
 
+    /// 用于设置页和详情面板的完整本地时间；没有时间时统一显示占位符。
+    static func fullDateTime(_ date: Date?) -> String {
+        guard let date else {
+            return "—"
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter.string(from: date)
+    }
+
+    /// 以完整日期时间显示窗口结束时刻，便于跨天查看。
+    static func windowEndDescription(_ metric: UsageMetric) -> String? {
+        guard let windowEnd = metric.windowEnd else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter.string(from: windowEnd)
+    }
+
     static func metric(
         in snapshot: UsageSnapshot,
         dimension: DisplayDimension
