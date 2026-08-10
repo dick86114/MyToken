@@ -88,6 +88,9 @@ struct UsageMapper {
         guard let limit, hasValidLimit(limit) else {
             return nil
         }
+        guard used != nil || remaining != nil else {
+            return nil
+        }
 
         let resolvedUsed = used ?? (remaining.map { limit - $0 } ?? 0)
         let resolvedRemaining = remaining ?? (limit - resolvedUsed)

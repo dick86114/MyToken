@@ -89,6 +89,23 @@ final class UsageMapperTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(result.token).percent, 25, accuracy: 0.001)
     }
 
+    func test五小时缺少已用与剩余量时不生成指标且保留周指标() throws {
+        let dto = UsageResponseDTO(
+            planName: "Pro", type: 1,
+            dailyLimitUsd: 10, weeklyLimitUsd: 20,
+            dailyUsedUsd: nil, weeklyUsedUsd: 10,
+            dailyRemainingUsd: nil, weeklyRemainingUsd: 10,
+            dayWindowEndAt: nil, weekWindowEndAt: nil,
+            totalTokens: nil, consumedTokens: nil, remainingTokens: nil,
+            allowedModels: []
+        )
+
+        let result = try UsageMapper().map(dto, fetchedAt: .now)
+
+        XCTAssertNil(result.fiveHour)
+        XCTAssertEqual(try XCTUnwrap(result.weekly).percent, 50, accuracy: 0.001)
+    }
+
     func test未知类型按有效非零额度判断订阅类型() throws {
         let 周期订阅DTO = UsageResponseDTO(
             planName: "Pro", type: 99,
