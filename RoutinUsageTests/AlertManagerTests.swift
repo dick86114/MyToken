@@ -139,6 +139,50 @@ final class AlertManagerTests: XCTestCase {
         )
     }
 
+    func test新周期低于阈值也会记录水位并阻止迟到旧窗口补发() throws {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let key = makeKey()
+        let oldWindowEnd = Date(timeIntervalSince1970: 10_000)
+        let newWindowEnd = Date(timeIntervalSince1970: 20_000)
+
+        XCTAssertEqual(
+            context.evaluator.evaluate(
+                key: key,
+                snapshot: periodicSnapshot(
+                    fiveHourPercent: 96,
+                    windowEnd: oldWindowEnd
+                ),
+                thresholds: .init()
+            ).map(\.level),
+            [.high]
+        )
+        XCTAssertEqual(
+            AlertEvaluator(
+                defaults: try XCTUnwrap(UserDefaults(suiteName: context.suiteName))
+            ).evaluate(
+                key: key,
+                snapshot: periodicSnapshot(
+                    fiveHourPercent: 79,
+                    windowEnd: newWindowEnd
+                ),
+                thresholds: .init()
+            ),
+            []
+        )
+        XCTAssertEqual(
+            context.evaluator.evaluate(
+                key: key,
+                snapshot: periodicSnapshot(
+                    fiveHourPercent: 96,
+                    windowEnd: oldWindowEnd
+                ),
+                thresholds: .init()
+            ),
+            []
+        )
+    }
+
     func test周期窗口和阈值变化后只保留当前去重记录() throws {
         let context = makeContext()
         defer { context.cleanUp() }
@@ -542,6 +586,56 @@ final class AlertManagerTests: XCTestCase {
         XCTAssertEqual(retryAlerts.map(\.level), [.high])
         let retryState = await retrySender.state
         XCTAssertEqual(retryState.sentAlerts.map(\.level), [.high])
+    }
+
+    func test低阈值发送挂起后回落再由高阈值接管不会倒序补发低阈值() async throws {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let key = makeKey()
+        let delayedSender = ControlledSendingSender()
+        let delayedManager = AlertManager(evaluator: context.evaluator, sender: delayedSender)
+        let lowSnapshot = tokenSnapshot(percent: 80)
+        let delayedLowTask = Task {
+            try await delayedManager.evaluateAndNotify(
+                key: key,
+                snapshot: lowSnapshot,
+                thresholds: .init(),
+                notificationsEnabled: true
+            )
+        }
+        await delayedSender.waitUntilSendCount(1)
+
+        XCTAssertEqual(
+            context.evaluator.evaluate(
+                key: key,
+                snapshot: tokenSnapshot(percent: 79),
+                thresholds: .init()
+            ),
+            []
+        )
+        let highSender = NotificationSenderSpy(authorizationGranted: true)
+        let highManager = AlertManager(evaluator: context.evaluator, sender: highSender)
+        let highAlerts = try await highManager.evaluateAndNotify(
+            key: key,
+            snapshot: tokenSnapshot(percent: 96),
+            thresholds: .init(),
+            notificationsEnabled: true
+        )
+        XCTAssertEqual(highAlerts.map(\.level), [.high])
+        let highState = await highSender.state
+        XCTAssertEqual(highState.sentAlerts.map(\.level), [.high])
+
+        await delayedSender.resolveNextSend()
+        _ = try await delayedLowTask.value
+
+        XCTAssertEqual(
+            context.evaluator.evaluate(
+                key: key,
+                snapshot: tokenSnapshot(percent: 96),
+                thresholds: .init()
+            ),
+            []
+        )
     }
 
     func test周期额度缺少窗口结束时间时不产生无法去重的通知() {

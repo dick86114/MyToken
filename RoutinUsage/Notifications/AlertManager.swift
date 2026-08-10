@@ -78,15 +78,22 @@ struct AlertWindowKey: Codable, Hashable, Sendable {
     let threshold: Int
 }
 
+private struct AlertPeriodicWindowWatermark: Codable, Hashable, Sendable {
+    let keyID: UUID
+    let dimension: UsageDimension
+    let windowIdentifier: String
+}
+
 private final class AlertEvaluatorSharedState: @unchecked Sendable {
     let lock = NSLock()
     var reservationOwners: [AlertWindowKey: UUID] = [:]
     var inFlightReservations: Set<UUID> = []
-    var pendingResetWindows: Set<AlertWindowKey> = []
+    var pendingResetWindows: [AlertWindowKey: UUID] = [:]
 }
 
 final class AlertEvaluator: @unchecked Sendable {
     private static let persistedKey = "usageAlertTriggeredWindows"
+    private static let periodicWatermarksKey = "usageAlertLatestPeriodicWindows"
     private static let sharedState = AlertEvaluatorSharedState()
 
     private let defaults: UserDefaults
@@ -104,6 +111,7 @@ final class AlertEvaluator: @unchecked Sendable {
         defer { Self.sharedState.lock.unlock() }
 
         var triggeredWindows = Self.loadTriggeredWindows(from: defaults)
+        var periodicWatermarks = Self.loadPeriodicWatermarks(from: defaults)
         var alerts: [UsageAlert] = []
         switch snapshot.kind {
         case .periodic:
@@ -115,7 +123,8 @@ final class AlertEvaluator: @unchecked Sendable {
                     windowIdentifier: String(windowEnd.timeIntervalSince1970),
                     thresholds: thresholds,
                     clearsWhenBelowThreshold: false,
-                    triggeredWindows: &triggeredWindows
+                    triggeredWindows: &triggeredWindows,
+                    periodicWatermarks: &periodicWatermarks
                 )
             }
             if let metric = snapshot.weekly, let windowEnd = metric.windowEnd {
@@ -126,7 +135,8 @@ final class AlertEvaluator: @unchecked Sendable {
                     windowIdentifier: String(windowEnd.timeIntervalSince1970),
                     thresholds: thresholds,
                     clearsWhenBelowThreshold: false,
-                    triggeredWindows: &triggeredWindows
+                    triggeredWindows: &triggeredWindows,
+                    periodicWatermarks: &periodicWatermarks
                 )
             }
         case .tokenPack:
@@ -138,12 +148,14 @@ final class AlertEvaluator: @unchecked Sendable {
                     windowIdentifier: "token-pack",
                     thresholds: thresholds,
                     clearsWhenBelowThreshold: true,
-                    triggeredWindows: &triggeredWindows
+                    triggeredWindows: &triggeredWindows,
+                    periodicWatermarks: &periodicWatermarks
                 )
             }
         }
 
         persistTriggeredWindows(triggeredWindows)
+        persistPeriodicWatermarks(periodicWatermarks)
         return alerts
     }
 
@@ -158,7 +170,7 @@ final class AlertEvaluator: @unchecked Sendable {
                 where Self.sharedState.reservationOwners[windowKey] == alert.reservationID {
                 triggeredWindows.remove(windowKey)
                 Self.sharedState.reservationOwners.removeValue(forKey: windowKey)
-                Self.sharedState.pendingResetWindows.remove(windowKey)
+                Self.sharedState.pendingResetWindows.removeValue(forKey: windowKey)
             }
         }
         persistTriggeredWindows(triggeredWindows)
@@ -193,8 +205,9 @@ final class AlertEvaluator: @unchecked Sendable {
         Self.sharedState.inFlightReservations.remove(alert.reservationID)
         for windowKey in alert.triggeredWindows
             where Self.sharedState.reservationOwners[windowKey] == alert.reservationID {
-            if Self.sharedState.pendingResetWindows.remove(windowKey) != nil {
+            if Self.sharedState.pendingResetWindows[windowKey] == alert.reservationID {
                 triggeredWindows.remove(windowKey)
+                Self.sharedState.pendingResetWindows.removeValue(forKey: windowKey)
             }
             Self.sharedState.reservationOwners.removeValue(forKey: windowKey)
         }
@@ -208,7 +221,8 @@ final class AlertEvaluator: @unchecked Sendable {
         windowIdentifier: String,
         thresholds: AlertThresholds,
         clearsWhenBelowThreshold: Bool,
-        triggeredWindows: inout Set<AlertWindowKey>
+        triggeredWindows: inout Set<AlertWindowKey>,
+        periodicWatermarks: inout Set<AlertPeriodicWindowWatermark>
     ) -> [UsageAlert] {
         let levels: [(threshold: Int, level: AlertLevel)] = [
             (thresholds.low, .low),
@@ -221,7 +235,8 @@ final class AlertEvaluator: @unchecked Sendable {
             windowIdentifier: windowIdentifier,
             activeThresholds: Set(levels.map(\.threshold)),
             isPeriodic: !clearsWhenBelowThreshold,
-            triggeredWindows: &triggeredWindows
+            triggeredWindows: &triggeredWindows,
+            periodicWatermarks: &periodicWatermarks
         ) else {
             return []
         }
@@ -238,7 +253,7 @@ final class AlertEvaluator: @unchecked Sendable {
                     let reservationID = Self.sharedState.reservationOwners[windowKey],
                     Self.sharedState.inFlightReservations.contains(reservationID)
                 {
-                    Self.sharedState.pendingResetWindows.insert(windowKey)
+                    Self.sharedState.pendingResetWindows[windowKey] = reservationID
                     continue
                 }
                 removeState(for: [windowKey], triggeredWindows: &triggeredWindows)
@@ -289,6 +304,7 @@ final class AlertEvaluator: @unchecked Sendable {
         }
         for windowKey in reservedWindows {
             Self.sharedState.reservationOwners[windowKey] = reservationID
+            Self.sharedState.pendingResetWindows.removeValue(forKey: windowKey)
         }
 
         return [UsageAlert(
@@ -309,18 +325,30 @@ final class AlertEvaluator: @unchecked Sendable {
         windowIdentifier: String,
         activeThresholds: Set<Int>,
         isPeriodic: Bool,
-        triggeredWindows: inout Set<AlertWindowKey>
+        triggeredWindows: inout Set<AlertWindowKey>,
+        periodicWatermarks: inout Set<AlertPeriodicWindowWatermark>
     ) -> Bool {
         let matchingKeys = triggeredWindows.filter {
             $0.keyID == keyID && $0.dimension == dimension
         }
-        if
-            isPeriodic,
-            let currentWindow = Double(windowIdentifier),
-            let latestWindow = matchingKeys.compactMap({ Double($0.windowIdentifier) }).max(),
-            currentWindow < latestWindow
-        {
-            return false
+        if isPeriodic, let currentWindow = Double(windowIdentifier) {
+            let matchingWatermarks = periodicWatermarks.filter {
+                $0.keyID == keyID && $0.dimension == dimension
+            }
+            let latestWindow = (
+                matchingKeys.compactMap { Double($0.windowIdentifier) }
+                    + matchingWatermarks.compactMap { Double($0.windowIdentifier) }
+            ).max()
+            if let latestWindow, currentWindow < latestWindow {
+                return false
+            }
+
+            periodicWatermarks.subtract(matchingWatermarks)
+            periodicWatermarks.insert(AlertPeriodicWindowWatermark(
+                keyID: keyID,
+                dimension: dimension,
+                windowIdentifier: windowIdentifier
+            ))
         }
 
         let obsoleteKeys = matchingKeys.filter {
@@ -338,7 +366,7 @@ final class AlertEvaluator: @unchecked Sendable {
         var affectedReservations: Set<UUID> = []
         for windowKey in windowKeys {
             triggeredWindows.remove(windowKey)
-            Self.sharedState.pendingResetWindows.remove(windowKey)
+            Self.sharedState.pendingResetWindows.removeValue(forKey: windowKey)
             if let reservationID = Self.sharedState.reservationOwners.removeValue(forKey: windowKey) {
                 affectedReservations.insert(reservationID)
             }
@@ -356,10 +384,34 @@ final class AlertEvaluator: @unchecked Sendable {
         defaults.set(data, forKey: Self.persistedKey)
     }
 
+    private func persistPeriodicWatermarks(
+        _ periodicWatermarks: Set<AlertPeriodicWindowWatermark>
+    ) {
+        guard let data = try? JSONEncoder().encode(periodicWatermarks) else {
+            return
+        }
+        defaults.set(data, forKey: Self.periodicWatermarksKey)
+    }
+
     private static func loadTriggeredWindows(from defaults: UserDefaults) -> Set<AlertWindowKey> {
         guard
             let data = defaults.data(forKey: persistedKey),
             let values = try? JSONDecoder().decode(Set<AlertWindowKey>.self, from: data)
+        else {
+            return []
+        }
+        return values
+    }
+
+    private static func loadPeriodicWatermarks(
+        from defaults: UserDefaults
+    ) -> Set<AlertPeriodicWindowWatermark> {
+        guard
+            let data = defaults.data(forKey: periodicWatermarksKey),
+            let values = try? JSONDecoder().decode(
+                Set<AlertPeriodicWindowWatermark>.self,
+                from: data
+            )
         else {
             return []
         }
