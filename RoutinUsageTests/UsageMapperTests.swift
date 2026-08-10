@@ -9,13 +9,13 @@ final class UsageMapperTests: XCTestCase {
             planName: "Pro",
             type: 1,
             status: 1,
-            startAt: "2026-08-01T00:00:00Z",
-            endAt: "2026-09-01T00:00:00Z",
+            startAt: "2026-08-01T00:00:00.123Z",
+            endAt: "2026-09-01T00:00:00.456Z",
             dailyLimitUsd: 10, weeklyLimitUsd: 50,
             dailyUsedUsd: 2, weeklyUsedUsd: 10,
             dailyRemainingUsd: 8, weeklyRemainingUsd: 40,
-            dayWindowEndAt: "2026-08-10T14:00:00Z",
-            weekWindowEndAt: "2026-08-15T00:00:00Z",
+            dayWindowEndAt: "2026-08-10T14:00:00.789Z",
+            weekWindowEndAt: "2026-08-15T00:00:00.321Z",
             totalTokens: nil, consumedTokens: nil, remainingTokens: nil,
             allowedModels: [],
             groupNames: ["Codex", "Codex Pro", "未配对名称"],
@@ -31,10 +31,26 @@ final class UsageMapperTests: XCTestCase {
             UsageGroupMultiplier(name: "Codex", multiplier: 1),
             UsageGroupMultiplier(name: "Codex Pro", multiplier: 2)
         ])
-        XCTAssertEqual(snapshot.fiveHour?.windowEnd, Date(timeIntervalSince1970: 1_786_370_400))
-        XCTAssertEqual(snapshot.weekly?.windowEnd, Date(timeIntervalSince1970: 1_786_752_000))
-        XCTAssertEqual(snapshot.subscriptionStartAt, Date(timeIntervalSince1970: 1_785_542_400))
-        XCTAssertEqual(snapshot.subscriptionEndAt, Date(timeIntervalSince1970: 1_788_220_800))
+        XCTAssertEqual(
+            try XCTUnwrap(snapshot.fiveHour?.windowEnd).timeIntervalSince1970,
+            1_786_370_400.789,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(snapshot.weekly?.windowEnd).timeIntervalSince1970,
+            1_786_752_000.321,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(snapshot.subscriptionStartAt).timeIntervalSince1970,
+            1_785_542_400.123,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(snapshot.subscriptionEndAt).timeIntervalSince1970,
+            1_788_220_800.456,
+            accuracy: 0.0001
+        )
     }
 
     func test周期订阅把Daily映射为五小时窗口() throws {
