@@ -30,6 +30,7 @@ struct UsageAlert: Equatable, Sendable {
     let windowEnd: Date?
     fileprivate let reservationID: UUID
     fileprivate let triggeredWindows: Set<AlertWindowKey>
+    fileprivate let replacedReservationOwners: [AlertWindowKey: UUID]
 
     var notificationTitle: String {
         "Routin 用量预警"
@@ -89,6 +90,7 @@ private final class AlertEvaluatorSharedState: @unchecked Sendable {
     var reservationOwners: [AlertWindowKey: UUID] = [:]
     var inFlightReservations: Set<UUID> = []
     var pendingResetWindows: [AlertWindowKey: UUID] = [:]
+    var failedSupersededReservations: Set<UUID> = []
 }
 
 final class AlertEvaluator: @unchecked Sendable {
@@ -166,12 +168,50 @@ final class AlertEvaluator: @unchecked Sendable {
         var triggeredWindows = Self.loadTriggeredWindows(from: defaults)
         for alert in alerts {
             Self.sharedState.inFlightReservations.remove(alert.reservationID)
+            let wasSuperseded = alert.triggeredWindows.contains { windowKey in
+                guard let owner = Self.sharedState.reservationOwners[windowKey] else {
+                    return false
+                }
+                return owner != alert.reservationID
+            }
+            if wasSuperseded {
+                Self.sharedState.failedSupersededReservations.insert(alert.reservationID)
+            }
             for windowKey in alert.triggeredWindows
                 where Self.sharedState.reservationOwners[windowKey] == alert.reservationID {
-                triggeredWindows.remove(windowKey)
-                Self.sharedState.reservationOwners.removeValue(forKey: windowKey)
-                Self.sharedState.pendingResetWindows.removeValue(forKey: windowKey)
+                guard let previousOwner = alert.replacedReservationOwners[windowKey] else {
+                    triggeredWindows.remove(windowKey)
+                    Self.sharedState.reservationOwners.removeValue(forKey: windowKey)
+                    Self.sharedState.pendingResetWindows.removeValue(forKey: windowKey)
+                    continue
+                }
+
+                if Self.sharedState.failedSupersededReservations.contains(previousOwner) {
+                    triggeredWindows.remove(windowKey)
+                    Self.sharedState.reservationOwners.removeValue(forKey: windowKey)
+                    Self.sharedState.pendingResetWindows.removeValue(forKey: windowKey)
+                    continue
+                }
+
+                let pendingResetOwner = Self.sharedState.pendingResetWindows[windowKey]
+                if
+                    pendingResetOwner != nil,
+                    !Self.sharedState.inFlightReservations.contains(previousOwner)
+                {
+                    triggeredWindows.remove(windowKey)
+                    Self.sharedState.reservationOwners.removeValue(forKey: windowKey)
+                    Self.sharedState.pendingResetWindows.removeValue(forKey: windowKey)
+                    continue
+                }
+
+                Self.sharedState.reservationOwners[windowKey] = previousOwner
+                if pendingResetOwner == alert.reservationID {
+                    Self.sharedState.pendingResetWindows[windowKey] = previousOwner
+                }
             }
+            Self.sharedState.failedSupersededReservations.subtract(
+                alert.replacedReservationOwners.values
+            )
         }
         persistTriggeredWindows(triggeredWindows)
     }
@@ -207,10 +247,13 @@ final class AlertEvaluator: @unchecked Sendable {
             where Self.sharedState.reservationOwners[windowKey] == alert.reservationID {
             if Self.sharedState.pendingResetWindows[windowKey] == alert.reservationID {
                 triggeredWindows.remove(windowKey)
-                Self.sharedState.pendingResetWindows.removeValue(forKey: windowKey)
             }
+            Self.sharedState.pendingResetWindows.removeValue(forKey: windowKey)
             Self.sharedState.reservationOwners.removeValue(forKey: windowKey)
         }
+        Self.sharedState.failedSupersededReservations.subtract(
+            alert.replacedReservationOwners.values
+        )
         persistTriggeredWindows(triggeredWindows)
     }
 
@@ -288,6 +331,7 @@ final class AlertEvaluator: @unchecked Sendable {
         let reservationID = UUID()
         triggeredWindows.formUnion(newlyTriggeredWindows)
         var reservedWindows = newlyTriggeredWindows
+        var replacedReservationOwners: [AlertWindowKey: UUID] = [:]
         for item in levels where item.threshold < highest.threshold {
             let lowerWindowKey = AlertWindowKey(
                 keyID: key.id,
@@ -297,14 +341,17 @@ final class AlertEvaluator: @unchecked Sendable {
             )
             if
                 !newlyTriggeredWindows.contains(lowerWindowKey),
-                Self.sharedState.reservationOwners[lowerWindowKey] != nil
+                let previousOwner = Self.sharedState.reservationOwners[lowerWindowKey]
             {
                 reservedWindows.insert(lowerWindowKey)
+                replacedReservationOwners[lowerWindowKey] = previousOwner
             }
         }
         for windowKey in reservedWindows {
             Self.sharedState.reservationOwners[windowKey] = reservationID
-            Self.sharedState.pendingResetWindows.removeValue(forKey: windowKey)
+            if replacedReservationOwners[windowKey] == nil {
+                Self.sharedState.pendingResetWindows.removeValue(forKey: windowKey)
+            }
         }
 
         return [UsageAlert(
@@ -315,7 +362,8 @@ final class AlertEvaluator: @unchecked Sendable {
             percent: metric.percent,
             windowEnd: metric.windowEnd,
             reservationID: reservationID,
-            triggeredWindows: reservedWindows
+            triggeredWindows: reservedWindows,
+            replacedReservationOwners: replacedReservationOwners
         )]
     }
 

@@ -638,6 +638,112 @@ final class AlertManagerTests: XCTestCase {
         )
     }
 
+    func test高阈值接管低阈值发送后失败不会解除低阈值保护() async throws {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let key = makeKey()
+        let delayedSender = ControlledSendingSender()
+        let delayedManager = AlertManager(evaluator: context.evaluator, sender: delayedSender)
+        let lowSnapshot = tokenSnapshot(percent: 80)
+        let delayedLowTask = Task {
+            try await delayedManager.evaluateAndNotify(
+                key: key,
+                snapshot: lowSnapshot,
+                thresholds: .init(),
+                notificationsEnabled: true
+            )
+        }
+        await delayedSender.waitUntilSendCount(1)
+
+        let failingHighSender = NotificationSenderSpy(
+            authorizationResults: [true],
+            sendFailureCount: 1
+        )
+        let failingHighManager = AlertManager(
+            evaluator: context.evaluator,
+            sender: failingHighSender
+        )
+        do {
+            _ = try await failingHighManager.evaluateAndNotify(
+                key: key,
+                snapshot: tokenSnapshot(percent: 95),
+                thresholds: .init(),
+                notificationsEnabled: true
+            )
+            XCTFail("高阈值发送应失败")
+        } catch {
+            XCTAssertEqual(error as? NotificationSenderSpyError, .发送失败)
+        }
+
+        XCTAssertEqual(
+            context.evaluator.evaluate(
+                key: key,
+                snapshot: lowSnapshot,
+                thresholds: .init()
+            ),
+            []
+        )
+
+        await delayedSender.resolveNextSend()
+        _ = try await delayedLowTask.value
+    }
+
+    func test被接管的低阈值与高阈值依次发送失败会恢复低阈值资格() async throws {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let key = makeKey()
+        let lowSnapshot = tokenSnapshot(percent: 80)
+        let highSnapshot = tokenSnapshot(percent: 95)
+        let failingLowSender = ControlledFailingSendingSender()
+        let lowManager = AlertManager(evaluator: context.evaluator, sender: failingLowSender)
+        let lowTask = Task {
+            try await lowManager.evaluateAndNotify(
+                key: key,
+                snapshot: lowSnapshot,
+                thresholds: .init(),
+                notificationsEnabled: true
+            )
+        }
+        await failingLowSender.waitUntilSendCount(1)
+
+        let failingHighSender = ControlledFailingSendingSender()
+        let highManager = AlertManager(evaluator: context.evaluator, sender: failingHighSender)
+        let highTask = Task {
+            try await highManager.evaluateAndNotify(
+                key: key,
+                snapshot: highSnapshot,
+                thresholds: .init(),
+                notificationsEnabled: true
+            )
+        }
+        await failingHighSender.waitUntilSendCount(1)
+
+        await failingLowSender.failNextSend()
+        do {
+            _ = try await lowTask.value
+            XCTFail("低阈值发送应失败")
+        } catch {
+            XCTAssertEqual(error as? NotificationSenderSpyError, .发送失败)
+        }
+
+        await failingHighSender.failNextSend()
+        do {
+            _ = try await highTask.value
+            XCTFail("高阈值发送应失败")
+        } catch {
+            XCTAssertEqual(error as? NotificationSenderSpyError, .发送失败)
+        }
+
+        XCTAssertEqual(
+            context.evaluator.evaluate(
+                key: key,
+                snapshot: lowSnapshot,
+                thresholds: .init()
+            ).map(\.level),
+            [.low]
+        )
+    }
+
     func test周期额度缺少窗口结束时间时不产生无法去重的通知() {
         let context = makeContext()
         defer { context.cleanUp() }
@@ -883,6 +989,41 @@ private actor ControlledSendingSender: NotificationSending {
             waiter.continuation.resume()
         }
         await withCheckedContinuation { continuation in
+            sendContinuations.append(continuation)
+        }
+    }
+}
+
+private actor ControlledFailingSendingSender: NotificationSending {
+    private var sendCount = 0
+    private var sendContinuations: [CheckedContinuation<Void, Error>] = []
+    private var sendWaiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+
+    func waitUntilSendCount(_ expectedCount: Int) async {
+        guard sendCount < expectedCount else {
+            return
+        }
+        await withCheckedContinuation { continuation in
+            sendWaiters.append((expectedCount, continuation))
+        }
+    }
+
+    func failNextSend() {
+        sendContinuations.removeFirst().resume(throwing: NotificationSenderSpyError.发送失败)
+    }
+
+    func requestAuthorization() async throws -> Bool {
+        true
+    }
+
+    func send(_ alert: UsageAlert) async throws {
+        sendCount += 1
+        let readyWaiters = sendWaiters.filter { sendCount >= $0.count }
+        sendWaiters.removeAll { sendCount >= $0.count }
+        for waiter in readyWaiters {
+            waiter.continuation.resume()
+        }
+        try await withCheckedThrowingContinuation { continuation in
             sendContinuations.append(continuation)
         }
     }
