@@ -88,7 +88,7 @@ final class RefreshScheduler {
         }
 
         let newTimer = timerScheduler.schedule(every: wakeDebounceSeconds) { [weak self] in
-            MainActor.assumeIsolated {
+            Task { @MainActor [weak self] in
                 self?.fireWake(generation: generation)
             }
         }
@@ -119,7 +119,7 @@ final class RefreshScheduler {
 
         let newTimer = timerScheduler.schedule(every: TimeInterval(minutes * 60)) {
             [weak self] in
-            MainActor.assumeIsolated {
+            Task { @MainActor [weak self] in
                 self?.firePeriodic(generation: generation)
             }
         }
