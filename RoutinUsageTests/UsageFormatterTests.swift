@@ -48,6 +48,59 @@ final class UsageFormatterTests: XCTestCase {
         )
     }
 
+    func test菜单栏别名超长时截断为前五个字符加省略号() {
+        XCTAssertEqual(UsageFormatter.truncatedMenuBarAlias("主账号名称很长"), "主账号名称…")
+        XCTAssertEqual(UsageFormatter.truncatedMenuBarAlias("主账号"), "主账号")
+    }
+
+    func test菜单栏别名百分比样式返回别名和百分比() {
+        let state = makeState(snapshot: makePeriodicSnapshot(fiveHourPercent: 67.5))
+
+        XCTAssertEqual(
+            UsageFormatter.menuBarText(
+                state: state,
+                dimension: .fiveHour,
+                style: .aliasPercent
+            ),
+            "主账号 68%"
+        )
+    }
+
+    func test菜单栏别名竖线样式有效时返回别名加载时返回省略号() {
+        let state = makeState(snapshot: makePeriodicSnapshot(fiveHourPercent: 67.5))
+        XCTAssertEqual(
+            UsageFormatter.menuBarText(
+                state: state,
+                dimension: .fiveHour,
+                style: .aliasVerticalBar
+            ),
+            "主账号"
+        )
+
+        let loadingState = makeState(snapshot: nil, isRefreshing: true)
+        XCTAssertEqual(
+            UsageFormatter.menuBarText(
+                state: loadingState,
+                dimension: .fiveHour,
+                style: .aliasVerticalBar
+            ),
+            "…"
+        )
+    }
+
+    func test菜单栏别名竖线样式资源包仍返回Token百分比() {
+        let state = makeState(snapshot: makeTokenSnapshot(percent: 92.4))
+
+        XCTAssertEqual(
+            UsageFormatter.menuBarText(
+                state: state,
+                dimension: .weekly,
+                style: .aliasVerticalBar
+            ),
+            "92%"
+        )
+    }
+
     func test存在缓存且刷新失败继续显示缓存百分比() {
         let state = makeState(
             snapshot: makePeriodicSnapshot(fiveHourPercent: 81.2),
