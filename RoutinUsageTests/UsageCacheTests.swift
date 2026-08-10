@@ -37,6 +37,25 @@ final class UsageCacheTests: XCTestCase {
         XCTAssertEqual(try context.cache.load(for: secondID), second)
     }
 
+    func test损坏缓存数据会被清理并按空缓存恢复() throws {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let keyID = UUID()
+        let snapshot = makeSnapshot(planName: "个人版", fetchedAt: Date(timeIntervalSince1970: 100))
+
+        context.defaults.set(Data("损坏缓存".utf8), forKey: "usageSnapshots")
+        XCTAssertNil(try context.cache.load(for: keyID))
+        XCTAssertNil(context.defaults.data(forKey: "usageSnapshots"))
+
+        context.defaults.set(Data("损坏缓存".utf8), forKey: "usageSnapshots")
+        try context.cache.save(snapshot, for: keyID)
+        XCTAssertEqual(try context.cache.load(for: keyID), snapshot)
+
+        context.defaults.set(Data("损坏缓存".utf8), forKey: "usageSnapshots")
+        try context.cache.delete(for: keyID)
+        XCTAssertNil(context.defaults.data(forKey: "usageSnapshots"))
+    }
+
     func test刷新间隔一分钟时四分五十九秒仍新鲜五分钟过期() {
         let lastSuccess = Date(timeIntervalSince1970: 1_000)
 

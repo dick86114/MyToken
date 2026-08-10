@@ -28,14 +28,23 @@ final class UsageCache: UsageCaching, @unchecked Sendable {
     func delete(for keyID: UUID) throws {
         var values = try snapshots()
         values.removeValue(forKey: keyID)
-        defaults.set(try JSONEncoder().encode(values), forKey: storageKey)
+        if values.isEmpty {
+            defaults.removeObject(forKey: storageKey)
+        } else {
+            defaults.set(try JSONEncoder().encode(values), forKey: storageKey)
+        }
     }
 
     private func snapshots() throws -> [UUID: UsageSnapshot] {
         guard let data = defaults.data(forKey: storageKey) else {
             return [:]
         }
-        return try JSONDecoder().decode([UUID: UsageSnapshot].self, from: data)
+        do {
+            return try JSONDecoder().decode([UUID: UsageSnapshot].self, from: data)
+        } catch {
+            defaults.removeObject(forKey: storageKey)
+            return [:]
+        }
     }
 }
 
