@@ -46,6 +46,40 @@ final class KeyRepositoryTests: XCTestCase {
         XCTAssertTrue(context.repository.list().isEmpty)
     }
 
+    func test添加配置拒绝匹配Plan秘密的显示名称且偏好设置不落秘密() {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let secret = "plan-secret-8F2A"
+
+        for name in [secret, "plan-other-name"] {
+            XCTAssertThrowsError(try context.repository.add(name: name, secret: secret)) { error in
+                XCTAssertEqual(error as? KeyRepositoryError, .invalidName)
+                XCTAssertEqual(error.localizedDescription, "显示名称不能是 plan Key")
+            }
+        }
+
+        XCTAssertTrue(context.repository.list().isEmpty)
+        let persisted = context.defaults.data(forKey: "keyConfigurations")
+            .flatMap { String(data: $0, encoding: .utf8) } ?? ""
+        XCTAssertFalse(persisted.contains(secret))
+    }
+
+    func test短于四位的Key内容被拒绝且不会写入后缀元数据() {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let secret = "plan-abc"
+
+        XCTAssertThrowsError(try context.repository.add(name: "主账号", secret: secret)) { error in
+            XCTAssertEqual(error as? KeyRepositoryError, .invalidSecret)
+            XCTAssertEqual(error.localizedDescription, "plan Key 内容至少需要 4 位")
+        }
+
+        let persisted = context.defaults.data(forKey: "keyConfigurations")
+            .flatMap { String(data: $0, encoding: .utf8) } ?? ""
+        XCTAssertFalse(persisted.contains("abc"))
+        XCTAssertTrue(context.repository.list().isEmpty)
+    }
+
     func test更新配置同步更新名称后缀与Keychain() throws {
         let context = makeContext()
         defer { context.cleanUp() }

@@ -70,6 +70,9 @@ final class AppLifecycleTests: XCTestCase {
         environment.settings.notificationsEnabled = true
         await environment.notificationsDidChange(enabled: true)
         await environment.store.refreshAll()
+        await 等待条件 {
+            await context.notificationSender.sentAlerts().count == 1
+        }
         await context.fetcher.setResponse(.success(makeSnapshot(percent: 20)), for: "plan-main-0001")
         await environment.store.refreshAll()
         environment.settings.notificationsEnabled = false
@@ -90,10 +93,16 @@ final class AppLifecycleTests: XCTestCase {
         await context.fetcher.setResponse(.success(usage), for: "plan-main-0001")
         let environment = context.makeEnvironment()
         await environment.start()
+        await 等待条件 {
+            await context.notificationSender.sentAlerts().count == 1
+        }
 
         environment.settings.thresholds = AlertThresholds(low: 80, high: 90)
         environment.thresholdsDidChange(to: environment.settings.thresholds)
         await environment.store.refreshAll()
+        await 等待条件 {
+            await context.notificationSender.sentAlerts().count == 2
+        }
 
         let alerts = await context.notificationSender.sentAlerts()
         XCTAssertEqual(alerts.map(\.level), [.low, .high])
@@ -131,6 +140,9 @@ final class AppLifecycleTests: XCTestCase {
         environment.settings.refreshMinutes = 1
 
         await environment.start()
+        await 等待条件 {
+            await context.notificationSender.sentAlerts().count == 1
+        }
 
         let alerts = await context.notificationSender.sentAlerts()
         XCTAssertEqual(alerts.map(\.level), [.high])
@@ -269,6 +281,91 @@ final class AppLifecycleTests: XCTestCase {
 
         let authorizationRequestCount = await context.notificationSender.authorizationRequestCount
         XCTAssertEqual(authorizationRequestCount, 1)
+    }
+
+    func test通知授权挂起不会阻塞启动完成与刷新调度() async throws {
+        let suiteName = "AppLifecycleTests.authorization-blocked-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let keychain = LifecycleKeychainFake()
+        let repository = KeyRepository(defaults: defaults, keychain: keychain)
+        let key = try repository.add(name: "主账号", secret: "plan-main-0001")
+        let snapshot = makeSnapshot(percent: 96)
+        let fetcher = ScriptedUsageFetcher(responses: ["plan-main-0001": .success(snapshot)])
+        let blockingSender = BlockingAuthorizationNotificationSender()
+        let notificationSender = AuthorizationCachingNotificationSender(sender: blockingSender)
+        let settings = AppSettings(defaults: defaults)
+        settings.notificationsEnabled = true
+        let store = UsageStore(
+            keyRepository: repository,
+            keychain: keychain,
+            apiClient: fetcher,
+            cache: LifecycleUsageCache(),
+            alertEvaluator: AlertEvaluator(defaults: defaults),
+            notificationSender: notificationSender,
+            defaults: defaults,
+            notificationsEnabled: true,
+            now: { Date(timeIntervalSince1970: 10_000) }
+        )
+        let scheduler = LifecycleRefreshSchedulerSpy()
+        let environment = AppEnvironment(
+            settings: settings,
+            store: store,
+            refreshScheduler: scheduler,
+            loginItemManager: LifecycleLoginItemManager(),
+            keyRepository: repository,
+            apiClient: fetcher,
+            notificationSender: notificationSender,
+            applicationNotificationCenter: NotificationCenter()
+        )
+        var didStart = false
+
+        let start = Task { @MainActor in
+            await environment.start()
+            didStart = true
+        }
+        await blockingSender.waitUntilAuthorizationRequested()
+
+        await 等待条件 { didStart }
+        XCTAssertTrue(didStart)
+        XCTAssertEqual(environment.store.state(for: key.id)?.snapshot, snapshot)
+        XCTAssertEqual(scheduler.startedMinutes, [5])
+
+        await blockingSender.resolveAuthorization(true)
+        await start.value
+    }
+
+    func test启动时设置显示系统实际登录启动状态() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let loginItemManager = EnabledLifecycleLoginItemManager()
+        let settings = AppSettings(defaults: context.defaults)
+        let store = UsageStore(
+            keyRepository: context.repository,
+            keychain: context.keychain,
+            apiClient: context.fetcher,
+            cache: context.cache,
+            alertEvaluator: AlertEvaluator(defaults: context.defaults),
+            notificationSender: context.notificationSender,
+            defaults: context.defaults,
+            notificationsEnabled: false,
+            now: { Date(timeIntervalSince1970: 10_000) }
+        )
+        let environment = AppEnvironment(
+            settings: settings,
+            store: store,
+            refreshScheduler: context.refreshScheduler,
+            loginItemManager: loginItemManager,
+            keyRepository: context.repository,
+            apiClient: context.fetcher,
+            notificationSender: context.notificationSender,
+            applicationNotificationCenter: context.applicationNotificationCenter
+        )
+
+        await environment.start()
+
+        XCTAssertTrue(settings.launchAtLogin)
     }
 
     func test生命周期与用量刷新共享授权结果() async throws {
@@ -692,4 +789,12 @@ private struct LifecycleLoginItemManager: LoginItemManaging {
     var isEnabled: Bool { false }
 
     func setEnabled(_ enabled: Bool) throws {}
+}
+
+private final class EnabledLifecycleLoginItemManager: LoginItemManaging, @unchecked Sendable {
+    var isEnabled = true
+
+    func setEnabled(_ enabled: Bool) throws {
+        isEnabled = enabled
+    }
 }

@@ -10,6 +10,8 @@ enum KeyEditorValidationError: LocalizedError, Equatable, Sendable {
     case emptyName
     case emptySecret
     case invalidSecretPrefix
+    case unsafeName
+    case secretTooShort
     case thresholdOutOfRange
     case invalidThresholdOrder
 
@@ -21,6 +23,10 @@ enum KeyEditorValidationError: LocalizedError, Equatable, Sendable {
             return "请输入 plan Key"
         case .invalidSecretPrefix:
             return "Key 必须以 plan- 开头"
+        case .unsafeName:
+            return "显示名称不能是 plan Key"
+        case .secretTooShort:
+            return "plan Key 内容至少需要 4 位"
         case .thresholdOutOfRange:
             return "阈值必须是 1 至 100 的整数"
         case .invalidThresholdOrder:
@@ -35,11 +41,17 @@ enum KeyEditorValidation {
         guard !normalizedName.isEmpty else {
             throw KeyEditorValidationError.emptyName
         }
+        guard KeyCredentialPolicy.isSafeDisplayName(normalizedName) else {
+            throw KeyEditorValidationError.unsafeName
+        }
         guard !secret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw KeyEditorValidationError.emptySecret
         }
-        guard secret.hasPrefix("plan-"), secret.count > "plan-".count else {
+        guard KeyCredentialPolicy.hasValidPrefix(secret) else {
             throw KeyEditorValidationError.invalidSecretPrefix
+        }
+        guard KeyCredentialPolicy.hasSufficientSecretPayload(secret) else {
+            throw KeyEditorValidationError.secretTooShort
         }
         return ValidatedKeyInput(name: normalizedName, secret: secret)
     }

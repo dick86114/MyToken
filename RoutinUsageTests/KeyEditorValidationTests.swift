@@ -21,6 +21,25 @@ final class KeyEditorValidationTests: XCTestCase {
         }
     }
 
+    func test显示名称匹配Plan秘密时返回中文错误() {
+        XCTAssertThrowsError(
+            try KeyEditorValidation.validate(
+                name: "plan-sensitive-8F2A",
+                secret: "plan-sensitive-8F2A"
+            )
+        ) { error in
+            XCTAssertEqual(error.localizedDescription, "显示名称不能是 plan Key")
+        }
+    }
+
+    func test短于四位的PlanKey内容返回中文错误() {
+        XCTAssertThrowsError(
+            try KeyEditorValidation.validate(name: "主账号", secret: "plan-abc")
+        ) { error in
+            XCTAssertEqual(error.localizedDescription, "plan Key 内容至少需要 4 位")
+        }
+    }
+
     func test低阈值不小于高阈值返回中文错误() {
         XCTAssertThrowsError(try KeyEditorValidation.validateThresholds(low: 95, high: 80)) { error in
             XCTAssertEqual(error.localizedDescription, "低阈值必须小于高阈值")
@@ -100,6 +119,15 @@ final class KeyEditorValidationTests: XCTestCase {
 
     func testKey列表只显示固定掩码和四位尾号() {
         XCTAssertEqual(KeyDisplayMask.masked(suffix: "8F2A"), "plan-••••8F2A")
+    }
+
+    func test不足四位的旧后缀在设置中完全遮掩() {
+        let secret = "abc"
+
+        let displayText = KeyDisplayMask.masked(suffix: secret)
+
+        XCTAssertEqual(displayText, "plan-••••")
+        XCTAssertFalse(displayText.contains(secret))
     }
 
     private func waitUntil(_ condition: @MainActor () -> Bool) async -> Bool {

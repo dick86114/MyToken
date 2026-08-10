@@ -65,6 +65,7 @@ final class AppEnvironment {
     @ObservationIgnored private var terminationObservation: ApplicationTerminationObservation?
     @ObservationIgnored private var isStarted = false
     @ObservationIgnored private var hasRequestedNotificationAuthorization = false
+    @ObservationIgnored private var notificationAuthorizationTask: Task<Void, Never>?
 
     init(
         settings: AppSettings,
@@ -127,6 +128,10 @@ final class AppEnvironment {
         }
         isStarted = true
         observeApplicationTermination()
+        LoginItemSettingSynchronizer.synchronize(
+            settings: settings,
+            manager: loginItemManager
+        )
         showsOnboarding = store.orderedKeyIDs.isEmpty
         synchronizeStoreSettings()
 
@@ -156,7 +161,11 @@ final class AppEnvironment {
             return
         }
         hasRequestedNotificationAuthorization = true
-        _ = try? await notificationSender.requestAuthorization()
+        let notificationSender = notificationSender
+        notificationAuthorizationTask = Task {
+            _ = try? await notificationSender.requestAuthorization()
+        }
+        await Task.yield()
     }
 
     func thresholdsDidChange(to _: AlertThresholds) {
@@ -217,6 +226,8 @@ final class AppEnvironment {
         }
         isStarted = false
         terminationObservation = nil
+        notificationAuthorizationTask?.cancel()
+        notificationAuthorizationTask = nil
         refreshScheduler.stop()
     }
 }

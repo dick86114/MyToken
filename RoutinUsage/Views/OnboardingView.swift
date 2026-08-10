@@ -23,7 +23,7 @@ struct OnboardingView: View {
             VStack(spacing: 8) {
                 Text("欢迎使用 Routin Usage")
                     .font(.title2.weight(.semibold))
-                Text("添加第一个 plan Key，即可在菜单栏查看五小时、周或 Token 资源包用量。")
+                Text("添加第一个 plan Key，即可在菜单栏查看 5 小时、周或 Token 资源包用量。")
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

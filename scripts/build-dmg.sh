@@ -1,31 +1,96 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ ! -f "project.yml" ]]; then
-  echo "错误：当前目录未找到 project.yml，请在仓库根目录运行此脚本。" >&2
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+repo_root="$(cd -- "$script_dir/.." && pwd -P)"
+
+if [[ ! -f "$repo_root/project.yml" ]]; then
+  echo "错误：脚本所在仓库未找到 project.yml。" >&2
   exit 1
 fi
 
-# 仅清理本脚本负责生成的两个目录。
-rm -rf -- "build/dist" "build/DerivedData"
-mkdir -p "build/dist"
+build_root="$repo_root/build"
+dist_dir="$build_root/dist"
+derived_data_dir="$build_root/DerivedData"
+staging_dir="$build_root/DMGStaging"
+
+if [[ -L "$build_root" ]]; then
+  echo "错误：build 不能是符号链接，已拒绝清理。" >&2
+  exit 1
+fi
+
+canonical_path() {
+  local target="$1"
+  local existing="$target"
+  local suffix=""
+  local parent
+
+  while [[ ! -e "$existing" && ! -L "$existing" ]]; do
+    suffix="/$(basename -- "$existing")$suffix"
+    existing="$(dirname -- "$existing")"
+  done
+
+  if [[ -d "$existing" ]]; then
+    existing="$(cd -- "$existing" && pwd -P)"
+  else
+    parent="$(cd -- "$(dirname -- "$existing")" && pwd -P)"
+    existing="$parent/$(basename -- "$existing")"
+  fi
+  printf '%s%s\n' "$existing" "$suffix"
+}
+
+assert_inside_repo() {
+  local target="$1"
+  local canonical
+  canonical="$(canonical_path "$target")"
+  case "$canonical" in
+    "$repo_root"/*) ;;
+    *)
+      echo "错误：清理目标位于仓库外：$canonical" >&2
+      exit 1
+      ;;
+  esac
+}
+
+assert_inside_repo "$dist_dir"
+assert_inside_repo "$derived_data_dir"
+assert_inside_repo "$staging_dir"
+
+if [[ "${ROUTIN_DMG_DRY_RUN:-0}" == "1" ]]; then
+  echo "仓库根目录：$repo_root"
+  echo "将清理：$dist_dir"
+  echo "将清理：$derived_data_dir"
+  echo "将清理：$staging_dir"
+  exit 0
+fi
+
+# 仅清理经过仓库边界校验的构建产物目录。
+rm -rf -- "$dist_dir" "$derived_data_dir" "$staging_dir"
+mkdir -p "$dist_dir" "$staging_dir"
+
+cd -- "$repo_root"
 
 xcodegen generate
 xcodebuild \
   -project RoutinUsage.xcodeproj \
   -scheme RoutinUsage \
   -configuration Release \
-  -derivedDataPath build/DerivedData \
+  -derivedDataPath "$derived_data_dir" \
   CODE_SIGNING_ALLOWED=NO \
   clean build
 
 ditto \
-  "build/DerivedData/Build/Products/Release/Routin Usage.app" \
-  "build/dist/Routin Usage.app"
+  "$derived_data_dir/Build/Products/Release/Routin Usage.app" \
+  "$dist_dir/Routin Usage.app"
+
+ditto "$dist_dir/Routin Usage.app" "$staging_dir/Routin Usage.app"
+ditto "$repo_root/docs/首次运行说明.md" "$staging_dir/首次运行说明.md"
 
 hdiutil create \
   -volname "Routin Usage" \
-  -srcfolder "build/dist/Routin Usage.app" \
+  -srcfolder "$staging_dir" \
   -ov \
   -format UDZO \
-  "build/dist/Routin-Usage.dmg"
+  "$dist_dir/Routin-Usage.dmg"
+
+rm -rf -- "$staging_dir"

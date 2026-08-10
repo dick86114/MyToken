@@ -1,8 +1,12 @@
+import AppKit
 import SwiftUI
 
 enum KeyDisplayMask {
     static func masked(suffix: String) -> String {
-        "plan-••••\(suffix.suffix(4))"
+        guard suffix.count >= KeyCredentialPolicy.minimumVisibleSuffixLength else {
+            return "plan-••••"
+        }
+        return "plan-••••\(suffix.suffix(KeyCredentialPolicy.minimumVisibleSuffixLength))"
     }
 }
 
@@ -72,6 +76,18 @@ struct SettingsView: View {
         .frame(minWidth: 520, idealWidth: 560, minHeight: 420, idealHeight: 500)
         .onChange(of: store.orderedKeyIDs) { _, ids in
             orderedKeyIDs = ids
+        }
+        .onAppear {
+            LoginItemSettingSynchronizer.synchronize(
+                settings: settings,
+                manager: loginItemManager
+            )
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            LoginItemSettingSynchronizer.synchronize(
+                settings: settings,
+                manager: loginItemManager
+            )
         }
         .sheet(item: $editor) { presentation in
             editorView(for: presentation)
@@ -152,19 +168,19 @@ private extension SettingsView {
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(configuration.name)
+                Text(configuration.displayName)
                 Text(KeyDisplayMask.masked(suffix: configuration.keySuffix))
                     .font(.system(.caption, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(configuration.name)，\(KeyDisplayMask.masked(suffix: configuration.keySuffix))")
+            .accessibilityLabel("\(configuration.displayName)，\(KeyDisplayMask.masked(suffix: configuration.keySuffix))")
 
             Spacer()
 
             Button("编辑") { editor = .edit(configuration) }
                 .buttonStyle(.borderless)
-                .accessibilityLabel("编辑 \(configuration.name)")
+                .accessibilityLabel("编辑 \(configuration.displayName)")
 
             Button(role: .destructive) {
                 pendingDeletion = configuration
@@ -172,7 +188,7 @@ private extension SettingsView {
                 Image(systemName: "trash")
             }
             .buttonStyle(.borderless)
-            .accessibilityLabel("删除 \(configuration.name)")
+            .accessibilityLabel("删除 \(configuration.displayName)")
         }
         .contentShape(Rectangle())
         .onTapGesture { store.selectKey(configuration.id) }
@@ -184,7 +200,7 @@ private extension SettingsView {
                 Picker("当前 Key", selection: selectedKeyBinding) {
                     ForEach(orderedKeyIDs, id: \.self) { id in
                         if let configuration = store.state(for: id)?.configuration {
-                            Text(configuration.name).tag(Optional(id))
+                            Text(configuration.displayName).tag(Optional(id))
                         }
                     }
                 }
@@ -192,7 +208,7 @@ private extension SettingsView {
                 .accessibilityLabel("菜单栏当前 Key")
 
                 Picker("周期维度", selection: $settings.displayDimension) {
-                    Text("五小时").tag(DisplayDimension.fiveHour)
+                    Text("5 小时").tag(DisplayDimension.fiveHour)
                     Text("周").tag(DisplayDimension.weekly)
                 }
                 .accessibilityLabel("周期订阅显示维度")
@@ -257,12 +273,13 @@ private extension SettingsView {
         Binding(
             get: { settings.launchAtLogin },
             set: { enabled in
-                let previousValue = settings.launchAtLogin
-                settings.launchAtLogin = enabled
                 do {
-                    try loginItemManager.setEnabled(enabled)
+                    try LoginItemSettingSynchronizer.setEnabled(
+                        enabled,
+                        settings: settings,
+                        manager: loginItemManager
+                    )
                 } catch {
-                    settings.launchAtLogin = previousValue
                     operationError = "无法更新登录启动设置：\(error.localizedDescription)"
                 }
             }
@@ -275,7 +292,7 @@ private extension SettingsView {
         case .add:
             KeyEditorView(save: addKey)
         case let .edit(configuration):
-            KeyEditorView(title: "编辑 Key", initialName: configuration.name) { name, secret in
+            KeyEditorView(title: "编辑 Key", initialName: configuration.displayName) { name, secret in
                 try await updateValidatedKey(configuration.id, name, secret)
             }
         }

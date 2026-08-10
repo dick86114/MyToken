@@ -1,9 +1,20 @@
 import Foundation
 
-enum KeyRepositoryError: Error, Equatable, Sendable {
+enum KeyRepositoryError: LocalizedError, Equatable, Sendable {
     case invalidName
     case invalidSecret
     case configurationNotFound
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidName:
+            return "显示名称不能是 plan Key"
+        case .invalidSecret:
+            return "plan Key 内容至少需要 4 位"
+        case .configurationNotFound:
+            return "未找到 Key 配置"
+        }
+    }
 }
 
 final class KeyRepository {
@@ -33,7 +44,7 @@ final class KeyRepository {
         let configuration = KeyConfiguration(
             id: UUID(),
             name: normalizedName,
-            keySuffix: String(secret.suffix(4)),
+            keySuffix: KeyCredentialPolicy.metadataSuffix(for: secret),
             sortOrder: configurations.count
         )
 
@@ -53,7 +64,7 @@ final class KeyRepository {
         let configuration = KeyConfiguration(
             id: id,
             name: normalizedName,
-            keySuffix: String(secret.suffix(4)),
+            keySuffix: KeyCredentialPolicy.metadataSuffix(for: secret),
             sortOrder: configurations[index].sortOrder
         )
 
@@ -96,7 +107,13 @@ final class KeyRepository {
         guard !normalizedName.isEmpty else {
             throw KeyRepositoryError.invalidName
         }
-        guard secret.hasPrefix("plan-"), secret.count > "plan-".count else {
+        guard KeyCredentialPolicy.isSafeDisplayName(normalizedName) else {
+            throw KeyRepositoryError.invalidName
+        }
+        guard
+            KeyCredentialPolicy.hasValidPrefix(secret),
+            KeyCredentialPolicy.hasSufficientSecretPayload(secret)
+        else {
             throw KeyRepositoryError.invalidSecret
         }
         return normalizedName

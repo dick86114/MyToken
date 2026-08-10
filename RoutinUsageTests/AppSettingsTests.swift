@@ -94,6 +94,39 @@ final class LoginItemManagerTests: XCTestCase {
         XCTAssertEqual(enabledService.registerCount, 0)
         XCTAssertEqual(enabledService.unregisterCount, 1)
     }
+
+    @MainActor
+    func test登录启动设置同步系统外部变更与待批准状态() throws {
+        let context = try AppSettingsTests().makeContext()
+        defer { context.cleanUp() }
+        let settings = AppSettings(defaults: context.defaults)
+        settings.launchAtLogin = true
+        let manager = LoginItemManagerFake(isEnabled: false)
+
+        LoginItemSettingSynchronizer.synchronize(settings: settings, manager: manager)
+        XCTAssertFalse(settings.launchAtLogin)
+
+        manager.isEnabled = true
+        LoginItemSettingSynchronizer.synchronize(settings: settings, manager: manager)
+        XCTAssertTrue(settings.launchAtLogin)
+    }
+
+    @MainActor
+    func test注册后系统仍待批准时设置保持关闭() throws {
+        let context = try AppSettingsTests().makeContext()
+        defer { context.cleanUp() }
+        let settings = AppSettings(defaults: context.defaults)
+        let manager = LoginItemManagerFake(isEnabled: false, remainsDisabledAfterSet: true)
+
+        try LoginItemSettingSynchronizer.setEnabled(
+            true,
+            settings: settings,
+            manager: manager
+        )
+
+        XCTAssertEqual(manager.requestedValues, [true])
+        XCTAssertFalse(settings.launchAtLogin)
+    }
 }
 
 private extension AppSettingsTests {
@@ -141,6 +174,24 @@ private final class LoginItemServiceSpy: LoginItemServicing, @unchecked Sendable
     func unregister() throws {
         lock.withLock {
             storedUnregisterCount += 1
+        }
+    }
+}
+
+private final class LoginItemManagerFake: LoginItemManaging, @unchecked Sendable {
+    var isEnabled: Bool
+    let remainsDisabledAfterSet: Bool
+    private(set) var requestedValues: [Bool] = []
+
+    init(isEnabled: Bool, remainsDisabledAfterSet: Bool = false) {
+        self.isEnabled = isEnabled
+        self.remainsDisabledAfterSet = remainsDisabledAfterSet
+    }
+
+    func setEnabled(_ enabled: Bool) throws {
+        requestedValues.append(enabled)
+        if !remainsDisabledAfterSet {
+            isEnabled = enabled
         }
     }
 }

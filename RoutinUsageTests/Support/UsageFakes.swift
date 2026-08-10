@@ -35,6 +35,10 @@ actor ScriptedUsageFetcher: UsageFetching {
         requestCounts[apiKey, default: 0]
     }
 
+    func setResponse(_ response: Response, for apiKey: String) {
+        responses[apiKey] = response
+    }
+
     func waitUntilRequested(_ apiKey: String) async {
         while requestCounts[apiKey, default: 0] == 0 {
             await Task.yield()
@@ -189,6 +193,38 @@ actor BlockingNotificationSender: NotificationSending {
         for continuation in pending {
             continuation.resume()
         }
+    }
+}
+
+actor BlockingAuthorizationNotificationSender: NotificationSending {
+    private var authorizationRequested = false
+    private var authorizationContinuation: CheckedContinuation<Bool, Never>?
+    private var alerts: [UsageAlert] = []
+
+    func requestAuthorization() async throws -> Bool {
+        authorizationRequested = true
+        return await withCheckedContinuation { continuation in
+            authorizationContinuation = continuation
+        }
+    }
+
+    func send(_ alert: UsageAlert) async throws {
+        alerts.append(alert)
+    }
+
+    func waitUntilAuthorizationRequested() async {
+        while !authorizationRequested {
+            await Task.yield()
+        }
+    }
+
+    func resolveAuthorization(_ authorized: Bool) {
+        authorizationContinuation?.resume(returning: authorized)
+        authorizationContinuation = nil
+    }
+
+    func sentAlerts() -> [UsageAlert] {
+        alerts
     }
 }
 
