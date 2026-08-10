@@ -128,8 +128,12 @@ final class AppEnvironment {
         isStarted = true
         observeApplicationTermination()
         showsOnboarding = store.orderedKeyIDs.isEmpty
+        synchronizeStoreSettings()
 
         await store.refreshAll()
+        guard isStarted else {
+            return
+        }
         refreshScheduler.start(minutes: settings.refreshMinutes) { [weak self] in
             Task { @MainActor [weak self] in
                 await self?.store.refreshAll()
@@ -139,6 +143,7 @@ final class AppEnvironment {
     }
 
     func refreshIntervalDidChange(to minutes: Int) {
+        synchronizeStoreSettings()
         guard isStarted else {
             return
         }
@@ -146,11 +151,16 @@ final class AppEnvironment {
     }
 
     func notificationsDidChange(enabled: Bool) async {
+        synchronizeStoreSettings()
         guard enabled, !hasRequestedNotificationAuthorization else {
             return
         }
         hasRequestedNotificationAuthorization = true
         _ = try? await notificationSender.requestAuthorization()
+    }
+
+    func thresholdsDidChange(to _: AlertThresholds) {
+        synchronizeStoreSettings()
     }
 
     func selectedKeyDidChange(to keyID: UUID?) async {
@@ -174,9 +184,10 @@ final class AppEnvironment {
         secret: String
     ) async throws -> KeyEditorSaveResult {
         let input = try KeyEditorValidation.validate(name: name, secret: secret)
+        let validationTime = Date()
         let snapshot: UsageSnapshot?
         do {
-            snapshot = try await apiClient.fetchUsage(apiKey: input.secret, now: Date())
+            snapshot = try await apiClient.fetchUsage(apiKey: input.secret, now: validationTime)
             try Task.checkCancellation()
         } catch is CancellationError {
             throw CancellationError()
@@ -191,15 +202,13 @@ final class AppEnvironment {
         } catch {
             throw UsageStoreError.persistence
         }
-        await store.refresh(keyID: id)
+        await store.applyValidatedSnapshot(snapshot, for: id, validatedAt: validationTime)
         return snapshot == nil ? .savedWithoutSubscription : .saved
     }
 
     func moveKey(fromOffsets: IndexSet, toOffset: Int) {
         keyRepository.move(fromOffsets: fromOffsets, toOffset: toOffset)
-        Task { @MainActor [weak self] in
-            await self?.store.refreshAll()
-        }
+        store.reloadConfigurations()
     }
 
     func stop() {
@@ -213,6 +222,14 @@ final class AppEnvironment {
 }
 
 private extension AppEnvironment {
+    func synchronizeStoreSettings() {
+        store.updateSettings(
+            refreshMinutes: settings.refreshMinutes,
+            thresholds: settings.thresholds,
+            notificationsEnabled: settings.notificationsEnabled
+        )
+    }
+
     func observeApplicationTermination() {
         guard terminationObservation == nil else {
             return

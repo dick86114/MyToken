@@ -58,6 +58,9 @@ private struct AppMenuBarLabel: View {
                 await environment.notificationsDidChange(enabled: enabled)
             }
         }
+        .onChange(of: environment.settings.thresholds) { _, thresholds in
+            environment.thresholdsDidChange(to: thresholds)
+        }
         .onChange(of: environment.store.selectedKeyID) { _, keyID in
             Task {
                 await environment.selectedKeyDidChange(to: keyID)

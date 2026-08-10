@@ -44,9 +44,9 @@ final class UsageStore {
     @ObservationIgnored private let alertEvaluator: AlertEvaluator
     @ObservationIgnored private let notificationSender: any NotificationSending
     @ObservationIgnored private let defaults: UserDefaults
-    @ObservationIgnored private let refreshMinutes: Int
-    @ObservationIgnored private let thresholds: AlertThresholds
-    @ObservationIgnored private let notificationsEnabled: Bool
+    @ObservationIgnored private var refreshMinutes: Int
+    @ObservationIgnored private var thresholds: AlertThresholds
+    @ObservationIgnored private var notificationsEnabled: Bool
     @ObservationIgnored private let now: @Sendable () -> Date
     @ObservationIgnored private var refreshingKeyIDs: Set<UUID> = []
     @ObservationIgnored private var refreshGenerationByKeyID: [UUID: UUID] = [:]
@@ -97,6 +97,62 @@ final class UsageStore {
             return
         }
         await perform([request])
+    }
+
+    func updateSettings(
+        refreshMinutes: Int,
+        thresholds: AlertThresholds,
+        notificationsEnabled: Bool
+    ) {
+        self.refreshMinutes = refreshMinutes
+        self.thresholds = thresholds
+        self.notificationsEnabled = notificationsEnabled
+        let currentTime = now()
+        for keyID in states.keys {
+            guard var state = states[keyID] else {
+                continue
+            }
+            state.isStale = state.snapshot != nil && (
+                state.error != nil
+                    || state.lastSuccessAt.map {
+                        UsageFreshness.isStale(
+                            lastSuccess: $0,
+                            now: currentTime,
+                            refreshMinutes: refreshMinutes
+                        )
+                    } == true
+            )
+            states[keyID] = state
+        }
+    }
+
+    func reloadConfigurations() {
+        synchronizeConfigurations()
+    }
+
+    func applyValidatedSnapshot(
+        _ snapshot: UsageSnapshot?,
+        for keyID: UUID,
+        validatedAt: Date
+    ) async {
+        synchronizeConfigurations()
+        guard var state = states[keyID] else {
+            return
+        }
+        refreshGenerationByKeyID[keyID] = UUID()
+        state.snapshot = snapshot
+        state.lastSuccessAt = snapshot?.fetchedAt ?? validatedAt
+        state.isRefreshing = refreshingKeyIDs.contains(keyID)
+        state.isStale = false
+        state.error = snapshot == nil ? .noSubscription : nil
+        states[keyID] = state
+
+        if let snapshot {
+            try? cache.save(snapshot, for: keyID)
+            await evaluateNotifications(for: state.configuration, snapshot: snapshot)
+        } else {
+            try? cache.delete(for: keyID)
+        }
     }
 
     func selectKey(_ id: UUID) {

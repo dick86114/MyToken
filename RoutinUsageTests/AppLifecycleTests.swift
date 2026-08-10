@@ -58,6 +58,183 @@ final class AppLifecycleTests: XCTestCase {
         XCTAssertEqual(requestCount, 1)
     }
 
+    func test运行期通知开关立即同步到用量刷新() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        _ = try context.repository.add(name: "主账号", secret: "plan-main-0001")
+        let highUsage = makeSnapshot(planName: "高用量", percent: 96)
+        await context.fetcher.setResponse(.success(highUsage), for: "plan-main-0001")
+        let environment = context.makeEnvironment()
+        await environment.start()
+
+        environment.settings.notificationsEnabled = true
+        await environment.notificationsDidChange(enabled: true)
+        await environment.store.refreshAll()
+        await context.fetcher.setResponse(.success(makeSnapshot(percent: 20)), for: "plan-main-0001")
+        await environment.store.refreshAll()
+        environment.settings.notificationsEnabled = false
+        await environment.notificationsDidChange(enabled: false)
+        await context.fetcher.setResponse(.success(highUsage), for: "plan-main-0001")
+        await environment.store.refreshAll()
+
+        let alerts = await context.notificationSender.sentAlerts()
+        XCTAssertEqual(alerts.count, 1)
+        XCTAssertEqual(alerts.first?.level, .high)
+    }
+
+    func test运行期阈值变更立即影响通知去重() async throws {
+        let context = try makeContext(notificationsEnabled: true)
+        defer { context.cleanUp() }
+        _ = try context.repository.add(name: "主账号", secret: "plan-main-0001")
+        let usage = makeSnapshot(planName: "中高用量", percent: 92)
+        await context.fetcher.setResponse(.success(usage), for: "plan-main-0001")
+        let environment = context.makeEnvironment()
+        await environment.start()
+
+        environment.settings.thresholds = AlertThresholds(low: 80, high: 90)
+        environment.thresholdsDidChange(to: environment.settings.thresholds)
+        await environment.store.refreshAll()
+
+        let alerts = await context.notificationSender.sentAlerts()
+        XCTAssertEqual(alerts.map(\.level), [.low, .high])
+    }
+
+    func test运行期刷新间隔变更立即影响过期判断() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        context.defaults.set(15, forKey: "refreshMinutes")
+        let key = try context.repository.add(name: "主账号", secret: "plan-main-0001")
+        let cached = makeSnapshot(fetchedAt: Date(timeIntervalSince1970: 9_500))
+        try context.cache.save(cached, for: key.id)
+        await context.fetcher.setResponse(.success(cached), for: "plan-main-0001")
+        let environment = context.makeEnvironment()
+        await environment.start()
+        let stateBefore = try XCTUnwrap(environment.store.state(for: key.id))
+        XCTAssertFalse(stateBefore.isStale)
+
+        environment.settings.refreshMinutes = 1
+        environment.refreshIntervalDidChange(to: 1)
+
+        XCTAssertTrue(environment.store.state(for: key.id)?.isStale == true)
+        XCTAssertEqual(context.scheduler.rescheduledMinutes, [1])
+    }
+
+    func test启动使用启动时最新通知阈值与刷新间隔设置() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        _ = try context.repository.add(name: "主账号", secret: "plan-main-0001")
+        let usage = makeSnapshot(planName: "中高用量", percent: 92)
+        await context.fetcher.setResponse(.success(usage), for: "plan-main-0001")
+        let environment = context.makeEnvironment()
+        environment.settings.notificationsEnabled = true
+        environment.settings.thresholds = AlertThresholds(low: 80, high: 90)
+        environment.settings.refreshMinutes = 1
+
+        await environment.start()
+
+        let alerts = await context.notificationSender.sentAlerts()
+        XCTAssertEqual(alerts.map(\.level), [.high])
+        XCTAssertEqual(context.scheduler.startedMinutes, [1])
+    }
+
+    func test首次刷新等待期间停止不会重新启动调度器() async throws {
+        let suiteName = "AppLifecycleTests.start-stop-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let keychain = LifecycleKeychainFake()
+        let repository = KeyRepository(defaults: defaults, keychain: keychain)
+        let key = try repository.add(name: "主账号", secret: "plan-gated-0001")
+        let fetcher = ScriptedUsageFetcher(responses: ["plan-gated-0001": .suspended])
+        let sender = LifecycleNotificationSender()
+        let store = UsageStore(
+            keyRepository: repository,
+            keychain: keychain,
+            apiClient: fetcher,
+            cache: LifecycleUsageCache(),
+            alertEvaluator: AlertEvaluator(defaults: defaults),
+            notificationSender: sender,
+            defaults: defaults,
+            now: { Date(timeIntervalSince1970: 10_000) }
+        )
+        let scheduler = LifecycleRefreshSchedulerSpy()
+        let environment = AppEnvironment(
+            settings: AppSettings(defaults: defaults),
+            store: store,
+            refreshScheduler: scheduler,
+            loginItemManager: LifecycleLoginItemManager(),
+            keyRepository: repository,
+            apiClient: fetcher,
+            notificationSender: sender,
+            applicationNotificationCenter: NotificationCenter()
+        )
+
+        let start = Task { @MainActor in await environment.start() }
+        await fetcher.waitUntilRequested("plan-gated-0001")
+        environment.stop()
+        await fetcher.resume("plan-gated-0001", with: .success(nil))
+        await start.value
+
+        XCTAssertEqual(scheduler.startedMinutes, [])
+        XCTAssertEqual(scheduler.stopCount, 1)
+        XCTAssertEqual(environment.store.state(for: key.id)?.error, .noSubscription)
+    }
+
+    func test编辑Key验证成功与旧刷新重叠时最终发布新数据() async throws {
+        let suiteName = "AppLifecycleTests.edit-refresh-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let keychain = LifecycleKeychainFake()
+        let repository = KeyRepository(defaults: defaults, keychain: keychain)
+        let key = try repository.add(name: "旧名称", secret: "plan-old-0001")
+        let oldSnapshot = makeSnapshot(planName: "旧数据", percent: 96)
+        let newSnapshot = makeSnapshot(planName: "新数据", percent: 20)
+        let fetcher = ScriptedUsageFetcher(responses: [
+            "plan-old-0001": .suspended,
+            "plan-new-0002": .success(newSnapshot)
+        ])
+        let sender = LifecycleNotificationSender()
+        let store = UsageStore(
+            keyRepository: repository,
+            keychain: keychain,
+            apiClient: fetcher,
+            cache: LifecycleUsageCache(),
+            alertEvaluator: AlertEvaluator(defaults: defaults),
+            notificationSender: sender,
+            defaults: defaults,
+            now: { Date(timeIntervalSince1970: 10_000) }
+        )
+        let environment = AppEnvironment(
+            settings: AppSettings(defaults: defaults),
+            store: store,
+            refreshScheduler: LifecycleRefreshSchedulerSpy(),
+            loginItemManager: LifecycleLoginItemManager(),
+            keyRepository: repository,
+            apiClient: fetcher,
+            notificationSender: sender,
+            applicationNotificationCenter: NotificationCenter()
+        )
+        let oldRefresh = Task { @MainActor in await store.refresh(keyID: key.id) }
+        await fetcher.waitUntilRequested("plan-old-0001")
+
+        let edit = Task { @MainActor in
+            try await environment.updateValidatedKey(
+                id: key.id,
+                name: "新名称",
+                secret: "plan-new-0002"
+            )
+        }
+        _ = try await edit.value
+        await fetcher.resume("plan-old-0001", with: .success(oldSnapshot))
+        await oldRefresh.value
+
+        XCTAssertEqual(store.state(for: key.id)?.configuration.name, "新名称")
+        XCTAssertEqual(store.state(for: key.id)?.snapshot, newSnapshot)
+        let newRequestCount = await fetcher.requestCount(for: "plan-new-0002")
+        XCTAssertEqual(newRequestCount, 1)
+    }
+
     func test唤醒事件去抖后补刷全部Key() async throws {
         let context = try makeContext(useRealScheduler: true)
         defer { context.cleanUp() }
@@ -195,6 +372,27 @@ final class AppLifecycleTests: XCTestCase {
         XCTAssertEqual(weeklyText, "60%")
         XCTAssertEqual(requestCount, 0)
     }
+
+    func test调整Key排序只同步顺序不额外刷新() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        _ = try context.repository.add(name: "一", secret: "plan-one-0001")
+        _ = try context.repository.add(name: "二", secret: "plan-two-0002")
+        await context.fetcher.setResponse(.success(makeSnapshot()), for: "plan-one-0001")
+        await context.fetcher.setResponse(.success(makeSnapshot()), for: "plan-two-0002")
+        let environment = context.makeEnvironment()
+        await environment.start()
+        let ids = environment.store.orderedKeyIDs
+
+        environment.moveKey(fromOffsets: IndexSet(integer: 0), toOffset: 2)
+        await 等待条件 { environment.store.orderedKeyIDs == [ids[1], ids[0]] }
+
+        let firstRequestCount = await context.fetcher.requestCount(for: "plan-one-0001")
+        let secondRequestCount = await context.fetcher.requestCount(for: "plan-two-0002")
+        XCTAssertEqual(environment.store.orderedKeyIDs, [ids[1], ids[0]])
+        XCTAssertEqual(firstRequestCount, 1)
+        XCTAssertEqual(secondRequestCount, 1)
+    }
 }
 
 private extension AppLifecycleTests {
@@ -239,22 +437,26 @@ private extension AppLifecycleTests {
         )
     }
 
-    func makeSnapshot(planName: String = "Pro") -> UsageSnapshot {
+    func makeSnapshot(
+        planName: String = "Pro",
+        percent: Double = 20,
+        fetchedAt: Date = Date(timeIntervalSince1970: 1_786_291_200)
+    ) -> UsageSnapshot {
         UsageSnapshot(
             planName: planName,
             kind: .tokenPack,
             fiveHour: nil,
             weekly: nil,
             token: UsageMetric(
-                used: 20,
+                used: Decimal(percent),
                 limit: 100,
-                remaining: 80,
-                percent: 20,
+                remaining: Decimal(100 - percent),
+                percent: percent,
                 unit: .token,
                 windowEnd: nil
             ),
             allowedModels: [],
-            fetchedAt: Date(timeIntervalSince1970: 1_786_291_200)
+            fetchedAt: fetchedAt
         )
     }
 
@@ -324,7 +526,8 @@ private struct AppLifecycleTestContext {
             defaults: defaults,
             refreshMinutes: settings.refreshMinutes,
             thresholds: settings.thresholds,
-            notificationsEnabled: settings.notificationsEnabled
+            notificationsEnabled: settings.notificationsEnabled,
+            now: { Date(timeIntervalSince1970: 10_000) }
         )
         return AppEnvironment(
             settings: settings,
@@ -407,13 +610,20 @@ private final class LifecycleUsageCache: UsageCaching, @unchecked Sendable {
 
 private actor LifecycleNotificationSender: NotificationSending {
     private(set) var authorizationRequestCount = 0
+    private var alerts: [UsageAlert] = []
 
     func requestAuthorization() async throws -> Bool {
         authorizationRequestCount += 1
         return true
     }
 
-    func send(_ alert: UsageAlert) async throws {}
+    func send(_ alert: UsageAlert) async throws {
+        alerts.append(alert)
+    }
+
+    func sentAlerts() -> [UsageAlert] {
+        alerts
+    }
 }
 
 @MainActor
