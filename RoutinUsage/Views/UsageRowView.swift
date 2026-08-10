@@ -29,7 +29,43 @@ struct UsageRowView: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
-        .accessibilityHint("点击后设为菜单栏当前 Key")
+        .accessibilityHint(accessibilityHint)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+enum UsageRowAccessibility {
+    static func label(
+        state: KeyUsageState,
+        metric: UsageMetric?,
+        dimension: DisplayDimension,
+        isSelected: Bool
+    ) -> String {
+        let currentPrefix = isSelected ? "当前，" : ""
+        let prefix = "\(currentPrefix)\(state.configuration.name)，"
+        if state.isStale, metric != nil {
+            return prefix + UsageFormatter.statusText(state: state, dimension: dimension)
+                + "，当前显示上次成功数据"
+        }
+        if state.isRefreshing, state.snapshot == nil {
+            return prefix + "正在加载"
+        }
+        if state.error == .noSubscription {
+            return prefix + UsageFormatter.statusText(state: state, dimension: dimension)
+        }
+        if state.error != nil, state.snapshot == nil {
+            return prefix + UsageFormatter.statusText(state: state, dimension: dimension)
+                + "，没有缓存"
+        }
+        if let metric,
+           let percentText = UsageFormatter.percentText(metric) {
+            return prefix + "已使用 \(percentText)，\(UsageFormatter.fullAmount(metric))"
+        }
+        return prefix + UsageFormatter.statusText(state: state, dimension: dimension)
+    }
+
+    static func hint(isSelected: Bool) -> String {
+        isSelected ? "已是菜单栏当前 Key" : "点击后设为菜单栏当前 Key"
     }
 }
 
@@ -39,9 +75,21 @@ private extension UsageRowView {
     }
 
     var metric: UsageMetric? {
+        guard let rawMetric,
+              UsageFormatter.percentText(rawMetric) != nil else {
+            return nil
+        }
+        return rawMetric
+    }
+
+    var rawMetric: UsageMetric? {
         state.snapshot.flatMap {
             UsageFormatter.metric(in: $0, dimension: dimension)
         }
+    }
+
+    var hasInvalidMetric: Bool {
+        rawMetric.map { UsageFormatter.percentText($0) == nil } ?? false
     }
 
     var header: some View {
@@ -55,8 +103,9 @@ private extension UsageRowView {
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)
-            if let metric {
-                Text("\(Int(metric.percent.rounded()))%")
+            if let metric,
+               let percentText = UsageFormatter.percentText(metric) {
+                Text(percentText)
                     .font(.system(.headline, design: .rounded, weight: .semibold))
                     .monospacedDigit()
                     .foregroundStyle(progressColor)
@@ -88,7 +137,7 @@ private extension UsageRowView {
 
             if state.isStale {
                 Label(
-                    UsageFormatter.statusText(state: state),
+                    UsageFormatter.statusText(state: state, dimension: dimension),
                     systemImage: "clock.badge.exclamationmark"
                 )
                     .font(.caption)
@@ -126,41 +175,44 @@ private extension UsageRowView {
 
     @ViewBuilder
     var statusLabel: some View {
-        if state.isRefreshing && state.snapshot == nil {
+        if hasInvalidMetric {
             Label(
-                UsageFormatter.statusText(state: state),
+                UsageFormatter.statusText(state: state, dimension: dimension),
+                systemImage: "exclamationmark.triangle"
+            )
+        } else if state.isRefreshing && state.snapshot == nil {
+            Label(
+                UsageFormatter.statusText(state: state, dimension: dimension),
                 systemImage: "arrow.triangle.2.circlepath"
             )
         } else if state.error == .noSubscription {
-            Label(UsageFormatter.statusText(state: state), systemImage: "minus.circle")
+            Label(
+                UsageFormatter.statusText(state: state, dimension: dimension),
+                systemImage: "minus.circle"
+            )
         } else if state.error != nil {
             Label(
-                UsageFormatter.statusText(state: state),
+                UsageFormatter.statusText(state: state, dimension: dimension),
                 systemImage: "exclamationmark.triangle"
             )
         } else {
-            Label(UsageFormatter.statusText(state: state), systemImage: "clock")
+            Label(
+                UsageFormatter.statusText(state: state, dimension: dimension),
+                systemImage: "clock"
+            )
         }
     }
 
     var accessibilityLabel: String {
-        let prefix = "\(state.configuration.name)，"
-        if state.isStale, metric != nil {
-            return prefix + UsageFormatter.statusText(state: state)
-                + "，当前显示上次成功数据"
-        }
-        if state.isRefreshing, state.snapshot == nil {
-            return prefix + "正在加载"
-        }
-        if state.error == .noSubscription {
-            return prefix + UsageFormatter.statusText(state: state)
-        }
-        if state.error != nil, state.snapshot == nil {
-            return prefix + UsageFormatter.statusText(state: state) + "，没有缓存"
-        }
-        if let metric {
-            return prefix + "已使用 \(Int(metric.percent.rounded()))%，\(UsageFormatter.fullAmount(metric))"
-        }
-        return prefix + UsageFormatter.statusText(state: state)
+        UsageRowAccessibility.label(
+            state: state,
+            metric: metric,
+            dimension: dimension,
+            isSelected: isSelected
+        )
+    }
+
+    var accessibilityHint: String {
+        UsageRowAccessibility.hint(isSelected: isSelected)
     }
 }

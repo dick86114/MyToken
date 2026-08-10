@@ -20,7 +20,7 @@ enum UsageFormatter {
         guard let metric = metric(in: snapshot, dimension: dimension) else {
             return "--"
         }
-        return "\(Int(metric.percent.rounded()))%"
+        return percentText(metric) ?? "!"
     }
 
     static func amount(_ metric: UsageMetric) -> String {
@@ -65,7 +65,24 @@ enum UsageFormatter {
         }
     }
 
-    static func statusText(state: KeyUsageState) -> String {
+    static func percentText(_ metric: UsageMetric) -> String? {
+        guard metric.percent.isFinite,
+              let roundedPercent = Int(exactly: metric.percent.rounded()) else {
+            return nil
+        }
+        return "\(roundedPercent)%"
+    }
+
+    static func statusText(
+        state: KeyUsageState,
+        dimension: DisplayDimension? = nil
+    ) -> String {
+        if let dimension,
+           let snapshot = state.snapshot,
+           let metric = metric(in: snapshot, dimension: dimension),
+           percentText(metric) == nil {
+            return "用量数据异常"
+        }
         if state.isStale, state.snapshot != nil {
             guard let error = state.error else {
                 return "缓存已过期"

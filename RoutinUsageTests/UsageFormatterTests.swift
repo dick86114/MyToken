@@ -123,6 +123,72 @@ final class UsageFormatterTests: XCTestCase {
 
         XCTAssertEqual(UsageFormatter.statusText(state: state), "网络错误，请刷新重试")
     }
+
+    func test非有限百分比显示安全错误状态() {
+        let state = makeState(snapshot: makePeriodicSnapshot(fiveHourPercent: .nan))
+
+        XCTAssertEqual(
+            UsageFormatter.menuBarText(state: state, dimension: .fiveHour),
+            "!"
+        )
+        XCTAssertEqual(
+            UsageFormatter.statusText(state: state, dimension: .fiveHour),
+            "用量数据异常"
+        )
+    }
+
+    func test超出整数范围的百分比显示安全错误状态() {
+        let state = makeState(
+            snapshot: makePeriodicSnapshot(fiveHourPercent: .greatestFiniteMagnitude)
+        )
+
+        XCTAssertEqual(
+            UsageFormatter.menuBarText(state: state, dimension: .fiveHour),
+            "!"
+        )
+        XCTAssertEqual(
+            UsageFormatter.statusText(state: state, dimension: .fiveHour),
+            "用量数据异常"
+        )
+    }
+
+    func test当前Key的可访问性标签和提示明确表达选中状态() throws {
+        let state = makeState(snapshot: makePeriodicSnapshot(fiveHourPercent: 67.5))
+        let metric = try XCTUnwrap(state.snapshot?.fiveHour)
+
+        XCTAssertEqual(
+            UsageRowAccessibility.label(
+                state: state,
+                metric: metric,
+                dimension: .fiveHour,
+                isSelected: true
+            ),
+            "当前，主账号，已使用 68%，$6.80 / $10.00"
+        )
+        XCTAssertEqual(
+            UsageRowAccessibility.hint(isSelected: true),
+            "已是菜单栏当前 Key"
+        )
+    }
+
+    func test非当前Key保留设为当前的可访问性提示() throws {
+        let state = makeState(snapshot: makePeriodicSnapshot(fiveHourPercent: 67.5))
+        let metric = try XCTUnwrap(state.snapshot?.fiveHour)
+
+        XCTAssertEqual(
+            UsageRowAccessibility.label(
+                state: state,
+                metric: metric,
+                dimension: .fiveHour,
+                isSelected: false
+            ),
+            "主账号，已使用 68%，$6.80 / $10.00"
+        )
+        XCTAssertEqual(
+            UsageRowAccessibility.hint(isSelected: false),
+            "点击后设为菜单栏当前 Key"
+        )
+    }
 }
 
 private extension UsageFormatterTests {
