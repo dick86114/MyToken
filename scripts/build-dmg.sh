@@ -86,6 +86,15 @@ ditto \
 ditto "$dist_dir/MyRoutin.app" "$staging_dir/MyRoutin.app"
 ditto "$repo_root/docs/首次运行说明.md" "$staging_dir/首次运行说明.md"
 
+iconset_dir="$build_root/MyRoutin.iconset"
+mkdir -p "$iconset_dir"
+cp "$repo_root"/RoutinUsage/Assets.xcassets/AppIcon.appiconset/icon_*.png "$iconset_dir/"
+iconutil -c icns \
+  "$iconset_dir" \
+  -o "$build_root/MyRoutin.icns"
+cp "$build_root/MyRoutin.icns" "$staging_dir/.VolumeIcon.icns"
+SetFile -a V "$staging_dir/.VolumeIcon.icns"
+
 hdiutil create \
   -volname "MyRoutin" \
   -srcfolder "$staging_dir" \

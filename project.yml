@@ -10,6 +10,7 @@ settings:
     CURRENT_PROJECT_VERSION: 1
     GENERATE_INFOPLIST_FILE: YES
     INFOPLIST_KEY_LSUIElement: YES
+    ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
 targets:
   RoutinUsage:
     type: application
