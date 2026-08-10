@@ -257,6 +257,33 @@ final class AlertEvaluator: @unchecked Sendable {
         persistTriggeredWindows(triggeredWindows)
     }
 
+    func clearState(for keyID: UUID) {
+        Self.sharedState.lock.lock()
+        defer { Self.sharedState.lock.unlock() }
+
+        var triggeredWindows = Self.loadTriggeredWindows(from: defaults)
+        let removedWindows = triggeredWindows.filter { $0.keyID == keyID }
+        triggeredWindows.subtract(removedWindows)
+
+        var periodicWatermarks = Self.loadPeriodicWatermarks(from: defaults)
+        periodicWatermarks = periodicWatermarks.filter { $0.keyID != keyID }
+
+        let removedReservations = Set(removedWindows.compactMap {
+            Self.sharedState.reservationOwners.removeValue(forKey: $0)
+        })
+        for window in removedWindows {
+            Self.sharedState.pendingResetWindows.removeValue(forKey: window)
+        }
+        let remainingReservations = Set(Self.sharedState.reservationOwners.values)
+        for reservationID in removedReservations where !remainingReservations.contains(reservationID) {
+            Self.sharedState.inFlightReservations.remove(reservationID)
+            Self.sharedState.failedSupersededReservations.remove(reservationID)
+        }
+
+        persistTriggeredWindows(triggeredWindows)
+        persistPeriodicWatermarks(periodicWatermarks)
+    }
+
     private func evaluate(
         key: KeyConfiguration,
         metric: UsageMetric,
