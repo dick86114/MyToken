@@ -24,7 +24,23 @@ targets:
   RoutinUsageTests:
     type: bundle.unit-test
     platform: macOS
-    sources: [RoutinUsageTests]
+    sources:
+      - RoutinUsageTests
+      - path: scripts/build-dmg.sh
+        buildPhase: resources
+      - path: project.yml
+        buildPhase: resources
+    preBuildScripts:
+      - name: 同步静态源码测试资源
+        basedOnDependencyAnalysis: false
+        script: |
+          set -euo pipefail
+          resource_dir="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
+          mkdir -p "$resource_dir"
+          cp "$PROJECT_DIR/RoutinUsage/App/RoutinUsageApp.swift" "$resource_dir/RoutinUsageApp.swift.txt"
+          cp "$PROJECT_DIR/RoutinUsage/Views/SettingsView.swift" "$resource_dir/SettingsView.swift.txt"
+          cp "$PROJECT_DIR/RoutinUsage/Views/OnboardingView.swift" "$resource_dir/OnboardingView.swift.txt"
+          cp "$PROJECT_DIR/RoutinUsage/Views/UsageRowView.swift" "$resource_dir/UsageRowView.swift.txt"
     settings:
       base:
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/MyRoutin.app/Contents/MacOS/MyRoutin"

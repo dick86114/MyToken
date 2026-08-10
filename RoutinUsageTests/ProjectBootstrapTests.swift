@@ -55,9 +55,26 @@ final class ProjectBootstrapTests: XCTestCase {
     }
 
     private func sourceText(at relativePath: String) throws -> String {
-        let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-        let repositoryRoot = testsDirectory.deletingLastPathComponent()
-        let sourceURL = repositoryRoot.appendingPathComponent(relativePath)
+        let resource: (name: String, extension: String?)
+        switch relativePath {
+        case "project.yml":
+            resource = ("project", "yml")
+        case "RoutinUsage/App/RoutinUsageApp.swift":
+            resource = ("RoutinUsageApp.swift", "txt")
+        case "RoutinUsage/Views/SettingsView.swift":
+            resource = ("SettingsView.swift", "txt")
+        case "RoutinUsage/Views/OnboardingView.swift":
+            resource = ("OnboardingView.swift", "txt")
+        case "RoutinUsage/Views/UsageRowView.swift":
+            resource = ("UsageRowView.swift", "txt")
+        default:
+            throw CocoaError(.fileNoSuchFile)
+        }
+        guard let sourceURL = Bundle(for: ProjectBootstrapTests.self)
+            .url(forResource: resource.name, withExtension: resource.extension)
+        else {
+            throw CocoaError(.fileNoSuchFile)
+        }
         return try String(contentsOf: sourceURL, encoding: .utf8)
     }
 }
