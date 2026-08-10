@@ -22,6 +22,12 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(onboarding.contains("5 小时"))
     }
 
+    func test工程规格锁定为Xcode15兼容格式() throws {
+        let projectSpec = try sourceText(at: "project.yml")
+
+        XCTAssertTrue(projectSpec.contains("projectFormat: xcode15_3"))
+    }
+
     private func sourceText(at relativePath: String) throws -> String {
         let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         let repositoryRoot = testsDirectory.deletingLastPathComponent()
