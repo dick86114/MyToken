@@ -10,8 +10,6 @@ struct UsagePopoverView: View {
     let updateStatus: AppUpdateStatus
     let installAvailableUpdate: InstallAvailableUpdate
 
-    @Environment(\.openSettings) private var openSettings
-
     init(
         store: UsageStore,
         settings: AppSettings,
@@ -138,8 +136,8 @@ private extension UsagePopoverView {
             .accessibilityLabel(refreshAccessibilityLabel)
 
             HStack {
-                Button("设置") {
-                    openSettings()
+                SettingsLink {
+                    Text("设置")
                 }
                 .keyboardShortcut(",")
 

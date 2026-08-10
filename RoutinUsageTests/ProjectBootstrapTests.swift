@@ -89,6 +89,14 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(usageRowView.contains("允许模型"))
     }
 
+    func test弹窗设置入口使用Xcode15兼容的SettingsLink() throws {
+        let usagePopoverView = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
+
+        XCTAssertTrue(usagePopoverView.contains("SettingsLink"))
+        XCTAssertTrue(usagePopoverView.contains("设置"))
+        XCTAssertFalse(usagePopoverView.contains("openSettings"))
+    }
+
     private func sourceText(at relativePath: String) throws -> String {
         let resource: (name: String, extension: String?)
         switch relativePath {
@@ -104,6 +112,8 @@ final class ProjectBootstrapTests: XCTestCase {
             resource = ("UsageRowView.swift", "txt")
         case "RoutinUsage/Views/MenuBarLabelView.swift":
             resource = ("MenuBarLabelView.swift", "txt")
+        case "RoutinUsage/Views/UsagePopoverView.swift":
+            resource = ("UsagePopoverView.swift", "txt")
         default:
             throw CocoaError(.fileNoSuchFile)
         }
