@@ -4,9 +4,7 @@ enum UsageMapperError: Error, Equatable {
     case invalidLimit
 }
 
-struct UsageMapper {
-    private let dateFormatter = ISO8601DateFormatter()
-
+struct UsageMapper: Sendable {
     func map(_ dto: UsageResponseDTO, fetchedAt: Date) throws -> UsageSnapshot {
         let hasPeriodicLimit = hasValidLimit(dto.dailyLimitUsd) || hasValidLimit(dto.weeklyLimitUsd)
         let hasTokenLimit = hasValidLimit(dto.totalTokens)
@@ -120,6 +118,6 @@ struct UsageMapper {
         guard let value else {
             return nil
         }
-        return dateFormatter.date(from: value)
+        return ISO8601DateFormatter().date(from: value)
     }
 }
