@@ -1,7 +1,7 @@
 .DS_Store
 .superpowers/
+.worktrees/
 DerivedData/
 .build/
 *.xcuserstate
 xcuserdata/
-
