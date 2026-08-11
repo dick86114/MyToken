@@ -12,9 +12,11 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(source.contains(".menuBarExtraStyle(.window)"))
     }
 
-    func test设置场景允许窗口按内容最小尺寸自由缩放() throws {
+    func test设置使用独立可缩放窗口场景而不是系统固定设置场景() throws {
         let source = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
 
+        XCTAssertTrue(source.contains("Window(\"设置\", id: \"settings\")"))
+        XCTAssertFalse(source.contains("Settings {"))
         XCTAssertTrue(source.contains(".windowResizability(.contentMinSize)"))
     }
 
@@ -54,6 +56,8 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(menuBarLabel.contains("style: settings.menuBarStyle"))
         XCTAssertTrue(menuBarLabel.contains("Image(nsImage:"))
         XCTAssertTrue(menuBarLabel.contains("MenuBarVerticalUsageIcon.image"))
+        XCTAssertTrue(menuBarLabel.contains("Text(\"·\")"))
+        XCTAssertTrue(menuBarLabel.contains("HStack(spacing: 5)"))
         XCTAssertTrue(menuBarLabel.contains(".frame(width: 7, height: 18)"))
     }
 
@@ -103,12 +107,13 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(settings.contains("UsageFormatter.groupMultiplierText(snapshot.groupMultipliers)"))
     }
 
-    func test弹窗设置入口使用Xcode15兼容的SettingsLink() throws {
+    func test弹窗设置入口直接打开独立设置窗口() throws {
         let usagePopoverView = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
 
-        XCTAssertTrue(usagePopoverView.contains("SettingsLink"))
+        XCTAssertTrue(usagePopoverView.contains("@Environment(\\.openWindow)"))
+        XCTAssertTrue(usagePopoverView.contains("openWindow(id: \"settings\")"))
         XCTAssertTrue(usagePopoverView.contains("设置"))
-        XCTAssertFalse(usagePopoverView.contains("openSettings"))
+        XCTAssertFalse(usagePopoverView.contains("SettingsLink"))
     }
 
     private func sourceText(at relativePath: String) throws -> String {

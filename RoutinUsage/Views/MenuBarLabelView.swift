@@ -22,8 +22,10 @@ private extension MenuBarLabelView {
         )
 
         if let metric = verticalMetric {
-            HStack(spacing: 4) {
+            HStack(spacing: 5) {
                 Text(text)
+                Text("·")
+                    .foregroundStyle(.secondary)
                 Image(nsImage: MenuBarVerticalUsageIcon.image(percent: metric.percent))
                     .frame(width: 7, height: 18)
                     .accessibilityHidden(true)
