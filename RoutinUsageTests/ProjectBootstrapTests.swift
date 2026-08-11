@@ -54,11 +54,10 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(settings.contains("Picker(\"显示样式\", selection: $settings.menuBarStyle)"))
         XCTAssertTrue(settings.contains("MenuBarStyle.allCases"))
         XCTAssertTrue(menuBarLabel.contains("style: settings.menuBarStyle"))
-        XCTAssertTrue(menuBarLabel.contains("Image(nsImage:"))
-        XCTAssertTrue(menuBarLabel.contains("MenuBarVerticalUsageIcon.image"))
-        XCTAssertTrue(menuBarLabel.contains("Text(\"·\")"))
-        XCTAssertTrue(menuBarLabel.contains("HStack(spacing: 5)"))
-        XCTAssertTrue(menuBarLabel.contains(".frame(width: 7, height: 18)"))
+        XCTAssertTrue(menuBarLabel.contains("MenuBarAliasVerticalUsageIcon.image"))
+        XCTAssertTrue(menuBarLabel.contains("Image(nsImage: MenuBarAliasVerticalUsageIcon.image("))
+        XCTAssertFalse(menuBarLabel.contains("HStack(spacing: 5)"))
+        XCTAssertTrue(menuBarLabel.contains("alias + \" · \""))
     }
 
     func test弹窗倒计时每分钟刷新并将分组倍率合并为一行() throws {
