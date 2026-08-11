@@ -208,10 +208,8 @@ final class UsageFormatterTests: XCTestCase {
         )
     }
 
-    func test重置时间使用当前时区() {
-        let 原时区 = NSTimeZone.default
-        NSTimeZone.default = TimeZone(secondsFromGMT: 8 * 60 * 60)!
-        defer { NSTimeZone.default = 原时区 }
+    func test重置时间使用显式时区() {
+        let 时区 = TimeZone(secondsFromGMT: 8 * 60 * 60)!
         let metric = makeMetric(
             used: 1,
             limit: 10,
@@ -220,7 +218,7 @@ final class UsageFormatterTests: XCTestCase {
             windowEnd: Date(timeIntervalSince1970: 1_786_341_600)
         )
 
-        XCTAssertEqual(UsageFormatter.resetTime(metric), "14:00")
+        XCTAssertEqual(UsageFormatter.resetTime(metric, timeZone: 时区), "14:00")
     }
 
     func test缺少重置时间显示双短横线() {
@@ -268,9 +266,6 @@ final class UsageFormatterTests: XCTestCase {
     }
 
     func test剩余时长按绝对时间计算而不受时区影响() {
-        let 原时区 = NSTimeZone.default
-        NSTimeZone.default = TimeZone(secondsFromGMT: -7 * 60 * 60)!
-        defer { NSTimeZone.default = 原时区 }
         let now = Date(timeIntervalSince1970: 1_786_320_000)
         let end = Date(timeIntervalSince1970: 1_786_333_500)
 
@@ -281,12 +276,13 @@ final class UsageFormatterTests: XCTestCase {
     }
 
     func test完整时间使用统一的本地日期格式() {
-        let 原时区 = NSTimeZone.default
-        NSTimeZone.default = TimeZone(secondsFromGMT: 8 * 60 * 60)!
-        defer { NSTimeZone.default = 原时区 }
+        let 时区 = TimeZone(secondsFromGMT: 8 * 60 * 60)!
 
         XCTAssertEqual(
-            UsageFormatter.fullDateTime(Date(timeIntervalSince1970: 1_786_341_600)),
+            UsageFormatter.fullDateTime(
+                Date(timeIntervalSince1970: 1_786_341_600),
+                timeZone: 时区
+            ),
             "2026-08-10 14:00:00"
         )
         XCTAssertEqual(UsageFormatter.fullDateTime(nil), "—")
