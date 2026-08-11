@@ -6,22 +6,24 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertEqual(RoutinUsageApp.applicationName, "MyRoutin")
     }
 
-    func test菜单栏场景使用可承载总览面板的Window样式() throws {
+    func test菜单栏使用原生状态栏按钮承载左右键交互() throws {
         let source = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
 
-        XCTAssertTrue(source.contains(".menuBarExtraStyle(.window)"))
+        XCTAssertTrue(source.contains("StatusBarController(environment: environment)"))
+        XCTAssertTrue(source.contains("@State private var statusBarController"))
+        XCTAssertFalse(source.contains("MenuBarExtra"))
     }
 
     func test菜单栏标签提供右键账号与应用操作菜单() throws {
-        let menuBarLabel = try sourceText(at: "RoutinUsage/Views/MenuBarLabelView.swift")
-        let app = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
+        let statusBarController = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
 
-        XCTAssertTrue(menuBarLabel.contains(".contextMenu"))
-        XCTAssertTrue(menuBarLabel.contains("切换账号"))
-        XCTAssertTrue(menuBarLabel.contains("store.selectKey(id)"))
-        XCTAssertTrue(menuBarLabel.contains("检查更新"))
-        XCTAssertTrue(menuBarLabel.contains("NSApplication.shared.terminate(nil)"))
-        XCTAssertTrue(app.contains("checkForUpdates: environment.checkForUpdates"))
+        XCTAssertTrue(statusBarController.contains("button.sendAction(on: [.leftMouseUp, .rightMouseUp])"))
+        XCTAssertTrue(statusBarController.contains("button.imagePosition = .imageRight"))
+        XCTAssertTrue(statusBarController.contains("NSApp.currentEvent?.type == .rightMouseUp"))
+        XCTAssertTrue(statusBarController.contains("切换账号"))
+        XCTAssertTrue(statusBarController.contains("environment.store.selectKey(id)"))
+        XCTAssertTrue(statusBarController.contains("检查更新"))
+        XCTAssertTrue(statusBarController.contains("NSApplication.shared.terminate(nil)"))
     }
 
     func test弹窗进度条复用菜单栏的用量风险分级() throws {
@@ -299,6 +301,8 @@ final class ProjectBootstrapTests: XCTestCase {
             resource = ("release", "yml")
         case "RoutinUsage/App/RoutinUsageApp.swift":
             resource = ("RoutinUsageApp.swift", "txt")
+        case "RoutinUsage/App/StatusBarController.swift":
+            resource = ("StatusBarController.swift", "txt")
         case "RoutinUsage/Views/SettingsView.swift":
             resource = ("SettingsView.swift", "txt")
         case "RoutinUsage/Views/UpdateNotesView.swift":
