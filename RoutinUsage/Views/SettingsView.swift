@@ -53,7 +53,6 @@ struct SettingsView: View {
     @State private var highThreshold: Int
     @State private var thresholdError: String?
     @State private var operationError: String?
-    @State private var revealedKeyIDs: Set<UUID> = []
 
     init(
         store: UsageStore,
@@ -107,10 +106,7 @@ struct SettingsView: View {
                 manager: loginItemManager
             )
         }
-        .onDisappear {
-            revealedKeyIDs.removeAll()
-            NSApp.setActivationPolicy(.accessory)
-        }
+        .onDisappear { NSApp.setActivationPolicy(.accessory) }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             LoginItemSettingSynchronizer.synchronize(
                 settings: settings,
@@ -198,7 +194,7 @@ private extension SettingsView {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(configuration.displayName)
-                Text(displayedKey(for: configuration))
+                Text(KeyDisplayMask.masked(suffix: configuration.keySuffix))
                     .font(.system(.caption, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
@@ -206,14 +202,6 @@ private extension SettingsView {
             .accessibilityLabel("\(configuration.displayName)，\(KeyDisplayMask.masked(suffix: configuration.keySuffix))")
 
             Spacer()
-
-            Button {
-                toggleKeyVisibility(for: configuration.id)
-            } label: {
-                Image(systemName: revealedKeyIDs.contains(configuration.id) ? "eye.slash" : "eye")
-            }
-            .buttonStyle(.borderless)
-            .accessibilityLabel(revealedKeyIDs.contains(configuration.id) ? "隐藏 \(configuration.displayName)" : "显示 \(configuration.displayName)")
 
             Button("编辑") { editor = .edit(configuration) }
                 .buttonStyle(.borderless)
@@ -235,21 +223,6 @@ private extension SettingsView {
         }
         .contentShape(Rectangle())
         .onTapGesture { store.selectKey(configuration.id) }
-    }
-
-    func displayedKey(for configuration: KeyConfiguration) -> String {
-        guard revealedKeyIDs.contains(configuration.id), let secret = readKey(configuration.id) else {
-            return KeyDisplayMask.masked(suffix: configuration.keySuffix)
-        }
-        return secret
-    }
-
-    func toggleKeyVisibility(for id: UUID) {
-        if revealedKeyIDs.contains(id) {
-            revealedKeyIDs.remove(id)
-        } else {
-            revealedKeyIDs.insert(id)
-        }
     }
 
     @ViewBuilder
@@ -286,7 +259,12 @@ private extension SettingsView {
                     usageDetailItem("Token 用量", token)
                 }
 
-                detailItem("分组倍率", groupMultiplierText(snapshot.groupMultiplier))
+                detailItem(
+                    "分组倍率",
+                    snapshot.groupMultipliers.isEmpty
+                        ? "—"
+                        : UsageFormatter.groupMultiplierText(snapshot.groupMultipliers)
+                )
 
                 if !snapshot.allowedModels.isEmpty {
                     detailItem("允许模型", snapshot.allowedModels.joined(separator: "、"))
@@ -333,13 +311,6 @@ private extension SettingsView {
             }
         }
         return UsageFormatter.statusText(state: state)
-    }
-
-    func groupMultiplierText(_ multiplier: Decimal?) -> String {
-        guard let multiplier else {
-            return "—"
-        }
-        return "×\(NSDecimalNumber(decimal: multiplier).stringValue)"
     }
 
     var displayAndRefresh: some View {
@@ -483,7 +454,11 @@ private extension SettingsView {
         case .add:
             KeyEditorView(save: addKey)
         case let .edit(configuration):
-            KeyEditorView(title: "编辑 Key", initialName: configuration.displayName) { name, secret in
+            KeyEditorView(
+                title: "编辑 Key",
+                initialName: configuration.displayName,
+                initialSecret: readKey(configuration.id) ?? ""
+            ) { name, secret in
                 try await updateValidatedKey(configuration.id, name, secret)
             }
         }

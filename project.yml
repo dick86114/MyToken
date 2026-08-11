@@ -39,6 +39,7 @@ targets:
           mkdir -p "$resource_dir"
           cp "$PROJECT_DIR/RoutinUsage/App/RoutinUsageApp.swift" "$resource_dir/RoutinUsageApp.swift.txt"
           cp "$PROJECT_DIR/RoutinUsage/Views/SettingsView.swift" "$resource_dir/SettingsView.swift.txt"
+          cp "$PROJECT_DIR/RoutinUsage/Views/KeyEditorView.swift" "$resource_dir/KeyEditorView.swift.txt"
           cp "$PROJECT_DIR/RoutinUsage/Views/OnboardingView.swift" "$resource_dir/OnboardingView.swift.txt"
           cp "$PROJECT_DIR/RoutinUsage/Views/UsageRowView.swift" "$resource_dir/UsageRowView.swift.txt"
           cp "$PROJECT_DIR/RoutinUsage/Views/MenuBarLabelView.swift" "$resource_dir/MenuBarLabelView.swift.txt"

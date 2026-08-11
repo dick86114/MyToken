@@ -20,8 +20,8 @@ struct UsageResponseDTO: Decodable, Sendable {
     let consumedTokens: Decimal?
     let remainingTokens: Decimal?
     let allowedModels: [String]?
-    let groupNames: [String]?
-    let groupMultipliers: [Decimal]?
+    let groupNames: UsageKeyedValues<String>?
+    let groupMultipliers: UsageKeyedValues<Decimal>?
 
     init(
         subscriptionId: String? = nil,
@@ -59,7 +59,61 @@ struct UsageResponseDTO: Decodable, Sendable {
         self.consumedTokens = consumedTokens
         self.remainingTokens = remainingTokens
         self.allowedModels = allowedModels
-        self.groupNames = groupNames
-        self.groupMultipliers = groupMultipliers
+        self.groupNames = groupNames.map(UsageKeyedValues.init)
+        self.groupMultipliers = groupMultipliers.map(UsageKeyedValues.init)
+    }
+}
+
+/// 兼容旧接口的数组形式和新接口按分组 key 返回的对象形式。
+struct UsageKeyedValues<Value: Decodable & Sendable>: Decodable, Sendable {
+    let keys: [String]
+    let values: [String: Value]
+
+    init(_ array: [Value]) {
+        let keys = array.indices.map(String.init)
+        self.init(
+            keys: keys,
+            values: Dictionary(uniqueKeysWithValues: zip(keys, array))
+        )
+    }
+
+    private init(keys: [String], values: [String: Value]) {
+        self.keys = keys
+        self.values = values
+    }
+
+    init(from decoder: Decoder) throws {
+        if var unkeyed = try? decoder.unkeyedContainer() {
+            var decoded: [Value] = []
+            while !unkeyed.isAtEnd {
+                decoded.append(try unkeyed.decode(Value.self))
+            }
+            self.init(decoded)
+            return
+        }
+
+        let container = try decoder.container(keyedBy: DynamicCodingKey.self)
+        // JSON 对象键的枚举顺序未定义；按 key 排序保证菜单和测试结果稳定。
+        let keys = container.allKeys.map(\.stringValue).sorted()
+        var values: [String: Value] = [:]
+        for key in container.allKeys {
+            values[key.stringValue] = try container.decode(Value.self, forKey: key)
+        }
+        self.init(keys: keys, values: values)
+    }
+}
+
+private struct DynamicCodingKey: CodingKey {
+    let stringValue: String
+    let intValue: Int?
+
+    init?(stringValue: String) {
+        self.stringValue = stringValue
+        intValue = Int(stringValue)
+    }
+
+    init?(intValue: Int) {
+        stringValue = String(intValue)
+        self.intValue = intValue
     }
 }

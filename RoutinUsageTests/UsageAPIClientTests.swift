@@ -26,12 +26,44 @@ final class UsageAPIClientTests: XCTestCase {
         XCTAssertNil(result)
     }
 
-    func test带空白的JSONNull不是精确空响应() async {
+    func test带空白的JSONNull也表示无订阅() async throws {
         let client = makeClient(statusCode: 200, body: " null")
 
-        await XCTAssert抛出API错误(.invalidResponse) {
-            _ = try await client.fetchUsage(apiKey: "plan-test", now: .distantPast)
+        let result = try await client.fetchUsage(apiKey: "plan-test", now: .distantPast)
+
+        XCTAssertNil(result)
+    }
+
+    func test按Key对应的分组字段可以解码并配对() async throws {
+        let client = makeClient(statusCode: 200, body: #"""
+        {
+            "planName": "Pro",
+            "type": 1,
+            "dailyLimitUsd": 10,
+            "weeklyLimitUsd": 50,
+            "dailyUsedUsd": 2,
+            "weeklyUsedUsd": 10,
+            "dailyRemainingUsd": 8,
+            "weeklyRemainingUsd": 40,
+            "dayWindowEndAt": "2026-08-10T14:00:00Z",
+            "weekWindowEndAt": "2026-08-15T00:00:00Z",
+            "groupNames": {
+                "codex": "Codex",
+                "codex-pro": "Codex Pro"
+            },
+            "groupMultipliers": {
+                "codex": 1,
+                "codex-pro": 2
+            }
         }
+        """#)
+
+        let result = try await client.fetchUsage(apiKey: "plan-test", now: .distantPast)
+
+        XCTAssertEqual(result?.groupMultipliers, [
+            UsageGroupMultiplier(name: "Codex", multiplier: 1),
+            UsageGroupMultiplier(name: "Codex Pro", multiplier: 2)
+        ])
     }
 
     func test无效密钥响应映射为InvalidKey() async {

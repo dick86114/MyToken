@@ -49,7 +49,8 @@ struct UsageAPIClient: UsageFetching {
             throw UsageAPIError.server(statusCode: httpResponse.statusCode)
         }
 
-        if data == Data("null".utf8) {
+        if String(data: data, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) == "null" {
             return nil
         }
 

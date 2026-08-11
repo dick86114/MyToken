@@ -185,18 +185,20 @@ struct KeyEditorView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var model: KeyEditorModel
+    @State private var isSecretVisible = false
     @FocusState private var focusedField: Field?
 
     init(
         title: String = "添加 Key",
         initialName: String = "",
+        initialSecret: String = "",
         save: @escaping @MainActor (String, String) async throws -> KeyEditorSaveResult,
         onSaved: @escaping @MainActor () -> Void = {}
     ) {
         self.title = title
         self.save = save
         self.onSaved = onSaved
-        _model = State(initialValue: KeyEditorModel(name: initialName))
+        _model = State(initialValue: KeyEditorModel(name: initialName, secret: initialSecret))
     }
 
     var body: some View {
@@ -212,11 +214,27 @@ struct KeyEditorView: View {
                     .accessibilityLabel("Key 名称")
                     .onSubmit { focusedField = .secret }
 
-                SecureField("plan-…", text: $model.secret)
+                HStack(spacing: 8) {
+                    Group {
+                        if isSecretVisible {
+                            TextField("plan-…", text: $model.secret)
+                        } else {
+                            SecureField("plan-…", text: $model.secret)
+                        }
+                    }
                     .focused($focusedField, equals: .secret)
                     .accessibilityLabel("plan Key")
                     .textContentType(.password)
                     .onSubmit { submit() }
+
+                    Button {
+                        isSecretVisible.toggle()
+                    } label: {
+                        Image(systemName: isSecretVisible ? "eye.slash" : "eye")
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(isSecretVisible ? "隐藏 plan Key" : "显示 plan Key")
+                }
             }
             .formStyle(.grouped)
 

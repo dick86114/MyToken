@@ -133,11 +133,15 @@ struct UsageMapper: Sendable {
     }
 
     private func pairedGroupMultipliers(
-        names: [String]?,
-        multipliers: [Decimal]?
+        names: UsageKeyedValues<String>?,
+        multipliers: UsageKeyedValues<Decimal>?
     ) -> [UsageGroupMultiplier] {
-        zip(names ?? [], multipliers ?? []).map {
-            UsageGroupMultiplier(name: $0, multiplier: $1)
+        guard let names, let multipliers else { return [] }
+        return names.keys.compactMap { key in
+            guard let name = names.values[key], let multiplier = multipliers.values[key] else {
+                return nil
+            }
+            return UsageGroupMultiplier(name: name, multiplier: multiplier)
         }
     }
 
