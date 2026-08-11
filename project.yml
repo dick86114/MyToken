@@ -44,6 +44,7 @@ targets:
           cp "$PROJECT_DIR/RoutinUsage/Views/UsageRowView.swift" "$resource_dir/UsageRowView.swift.txt"
           cp "$PROJECT_DIR/RoutinUsage/Views/MenuBarLabelView.swift" "$resource_dir/MenuBarLabelView.swift.txt"
           cp "$PROJECT_DIR/RoutinUsage/Views/UsagePopoverView.swift" "$resource_dir/UsagePopoverView.swift.txt"
+          cp "$PROJECT_DIR/.github/workflows/release.yml" "$resource_dir/release.yml"
     settings:
       base:
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/MyRoutin.app/Contents/MacOS/MyRoutin"

@@ -89,6 +89,13 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(projectSpec.contains("SWIFT_VERSION: \"5.0\""))
     }
 
+    func test发布工作流使用MyRoutin作为版本展示名称() throws {
+        let releaseWorkflow = try sourceText(at: ".github/workflows/release.yml")
+
+        XCTAssertTrue(releaseWorkflow.contains("name: MyRoutin v${{ inputs.version }}"))
+        XCTAssertFalse(releaseWorkflow.contains("Routin Usage"))
+    }
+
     func test弹窗详情显示剩余时长与配对分组倍率且不显示允许模型() throws {
         let usageRowView = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
 
@@ -120,6 +127,8 @@ final class ProjectBootstrapTests: XCTestCase {
         switch relativePath {
         case "project.yml":
             resource = ("project", "yml")
+        case ".github/workflows/release.yml":
+            resource = ("release", "yml")
         case "RoutinUsage/App/RoutinUsageApp.swift":
             resource = ("RoutinUsageApp.swift", "txt")
         case "RoutinUsage/Views/SettingsView.swift":
