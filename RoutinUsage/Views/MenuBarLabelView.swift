@@ -23,9 +23,10 @@ private extension MenuBarLabelView {
 
         if let metric = verticalMetric {
             HStack(spacing: 0) {
+                // 菜单栏承载组合视图时会反向呈现子视图；先声明竖条，实际显示才会保持别名在前。
+                Image(nsImage: MenuBarVerticalUsageIcon.image(percent: metric.percent))
                 // 保持为原生文字，让系统根据菜单栏实际背景自动选择深浅色。
                 Text(alias + " · ")
-                Image(nsImage: MenuBarVerticalUsageIcon.image(percent: metric.percent))
             }
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(verticalBarAccessibilityLabel(metric: metric))

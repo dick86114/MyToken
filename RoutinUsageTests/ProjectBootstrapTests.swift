@@ -59,6 +59,15 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(menuBarLabel.contains("MenuBarAliasVerticalUsageIcon"))
         XCTAssertFalse(menuBarLabel.contains("NSColor.labelColor"))
         XCTAssertTrue(menuBarLabel.contains("alias + \" · \""))
+        let progressBar = try XCTUnwrap(
+            menuBarLabel.range(of: "Image(nsImage: MenuBarVerticalUsageIcon.image(percent: metric.percent))")
+        )
+        let alias = try XCTUnwrap(menuBarLabel.range(of: "Text(alias + \" · \")"))
+        XCTAssertLessThan(
+            progressBar.lowerBound,
+            alias.lowerBound,
+            "菜单栏承载组合视图时会反向呈现子视图，源码必须先声明竖条以确保实际显示为别名在前"
+        )
     }
 
     func test统一玻璃辅助层使用系统玻璃并保留旧系统材质回退() throws {
