@@ -28,7 +28,12 @@ struct UsageRowView: View {
                 .padding(.horizontal, 4)
             }
             .buttonStyle(.plain)
-            .liquidGlassSurface(cornerRadius: 12)
+            .background {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.accentColor.opacity(0.10))
+                }
+            }
             .accessibilityElement(children: .combine)
             .accessibilityLabel(accessibilityLabel(now: timeline.date))
             .accessibilityHint(accessibilityHint)
@@ -149,7 +154,6 @@ private extension UsageRowView {
                 total: 100
             )
             .tint(progressColor)
-            .liquidGlassProgressSurface()
 
             HStack(spacing: 8) {
                 Text(UsageFormatter.amount(metric))
