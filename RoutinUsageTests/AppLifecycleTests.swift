@@ -653,6 +653,53 @@ final class AppLifecycleTests: XCTestCase {
         XCTAssertEqual(environment.updateStatus, .available(update))
     }
 
+    func test更新检查失败会写入诊断日志() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let logger = LifecycleLogWriter()
+        let environment = context.makeEnvironment(
+            updateService: LifecycleUpdateService(result: .failure(.unavailable)),
+            updateCheckScheduler: LifecycleUpdateSchedulerSpy(),
+            logWriter: logger
+        )
+
+        await environment.start()
+        await 等待条件 {
+            if case .failed = environment.updateStatus {
+                return true
+            }
+            return false
+        }
+
+        let events = await logger.events
+        XCTAssertTrue(events.contains { $0.event == "update_check_failed" })
+    }
+
+    func test更新安装失败会写入诊断日志() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let logger = LifecycleLogWriter()
+        let update = AppUpdate(
+            version: "1.3.0",
+            releaseURL: URL(string: "https://example.com/release")!,
+            downloadURL: URL(string: "https://example.com/download")!,
+            notes: ""
+        )
+        let environment = context.makeEnvironment(
+            updateService: LifecycleUpdateService(result: .available(update)),
+            updateCheckScheduler: LifecycleUpdateSchedulerSpy(),
+            logWriter: logger
+        )
+
+        await environment.start()
+        await 等待条件 { environment.updateStatus == .available(update) }
+        await environment.installAvailableUpdate()
+
+        let events = await logger.events
+        XCTAssertTrue(events.contains { $0.event == "update_install_started" })
+        XCTAssertTrue(events.contains { $0.event == "update_install_failed" })
+    }
+
     func test停止与启动在通知让出执行器竞争时不会重新启动更新检查() async throws {
         let context = try makeContext(notificationsEnabled: true)
         defer { context.cleanUp() }
@@ -878,7 +925,8 @@ private struct AppLifecycleTestContext {
     func makeEnvironment(
         updateService: any UpdateChecking,
         updateCheckScheduler: any UpdateCheckScheduling,
-        notificationTaskYield: @escaping @Sendable () async -> Void = { await Task.yield() }
+        notificationTaskYield: @escaping @Sendable () async -> Void = { await Task.yield() },
+        logWriter: any AppLogWriting = NoopAppLogWriter()
     ) -> AppEnvironment {
         let settings = AppSettings(defaults: defaults)
         settings.notificationsEnabled = notificationsEnabled
@@ -906,7 +954,8 @@ private struct AppLifecycleTestContext {
             applicationNotificationCenter: applicationNotificationCenter,
             updateService: updateService,
             updateCheckScheduler: updateCheckScheduler,
-            notificationTaskYield: notificationTaskYield
+            notificationTaskYield: notificationTaskYield,
+            logWriter: logWriter
         )
     }
 
@@ -1096,6 +1145,24 @@ private actor LifecycleUpdateService: UpdateChecking {
         progress: @escaping @Sendable (Double?) async -> Void
     ) async throws -> URL {
         throw UpdateServiceError.unavailable
+    }
+}
+
+private actor LifecycleLogWriter: AppLogWriting {
+    struct Event: Sendable {
+        let level: AppLogLevel
+        let event: String
+        let details: String?
+    }
+
+    private(set) var events: [Event] = []
+
+    func log(level: AppLogLevel, event: String, details: String?) async {
+        events.append(Event(level: level, event: event, details: details))
+    }
+
+    func recentText(maxCharacters: Int) async -> String {
+        ""
     }
 }
 

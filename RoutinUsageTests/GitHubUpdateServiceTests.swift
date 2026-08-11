@@ -8,13 +8,20 @@ final class GitHubUpdateServiceTests: XCTestCase {
             let response = try XCTUnwrap(HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil))
             return (response, Data(#"{"tag_name":"v1.2.0","html_url":"https://github.com/dick86114/MyRoutin/releases/tag/v1.2.0","body":"修复问题","assets":[{"name":"MyRoutin.dmg","browser_download_url":"https://example.com/MyRoutin.dmg"}]}"#.utf8))
         }
-        let service = GitHubUpdateService(session: stub.session, currentVersion: "1.1.9")
+        let logger = UpdateLogWriter()
+        let service = GitHubUpdateService(
+            session: stub.session,
+            currentVersion: "1.1.9",
+            logWriter: logger
+        )
 
         let update = try await service.checkForUpdate()
 
         XCTAssertEqual(stub.registration.lastRequest?.url, GitHubUpdateService.releasesURL)
         XCTAssertEqual(update?.version, "1.2.0")
         XCTAssertEqual(update?.downloadURL.absoluteString, "https://example.com/MyRoutin.dmg")
+        let events = await logger.events
+        XCTAssertTrue(events.contains { $0 == "update_check_succeeded" })
     }
 
     func test相同或更旧Release不提示更新() async throws {
@@ -116,5 +123,17 @@ private actor DownloadProgressCapture {
 
     func append(_ value: Double?) {
         values.append(value)
+    }
+}
+
+private actor UpdateLogWriter: AppLogWriting {
+    private(set) var events: [String] = []
+
+    func log(level: AppLogLevel, event: String, details: String?) async {
+        events.append(event)
+    }
+
+    func recentText(maxCharacters: Int) async -> String {
+        ""
     }
 }

@@ -36,6 +36,18 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(statusBarController.contains("NSApplication.shared.terminate(nil)"))
     }
 
+    func test菜单栏和设置页提供问题提交入口() throws {
+        let statusBarController = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
+        let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+        let app = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
+
+        XCTAssertTrue(statusBarController.contains("提交问题"))
+        XCTAssertTrue(statusBarController.contains("openIssueReport"))
+        XCTAssertTrue(settings.contains("提交问题"))
+        XCTAssertTrue(settings.contains("submitIssueReport"))
+        XCTAssertTrue(app.contains("submitIssueReport: environment.openIssueReport"))
+    }
+
     func test菜单栏弹窗显示时会激活应用并获取焦点() throws {
         let source = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
 
