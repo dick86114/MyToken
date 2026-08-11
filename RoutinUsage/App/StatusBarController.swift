@@ -185,6 +185,15 @@ final class StatusBarController: NSObject {
         menu.addItem(checkForUpdatesItem)
         menu.addItem(.separator())
 
+        let issueItem = NSMenuItem(
+            title: "提交问题",
+            action: #selector(submitIssueReport),
+            keyEquivalent: ""
+        )
+        issueItem.target = self
+        menu.addItem(issueItem)
+        menu.addItem(.separator())
+
         let quitItem = NSMenuItem(
             title: "退出 MyRoutin",
             action: #selector(quitApplication),
@@ -233,6 +242,10 @@ final class StatusBarController: NSObject {
 
     @objc private func checkForUpdates() {
         Task { await environment.checkForUpdates() }
+    }
+
+    @objc private func submitIssueReport() {
+        Task { await environment.openIssueReport() }
     }
 
     private var isDownloadingUpdate: Bool {

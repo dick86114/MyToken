@@ -19,6 +19,7 @@ struct SettingsView: View {
     typealias MoveKey = @MainActor (IndexSet, Int) -> Void
     typealias CheckForUpdates = @MainActor () async -> Void
     typealias InstallAvailableUpdate = @MainActor () async -> Void
+    typealias SubmitIssueReport = @MainActor () async -> Void
     typealias ReadKey = @MainActor (UUID) -> String?
 
     private enum EditorPresentation: Identifiable {
@@ -44,6 +45,7 @@ struct SettingsView: View {
     private let updateStatus: AppUpdateStatus
     private let checkForUpdates: CheckForUpdates
     private let installAvailableUpdate: InstallAvailableUpdate
+    private let submitIssueReport: SubmitIssueReport
     private let readKey: ReadKey
 
     @State private var editor: EditorPresentation?
@@ -63,6 +65,7 @@ struct SettingsView: View {
         updateStatus: AppUpdateStatus = .idle,
         checkForUpdates: @escaping CheckForUpdates = {},
         installAvailableUpdate: @escaping InstallAvailableUpdate = {},
+        submitIssueReport: @escaping SubmitIssueReport = {},
         readKey: @escaping ReadKey = { _ in nil }
     ) {
         self.store = store
@@ -73,6 +76,7 @@ struct SettingsView: View {
         self.updateStatus = updateStatus
         self.checkForUpdates = checkForUpdates
         self.installAvailableUpdate = installAvailableUpdate
+        self.submitIssueReport = submitIssueReport
         self.readKey = readKey
         _orderedKeyIDs = State(initialValue: store.orderedKeyIDs)
         _lowThreshold = State(initialValue: settings.thresholds.low)
@@ -393,6 +397,8 @@ private extension SettingsView {
                         .accessibilityLabel("当前版本 \(currentVersion)")
                 }
                 updateControls
+                Button("提交问题") { Task { await submitIssueReport() } }
+                    .liquidGlassButton()
             }
         }
         .formStyle(.grouped)

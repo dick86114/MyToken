@@ -54,13 +54,24 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
 
     let session: URLSession
     let currentVersion: String
+    let logWriter: any AppLogWriting
 
-    init(session: URLSession = .shared, currentVersion: String? = nil) {
+    init(
+        session: URLSession = .shared,
+        currentVersion: String? = nil,
+        logWriter: any AppLogWriting = NoopAppLogWriter()
+    ) {
         self.session = session
         self.currentVersion = currentVersion ?? (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0")
+        self.logWriter = logWriter
     }
 
     func checkForUpdate() async throws -> AppUpdate? {
+        await logWriter.log(
+            level: .info,
+            event: "update_check_started",
+            details: "version=\(currentVersion)"
+        )
         var request = URLRequest(
             url: Self.releasesURL,
             cachePolicy: .reloadIgnoringLocalCacheData,
@@ -73,36 +84,69 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
         do {
             (data, response) = try await session.data(for: request)
         } catch is CancellationError {
+            await logWriter.log(level: .warning, event: "update_check_cancelled", details: "source=api")
             throw CancellationError()
         } catch {
+            await logWriter.log(
+                level: .error,
+                event: "update_check_network_failed",
+                details: String(describing: error)
+            )
             throw UpdateServiceError.unavailable
         }
         guard let http = response as? HTTPURLResponse else {
+            await logWriter.log(level: .error, event: "update_check_invalid_response", details: "source=api")
             throw UpdateServiceError.unavailable
         }
+        await logWriter.log(
+            level: .info,
+            event: "update_check_response",
+            details: "source=api status=\(http.statusCode)"
+        )
         if http.statusCode == 403 || http.statusCode == 429 {
             // GitHub API 的未登录请求按出口 IP 共享限额，桌面用户很容易撞到 403。
             // Atom feed 不走同一套 API 限额，且足够提供版本和发布页信息。
+            await logWriter.log(
+                level: .warning,
+                event: "update_check_rate_limited",
+                details: "status=\(http.statusCode)"
+            )
             return try await checkForUpdateFromAtom()
         }
         guard (200..<300).contains(http.statusCode) else {
             throw UpdateServiceError.unavailable
         }
         let release: ReleaseDTO
-        do { release = try JSONDecoder().decode(ReleaseDTO.self, from: data) } catch {
+        do {
+            release = try JSONDecoder().decode(ReleaseDTO.self, from: data)
+        } catch {
+            await logWriter.log(
+                level: .error,
+                event: "update_check_decode_failed",
+                details: String(describing: error)
+            )
             throw UpdateServiceError.invalidResponse
         }
         let version = Self.normalize(release.tagName)
-        guard Self.compare(version, currentVersion) == .orderedDescending else { return nil }
+        guard Self.compare(version, currentVersion) == .orderedDescending else {
+            await logWriter.log(level: .info, event: "update_check_succeeded", details: "result=no_update")
+            return nil
+        }
         guard let asset = release.assets.first(where: { $0.name.hasSuffix(".dmg") }),
               let downloadURL = URL(string: asset.browserDownloadURL) else {
+            await logWriter.log(level: .error, event: "update_check_asset_missing", details: "version=\(version)")
             throw UpdateServiceError.invalidResponse
         }
-        guard let releaseURL = URL(string: release.htmlURL) else { throw UpdateServiceError.invalidResponse }
+        guard let releaseURL = URL(string: release.htmlURL) else {
+            await logWriter.log(level: .error, event: "update_check_release_url_invalid", details: "version=\(version)")
+            throw UpdateServiceError.invalidResponse
+        }
+        await logWriter.log(level: .info, event: "update_check_succeeded", details: "version=\(version)")
         return AppUpdate(version: version, releaseURL: releaseURL, downloadURL: downloadURL, notes: release.body ?? "")
     }
 
     private func checkForUpdateFromAtom() async throws -> AppUpdate? {
+        await logWriter.log(level: .info, event: "update_check_atom_started", details: nil)
         var request = URLRequest(
             url: Self.releasesAtomURL,
             cachePolicy: .reloadIgnoringLocalCacheData,
@@ -116,26 +160,48 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
         do {
             (data, response) = try await session.data(for: request)
         } catch is CancellationError {
+            await logWriter.log(level: .warning, event: "update_check_cancelled", details: "source=atom")
             throw CancellationError()
         } catch {
+            await logWriter.log(
+                level: .error,
+                event: "update_check_atom_network_failed",
+                details: String(describing: error)
+            )
             throw UpdateServiceError.unavailable
         }
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            await logWriter.log(level: .error, event: "update_check_atom_failed", details: "response=invalid")
             throw UpdateServiceError.unavailable
         }
+        await logWriter.log(
+            level: .info,
+            event: "update_check_response",
+            details: "source=atom status=\(http.statusCode)"
+        )
 
         let parser = AtomReleaseParser()
         guard let release = parser.parse(data: data) else {
+            await logWriter.log(level: .error, event: "update_check_atom_decode_failed", details: nil)
             throw UpdateServiceError.invalidResponse
         }
         let version = Self.normalize(release.version)
-        guard Self.compare(version, currentVersion) == .orderedDescending else { return nil }
+        guard Self.compare(version, currentVersion) == .orderedDescending else {
+            await logWriter.log(level: .info, event: "update_check_succeeded", details: "result=no_update source=atom")
+            return nil
+        }
 
         let tag = release.version.hasPrefix("v") ? release.version : "v\(release.version)"
         guard let downloadURL = URL(string: "https://github.com/\(Self.repository)/releases/download/\(tag)/MyRoutin.dmg"),
               let releaseURL = URL(string: release.releaseURL) else {
+            await logWriter.log(level: .error, event: "update_check_atom_url_invalid", details: "version=\(version)")
             throw UpdateServiceError.invalidResponse
         }
+        await logWriter.log(
+            level: .info,
+            event: "update_check_succeeded",
+            details: "version=\(version) source=atom"
+        )
         return AppUpdate(
             version: version,
             releaseURL: releaseURL,
@@ -148,9 +214,19 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
         _ update: AppUpdate,
         progress: @escaping @Sendable (Double?) async -> Void
     ) async throws -> URL {
+        await logWriter.log(
+            level: .info,
+            event: "update_download_started",
+            details: "version=\(update.version)"
+        )
         do {
             let (bytes, response) = try await session.bytes(from: update.downloadURL)
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                await logWriter.log(
+                    level: .error,
+                    event: "update_download_failed",
+                    details: "version=\(update.version) response=invalid"
+                )
                 throw UpdateServiceError.downloadFailed
             }
 
@@ -179,16 +255,37 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
             }
 
             guard !data.isEmpty else {
+                await logWriter.log(
+                    level: .error,
+                    event: "update_download_failed",
+                    details: "version=\(update.version) response=empty"
+                )
                 throw UpdateServiceError.downloadFailed
             }
             let url = FileManager.default.temporaryDirectory.appendingPathComponent("MyRoutin-\(update.version).dmg")
             try data.write(to: url, options: .atomic)
+            await logWriter.log(
+                level: .info,
+                event: "update_download_succeeded",
+                details: "version=\(update.version) bytes=\(data.count)"
+            )
             return url
         } catch is CancellationError {
+            await logWriter.log(level: .warning, event: "update_download_cancelled", details: "version=\(update.version)")
             throw CancellationError()
         } catch let error as UpdateServiceError {
+            await logWriter.log(
+                level: .error,
+                event: "update_download_failed",
+                details: "version=\(update.version) error=\(String(describing: error))"
+            )
             throw error
         } catch {
+            await logWriter.log(
+                level: .error,
+                event: "update_download_failed",
+                details: "version=\(update.version) error=\(String(describing: error))"
+            )
             throw UpdateServiceError.downloadFailed
         }
     }
@@ -295,7 +392,8 @@ enum UpdateInstaller {
     static func install(
         dmgURL: URL,
         appName: String = "MyRoutin",
-        version: String
+        version: String,
+        logWriter: any AppLogWriting = AppLogStore.shared
     ) throws {
         let mountPoint = FileManager.default.temporaryDirectory.appendingPathComponent("routin-update-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: mountPoint, withIntermediateDirectories: true)
@@ -321,9 +419,16 @@ enum UpdateInstaller {
         NSWorkspace.shared.openApplication(at: destination, configuration: configuration) { _, error in
             Task { @MainActor in
                 if error == nil {
+                    await logWriter.log(level: .info, event: "update_restart_succeeded", details: "version=\(version)")
                     NSApplication.shared.terminate(nil)
                     return
                 }
+
+                await logWriter.log(
+                    level: .error,
+                    event: "update_restart_failed",
+                    details: String(describing: error)
+                )
 
                 // 新版本已复制完成但系统拒绝自动启动时，保留旧进程并给出可操作提示。
                 let alert = NSAlert()

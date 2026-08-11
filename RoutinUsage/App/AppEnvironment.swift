@@ -68,6 +68,7 @@ final class AppEnvironment {
     @ObservationIgnored private let apiClient: any UsageFetching
     @ObservationIgnored private let notificationSender: any NotificationSending
     @ObservationIgnored private let updateService: any UpdateChecking
+    @ObservationIgnored private let logWriter: any AppLogWriting
     @ObservationIgnored private let updateCheckScheduler: any UpdateCheckScheduling
     @ObservationIgnored private let notificationTaskYield: @Sendable () async -> Void
     @ObservationIgnored private let applicationNotificationCenter: NotificationCenter
@@ -90,7 +91,8 @@ final class AppEnvironment {
         applicationNotificationCenter: NotificationCenter = .default,
         updateService: any UpdateChecking = NoUpdateService(),
         updateCheckScheduler: (any UpdateCheckScheduling)? = nil,
-        notificationTaskYield: @escaping @Sendable () async -> Void = { await Task.yield() }
+        notificationTaskYield: @escaping @Sendable () async -> Void = { await Task.yield() },
+        logWriter: any AppLogWriting = NoopAppLogWriter()
     ) {
         self.settings = settings
         self.store = store
@@ -101,6 +103,7 @@ final class AppEnvironment {
         self.notificationSender = notificationSender
         self.applicationNotificationCenter = applicationNotificationCenter
         self.updateService = updateService
+        self.logWriter = logWriter
         self.updateCheckScheduler = updateCheckScheduler ?? UpdateCheckScheduler()
         self.notificationTaskYield = notificationTaskYield
         updateCompletionNotice = UpdateCompletionNotice.consume()
@@ -108,6 +111,7 @@ final class AppEnvironment {
 
     static func live() -> AppEnvironment {
         let defaults = UserDefaults.standard
+        let logWriter = AppLogStore.shared
         let settings = AppSettings(defaults: defaults)
         let localStore = LocalKeyStore(defaults: defaults)
         let keyRepository = KeyRepository(defaults: defaults, localStore: localStore)
@@ -138,8 +142,9 @@ final class AppEnvironment {
             keyRepository: keyRepository,
             apiClient: apiClient,
             notificationSender: notificationSender,
-            updateService: GitHubUpdateService(),
-            updateCheckScheduler: UpdateCheckScheduler()
+            updateService: GitHubUpdateService(logWriter: logWriter),
+            updateCheckScheduler: UpdateCheckScheduler(),
+            logWriter: logWriter
         )
     }
 
@@ -226,26 +231,73 @@ final class AppEnvironment {
     }
 
     func checkForUpdates() async {
+        await logWriter.log(level: .info, event: "update_check_requested", details: "source=user")
         guard let task = beginUpdateCheckIfNeeded(requiresStarted: false) else { return }
         await task.value
     }
 
     func installAvailableUpdate() async {
         guard case let .available(update) = updateStatus else { return }
+        await logWriter.log(
+            level: .info,
+            event: "update_install_started",
+            details: "version=\(update.version)"
+        )
         updateStatus = .downloading(progress: nil)
         do {
             let dmgURL = try await updateService.download(update) { [weak self] progress in
                 await self?.setUpdateDownloadProgress(progress)
             }
-            try UpdateInstaller.install(dmgURL: dmgURL, version: update.version)
+            try UpdateInstaller.install(
+                dmgURL: dmgURL,
+                version: update.version,
+                logWriter: logWriter
+            )
             updateStatus = .completed(update.version)
         } catch is CancellationError {
+            await logWriter.log(level: .warning, event: "update_install_cancelled", details: nil)
             updateStatus = .available(update)
         } catch let error as UpdateServiceError {
+            await logWriter.log(
+                level: .error,
+                event: "update_install_failed",
+                details: String(describing: error)
+            )
             updateStatus = .failed(updateErrorDescription(error))
         } catch {
+            await logWriter.log(
+                level: .error,
+                event: "update_install_failed",
+                details: String(describing: error)
+            )
             updateStatus = .failed("安装更新失败，请下载后手动安装")
         }
+    }
+
+    func openIssueReport() async {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+        let context = IssueReportContext(
+            version: version,
+            operatingSystem: ProcessInfo.processInfo.operatingSystemVersionString,
+            architecture: IssueReporter.architecture(),
+            updateStatus: IssueReporter.statusDescription(updateStatus),
+            logs: await logWriter.recentText(maxCharacters: IssueReporter.maxLogCharacters)
+        )
+        guard let url = IssueReporter.makeIssueURL(context: context) else {
+            await logWriter.log(level: .error, event: "issue_report_url_failed", details: nil)
+            return
+        }
+        guard IssueReporter.openIssueURL(url) else {
+            await logWriter.log(level: .error, event: "issue_report_open_failed", details: url.absoluteString)
+            let alert = NSAlert()
+            alert.messageText = "无法打开问题提交页面"
+            alert.informativeText = "请检查网络连接后重试。"
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "好")
+            alert.runModal()
+            return
+        }
+        await logWriter.log(level: .info, event: "issue_report_opened", details: nil)
     }
 
     func presentUpdateCompletionNoticeIfNeeded() {
@@ -339,13 +391,27 @@ private extension AppEnvironment {
         updateStatusBeforeChecking = previousStatus
         updateStatus = .checking
         let updateService = updateService
+        let logWriter = logWriter
         let task = Task { [weak self] in
             let outcome: UpdateCheckOutcome
             do {
                 outcome = .success(try await updateService.checkForUpdate())
             } catch is CancellationError {
+                await logWriter.log(level: .warning, event: "update_check_cancelled", details: nil)
                 outcome = .cancelled
+            } catch let error as UpdateServiceError {
+                await logWriter.log(
+                    level: .error,
+                    event: "update_check_failed",
+                    details: String(describing: error)
+                )
+                outcome = .failed
             } catch {
+                await logWriter.log(
+                    level: .error,
+                    event: "update_check_failed",
+                    details: String(describing: error)
+                )
                 outcome = .failed
             }
             guard let self else { return }

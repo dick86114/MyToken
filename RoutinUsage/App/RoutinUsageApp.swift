@@ -45,6 +45,7 @@ struct RoutinUsageApp: App {
                 updateStatus: environment.updateStatus,
                 checkForUpdates: environment.checkForUpdates,
                 installAvailableUpdate: environment.installAvailableUpdate,
+                submitIssueReport: environment.openIssueReport,
                 readKey: environment.readKey(id:)
             )
         }
