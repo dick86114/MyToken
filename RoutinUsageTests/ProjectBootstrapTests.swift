@@ -146,6 +146,24 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(usageRowView.contains("ForEach(Array(groupMultipliers.enumerated())"))
     }
 
+    func test弹窗详情将倒计时并排并在进度条下方右对齐分组倍率() throws {
+        let usageRowView = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
+
+        let countdownStart = try XCTUnwrap(
+            usageRowView.range(of: "HStack(alignment: .firstTextBaseline, spacing: 8)")
+        )
+        let multiplierStart = try XCTUnwrap(
+            usageRowView.range(of: "Text(UsageFormatter.groupMultiplierText(groupMultipliers))")
+        )
+        let countdowns = usageRowView[countdownStart.lowerBound..<multiplierStart.lowerBound]
+
+        XCTAssertTrue(countdowns.contains("detailLine("))
+        XCTAssertTrue(countdowns.contains("\"5 小时剩余\""))
+        XCTAssertTrue(countdowns.contains("\"周剩余\""))
+        XCTAssertTrue(countdowns.contains("Spacer(minLength: 8)"))
+        XCTAssertTrue(usageRowView.contains("HStack {\n                        Spacer()"))
+    }
+
     func test本地Key相关文案不再声称使用系统钥匙串() throws {
         let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
         let onboarding = try sourceText(at: "RoutinUsage/Views/OnboardingView.swift")
