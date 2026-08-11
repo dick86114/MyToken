@@ -66,6 +66,7 @@ final class AppEnvironment {
     @ObservationIgnored private let apiClient: any UsageFetching
     @ObservationIgnored private let notificationSender: any NotificationSending
     @ObservationIgnored private let updateService: any UpdateChecking
+    @ObservationIgnored private let updateCheckScheduler: any UpdateCheckScheduling
     @ObservationIgnored private let applicationNotificationCenter: NotificationCenter
     @ObservationIgnored private var terminationObservation: ApplicationTerminationObservation?
     @ObservationIgnored private var isStarted = false
@@ -81,7 +82,8 @@ final class AppEnvironment {
         apiClient: any UsageFetching,
         notificationSender: any NotificationSending,
         applicationNotificationCenter: NotificationCenter = .default,
-        updateService: any UpdateChecking = NoUpdateService()
+        updateService: any UpdateChecking = NoUpdateService(),
+        updateCheckScheduler: (any UpdateCheckScheduling)? = nil
     ) {
         self.settings = settings
         self.store = store
@@ -92,6 +94,7 @@ final class AppEnvironment {
         self.notificationSender = notificationSender
         self.applicationNotificationCenter = applicationNotificationCenter
         self.updateService = updateService
+        self.updateCheckScheduler = updateCheckScheduler ?? UpdateCheckScheduler()
     }
 
     static func live() -> AppEnvironment {
@@ -126,7 +129,8 @@ final class AppEnvironment {
             keyRepository: keyRepository,
             apiClient: apiClient,
             notificationSender: notificationSender,
-            updateService: GitHubUpdateService()
+            updateService: GitHubUpdateService(),
+            updateCheckScheduler: UpdateCheckScheduler()
         )
     }
 
@@ -154,6 +158,11 @@ final class AppEnvironment {
         }
         await notificationsDidChange(enabled: settings.notificationsEnabled)
         // 更新检查不应阻塞首次显示菜单栏或用量刷新。
+        updateCheckScheduler.start { [weak self] in
+            Task { @MainActor [weak self] in
+                await self?.checkForUpdates()
+            }
+        }
         Task { [weak self] in
             await self?.checkForUpdates()
         }
@@ -207,13 +216,19 @@ final class AppEnvironment {
 
     func checkForUpdates() async {
         guard updateStatus != .checking, updateStatus != .downloading else { return }
+        let availableUpdate: AppUpdate?
+        if case let .available(update) = updateStatus {
+            availableUpdate = update
+        } else {
+            availableUpdate = nil
+        }
         updateStatus = .checking
         do {
             updateStatus = try await updateService.checkForUpdate().map(AppUpdateStatus.available) ?? .idle
         } catch is CancellationError {
-            updateStatus = .idle
+            updateStatus = availableUpdate.map(AppUpdateStatus.available) ?? .idle
         } catch {
-            updateStatus = .failed("检查更新失败，请稍后重试")
+            updateStatus = availableUpdate.map(AppUpdateStatus.available) ?? .failed("检查更新失败，请稍后重试")
         }
     }
 
@@ -278,6 +293,7 @@ final class AppEnvironment {
         notificationAuthorizationTask?.cancel()
         notificationAuthorizationTask = nil
         refreshScheduler.stop()
+        updateCheckScheduler.stop()
     }
 }
 
