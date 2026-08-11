@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 @MainActor
@@ -23,7 +24,9 @@ private extension MenuBarLabelView {
         if let metric = verticalMetric {
             HStack(spacing: 4) {
                 Text(text)
-                VerticalUsageBar(percent: metric.percent)
+                Image(nsImage: MenuBarVerticalUsageIcon.image(percent: metric.percent))
+                    .frame(width: 7, height: 18)
+                    .accessibilityHidden(true)
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(verticalBarAccessibilityLabel(metric: metric))
@@ -100,40 +103,53 @@ enum MenuBarUsageRisk: Equatable {
     }
 }
 
-struct VerticalUsageBar: View {
-    let percent: Double
+enum MenuBarVerticalUsageIcon {
+    private static let size = NSSize(width: 7, height: 18)
 
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .bottom) {
-                Capsule()
-                    .fill(Color.secondary.opacity(0.25))
-                Capsule()
-                    .fill(fillColor)
-                    .frame(height: geometry.size.height * clampedPercent / 100)
-            }
+    static func image(percent: Double) -> NSImage {
+        let image = NSImage(size: size)
+        image.lockFocus()
+        defer { image.unlockFocus() }
+
+        let trackRect = NSRect(origin: .zero, size: size)
+        let track = NSBezierPath(
+            roundedRect: trackRect,
+            xRadius: size.width / 2,
+            yRadius: size.width / 2
+        )
+        NSColor.secondaryLabelColor.withAlphaComponent(0.25).setFill()
+        track.fill()
+
+        let height = size.height * clampedPercent(percent) / 100
+        guard height > 0 else {
+            image.isTemplate = false
+            return image
         }
-        .frame(width: 7, height: 18)
-        .accessibilityHidden(true)
-    }
-}
 
-private extension VerticalUsageBar {
-    var clampedPercent: Double {
+        NSGraphicsContext.saveGraphicsState()
+        track.addClip()
+        color(for: percent).setFill()
+        NSBezierPath(rect: NSRect(x: 0, y: 0, width: size.width, height: height)).fill()
+        NSGraphicsContext.restoreGraphicsState()
+        image.isTemplate = false
+        return image
+    }
+
+    private static func clampedPercent(_ percent: Double) -> Double {
         guard percent.isFinite else {
             return 0
         }
         return min(max(percent, 0), 100)
     }
 
-    var fillColor: Color {
+    private static func color(for percent: Double) -> NSColor {
         switch MenuBarUsageRisk.level(for: percent) {
         case .normal:
-            return .green
+            return .systemGreen
         case .warning:
-            return .orange
+            return .systemOrange
         case .critical:
-            return .red
+            return .systemRed
         }
     }
 }

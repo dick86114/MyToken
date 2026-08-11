@@ -69,15 +69,20 @@ enum UsageFormatter {
 
     static func resetTime(
         _ metric: UsageMetric,
+        now: Date = .now,
         timeZone: TimeZone = .current
     ) -> String {
         guard let windowEnd = metric.windowEnd else {
             return "--"
         }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "zh_CN")
         formatter.timeZone = timeZone
-        formatter.dateFormat = "HH:mm"
+        formatter.dateFormat = calendar.isDate(windowEnd, inSameDayAs: now)
+            ? "HH:mm"
+            : "MM-dd HH:mm"
         return formatter.string(from: windowEnd)
     }
 

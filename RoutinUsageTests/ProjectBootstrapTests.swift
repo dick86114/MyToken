@@ -12,6 +12,12 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(source.contains(".menuBarExtraStyle(.window)"))
     }
 
+    func test设置场景允许窗口按内容最小尺寸自由缩放() throws {
+        let source = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
+
+        XCTAssertTrue(source.contains(".windowResizability(.contentMinSize)"))
+    }
+
     func test设置与引导统一使用五小时产品文案() throws {
         let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
         let onboarding = try sourceText(at: "RoutinUsage/Views/OnboardingView.swift")
@@ -30,7 +36,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(settings.contains("@State private var revealedKeyIDs"))
         XCTAssertTrue(keyEditor.contains("@State private var isSecretVisible"))
         XCTAssertTrue(keyEditor.contains("TextField(\"plan-…\""))
-        XCTAssertTrue(keyEditor.contains("Image(systemName: isSecretVisible ? \"eye.slash\" : \"eye\")"))
+        XCTAssertTrue(keyEditor.contains("Image(systemName: isSecretVisible ? \"eye\" : \"eye.slash\")"))
     }
 
     func test设置页查看状态不从UserDefaults读取() throws {
@@ -46,8 +52,8 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(settings.contains("Picker(\"显示样式\", selection: $settings.menuBarStyle)"))
         XCTAssertTrue(settings.contains("MenuBarStyle.allCases"))
         XCTAssertTrue(menuBarLabel.contains("style: settings.menuBarStyle"))
-        XCTAssertTrue(menuBarLabel.contains("VerticalUsageBar"))
-        XCTAssertTrue(menuBarLabel.contains("ZStack(alignment: .bottom)"))
+        XCTAssertTrue(menuBarLabel.contains("Image(nsImage:"))
+        XCTAssertTrue(menuBarLabel.contains("MenuBarVerticalUsageIcon.image"))
         XCTAssertTrue(menuBarLabel.contains(".frame(width: 7, height: 18)"))
     }
 
