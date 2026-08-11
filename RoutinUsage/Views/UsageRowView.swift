@@ -27,6 +27,7 @@ struct UsageRowView: View {
             .padding(.horizontal, 4)
         }
         .buttonStyle(.plain)
+        .liquidGlassSurface(cornerRadius: 12)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityHint(accessibilityHint)
@@ -121,6 +122,7 @@ private extension UsageRowView {
                 total: 100
             )
             .tint(progressColor)
+            .liquidGlassProgressSurface()
 
             HStack(spacing: 8) {
                 Text(UsageFormatter.amount(metric))

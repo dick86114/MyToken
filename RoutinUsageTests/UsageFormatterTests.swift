@@ -5,10 +5,10 @@ import XCTest
 
 final class UsageFormatterTests: XCTestCase {
     @MainActor
-    func test别名竖条标签使用单张原生图像承载完整布局() {
-        let image = MenuBarAliasVerticalUsageIcon.image(alias: "京", percent: 35)
+    func test菜单栏独立竖条图像只承载彩色用量条() {
+        let image = MenuBarVerticalUsageIcon.image(percent: 35)
 
-        XCTAssertGreaterThan(image.size.width, 7)
+        XCTAssertEqual(image.size.width, 7)
         XCTAssertEqual(image.size.height, 18)
         XCTAssertFalse(image.isTemplate)
     }
