@@ -22,16 +22,8 @@ private extension MenuBarLabelView {
         )
 
         if let metric = verticalMetric {
-            HStack(spacing: 5) {
-                Text(text)
-                Text("·")
-                    .foregroundStyle(.secondary)
-                Image(nsImage: MenuBarVerticalUsageIcon.image(percent: metric.percent))
-                    .frame(width: 7, height: 18)
-                    .accessibilityHidden(true)
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(verticalBarAccessibilityLabel(metric: metric))
+            Image(nsImage: MenuBarAliasVerticalUsageIcon.image(alias: text, percent: metric.percent))
+                .accessibilityLabel(verticalBarAccessibilityLabel(metric: metric))
         } else {
             Text(text)
         }
@@ -106,35 +98,35 @@ enum MenuBarUsageRisk: Equatable {
 }
 
 enum MenuBarVerticalUsageIcon {
-    private static let size = NSSize(width: 7, height: 18)
+    static let size = NSSize(width: 7, height: 18)
 
-    static func image(percent: Double) -> NSImage {
-        let image = NSImage(size: size)
-        image.lockFocus()
-        defer { image.unlockFocus() }
-
-        let trackRect = NSRect(origin: .zero, size: size)
+    static func draw(percent: Double, in trackRect: NSRect) {
         let track = NSBezierPath(
             roundedRect: trackRect,
-            xRadius: size.width / 2,
-            yRadius: size.width / 2
+            xRadius: trackRect.width / 2,
+            yRadius: trackRect.width / 2
         )
         NSColor.secondaryLabelColor.withAlphaComponent(0.25).setFill()
         track.fill()
 
-        let height = size.height * clampedPercent(percent) / 100
+        let height = trackRect.height * clampedPercent(percent) / 100
         guard height > 0 else {
-            image.isTemplate = false
-            return image
+            return
         }
 
         NSGraphicsContext.saveGraphicsState()
         track.addClip()
         color(for: percent).setFill()
-        NSBezierPath(rect: NSRect(x: 0, y: 0, width: size.width, height: height)).fill()
+        NSBezierPath(
+            rect: NSRect(
+                x: trackRect.minX,
+                y: trackRect.minY,
+                width: trackRect.width,
+                height: height
+            )
+        )
+        .fill()
         NSGraphicsContext.restoreGraphicsState()
-        image.isTemplate = false
-        return image
     }
 
     private static func clampedPercent(_ percent: Double) -> Double {
@@ -153,5 +145,44 @@ enum MenuBarVerticalUsageIcon {
         case .critical:
             return .systemRed
         }
+    }
+}
+
+@MainActor
+enum MenuBarAliasVerticalUsageIcon {
+    private static let textFont = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+    private static let barGap: CGFloat = 5
+
+    static func image(alias: String, percent: Double) -> NSImage {
+        let text = alias + " · "
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: textFont,
+            .foregroundColor: NSColor.labelColor,
+        ]
+        let textSize = (text as NSString).size(withAttributes: attributes)
+        let size = NSSize(
+            width: ceil(textSize.width) + barGap + MenuBarVerticalUsageIcon.size.width,
+            height: MenuBarVerticalUsageIcon.size.height
+        )
+        let image = NSImage(size: size)
+        image.lockFocus()
+        defer { image.unlockFocus() }
+
+        let textOrigin = NSPoint(
+            x: 0,
+            y: floor((size.height - textSize.height) / 2)
+        )
+        (text as NSString).draw(at: textOrigin, withAttributes: attributes)
+        MenuBarVerticalUsageIcon.draw(
+            percent: percent,
+            in: NSRect(
+                x: ceil(textSize.width) + barGap,
+                y: 0,
+                width: MenuBarVerticalUsageIcon.size.width,
+                height: MenuBarVerticalUsageIcon.size.height
+            )
+        )
+        image.isTemplate = false
+        return image
     }
 }

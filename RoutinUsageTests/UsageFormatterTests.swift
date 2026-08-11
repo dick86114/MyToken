@@ -1,8 +1,18 @@
+import AppKit
 import Foundation
 import XCTest
 @testable import RoutinUsage
 
 final class UsageFormatterTests: XCTestCase {
+    @MainActor
+    func test别名竖条标签使用单张原生图像承载完整布局() {
+        let image = MenuBarAliasVerticalUsageIcon.image(alias: "京", percent: 35)
+
+        XCTAssertGreaterThan(image.size.width, 7)
+        XCTAssertEqual(image.size.height, 18)
+        XCTAssertFalse(image.isTemplate)
+    }
+
     func test菜单栏把百分比四舍五入为整数() {
         let state = makeState(snapshot: makePeriodicSnapshot(fiveHourPercent: 67.5))
 
