@@ -23,7 +23,7 @@ struct RoutinUsageApp: App {
             AppMenuBarLabel(environment: environment)
         }
         .menuBarExtraStyle(.window)
-        Settings {
+        Window("设置", id: "settings") {
             SettingsView(
                 store: environment.store,
                 settings: environment.settings,
@@ -42,6 +42,10 @@ struct RoutinUsageApp: App {
                 readKey: environment.readKey(id:)
             )
         }
+        .defaultSize(
+            width: WindowFramePersistence.defaultSize.width,
+            height: WindowFramePersistence.defaultSize.height
+        )
         .windowResizability(.contentMinSize)
     }
 }
