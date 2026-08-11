@@ -27,20 +27,19 @@ struct UsagePopoverView: View {
     var body: some View {
         VStack(spacing: 0) {
             toolbar
-                .padding(10)
-                .liquidGlassSurface(cornerRadius: 14)
-                .padding(12)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
 
             Divider()
 
             usageList
+                .padding(.vertical, 4)
 
             Divider()
 
             footer
-                .padding(10)
-                .liquidGlassSurface(cornerRadius: 14)
-                .padding(12)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
         }
         // 让窗口按内容自然撑开，避免固定高度造成不必要的竖向滚动条。
         .frame(width: 440)
@@ -58,7 +57,6 @@ private extension UsagePopoverView {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .liquidGlassControlSurface()
             .accessibilityLabel("用量显示周期")
 
             Button {
@@ -68,7 +66,6 @@ private extension UsagePopoverView {
                     ProgressView()
                         .controlSize(.small)
                         .frame(width: 16, height: 16)
-                        .liquidGlassProgressSurface()
                 } else {
                     Image(systemName: "arrow.clockwise")
                 }

@@ -36,6 +36,13 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(statusBarController.contains("NSApplication.shared.terminate(nil)"))
     }
 
+    func test菜单栏弹窗显示时会激活应用并获取焦点() throws {
+        let source = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
+
+        XCTAssertTrue(source.contains("NSApp.activate(ignoringOtherApps: true)"))
+        XCTAssertTrue(source.contains("popover.contentViewController?.view.window?.makeKey()"))
+    }
+
     func test弹窗进度条复用菜单栏的用量风险分级() throws {
         let usageRowView = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
 
@@ -141,17 +148,18 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(settings.contains("func glassSection"))
     }
 
-    func test弹窗行工具栏按钮进度和引导卡片接入玻璃外观() throws {
+    func test弹窗简化为单层窗口玻璃并保留玻璃按钮() throws {
         let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
         let row = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
         let onboarding = try sourceText(at: "RoutinUsage/Views/OnboardingView.swift")
 
-        XCTAssertTrue(popover.contains(".liquidGlassSurface(cornerRadius: 14)"))
-        XCTAssertTrue(popover.contains(".liquidGlassControlSurface()"))
         XCTAssertTrue(popover.contains(".liquidGlassButton()"))
-        XCTAssertTrue(popover.contains(".liquidGlassProgressSurface()"))
-        XCTAssertTrue(row.contains(".liquidGlassSurface(cornerRadius: 12)"))
-        XCTAssertTrue(row.contains(".liquidGlassProgressSurface()"))
+        XCTAssertTrue(popover.contains(".liquidGlassWindowBackground()"))
+        XCTAssertFalse(popover.contains(".liquidGlassSurface(cornerRadius:"))
+        XCTAssertFalse(popover.contains(".liquidGlassControlSurface()"))
+        XCTAssertFalse(popover.contains(".liquidGlassProgressSurface()"))
+        XCTAssertFalse(row.contains(".liquidGlassSurface(cornerRadius:"))
+        XCTAssertFalse(row.contains(".liquidGlassProgressSurface()"))
         XCTAssertTrue(onboarding.contains(".liquidGlassSurface(cornerRadius: 24)"))
         XCTAssertTrue(onboarding.contains(".liquidGlassButton(prominent: true)"))
         XCTAssertTrue(onboarding.contains(".liquidGlassWindowBackground()"))
