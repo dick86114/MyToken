@@ -90,9 +90,7 @@ struct SettingsView: View {
             notificationsAndSystem
                 .tabItem { Label("通知与系统", systemImage: "bell") }
         }
-        .padding(12)
-        .liquidGlassSurface(cornerRadius: 18)
-        .padding(16)
+        .padding(20)
         .frame(minWidth: 520, idealWidth: 560, minHeight: 420, idealHeight: 500)
         .liquidGlassWindowBackground()
         .background(WindowFramePersistence())
@@ -188,8 +186,7 @@ private extension SettingsView {
                 .scrollContentBackground(.hidden)
             }
         }
-        .padding(14)
-        .liquidGlassSurface(cornerRadius: 14)
+        .padding(4)
     }
 
     func keyRow(_ configuration: KeyConfiguration) -> some View {
@@ -228,8 +225,8 @@ private extension SettingsView {
                     .padding(.leading, 24)
             }
         }
-        .padding(8)
-        .liquidGlassSurface(cornerRadius: 14)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 4)
         .contentShape(Rectangle())
         .onTapGesture { store.selectKey(configuration.id) }
     }
@@ -324,46 +321,38 @@ private extension SettingsView {
 
     var displayAndRefresh: some View {
         Form {
-            glassSection {
-                Section("菜单栏显示") {
-                    Picker("当前 Key", selection: selectedKeyBinding) {
-                        ForEach(orderedKeyIDs, id: \.self) { id in
-                            if let configuration = store.state(for: id)?.configuration {
-                                Text(configuration.displayName).tag(Optional(id))
-                            }
+            Section("菜单栏显示") {
+                Picker("当前 Key", selection: selectedKeyBinding) {
+                    ForEach(orderedKeyIDs, id: \.self) { id in
+                        if let configuration = store.state(for: id)?.configuration {
+                            Text(configuration.displayName).tag(Optional(id))
                         }
                     }
-                    .disabled(orderedKeyIDs.isEmpty)
-                    .liquidGlassControlSurface()
-                    .accessibilityLabel("菜单栏当前 Key")
-
-                    Picker("周期维度", selection: $settings.displayDimension) {
-                        Text("5 小时").tag(DisplayDimension.fiveHour)
-                        Text("周").tag(DisplayDimension.weekly)
-                    }
-                    .liquidGlassControlSurface()
-                    .accessibilityLabel("周期订阅显示维度")
-
-                    Picker("显示样式", selection: $settings.menuBarStyle) {
-                        ForEach(MenuBarStyle.allCases, id: \.rawValue) { style in
-                            Text(style.title).tag(style)
-                        }
-                    }
-                    .liquidGlassControlSurface()
-                    .accessibilityLabel("菜单栏显示样式")
                 }
+                .disabled(orderedKeyIDs.isEmpty)
+                .accessibilityLabel("菜单栏当前 Key")
+
+                Picker("周期维度", selection: $settings.displayDimension) {
+                    Text("5 小时").tag(DisplayDimension.fiveHour)
+                    Text("周").tag(DisplayDimension.weekly)
+                }
+                .accessibilityLabel("周期订阅显示维度")
+
+                Picker("显示样式", selection: $settings.menuBarStyle) {
+                    ForEach(MenuBarStyle.allCases, id: \.rawValue) { style in
+                        Text(style.title).tag(style)
+                    }
+                }
+                .accessibilityLabel("菜单栏显示样式")
             }
 
-            glassSection {
-                Section("自动刷新") {
-                    Picker("刷新间隔", selection: $settings.refreshMinutes) {
-                        ForEach(AppSettings.allowedRefreshMinutes, id: \.self) { minutes in
-                            Text("\(minutes) 分钟").tag(minutes)
-                        }
+            Section("自动刷新") {
+                Picker("刷新间隔", selection: $settings.refreshMinutes) {
+                    ForEach(AppSettings.allowedRefreshMinutes, id: \.self) { minutes in
+                        Text("\(minutes) 分钟").tag(minutes)
                     }
-                    .liquidGlassControlSurface()
-                    .accessibilityLabel("自动刷新间隔")
                 }
+                .accessibilityLabel("自动刷新间隔")
             }
         }
         .formStyle(.grouped)
@@ -371,59 +360,42 @@ private extension SettingsView {
 
     var notificationsAndSystem: some View {
         Form {
-            glassSection {
-                Section("额度通知") {
-                    Toggle("启用额度通知", isOn: $settings.notificationsEnabled)
-                        .liquidGlassControlSurface()
-                        .accessibilityLabel("启用额度通知")
+            Section("额度通知") {
+                Toggle("启用额度通知", isOn: $settings.notificationsEnabled)
+                    .accessibilityLabel("启用额度通知")
 
-                    Stepper("低阈值：\(lowThreshold)%", value: $lowThreshold, in: 1...100)
-                        .disabled(!settings.notificationsEnabled)
-                        .liquidGlassControlSurface()
-                        .accessibilityLabel("低通知阈值，\(lowThreshold)%")
-                        .onChange(of: lowThreshold) { _, _ in applyThresholds() }
+                Stepper("低阈值：\(lowThreshold)%", value: $lowThreshold, in: 1...100)
+                    .disabled(!settings.notificationsEnabled)
+                    .accessibilityLabel("低通知阈值，\(lowThreshold)%")
+                    .onChange(of: lowThreshold) { _, _ in applyThresholds() }
 
-                    Stepper("高阈值：\(highThreshold)%", value: $highThreshold, in: 1...100)
-                        .disabled(!settings.notificationsEnabled)
-                        .liquidGlassControlSurface()
-                        .accessibilityLabel("高通知阈值，\(highThreshold)%")
-                        .onChange(of: highThreshold) { _, _ in applyThresholds() }
+                Stepper("高阈值：\(highThreshold)%", value: $highThreshold, in: 1...100)
+                    .disabled(!settings.notificationsEnabled)
+                    .accessibilityLabel("高通知阈值，\(highThreshold)%")
+                    .onChange(of: highThreshold) { _, _ in applyThresholds() }
 
-                    if let thresholdError {
-                        Text(thresholdError)
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                            .accessibilityLabel("阈值错误，\(thresholdError)")
-                    }
+                if let thresholdError {
+                    Text(thresholdError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .accessibilityLabel("阈值错误，\(thresholdError)")
                 }
             }
 
-            glassSection {
-                Section("系统") {
-                    Toggle("登录时启动", isOn: launchAtLoginBinding)
-                        .liquidGlassControlSurface()
-                        .accessibilityLabel("登录时启动")
-                }
+            Section("系统") {
+                Toggle("登录时启动", isOn: launchAtLoginBinding)
+                    .accessibilityLabel("登录时启动")
             }
 
-            glassSection {
-                Section("软件更新") {
-                    LabeledContent("当前版本") {
-                        Text(currentVersion)
-                            .accessibilityLabel("当前版本 \(currentVersion)")
-                    }
-                    updateControls
+            Section("软件更新") {
+                LabeledContent("当前版本") {
+                    Text(currentVersion)
+                        .accessibilityLabel("当前版本 \(currentVersion)")
                 }
+                updateControls
             }
         }
         .formStyle(.grouped)
-    }
-
-    @ViewBuilder
-    func glassSection<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        content()
-            .listRowBackground(Color.clear)
-            .liquidGlassSurface(cornerRadius: 14)
     }
 
     var selectedKeyBinding: Binding<UUID?> {
@@ -464,7 +436,6 @@ private extension SettingsView {
             LabeledContent("正在检查更新") {
                 ProgressView()
                     .controlSize(.small)
-                    .liquidGlassProgressSurface()
             }
         case let .available(update):
             VStack(alignment: .leading, spacing: 6) {
@@ -481,7 +452,6 @@ private extension SettingsView {
             LabeledContent("正在下载并安装更新") {
                 ProgressView()
                     .controlSize(.small)
-                    .liquidGlassProgressSurface()
             }
         case let .failed(message):
             VStack(alignment: .leading, spacing: 6) {

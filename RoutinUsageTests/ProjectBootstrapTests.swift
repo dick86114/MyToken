@@ -117,25 +117,18 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(popover.contains(".liquidGlassWindowBackground()"))
     }
 
-    func test设置页核心容器和控件全部接入玻璃外观() throws {
+    func test设置页保留玻璃按钮并移除嵌套玻璃容器() throws {
         let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
 
-        XCTAssertTrue(settings.contains(".liquidGlassSurface(cornerRadius: 18)"))
-        XCTAssertTrue(settings.contains(".liquidGlassSurface(cornerRadius: 14)"))
-        XCTAssertTrue(settings.contains(".liquidGlassControlSurface()"))
         XCTAssertTrue(settings.contains(".liquidGlassButton()"))
-        XCTAssertTrue(settings.contains(".liquidGlassProgressSurface()"))
+        XCTAssertTrue(settings.contains(".liquidGlassWindowBackground()"))
         XCTAssertTrue(settings.contains("TabView {"))
         XCTAssertTrue(settings.contains("List {"))
-        XCTAssertGreaterThanOrEqual(
-            settings.components(separatedBy: ".liquidGlassControlSurface()").count - 1,
-            8
-        )
         XCTAssertTrue(settings.contains("Button(role: .destructive)"))
-        XCTAssertGreaterThanOrEqual(
-            settings.components(separatedBy: "glassSection {").count - 1,
-            5
-        )
+        XCTAssertFalse(settings.contains(".liquidGlassControlSurface()"))
+        XCTAssertFalse(settings.contains(".liquidGlassProgressSurface()"))
+        XCTAssertFalse(settings.contains(".liquidGlassSurface(cornerRadius:"))
+        XCTAssertFalse(settings.contains("func glassSection"))
     }
 
     func test弹窗行工具栏按钮进度和引导卡片接入玻璃外观() throws {
@@ -175,22 +168,19 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(usageRowView.contains("ForEach(Array(groupMultipliers.enumerated())"))
     }
 
-    func test弹窗详情将倒计时并排并在进度条下方右对齐分组倍率() throws {
+    func test弹窗将分组倍率置于百分比下方并右对齐() throws {
         let usageRowView = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
 
-        let countdownStart = try XCTUnwrap(
-            usageRowView.range(of: "HStack(alignment: .firstTextBaseline, spacing: 8)")
+        let headerStart = try XCTUnwrap(
+            usageRowView.range(of: "var header: some View")
         )
-        let multiplierStart = try XCTUnwrap(
-            usageRowView.range(of: "Text(UsageFormatter.groupMultiplierText(groupMultipliers))")
-        )
-        let countdowns = usageRowView[countdownStart.lowerBound..<multiplierStart.lowerBound]
+        let progressStart = try XCTUnwrap(usageRowView.range(of: "ProgressView("))
+        let header = usageRowView[headerStart.lowerBound..<progressStart.lowerBound]
 
-        XCTAssertTrue(countdowns.contains("detailLine("))
-        XCTAssertTrue(countdowns.contains("\"5 小时剩余\""))
-        XCTAssertTrue(countdowns.contains("\"周剩余\""))
-        XCTAssertTrue(countdowns.contains("Spacer(minLength: 8)"))
-        XCTAssertTrue(usageRowView.contains("HStack {\n                    Spacer()"))
+        XCTAssertTrue(header.contains("VStack(alignment: .trailing"))
+        XCTAssertTrue(header.contains("Text(UsageFormatter.groupMultiplierText(groupMultipliers))"))
+        XCTAssertTrue(header.contains("Spacer(minLength: 8)"))
+        XCTAssertFalse(usageRowView.contains("HStack {\n                    Spacer()\n                    Text(UsageFormatter.groupMultiplierText(groupMultipliers))"))
     }
 
     func test本地Key相关文案不再声称使用系统钥匙串() throws {
