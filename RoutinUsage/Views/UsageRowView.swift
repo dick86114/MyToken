@@ -218,13 +218,14 @@ private extension UsageRowView {
         guard let metric else {
             return .gray
         }
-        if metric.percent >= 95 {
+        switch MenuBarUsageRisk.level(for: metric.percent) {
+        case .critical:
             return .red
-        }
-        if metric.percent >= 80 {
+        case .warning:
             return .orange
+        case .normal:
+            return .green
         }
-        return .green
     }
 
     @ViewBuilder

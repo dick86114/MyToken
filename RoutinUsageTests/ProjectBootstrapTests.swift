@@ -12,6 +12,24 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(source.contains(".menuBarExtraStyle(.window)"))
     }
 
+    func test菜单栏标签提供右键账号与应用操作菜单() throws {
+        let menuBarLabel = try sourceText(at: "RoutinUsage/Views/MenuBarLabelView.swift")
+        let app = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
+
+        XCTAssertTrue(menuBarLabel.contains(".contextMenu"))
+        XCTAssertTrue(menuBarLabel.contains("切换账号"))
+        XCTAssertTrue(menuBarLabel.contains("store.selectKey(id)"))
+        XCTAssertTrue(menuBarLabel.contains("检查更新"))
+        XCTAssertTrue(menuBarLabel.contains("NSApplication.shared.terminate(nil)"))
+        XCTAssertTrue(app.contains("checkForUpdates: environment.checkForUpdates"))
+    }
+
+    func test弹窗进度条复用菜单栏的用量风险分级() throws {
+        let usageRowView = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
+
+        XCTAssertTrue(usageRowView.contains("MenuBarUsageRisk.level(for: metric.percent)"))
+    }
+
     func test设置使用独立可缩放窗口场景而不是系统固定设置场景() throws {
         let source = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
 
@@ -56,6 +74,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(menuBarLabel.contains("style: settings.menuBarStyle"))
         XCTAssertTrue(menuBarLabel.contains("MenuBarAliasVerticalUsageIcon.image"))
         XCTAssertTrue(menuBarLabel.contains("Image(nsImage: MenuBarAliasVerticalUsageIcon.image("))
+        XCTAssertTrue(menuBarLabel.contains(".flipsForRightToLeftLayoutDirection(false)"))
         XCTAssertFalse(menuBarLabel.contains("HStack(spacing: 5)"))
         XCTAssertTrue(menuBarLabel.contains("alias + \" · \""))
     }

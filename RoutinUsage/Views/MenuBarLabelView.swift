@@ -3,12 +3,28 @@ import SwiftUI
 
 @MainActor
 struct MenuBarLabelView: View {
+    typealias CheckForUpdates = @MainActor () async -> Void
+
     let store: UsageStore
     let settings: AppSettings
+    let checkForUpdates: CheckForUpdates
+
+    init(
+        store: UsageStore,
+        settings: AppSettings,
+        checkForUpdates: @escaping CheckForUpdates = {}
+    ) {
+        self.store = store
+        self.settings = settings
+        self.checkForUpdates = checkForUpdates
+    }
 
     var body: some View {
         labelContent
             .help(helpText)
+            .contextMenu {
+                contextMenu
+            }
     }
 }
 
@@ -23,6 +39,7 @@ private extension MenuBarLabelView {
 
         if let metric = verticalMetric {
             Image(nsImage: MenuBarAliasVerticalUsageIcon.image(alias: text, percent: metric.percent))
+                .flipsForRightToLeftLayoutDirection(false)
                 .accessibilityLabel(verticalBarAccessibilityLabel(metric: metric))
         } else {
             Text(text)
@@ -62,6 +79,40 @@ private extension MenuBarLabelView {
         }
         return parts.joined(separator: " · ")
     }
+
+    @ViewBuilder
+    var contextMenu: some View {
+        Menu("切换账号") {
+            if store.orderedKeyIDs.isEmpty {
+                Text("尚未配置账号")
+            } else {
+                ForEach(store.orderedKeyIDs, id: \.self) { id in
+                    if let state = store.state(for: id) {
+                        Button {
+                            store.selectKey(id)
+                        } label: {
+                            Label(
+                                state.configuration.displayName,
+                                systemImage: store.selectedKeyID == id ? "checkmark" : "person"
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Divider()
+
+        Button("检查更新") {
+            Task { await checkForUpdates() }
+        }
+
+        Divider()
+
+        Button("退出 MyRoutin") {
+            NSApplication.shared.terminate(nil)
+        }
+    }
 }
 
 enum MenuBarVerticalUsage {
@@ -87,10 +138,10 @@ enum MenuBarUsageRisk: Equatable {
     case critical
 
     static func level(for percent: Double) -> Self {
-        if percent >= 95 {
+        if percent >= 80 {
             return .critical
         }
-        if percent >= 80 {
+        if percent >= 50 {
             return .warning
         }
         return .normal
