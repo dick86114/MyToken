@@ -231,7 +231,8 @@ final class UsageFormatterTests: XCTestCase {
 
     func test剩余时长在一天内显示小时和分钟() {
         let now = Date(timeIntervalSince1970: 1_786_320_000)
-        let end = now.addingTimeInterval(3 * 60 * 60 + 45 * 60)
+        let interval: TimeInterval = 13_500
+        let end = now.addingTimeInterval(interval)
 
         XCTAssertEqual(
             UsageFormatter.remainingDurationText(until: end, now: now),
@@ -241,10 +242,8 @@ final class UsageFormatterTests: XCTestCase {
 
     func test剩余时长跨天显示天小时和分钟() {
         let now = Date(timeIntervalSince1970: 1_786_320_000)
-        let days: TimeInterval = 4 * 24 * 60 * 60
-        let hours: TimeInterval = 3 * 60 * 60
-        let minutes: TimeInterval = 45 * 60
-        let end = now.addingTimeInterval(days + hours + minutes)
+        let interval: TimeInterval = 359_100
+        let end = now.addingTimeInterval(interval)
 
         XCTAssertEqual(
             UsageFormatter.remainingDurationText(until: end, now: now),
