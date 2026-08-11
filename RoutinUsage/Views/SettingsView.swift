@@ -382,6 +382,10 @@ private extension SettingsView {
             }
 
             Section("软件更新") {
+                LabeledContent("当前版本") {
+                    Text(currentVersion)
+                        .accessibilityLabel("当前版本 \(currentVersion)")
+                }
                 updateControls
             }
         }
@@ -427,12 +431,7 @@ private extension SettingsView {
             VStack(alignment: .leading, spacing: 6) {
                 Text("发现新版本 \(update.version)")
                     .fontWeight(.medium)
-                if !update.notes.isEmpty {
-                    Text(update.notes)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(3)
-                }
+                UpdateNotesView(notes: update.notes)
                 HStack {
                     Button("安装更新") { Task { await installAvailableUpdate() } }
                     Link("查看发布说明", destination: update.releaseURL)
@@ -446,6 +445,10 @@ private extension SettingsView {
                 Button("重试") { Task { await checkForUpdates() } }
             }
         }
+    }
+
+    var currentVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
     }
 
     @ViewBuilder
