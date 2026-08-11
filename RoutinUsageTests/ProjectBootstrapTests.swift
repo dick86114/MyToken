@@ -128,6 +128,21 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(settings.contains("UsageFormatter.groupMultiplierText(snapshot.groupMultipliers)"))
     }
 
+    func test设置页显示当前版本与完整更新日志() throws {
+        let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+
+        XCTAssertTrue(settings.contains("当前版本"))
+        XCTAssertTrue(settings.contains("UpdateNotesView(notes: update.notes)"))
+        XCTAssertFalse(settings.contains(".lineLimit(3)"))
+    }
+
+    func test更新日志视图使用Markdown并为无日志版本提供提示() throws {
+        let updateNotes = try sourceText(at: "RoutinUsage/Views/UpdateNotesView.swift")
+
+        XCTAssertTrue(updateNotes.contains("AttributedString(markdown:"))
+        XCTAssertTrue(updateNotes.contains("此版本未提供更新日志"))
+    }
+
     func test弹窗设置入口直接打开独立设置窗口() throws {
         let usagePopoverView = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
 
@@ -148,6 +163,8 @@ final class ProjectBootstrapTests: XCTestCase {
             resource = ("RoutinUsageApp.swift", "txt")
         case "RoutinUsage/Views/SettingsView.swift":
             resource = ("SettingsView.swift", "txt")
+        case "RoutinUsage/Views/UpdateNotesView.swift":
+            resource = ("UpdateNotesView.swift", "txt")
         case "RoutinUsage/Views/KeyEditorView.swift":
             resource = ("KeyEditorView.swift", "txt")
         case "RoutinUsage/Views/OnboardingView.swift":
