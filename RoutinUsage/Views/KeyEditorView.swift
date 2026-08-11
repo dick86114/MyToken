@@ -230,7 +230,7 @@ struct KeyEditorView: View {
                     Button {
                         isSecretVisible.toggle()
                     } label: {
-                        Image(systemName: isSecretVisible ? "eye.slash" : "eye")
+                        Image(systemName: isSecretVisible ? "eye" : "eye.slash")
                     }
                     .buttonStyle(.borderless)
                     .accessibilityLabel(isSecretVisible ? "隐藏 plan Key" : "显示 plan Key")

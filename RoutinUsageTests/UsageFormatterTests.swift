@@ -208,8 +208,9 @@ final class UsageFormatterTests: XCTestCase {
         )
     }
 
-    func test重置时间使用显式时区() {
+    func test重置时间在同一天使用显式时区仅显示时分() {
         let 时区 = TimeZone(secondsFromGMT: 8 * 60 * 60)!
+        let now = Date(timeIntervalSince1970: 1_786_320_000)
         let metric = makeMetric(
             used: 1,
             limit: 10,
@@ -218,7 +219,24 @@ final class UsageFormatterTests: XCTestCase {
             windowEnd: Date(timeIntervalSince1970: 1_786_341_600)
         )
 
-        XCTAssertEqual(UsageFormatter.resetTime(metric, timeZone: 时区), "14:00")
+        XCTAssertEqual(UsageFormatter.resetTime(metric, now: now, timeZone: 时区), "14:00")
+    }
+
+    func test重置时间跨日时显示日期和时分() {
+        let 时区 = TimeZone(secondsFromGMT: 8 * 60 * 60)!
+        let now = Date(timeIntervalSince1970: 1_786_320_000)
+        let metric = makeMetric(
+            used: 1,
+            limit: 10,
+            remaining: 9,
+            unit: .usd,
+            windowEnd: Date(timeIntervalSince1970: 1_786_406_400)
+        )
+
+        XCTAssertEqual(
+            UsageFormatter.resetTime(metric, now: now, timeZone: 时区),
+            "08-11 08:00"
+        )
     }
 
     func test缺少重置时间显示双短横线() {

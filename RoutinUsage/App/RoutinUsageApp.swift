@@ -42,6 +42,7 @@ struct RoutinUsageApp: App {
                 readKey: environment.readKey(id:)
             )
         }
+        .windowResizability(.contentMinSize)
     }
 }
 
