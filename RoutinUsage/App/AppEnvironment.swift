@@ -67,6 +67,7 @@ final class AppEnvironment {
     @ObservationIgnored private let notificationSender: any NotificationSending
     @ObservationIgnored private let updateService: any UpdateChecking
     @ObservationIgnored private let updateCheckScheduler: any UpdateCheckScheduling
+    @ObservationIgnored private let notificationTaskYield: @Sendable () async -> Void
     @ObservationIgnored private let applicationNotificationCenter: NotificationCenter
     @ObservationIgnored private var terminationObservation: ApplicationTerminationObservation?
     @ObservationIgnored private var isStarted = false
@@ -83,7 +84,8 @@ final class AppEnvironment {
         notificationSender: any NotificationSending,
         applicationNotificationCenter: NotificationCenter = .default,
         updateService: any UpdateChecking = NoUpdateService(),
-        updateCheckScheduler: (any UpdateCheckScheduling)? = nil
+        updateCheckScheduler: (any UpdateCheckScheduling)? = nil,
+        notificationTaskYield: @escaping @Sendable () async -> Void = { await Task.yield() }
     ) {
         self.settings = settings
         self.store = store
@@ -95,6 +97,7 @@ final class AppEnvironment {
         self.applicationNotificationCenter = applicationNotificationCenter
         self.updateService = updateService
         self.updateCheckScheduler = updateCheckScheduler ?? UpdateCheckScheduler()
+        self.notificationTaskYield = notificationTaskYield
     }
 
     static func live() -> AppEnvironment {
@@ -157,6 +160,9 @@ final class AppEnvironment {
             }
         }
         await notificationsDidChange(enabled: settings.notificationsEnabled)
+        guard isStarted else {
+            return
+        }
         // 更新检查不应阻塞首次显示菜单栏或用量刷新。
         updateCheckScheduler.start { [weak self] in
             Task { @MainActor [weak self] in
@@ -192,7 +198,7 @@ final class AppEnvironment {
         notificationAuthorizationTask = Task {
             _ = try? await notificationSender.requestAuthorization()
         }
-        await Task.yield()
+        await notificationTaskYield()
     }
 
     func thresholdsDidChange(to _: AlertThresholds) {

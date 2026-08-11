@@ -522,6 +522,60 @@ final class AppLifecycleTests: XCTestCase {
         XCTAssertEqual(environment.updateStatus, .available(update))
     }
 
+    func test后台检查取消时保留已有可安装更新() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let update = AppUpdate(
+            version: "1.2.0",
+            releaseURL: try XCTUnwrap(URL(string: "https://example.com/release")),
+            downloadURL: try XCTUnwrap(URL(string: "https://example.com/download")),
+            notes: "修复问题"
+        )
+        let service = LifecycleUpdateService(results: [
+            .available(update),
+            .cancelled
+        ])
+        let scheduler = LifecycleUpdateSchedulerSpy()
+        let environment = context.makeEnvironment(
+            updateService: service,
+            updateCheckScheduler: scheduler
+        )
+
+        await environment.start()
+        await 等待条件 { await service.checkCount == 1 }
+        XCTAssertEqual(environment.updateStatus, .available(update))
+        scheduler.fireTick()
+        await 等待条件 {
+            await service.checkCount == 2 && environment.updateStatus == .available(update)
+        }
+
+        XCTAssertEqual(environment.updateStatus, .available(update))
+    }
+
+    func test停止与启动在通知让出执行器竞争时不会重新启动更新检查() async throws {
+        let context = try makeContext(notificationsEnabled: true)
+        defer { context.cleanUp() }
+        let service = LifecycleUpdateService(result: .none)
+        let scheduler = LifecycleUpdateSchedulerSpy()
+        let yieldGate = LifecycleTaskYieldGate()
+        let environment = context.makeEnvironment(
+            updateService: service,
+            updateCheckScheduler: scheduler,
+            notificationTaskYield: { await yieldGate.yield() }
+        )
+
+        let start = Task { @MainActor in await environment.start() }
+        await yieldGate.waitUntilYielded()
+        environment.stop()
+        await yieldGate.resume()
+        await start.value
+
+        XCTAssertEqual(scheduler.startCount, 0)
+        XCTAssertEqual(scheduler.stopCount, 1)
+        let checkCount = await service.checkCount
+        XCTAssertEqual(checkCount, 0)
+    }
+
     func test切换Key时有缓存不请求而无数据只刷新所选Key() async throws {
         let context = try makeContext()
         defer { context.cleanUp() }
@@ -722,7 +776,8 @@ private struct AppLifecycleTestContext {
 
     func makeEnvironment(
         updateService: any UpdateChecking,
-        updateCheckScheduler: any UpdateCheckScheduling
+        updateCheckScheduler: any UpdateCheckScheduling,
+        notificationTaskYield: @escaping @Sendable () async -> Void = { await Task.yield() }
     ) -> AppEnvironment {
         let settings = AppSettings(defaults: defaults)
         settings.notificationsEnabled = notificationsEnabled
@@ -749,7 +804,8 @@ private struct AppLifecycleTestContext {
             notificationSender: notificationSender,
             applicationNotificationCenter: applicationNotificationCenter,
             updateService: updateService,
-            updateCheckScheduler: updateCheckScheduler
+            updateCheckScheduler: updateCheckScheduler,
+            notificationTaskYield: notificationTaskYield
         )
     }
 
@@ -885,6 +941,7 @@ private actor LifecycleUpdateService: UpdateChecking {
         case none
         case available(AppUpdate)
         case failure(UpdateServiceError)
+        case cancelled
     }
 
     private var results: [Result]
@@ -907,11 +964,39 @@ private actor LifecycleUpdateService: UpdateChecking {
             return update
         case let .failure(error):
             throw error
+        case .cancelled:
+            throw CancellationError()
         }
     }
 
     func download(_: AppUpdate) async throws -> URL {
         throw UpdateServiceError.unavailable
+    }
+}
+
+private actor LifecycleTaskYieldGate {
+    private var yieldContinuation: CheckedContinuation<Void, Never>?
+    private var yieldedWaiters: [CheckedContinuation<Void, Never>] = []
+
+    func yield() async {
+        let waiters = yieldedWaiters
+        yieldedWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+        await withCheckedContinuation { continuation in
+            yieldContinuation = continuation
+        }
+    }
+
+    func waitUntilYielded() async {
+        guard yieldContinuation == nil else { return }
+        await withCheckedContinuation { continuation in
+            yieldedWaiters.append(continuation)
+        }
+    }
+
+    func resume() {
+        yieldContinuation?.resume()
+        yieldContinuation = nil
     }
 }
 
