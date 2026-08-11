@@ -111,7 +111,7 @@ private extension UsageRowView {
     }
 
     var header: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(state.configuration.displayName)
                     .font(.headline)
@@ -123,10 +123,20 @@ private extension UsageRowView {
             Spacer(minLength: 8)
             if let metric,
                let percentText = UsageFormatter.percentText(metric) {
-                Text(percentText)
-                    .font(.system(.headline, design: .rounded, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(progressColor)
+                VStack(alignment: .trailing, spacing: 3) {
+                    Text(percentText)
+                        .font(.system(.headline, design: .rounded, weight: .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(progressColor)
+
+                    if let groupMultipliers = state.snapshot?.groupMultipliers,
+                       !groupMultipliers.isEmpty {
+                        Text(UsageFormatter.groupMultiplierText(groupMultipliers))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
             }
         }
     }
@@ -169,7 +179,7 @@ private extension UsageRowView {
         }
     }
 
-    /// 显示窗口剩余时长和按名称配对的分组倍率。
+    /// 显示窗口剩余时长。
     @ViewBuilder
     func details(now: Date) -> some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -190,13 +200,6 @@ private extension UsageRowView {
                             now: now
                         )
                     )
-                }
-            }
-            if let groupMultipliers = state.snapshot?.groupMultipliers,
-               !groupMultipliers.isEmpty {
-                HStack {
-                    Spacer()
-                    Text(UsageFormatter.groupMultiplierText(groupMultipliers))
                 }
             }
         }
