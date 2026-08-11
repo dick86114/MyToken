@@ -29,10 +29,12 @@ final class StatusBarController: NSObject {
         updateStatusButton()
         observeEnvironment()
 
+        // 先完成常驻应用的启动流程，再显示更新完成提示，避免同步模态弹窗阻塞首次更新检查。
         Task { @MainActor [weak self] in
-            self?.environment.presentUpdateCompletionNoticeIfNeeded()
+            guard let self else { return }
+            await self.environment.start()
+            self.environment.presentUpdateCompletionNoticeIfNeeded()
         }
-        Task { await environment.start() }
     }
 
     private func configurePopover() {

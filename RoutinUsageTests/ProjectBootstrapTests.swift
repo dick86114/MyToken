@@ -43,6 +43,14 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(source.contains("popover.contentViewController?.view.window?.makeKey()"))
     }
 
+    func test更新完成提示不会阻塞首次启动检查() throws {
+        let source = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
+        let start = try XCTUnwrap(source.range(of: "await self.environment.start()"))
+        let notice = try XCTUnwrap(source.range(of: "self.environment.presentUpdateCompletionNoticeIfNeeded()"))
+
+        XCTAssertLessThan(start.lowerBound, notice.lowerBound)
+    }
+
     func test弹窗进度条复用菜单栏的用量风险分级() throws {
         let usageRowView = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
 
@@ -293,6 +301,8 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(environment.contains("case completed(String)"))
         XCTAssertTrue(service.contains("createsNewApplicationInstance"))
         XCTAssertTrue(service.contains("UpdateCompletionNotice"))
+        XCTAssertTrue(service.contains("if error == nil"))
+        XCTAssertTrue(service.contains("新版本已安装到“应用程序”文件夹"))
         XCTAssertTrue(popover.contains("ProgressView(value: progress"))
         XCTAssertTrue(popover.contains("更新完成"))
         XCTAssertTrue(settings.contains("ProgressView(value: progress"))
