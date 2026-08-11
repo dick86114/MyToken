@@ -2,6 +2,8 @@
 .superpowers/
 .worktrees/
 DerivedData/
+build/
 .build/
+RoutinUsage.xcodeproj/
 *.xcuserstate
 xcuserdata/

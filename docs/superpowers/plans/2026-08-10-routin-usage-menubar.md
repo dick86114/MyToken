@@ -65,7 +65,7 @@ scripts/build-dmg.sh                             # 未签名 app 与 DMG 构建�
 docs/首次运行说明.md                              # 私有分发安装说明
 ```
 
-## 任务 1：建立可构建、可测试的菜单栏工程
+### Task 1: 建立可构建、可测试的菜单栏工程
 
 **文件：**
 
@@ -173,7 +173,7 @@ git add project.yml RoutinUsage RoutinUsageTests
 git commit -m "构建: 初始化 macOS 菜单栏工程"
 ```
 
-## 任务 2：实现订阅领域模型、接口模型和用量映射
+### Task 2: 实现订阅领域模型、接口模型和用量映射
 
 **文件：**
 
@@ -283,7 +283,7 @@ git add RoutinUsage/Models RoutinUsage/Usage/UsageMapper.swift RoutinUsageTests/
 git commit -m "功能: 增加订阅用量模型与映射"
 ```
 
-## 任务 3：实现 Keychain 和非敏感 Key 配置仓库
+### Task 3: 实现 Keychain 和非敏感 Key 配置仓库
 
 **文件：**
 
@@ -348,7 +348,7 @@ git add RoutinUsage/Models/KeyConfiguration.swift RoutinUsage/Security RoutinUsa
 git commit -m "功能: 安全保存多 Key 配置"
 ```
 
-## 任务 4：实现固定用量接口客户端
+### Task 4: 实现固定用量接口客户端
 
 **文件：**
 
@@ -413,7 +413,7 @@ git add RoutinUsage/Networking RoutinUsageTests/UsageAPIClientTests.swift Routin
 git commit -m "功能: 接入固定订阅用量接口"
 ```
 
-## 任务 5：实现最后成功数据缓存和过期判断
+### Task 5: 实现最后成功数据缓存和过期判断
 
 **文件：**
 
@@ -467,7 +467,7 @@ git add RoutinUsage/Persistence/UsageCache.swift RoutinUsageTests/UsageCacheTest
 git commit -m "功能: 缓存最后成功用量"
 ```
 
-## 任务 6：实现通知阈值、窗口去重和系统发送适配器
+### Task 6: 实现通知阈值、窗口去重和系统发送适配器
 
 **文件：**
 
@@ -518,7 +518,7 @@ git add RoutinUsage/Notifications RoutinUsageTests/AlertManagerTests.swift
 git commit -m "功能: 增加额度阈值通知"
 ```
 
-## 任务 7：实现应用设置、刷新调度和登录时启动
+### Task 7: 实现应用设置、刷新调度和登录时启动
 
 **文件：**
 
@@ -573,7 +573,7 @@ git add RoutinUsage/Models/AppSettings.swift RoutinUsage/Scheduling RoutinUsage/
 git commit -m "功能: 增加刷新调度与登录启动"
 ```
 
-## 任务 8：实现多 Key UsageStore 状态协调
+### Task 8: 实现多 Key UsageStore 状态协调
 
 **文件：**
 
@@ -642,7 +642,7 @@ git add RoutinUsage/Usage/UsageStore.swift RoutinUsageTests/UsageStoreTests.swif
 git commit -m "功能: 协调多 Key 用量刷新状态"
 ```
 
-## 任务 9：实现格式化、菜单栏标签和紧凑总览面板
+### Task 9: 实现格式化、菜单栏标签和紧凑总览面板
 
 **文件：**
 
@@ -692,7 +692,7 @@ git add RoutinUsage/Usage/UsageFormatter.swift RoutinUsage/Views/MenuBarLabelVie
 git commit -m "功能: 实现菜单栏用量总览"
 ```
 
-## 任务 10：实现设置窗口、Key 编辑和首次启动引导
+### Task 10: 实现设置窗口、Key 编辑和首次启动引导
 
 **文件：**
 
@@ -736,7 +736,7 @@ git add RoutinUsage/Views/SettingsView.swift RoutinUsage/Views/KeyEditorView.swi
 git commit -m "功能: 增加 Key 设置与首次引导"
 ```
 
-## 任务 11：装配生产依赖与完整应用生命周期
+### Task 11: 装配生产依赖与完整应用生命周期
 
 **文件：**
 
@@ -785,7 +785,7 @@ git add RoutinUsage/App RoutinUsageTests/AppLifecycleTests.swift
 git commit -m "功能: 完成菜单栏应用生命周期集成"
 ```
 
-## 任务 12：实现未签名 DMG 交付、安装说明和最终验收
+### Task 12: 实现未签名 DMG 交付、安装说明和最终验收
 
 **文件：**
 
