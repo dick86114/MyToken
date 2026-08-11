@@ -2,6 +2,10 @@ import AppKit
 import Observation
 import SwiftUI
 
+extension Notification.Name {
+    static let showSettingsWindow = Notification.Name("showSettingsWindow")
+}
+
 @MainActor
 final class StatusBarController: NSObject {
     private let environment: AppEnvironment
@@ -153,6 +157,14 @@ final class StatusBarController: NSObject {
         let accountsItem = NSMenuItem(title: "切换账号", action: nil, keyEquivalent: "")
         accountsItem.submenu = accountMenu()
         menu.addItem(accountsItem)
+
+        let settingsItem = NSMenuItem(
+            title: "设置",
+            action: #selector(openSettingsWindow),
+            keyEquivalent: ","
+        )
+        settingsItem.target = self
+        menu.addItem(settingsItem)
         menu.addItem(.separator())
 
         let checkForUpdatesItem = NSMenuItem(
@@ -216,6 +228,11 @@ final class StatusBarController: NSObject {
         Task { await environment.checkForUpdates() }
     }
 
+    @objc private func openSettingsWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+        NotificationCenter.default.post(name: Notification.Name.showSettingsWindow, object: nil)
+    }
+
     @objc private func quitApplication() {
         NSApplication.shared.terminate(nil)
     }
@@ -224,6 +241,8 @@ final class StatusBarController: NSObject {
 @MainActor
 private struct StatusPopoverContent: View {
     @Bindable var environment: AppEnvironment
+
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         UsagePopoverView(
@@ -236,6 +255,9 @@ private struct StatusPopoverContent: View {
             OnboardingView(store: environment.store) {
                 environment.dismissOnboarding()
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name.showSettingsWindow)) { _ in
+            openWindow(id: "settings")
         }
     }
 }
