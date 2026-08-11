@@ -15,6 +15,8 @@
 - 发布日志为必填 Markdown，标题固定 `MyRoutin v<version>`，禁用自动生成 Release Notes。
 - 启动时检查一次更新，之后每 6 小时检查；停止环境后不得继续检查。
 - 完整更新日志仅在设置页显示；菜单栏只显示发现更新与安装动作。
+- 设置窗口的 Tab、分区、列表行、开关、Picker、按钮和进度条均接入玻璃外观，且保留原生交互与危险色。
+- 别名与竖条必须拆分渲染：文字使用原生 `Text` 自动适配菜单栏深浅背景，竖条保留独立彩色非模板图像；不得采样壁纸像素决定文字颜色。
 
 ---
 
@@ -115,6 +117,7 @@ if notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
 - Modify: `RoutinUsage/Views/UsagePopoverView.swift`
 - Modify: `RoutinUsage/Views/UsageRowView.swift`
 - Modify: `RoutinUsage/Views/OnboardingView.swift`
+- Modify: `RoutinUsage/Views/MenuBarLabelView.swift`
 - Modify: `RoutinUsageTests/ProjectBootstrapTests.swift`
 - Modify: `project.yml`
 
@@ -122,7 +125,7 @@ if notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
 
 - [ ] **Step 1: 写失败测试。** 静态测试断言设置页和弹窗调用 `liquidGlassWindowBackground`，辅助层含 `if #available(macOS 26.0` 与 `regularMaterial`。
 - [ ] **Step 2: 运行 `scripts/test.sh` 确认失败。**
-- [ ] **Step 3: 写最小实现。** 将统一玻璃表面应用于设置 Tab、Key 详情、软件更新卡片、弹窗工具栏/行和引导卡片；菜单栏状态项保持原生单色渲染，删除操作保留红色语义。
+- [ ] **Step 3: 写最小实现。** 将统一玻璃表面应用于设置 Tab、分区、Key 详情、软件更新卡片、开关、Picker、按钮、进度条、弹窗工具栏/行和引导卡片。菜单栏状态项不绘制玻璃背景；将别名与竖条拆成原生 `Text(alias + " · ")` 和仅绘制彩色竖条的独立图像，让系统自动处理文字的深浅对比；删除操作保留红色语义。
 - [ ] **Step 4: 重跑 `scripts/test.sh` 确认通过。**
 - [ ] **Step 5: 提交。** 提交辅助层、四个界面、工程规格与测试，提交信息：`feat: 增加液态玻璃界面风格`。
 
