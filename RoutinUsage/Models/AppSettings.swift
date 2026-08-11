@@ -65,7 +65,7 @@ final class AppSettings {
 
         let storedMenuBarStyle = defaults.string(forKey: Keys.menuBarStyle)
             .flatMap(MenuBarStyle.init(rawValue:))
-        menuBarStyle = storedMenuBarStyle ?? .percent
+        menuBarStyle = storedMenuBarStyle ?? .aliasVerticalBar
 
         if defaults.object(forKey: Keys.notificationsEnabled) == nil {
             notificationsEnabled = true

@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import RoutinUsage
 
@@ -34,7 +35,7 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertTrue(settings.notificationsEnabled)
         XCTAssertEqual(settings.thresholds, AlertThresholds(low: 80, high: 95))
         XCTAssertFalse(settings.launchAtLogin)
-        XCTAssertEqual(settings.menuBarStyle, .percent)
+        XCTAssertEqual(settings.menuBarStyle, .aliasVerticalBar)
     }
 
     func test菜单栏样式可持久化并重新载入() throws {
@@ -49,14 +50,32 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(AppSettings(defaults: context.defaults).menuBarStyle, .aliasPercent)
     }
 
-    func test缺失或未知菜单栏样式回退为百分比() throws {
+    func test缺失或未知菜单栏样式回退为别名加竖形进度条() throws {
         let context = try makeContext()
         defer { context.cleanUp() }
 
-        XCTAssertEqual(AppSettings(defaults: context.defaults).menuBarStyle, .percent)
+        XCTAssertEqual(AppSettings(defaults: context.defaults).menuBarStyle, .aliasVerticalBar)
 
         context.defaults.set("broken", forKey: "menuBarStyle")
-        XCTAssertEqual(AppSettings(defaults: context.defaults).menuBarStyle, .percent)
+        XCTAssertEqual(AppSettings(defaults: context.defaults).menuBarStyle, .aliasVerticalBar)
+    }
+
+    @MainActor
+    func test设置窗口明确允许拖动边角改变大小() throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 560, height: 500),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        let coordinator = WindowFramePersistence(defaults: context.defaults).makeCoordinator()
+
+        coordinator.attach(to: window)
+
+        XCTAssertTrue(window.styleMask.contains(.resizable))
+        XCTAssertEqual(window.minSize, WindowFramePersistence.minimumSize)
     }
 
     func test刷新间隔只接受固定选项并可重新载入() throws {

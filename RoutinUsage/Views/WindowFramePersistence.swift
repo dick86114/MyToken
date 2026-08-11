@@ -73,6 +73,8 @@ struct WindowFramePersistence: NSViewRepresentable {
             }
             detach()
             self.window = window
+            // Settings 场景创建的窗口不保证默认带有可缩放样式，显式开启后才能拖动边角。
+            window.styleMask.insert(.resizable)
             window.minSize = WindowFramePersistence.minimumSize
             var frame = window.frame
             frame.size = WindowFramePersistence.loadSize(defaults: defaults)

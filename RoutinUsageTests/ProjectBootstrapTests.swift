@@ -24,16 +24,18 @@ final class ProjectBootstrapTests: XCTestCase {
 
     func test设置页包含临时查看Key的眼睛按钮与窗口代理() throws {
         let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+        let keyEditor = try sourceText(at: "RoutinUsage/Views/KeyEditorView.swift")
 
-        XCTAssertTrue(settings.contains("eye.slash"))
         XCTAssertTrue(settings.contains("WindowFramePersistence"))
-        XCTAssertTrue(settings.contains("@State private var revealedKeyIDs"))
+        XCTAssertFalse(settings.contains("@State private var revealedKeyIDs"))
+        XCTAssertTrue(keyEditor.contains("@State private var isSecretVisible"))
+        XCTAssertTrue(keyEditor.contains("TextField(\"plan-…\""))
+        XCTAssertTrue(keyEditor.contains("Image(systemName: isSecretVisible ? \"eye.slash\" : \"eye\")"))
     }
 
     func test设置页查看状态不从UserDefaults读取() throws {
         let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
 
-        XCTAssertFalse(settings.contains("revealedKeyIDs = State(initialValue:"))
         XCTAssertFalse(settings.contains("UserDefaults"))
     }
 
@@ -89,6 +91,12 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(usageRowView.contains("允许模型"))
     }
 
+    func test设置详情显示全部按Key配对的分组倍率() throws {
+        let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+
+        XCTAssertTrue(settings.contains("UsageFormatter.groupMultiplierText(snapshot.groupMultipliers)"))
+    }
+
     func test弹窗设置入口使用Xcode15兼容的SettingsLink() throws {
         let usagePopoverView = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
 
@@ -106,6 +114,8 @@ final class ProjectBootstrapTests: XCTestCase {
             resource = ("RoutinUsageApp.swift", "txt")
         case "RoutinUsage/Views/SettingsView.swift":
             resource = ("SettingsView.swift", "txt")
+        case "RoutinUsage/Views/KeyEditorView.swift":
+            resource = ("KeyEditorView.swift", "txt")
         case "RoutinUsage/Views/OnboardingView.swift":
             resource = ("OnboardingView.swift", "txt")
         case "RoutinUsage/Views/UsageRowView.swift":
