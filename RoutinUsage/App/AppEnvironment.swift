@@ -13,7 +13,8 @@ enum AppUpdateStatus: Equatable {
     case idle
     case checking
     case available(AppUpdate)
-    case downloading
+    case downloading(progress: Double?)
+    case completed(String)
     case failed(String)
 }
 
@@ -60,6 +61,7 @@ final class AppEnvironment {
     let loginItemManager: any LoginItemManaging
     var showsOnboarding = false
     private(set) var updateStatus: AppUpdateStatus = .idle
+    private(set) var updateCompletionNotice: String?
 
     @ObservationIgnored private let refreshScheduler: any RefreshScheduling
     @ObservationIgnored private let keyRepository: KeyRepository
@@ -101,6 +103,7 @@ final class AppEnvironment {
         self.updateService = updateService
         self.updateCheckScheduler = updateCheckScheduler ?? UpdateCheckScheduler()
         self.notificationTaskYield = notificationTaskYield
+        updateCompletionNotice = UpdateCompletionNotice.consume()
     }
 
     static func live() -> AppEnvironment {
@@ -229,10 +232,13 @@ final class AppEnvironment {
 
     func installAvailableUpdate() async {
         guard case let .available(update) = updateStatus else { return }
-        updateStatus = .downloading
+        updateStatus = .downloading(progress: nil)
         do {
-            let dmgURL = try await updateService.download(update)
-            try UpdateInstaller.install(dmgURL: dmgURL)
+            let dmgURL = try await updateService.download(update) { [weak self] progress in
+                await self?.setUpdateDownloadProgress(progress)
+            }
+            try UpdateInstaller.install(dmgURL: dmgURL, version: update.version)
+            updateStatus = .completed(update.version)
         } catch is CancellationError {
             updateStatus = .available(update)
         } catch let error as UpdateServiceError {
@@ -240,6 +246,20 @@ final class AppEnvironment {
         } catch {
             updateStatus = .failed("安装更新失败，请下载后手动安装")
         }
+    }
+
+    func presentUpdateCompletionNoticeIfNeeded() {
+        guard let version = updateCompletionNotice else {
+            return
+        }
+        updateCompletionNotice = nil
+
+        let alert = NSAlert()
+        alert.messageText = "更新完成"
+        alert.informativeText = "MyRoutin 已更新到 \(version)，应用已重新启动。"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "好")
+        alert.runModal()
     }
 
     func updateValidatedKey(
@@ -310,7 +330,7 @@ private extension AppEnvironment {
         if let updateCheckTask {
             return updateCheckTask
         }
-        guard updateStatus != .checking, updateStatus != .downloading else { return nil }
+        guard updateStatus != .checking, !isDownloadingUpdate else { return nil }
 
         let previousStatus = updateStatus
         updateCheckGeneration &+= 1
@@ -372,6 +392,20 @@ private extension AppEnvironment {
             updateStatus = updateStatusBeforeChecking ?? .idle
         }
         updateStatusBeforeChecking = nil
+    }
+
+    var isDownloadingUpdate: Bool {
+        if case .downloading = updateStatus {
+            return true
+        }
+        return false
+    }
+
+    func setUpdateDownloadProgress(_ progress: Double?) {
+        guard case .downloading = updateStatus else {
+            return
+        }
+        updateStatus = .downloading(progress: progress.map { min(max($0, 0), 1) })
     }
 
     func synchronizeStoreSettings() {

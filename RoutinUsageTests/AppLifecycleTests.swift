@@ -1091,7 +1091,10 @@ private actor LifecycleUpdateService: UpdateChecking {
         }
     }
 
-    func download(_: AppUpdate) async throws -> URL {
+    func download(
+        _: AppUpdate,
+        progress: @escaping @Sendable (Double?) async -> Void
+    ) async throws -> URL {
         throw UpdateServiceError.unavailable
     }
 }
@@ -1120,7 +1123,10 @@ private actor LifecycleControllableUpdateService: UpdateChecking {
         }
     }
 
-    func download(_: AppUpdate) async throws -> URL {
+    func download(
+        _: AppUpdate,
+        progress: @escaping @Sendable (Double?) async -> Void
+    ) async throws -> URL {
         throw UpdateServiceError.unavailable
     }
 

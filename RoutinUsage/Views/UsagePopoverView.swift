@@ -130,6 +130,17 @@ private extension UsagePopoverView {
                 .accessibilityElement(children: .combine)
             }
 
+            if case let .downloading(progress) = updateStatus {
+                updateProgressView(progress)
+            }
+
+            if case let .completed(version) = updateStatus {
+                Label("更新完成，当前版本 \(version)", systemImage: "checkmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+                    .accessibilityElement(children: .combine)
+            }
+
             HStack(spacing: 6) {
                 Image(systemName: store.isRefreshing ? "arrow.triangle.2.circlepath" : "clock")
                     .accessibilityHidden(true)
@@ -157,6 +168,33 @@ private extension UsagePopoverView {
                 .keyboardShortcut("q")
             }
         }
+    }
+
+    @ViewBuilder
+    func updateProgressView(_ progress: Double?) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.down.circle")
+                    .accessibilityHidden(true)
+                Text("正在下载更新")
+                Spacer(minLength: 4)
+                if let progress {
+                    Text("\(Int(progress * 100))%")
+                        .monospacedDigit()
+                }
+            }
+            if let progress {
+                ProgressView(value: progress, total: 1)
+            } else {
+                ProgressView()
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            progress.map { "正在下载更新，已完成 \(Int($0 * 100))%" } ?? "正在下载更新"
+        )
     }
 
     var latestRefreshDate: Date? {

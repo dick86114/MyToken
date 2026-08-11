@@ -8,6 +8,20 @@ struct AppUpdate: Equatable, Sendable {
     let notes: String
 }
 
+enum UpdateCompletionNotice {
+    private static let versionKey = "updateCompletionVersion"
+
+    static func record(version: String, defaults: UserDefaults = .standard) {
+        defaults.set(version, forKey: versionKey)
+    }
+
+    static func consume(defaults: UserDefaults = .standard) -> String? {
+        let version = defaults.string(forKey: versionKey)
+        defaults.removeObject(forKey: versionKey)
+        return version
+    }
+}
+
 enum UpdateServiceError: Error, Equatable, Sendable {
     case unavailable
     case invalidResponse
@@ -17,12 +31,20 @@ enum UpdateServiceError: Error, Equatable, Sendable {
 
 protocol UpdateChecking: Sendable {
     func checkForUpdate() async throws -> AppUpdate?
-    func download(_ update: AppUpdate) async throws -> URL
+    func download(
+        _ update: AppUpdate,
+        progress: @escaping @Sendable (Double?) async -> Void
+    ) async throws -> URL
 }
 
 struct NoUpdateService: UpdateChecking {
     func checkForUpdate() async throws -> AppUpdate? { nil }
-    func download(_ update: AppUpdate) async throws -> URL { throw UpdateServiceError.unavailable }
+    func download(
+        _ update: AppUpdate,
+        progress: @escaping @Sendable (Double?) async -> Void
+    ) async throws -> URL {
+        throw UpdateServiceError.unavailable
+    }
 }
 
 struct GitHubUpdateService: UpdateChecking, Sendable {
@@ -67,10 +89,41 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
         return AppUpdate(version: version, releaseURL: releaseURL, downloadURL: downloadURL, notes: release.body ?? "")
     }
 
-    func download(_ update: AppUpdate) async throws -> URL {
+    func download(
+        _ update: AppUpdate,
+        progress: @escaping @Sendable (Double?) async -> Void
+    ) async throws -> URL {
         do {
-            let (data, response) = try await session.data(from: update.downloadURL)
-            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode), !data.isEmpty else {
+            let (bytes, response) = try await session.bytes(from: update.downloadURL)
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                throw UpdateServiceError.downloadFailed
+            }
+
+            let totalBytes = response.expectedContentLength > 0 ? response.expectedContentLength : nil
+            var data = Data()
+            if let totalBytes {
+                data.reserveCapacity(Int(totalBytes))
+            }
+            var receivedBytes: Int64 = 0
+            var lastReportedProgress = -1.0
+
+            for try await byte in bytes {
+                data.append(byte)
+                receivedBytes += 1
+                guard let totalBytes else {
+                    if receivedBytes == 1 {
+                        await progress(nil)
+                    }
+                    continue
+                }
+                let currentProgress = min(max(Double(receivedBytes) / Double(totalBytes), 0), 1)
+                if currentProgress - lastReportedProgress >= 0.01 || currentProgress >= 1 {
+                    lastReportedProgress = currentProgress
+                    await progress(currentProgress)
+                }
+            }
+
+            guard !data.isEmpty else {
                 throw UpdateServiceError.downloadFailed
             }
             let url = FileManager.default.temporaryDirectory.appendingPathComponent("MyRoutin-\(update.version).dmg")
@@ -113,7 +166,11 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
 
 @MainActor
 enum UpdateInstaller {
-    static func install(dmgURL: URL, appName: String = "MyRoutin") throws {
+    static func install(
+        dmgURL: URL,
+        appName: String = "MyRoutin",
+        version: String
+    ) throws {
         let mountPoint = FileManager.default.temporaryDirectory.appendingPathComponent("routin-update-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: mountPoint, withIntermediateDirectories: true)
         defer {
@@ -131,7 +188,11 @@ enum UpdateInstaller {
         guard run("/usr/bin/ditto", [source.path, temporaryDestination.path]) == 0 else { throw UpdateServiceError.installFailed("复制新版本失败") }
         try? FileManager.default.removeItem(at: destination)
         try FileManager.default.moveItem(at: temporaryDestination, to: destination)
-        NSWorkspace.shared.open(destination)
+        UpdateCompletionNotice.record(version: version)
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.createsNewApplicationInstance = true
+        configuration.activates = true
+        NSWorkspace.shared.openApplication(at: destination, configuration: configuration)
         NSApplication.shared.terminate(nil)
     }
 
