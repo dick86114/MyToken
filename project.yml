@@ -28,6 +28,8 @@ targets:
       - RoutinUsageTests
       - path: scripts/build-dmg.sh
         buildPhase: resources
+      - path: scripts/test.sh
+        buildPhase: resources
       - path: project.yml
         buildPhase: resources
     preBuildScripts:

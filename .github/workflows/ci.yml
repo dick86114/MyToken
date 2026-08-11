@@ -16,10 +16,8 @@ jobs:
         run: xcodebuild -version
       - name: 安装 XcodeGen
         run: brew install xcodegen
-      - name: 生成 Xcode 工程
-        run: xcodegen generate
       - name: 执行单元测试
-        run: xcodebuild -project RoutinUsage.xcodeproj -scheme RoutinUsage -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO test
+        run: scripts/test.sh
       - name: 构建 DMG
         run: scripts/build-dmg.sh
       - name: 上传 DMG 构建产物
