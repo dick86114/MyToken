@@ -48,6 +48,7 @@ targets:
           cp "$PROJECT_DIR/RoutinUsage/Views/OnboardingView.swift" "$resource_dir/OnboardingView.swift.txt"
           cp "$PROJECT_DIR/RoutinUsage/Views/UsageRowView.swift" "$resource_dir/UsageRowView.swift.txt"
           cp "$PROJECT_DIR/RoutinUsage/Views/MenuBarLabelView.swift" "$resource_dir/MenuBarLabelView.swift.txt"
+          cp "$PROJECT_DIR/RoutinUsage/App/StatusBarController.swift" "$resource_dir/StatusBarController.swift.txt"
           cp "$PROJECT_DIR/RoutinUsage/Views/UsagePopoverView.swift" "$resource_dir/UsagePopoverView.swift.txt"
           cp "$PROJECT_DIR/RoutinUsage/Views/LiquidGlassSurface.swift" "$resource_dir/LiquidGlassSurface.swift.txt"
           cp "$PROJECT_DIR/.github/workflows/release.yml" "$resource_dir/release.yml"
