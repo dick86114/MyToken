@@ -14,12 +14,18 @@ struct RoutinUsageApp: App {
 
     @NSApplicationDelegateAdaptor(RoutinUsageAppDelegate.self) private var appDelegate
     @State private var environment: AppEnvironment
-    @State private var statusBarController: StatusBarController
+    @State private var statusBarController: StatusBarController?
+
+    private static var isRunningUnitTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
 
     init() {
         let environment = AppEnvironment.live()
         _environment = State(initialValue: environment)
-        _statusBarController = State(initialValue: StatusBarController(environment: environment))
+        _statusBarController = State(
+            initialValue: Self.isRunningUnitTests ? nil : StatusBarController(environment: environment)
+        )
     }
 
     var body: some Scene {

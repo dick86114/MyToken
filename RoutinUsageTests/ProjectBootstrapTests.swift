@@ -86,25 +86,13 @@ final class ProjectBootstrapTests: XCTestCase {
 
     func test设置页与菜单栏视图真实接入三种显示样式() throws {
         let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
-        let menuBarLabel = try sourceText(at: "RoutinUsage/Views/MenuBarLabelView.swift")
+        let statusBarController = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
 
         XCTAssertTrue(settings.contains("Picker(\"显示样式\", selection: $settings.menuBarStyle)"))
         XCTAssertTrue(settings.contains("MenuBarStyle.allCases"))
-        XCTAssertTrue(menuBarLabel.contains("style: settings.menuBarStyle"))
-        XCTAssertTrue(menuBarLabel.contains("Text(alias + \" · \")"))
-        XCTAssertTrue(menuBarLabel.contains("Image(nsImage: MenuBarVerticalUsageIcon.image(percent: metric.percent))"))
-        XCTAssertFalse(menuBarLabel.contains("MenuBarAliasVerticalUsageIcon"))
-        XCTAssertFalse(menuBarLabel.contains("NSColor.labelColor"))
-        XCTAssertTrue(menuBarLabel.contains("alias + \" · \""))
-        let progressBar = try XCTUnwrap(
-            menuBarLabel.range(of: "Image(nsImage: MenuBarVerticalUsageIcon.image(percent: metric.percent))")
-        )
-        let alias = try XCTUnwrap(menuBarLabel.range(of: "Text(alias + \" · \")"))
-        XCTAssertLessThan(
-            progressBar.lowerBound,
-            alias.lowerBound,
-            "菜单栏承载组合视图时会反向呈现子视图，源码必须先声明竖条以确保实际显示为别名在前"
-        )
+        XCTAssertTrue(statusBarController.contains("style: environment.settings.menuBarStyle"))
+        XCTAssertTrue(statusBarController.contains("MenuBarVerticalUsage.metric"))
+        XCTAssertTrue(statusBarController.contains("button.imagePosition = .imageRight"))
     }
 
     func test统一玻璃辅助层使用系统玻璃并保留旧系统材质回退() throws {
@@ -165,16 +153,11 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(onboarding.contains(".liquidGlassWindowBackground()"))
     }
 
-    func test菜单栏别名竖条作为单一辅助功能元素朗读() throws {
-        let menuBarLabel = try sourceText(at: "RoutinUsage/Views/MenuBarLabelView.swift")
+    func test菜单栏别名竖条提供辅助功能描述() throws {
+        let statusBarController = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
 
-        XCTAssertTrue(menuBarLabel.contains("Text(alias + \" · \")"))
-        XCTAssertTrue(menuBarLabel.contains("MenuBarVerticalUsageIcon.image(percent: metric.percent)"))
-        XCTAssertFalse(menuBarLabel.contains("NSAttributedString.Key"))
-        XCTAssertFalse(menuBarLabel.contains("CGWindowListCreateImage"))
-        XCTAssertFalse(menuBarLabel.contains("desktopImageURL"))
-        XCTAssertTrue(menuBarLabel.contains(".accessibilityElement(children: .ignore)"))
-        XCTAssertTrue(menuBarLabel.contains(".accessibilityLabel(verticalBarAccessibilityLabel(metric: metric))"))
+        XCTAssertTrue(statusBarController.contains("MenuBarVerticalUsageIcon.image(percent: metric.percent)"))
+        XCTAssertTrue(statusBarController.contains("button.setAccessibilityLabel"))
     }
 
     func test弹窗倒计时每分钟刷新并将分组倍率合并为一行() throws {
@@ -261,6 +244,13 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(workflow.contains("scripts/verify-xcode-26.sh"))
     }
 
+    func test单元测试运行时不初始化菜单栏控制器() throws {
+        let app = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
+
+        XCTAssertTrue(app.contains("XCTestConfigurationFilePath"))
+        XCTAssertTrue(app.contains("@State private var statusBarController: StatusBarController?"))
+    }
+
     func test弹窗详情显示剩余时长与配对分组倍率且不显示允许模型() throws {
         let usageRowView = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
 
@@ -332,8 +322,6 @@ final class ProjectBootstrapTests: XCTestCase {
             resource = ("OnboardingView.swift", "txt")
         case "RoutinUsage/Views/UsageRowView.swift":
             resource = ("UsageRowView.swift", "txt")
-        case "RoutinUsage/Views/MenuBarLabelView.swift":
-            resource = ("MenuBarLabelView.swift", "txt")
         case "RoutinUsage/Views/UsagePopoverView.swift":
             resource = ("UsagePopoverView.swift", "txt")
         case "RoutinUsage/Views/LiquidGlassSurface.swift":
