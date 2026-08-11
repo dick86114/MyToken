@@ -70,6 +70,7 @@ mkdir -p "$dist_dir" "$staging_dir"
 
 cd -- "$repo_root"
 
+"$script_dir/verify-xcode-26.sh"
 xcodegen generate
 xcodebuild \
   -project RoutinUsage.xcodeproj \

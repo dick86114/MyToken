@@ -18,6 +18,8 @@ permissions:
 jobs:
   release:
     runs-on: macos-15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
     steps:
       - uses: actions/checkout@v4
         with:
@@ -25,8 +27,8 @@ jobs:
       - name: 校验版本号
         run: |
           [[ "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-      - name: 输出 Xcode 版本
-        run: xcodebuild -version
+      - name: 校验 Xcode 26 与 macOS 26 SDK
+        run: scripts/verify-xcode-26.sh
       - name: 安装 XcodeGen
         run: brew install xcodegen
       - name: 写入应用版本

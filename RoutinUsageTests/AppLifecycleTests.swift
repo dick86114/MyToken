@@ -473,6 +473,30 @@ final class AppLifecycleTests: XCTestCase {
         XCTAssertEqual(scheduler.startCount, 1)
     }
 
+    func test首次用量刷新挂起时更新检查与六小时调度已经启动() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        _ = try context.repository.add(name: "主账号", secret: "plan-main-0001")
+        await context.fetcher.setResponse(.suspended, for: "plan-main-0001")
+        let service = LifecycleUpdateService(result: .none)
+        let scheduler = LifecycleUpdateSchedulerSpy()
+        let environment = context.makeEnvironment(
+            updateService: service,
+            updateCheckScheduler: scheduler
+        )
+
+        let start = Task { @MainActor in await environment.start() }
+        await context.fetcher.waitUntilRequested("plan-main-0001")
+        await 等待条件 { await service.checkCount == 1 }
+
+        let checkCount = await service.checkCount
+        XCTAssertEqual(checkCount, 1)
+        XCTAssertEqual(scheduler.startCount, 1)
+
+        await context.fetcher.resume("plan-main-0001", with: .success(nil))
+        await start.value
+    }
+
     func test更新调度触发再次检查且停止时取消调度() async throws {
         let context = try makeContext()
         defer { context.cleanUp() }
@@ -490,6 +514,83 @@ final class AppLifecycleTests: XCTestCase {
         environment.stop()
 
         XCTAssertEqual(scheduler.stopCount, 1)
+    }
+
+    func test停止会取消正在执行的首次更新检查并拒绝过期结果() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let update = AppUpdate(
+            version: "1.2.0",
+            releaseURL: try XCTUnwrap(URL(string: "https://example.com/release")),
+            downloadURL: try XCTUnwrap(URL(string: "https://example.com/download")),
+            notes: "修复问题"
+        )
+        let service = LifecycleControllableUpdateService()
+        let environment = context.makeEnvironment(
+            updateService: service,
+            updateCheckScheduler: LifecycleUpdateSchedulerSpy()
+        )
+
+        await environment.start()
+        await service.waitUntilCheckCount(reaches: 1)
+        XCTAssertEqual(environment.updateStatus, .checking)
+
+        environment.stop()
+        await 等待条件 { await service.cancellationCount == 1 }
+        await service.resume(with: .success(update))
+        await Task.yield()
+
+        let cancellationCount = await service.cancellationCount
+        XCTAssertEqual(cancellationCount, 1)
+        XCTAssertEqual(environment.updateStatus, .idle)
+    }
+
+    func test停止会取消调度触发后正在执行的更新检查() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let service = LifecycleControllableUpdateService(immediateResults: [.success(nil)])
+        let scheduler = LifecycleUpdateSchedulerSpy()
+        let environment = context.makeEnvironment(
+            updateService: service,
+            updateCheckScheduler: scheduler
+        )
+
+        await environment.start()
+        await service.waitUntilCheckCount(reaches: 1)
+        await 等待条件 { environment.updateStatus == .idle }
+        scheduler.fireTick()
+        await service.waitUntilCheckCount(reaches: 2)
+
+        environment.stop()
+        await 等待条件 { await service.cancellationCount == 1 }
+        await service.resume(with: .success(nil))
+
+        let cancellationCount = await service.cancellationCount
+        XCTAssertEqual(cancellationCount, 1)
+        XCTAssertEqual(scheduler.stopCount, 1)
+        XCTAssertEqual(environment.updateStatus, .idle)
+    }
+
+    func test环境释放会取消正在执行的更新检查() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let service = LifecycleControllableUpdateService()
+        weak var releasedEnvironment: AppEnvironment?
+        var environment: AppEnvironment? = context.makeEnvironment(
+            updateService: service,
+            updateCheckScheduler: LifecycleUpdateSchedulerSpy()
+        )
+        releasedEnvironment = environment
+
+        await environment?.start()
+        await service.waitUntilCheckCount(reaches: 1)
+        environment = nil
+        await 等待条件 { await service.cancellationCount == 1 }
+
+        let cancellationCount = await service.cancellationCount
+        XCTAssertEqual(cancellationCount, 1)
+        XCTAssertNil(releasedEnvironment)
+        await service.resume(with: .success(nil))
     }
 
     func test后台检查失败时保留已有可安装更新() async throws {
@@ -570,10 +671,10 @@ final class AppLifecycleTests: XCTestCase {
         await yieldGate.resume()
         await start.value
 
-        XCTAssertEqual(scheduler.startCount, 0)
+        XCTAssertEqual(scheduler.startCount, 1)
         XCTAssertEqual(scheduler.stopCount, 1)
         let checkCount = await service.checkCount
-        XCTAssertEqual(checkCount, 0)
+        XCTAssertEqual(checkCount, 1)
     }
 
     func test切换Key时有缓存不请求而无数据只刷新所选Key() async throws {
@@ -818,10 +919,12 @@ private actor LifecycleUsageFetcher: UsageFetching {
     enum Response: Sendable {
         case success(UsageSnapshot?)
         case failure(UsageAPIError)
+        case suspended
     }
 
     private var responses: [String: Response] = [:]
     private var requestCounts: [String: Int] = [:]
+    private var continuations: [String: [CheckedContinuation<Result<UsageSnapshot?, UsageAPIError>, Never>]] = [:]
 
     func setResponse(_ response: Response, for secret: String) {
         responses[secret] = response
@@ -834,11 +937,30 @@ private actor LifecycleUsageFetcher: UsageFetching {
             return snapshot
         case let .failure(error):
             throw error
+        case .suspended:
+            let result = await withCheckedContinuation { continuation in
+                continuations[apiKey, default: []].append(continuation)
+            }
+            return try result.get()
         }
     }
 
     func requestCount(for secret: String) -> Int {
         requestCounts[secret, default: 0]
+    }
+
+    func waitUntilRequested(_ secret: String) async {
+        while requestCounts[secret, default: 0] == 0 {
+            await Task.yield()
+        }
+    }
+
+    func resume(
+        _ secret: String,
+        with result: Result<UsageSnapshot?, UsageAPIError>
+    ) {
+        let pending = continuations.removeValue(forKey: secret) ?? []
+        pending.forEach { $0.resume(returning: result) }
     }
 }
 
@@ -971,6 +1093,50 @@ private actor LifecycleUpdateService: UpdateChecking {
 
     func download(_: AppUpdate) async throws -> URL {
         throw UpdateServiceError.unavailable
+    }
+}
+
+private actor LifecycleControllableUpdateService: UpdateChecking {
+    private var immediateResults: [Result<AppUpdate?, Error>]
+    private var continuation: CheckedContinuation<AppUpdate?, Error>?
+    private(set) var checkCount = 0
+    private(set) var cancellationCount = 0
+
+    init(immediateResults: [Result<AppUpdate?, Error>] = []) {
+        self.immediateResults = immediateResults
+    }
+
+    func checkForUpdate() async throws -> AppUpdate? {
+        checkCount += 1
+        if !immediateResults.isEmpty {
+            return try immediateResults.removeFirst().get()
+        }
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                self.continuation = continuation
+            }
+        } onCancel: {
+            Task { await self.recordCancellation() }
+        }
+    }
+
+    func download(_: AppUpdate) async throws -> URL {
+        throw UpdateServiceError.unavailable
+    }
+
+    func waitUntilCheckCount(reaches expectedCount: Int) async {
+        while checkCount < expectedCount {
+            await Task.yield()
+        }
+    }
+
+    func resume(with result: Result<AppUpdate?, Error>) {
+        continuation?.resume(with: result)
+        continuation = nil
+    }
+
+    private func recordCancellation() {
+        cancellationCount += 1
     }
 }
 

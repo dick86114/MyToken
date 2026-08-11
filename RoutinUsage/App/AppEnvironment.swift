@@ -73,6 +73,9 @@ final class AppEnvironment {
     @ObservationIgnored private var isStarted = false
     @ObservationIgnored private var hasRequestedNotificationAuthorization = false
     @ObservationIgnored private var notificationAuthorizationTask: Task<Void, Never>?
+    @ObservationIgnored private var updateCheckTask: Task<Void, Never>?
+    @ObservationIgnored private var updateCheckGeneration = 0
+    @ObservationIgnored private var updateStatusBeforeChecking: AppUpdateStatus?
 
     init(
         settings: AppSettings,
@@ -150,6 +153,14 @@ final class AppEnvironment {
         showsOnboarding = store.orderedKeyIDs.isEmpty
         synchronizeStoreSettings()
 
+        // 更新检查与六小时周期从启动阶段立即开始，不依赖首次用量刷新或通知授权。
+        updateCheckScheduler.start { [weak self] in
+            Task { @MainActor [weak self] in
+                _ = self?.beginUpdateCheckIfNeeded(requiresStarted: true)
+            }
+        }
+        _ = beginUpdateCheckIfNeeded(requiresStarted: true)
+
         await store.refreshAll()
         guard isStarted else {
             return
@@ -162,15 +173,6 @@ final class AppEnvironment {
         await notificationsDidChange(enabled: settings.notificationsEnabled)
         guard isStarted else {
             return
-        }
-        // 更新检查不应阻塞首次显示菜单栏或用量刷新。
-        updateCheckScheduler.start { [weak self] in
-            Task { @MainActor [weak self] in
-                await self?.checkForUpdates()
-            }
-        }
-        Task { [weak self] in
-            await self?.checkForUpdates()
         }
     }
 
@@ -221,21 +223,8 @@ final class AppEnvironment {
     }
 
     func checkForUpdates() async {
-        guard updateStatus != .checking, updateStatus != .downloading else { return }
-        let availableUpdate: AppUpdate?
-        if case let .available(update) = updateStatus {
-            availableUpdate = update
-        } else {
-            availableUpdate = nil
-        }
-        updateStatus = .checking
-        do {
-            updateStatus = try await updateService.checkForUpdate().map(AppUpdateStatus.available) ?? .idle
-        } catch is CancellationError {
-            updateStatus = availableUpdate.map(AppUpdateStatus.available) ?? .idle
-        } catch {
-            updateStatus = availableUpdate.map(AppUpdateStatus.available) ?? .failed("检查更新失败，请稍后重试")
-        }
+        guard let task = beginUpdateCheckIfNeeded(requiresStarted: false) else { return }
+        await task.value
     }
 
     func installAvailableUpdate() async {
@@ -300,10 +289,91 @@ final class AppEnvironment {
         notificationAuthorizationTask = nil
         refreshScheduler.stop()
         updateCheckScheduler.stop()
+        cancelActiveUpdateCheck()
+    }
+
+    deinit {
+        updateCheckTask?.cancel()
     }
 }
 
 private extension AppEnvironment {
+    enum UpdateCheckOutcome {
+        case success(AppUpdate?)
+        case cancelled
+        case failed
+    }
+
+    @discardableResult
+    func beginUpdateCheckIfNeeded(requiresStarted: Bool) -> Task<Void, Never>? {
+        guard !requiresStarted || isStarted else { return nil }
+        if let updateCheckTask {
+            return updateCheckTask
+        }
+        guard updateStatus != .checking, updateStatus != .downloading else { return nil }
+
+        let previousStatus = updateStatus
+        updateCheckGeneration &+= 1
+        let generation = updateCheckGeneration
+        updateStatusBeforeChecking = previousStatus
+        updateStatus = .checking
+        let updateService = updateService
+        let task = Task { [weak self] in
+            let outcome: UpdateCheckOutcome
+            do {
+                outcome = .success(try await updateService.checkForUpdate())
+            } catch is CancellationError {
+                outcome = .cancelled
+            } catch {
+                outcome = .failed
+            }
+            guard let self else { return }
+            self.finishUpdateCheck(
+                outcome,
+                generation: generation,
+                requiresStarted: requiresStarted
+            )
+        }
+        updateCheckTask = task
+        return task
+    }
+
+    func finishUpdateCheck(
+        _ outcome: UpdateCheckOutcome,
+        generation: Int,
+        requiresStarted: Bool
+    ) {
+        guard generation == updateCheckGeneration else { return }
+        updateCheckTask = nil
+        let previousStatus = updateStatusBeforeChecking ?? .idle
+        updateStatusBeforeChecking = nil
+        guard !requiresStarted || isStarted else { return }
+        guard !Task.isCancelled else { return }
+
+        switch outcome {
+        case let .success(update):
+            updateStatus = update.map(AppUpdateStatus.available) ?? .idle
+        case .cancelled:
+            updateStatus = previousStatus
+        case .failed:
+            if case .available = previousStatus {
+                updateStatus = previousStatus
+            } else {
+                updateStatus = .failed("检查更新失败，请稍后重试")
+            }
+        }
+    }
+
+    func cancelActiveUpdateCheck() {
+        updateCheckGeneration &+= 1
+        updateCheckTask?.cancel()
+        updateCheckTask = nil
+        if updateStatus == .checking {
+            updateStatus = updateStatusBeforeChecking ?? .idle
+        }
+        updateStatusBeforeChecking = nil
+    }
+
     func synchronizeStoreSettings() {
         store.updateSettings(
             refreshMinutes: settings.refreshMinutes,
