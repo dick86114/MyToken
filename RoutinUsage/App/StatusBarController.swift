@@ -29,6 +29,9 @@ final class StatusBarController: NSObject {
         updateStatusButton()
         observeEnvironment()
 
+        Task { @MainActor [weak self] in
+            self?.environment.presentUpdateCompletionNoticeIfNeeded()
+        }
         Task { await environment.start() }
     }
 
@@ -176,7 +179,7 @@ final class StatusBarController: NSObject {
         )
         checkForUpdatesItem.target = self
         checkForUpdatesItem.isEnabled = environment.updateStatus != .checking
-            && environment.updateStatus != .downloading
+            && !isDownloadingUpdate
         menu.addItem(checkForUpdatesItem)
         menu.addItem(.separator())
 
@@ -228,6 +231,13 @@ final class StatusBarController: NSObject {
 
     @objc private func checkForUpdates() {
         Task { await environment.checkForUpdates() }
+    }
+
+    private var isDownloadingUpdate: Bool {
+        if case .downloading = environment.updateStatus {
+            return true
+        }
+        return false
     }
 
     @objc private func openSettingsWindow() {

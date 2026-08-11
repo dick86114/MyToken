@@ -283,6 +283,22 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(updateNotes.contains("此版本未提供更新日志"))
     }
 
+    func test更新流程展示下载进度和完成提示并自动重启() throws {
+        let environment = try sourceText(at: "RoutinUsage/App/AppEnvironment.swift")
+        let service = try sourceText(at: "RoutinUsage/Updates/GitHubUpdateService.swift")
+        let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
+        let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+
+        XCTAssertTrue(environment.contains("case downloading(progress: Double?)"))
+        XCTAssertTrue(environment.contains("case completed(String)"))
+        XCTAssertTrue(service.contains("createsNewApplicationInstance"))
+        XCTAssertTrue(service.contains("UpdateCompletionNotice"))
+        XCTAssertTrue(popover.contains("ProgressView(value: progress"))
+        XCTAssertTrue(popover.contains("更新完成"))
+        XCTAssertTrue(settings.contains("ProgressView(value: progress"))
+        XCTAssertTrue(settings.contains("更新完成"))
+    }
+
     func test弹窗设置入口直接打开独立设置窗口() throws {
         let usagePopoverView = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
 
@@ -312,6 +328,10 @@ final class ProjectBootstrapTests: XCTestCase {
             resource = ("RoutinUsageApp.swift", "txt")
         case "RoutinUsage/App/StatusBarController.swift":
             resource = ("StatusBarController.swift", "txt")
+        case "RoutinUsage/App/AppEnvironment.swift":
+            resource = ("AppEnvironment.swift", "txt")
+        case "RoutinUsage/Updates/GitHubUpdateService.swift":
+            resource = ("GitHubUpdateService.swift", "txt")
         case "RoutinUsage/Views/SettingsView.swift":
             resource = ("SettingsView.swift", "txt")
         case "RoutinUsage/Views/UpdateNotesView.swift":

@@ -27,4 +27,57 @@ final class GitHubUpdateServiceTests: XCTestCase {
         let update = try await service.checkForUpdate()
         XCTAssertNil(update)
     }
+
+    func test下载更新逐步报告百分比并保存完整文件() async throws {
+        let payload = Data(repeating: 7, count: 100)
+        let stub = URLProtocolStub.makeSession { request in
+            let response = try XCTUnwrap(
+                HTTPURLResponse(
+                    url: try XCTUnwrap(request.url),
+                    statusCode: 200,
+                    httpVersion: nil,
+                    headerFields: ["Content-Length": "100"]
+                )
+            )
+            return (response, payload)
+        }
+        let service = GitHubUpdateService(session: stub.session, currentVersion: "1.0.0")
+        let update = AppUpdate(
+            version: "1.1.0",
+            releaseURL: URL(string: "https://example.com/release")!,
+            downloadURL: URL(string: "https://example.com/MyRoutin.dmg")!,
+            notes: ""
+        )
+        let progress = DownloadProgressCapture()
+
+        let url = try await service.download(update) { value in
+            await progress.append(value)
+        }
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        XCTAssertEqual(try Data(contentsOf: url), payload)
+        let values = await progress.values
+        XCTAssertTrue(values.contains { ($0 ?? 0) > 0 })
+        let finalProgress = try XCTUnwrap(values.last ?? nil)
+        XCTAssertEqual(finalProgress, 1, accuracy: 0.001)
+    }
+
+    func test更新完成标记只会被新进程消费一次() throws {
+        let suiteName = "GitHubUpdateServiceTests.notice-(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        UpdateCompletionNotice.record(version: "1.3.0", defaults: defaults)
+
+        XCTAssertEqual(UpdateCompletionNotice.consume(defaults: defaults), "1.3.0")
+        XCTAssertNil(UpdateCompletionNotice.consume(defaults: defaults))
+    }
+}
+
+private actor DownloadProgressCapture {
+    private(set) var values: [Double?] = []
+
+    func append(_ value: Double?) {
+        values.append(value)
+    }
 }

@@ -448,11 +448,25 @@ private extension SettingsView {
                     Link("查看发布说明", destination: update.releaseURL)
                 }
             }
-        case .downloading:
-            LabeledContent("正在下载并安装更新") {
-                ProgressView()
-                    .controlSize(.small)
+        case let .downloading(progress):
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("正在下载更新")
+                    Spacer()
+                    if let progress {
+                        Text("\(Int(progress * 100))%")
+                            .monospacedDigit()
+                    }
+                }
+                if let progress {
+                    ProgressView(value: progress, total: 1)
+                } else {
+                    ProgressView()
+                }
             }
+        case let .completed(version):
+            Label("更新完成，当前版本 \(version)", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.green)
         case let .failed(message):
             VStack(alignment: .leading, spacing: 6) {
                 Text(message).foregroundStyle(.red)
