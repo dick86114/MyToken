@@ -27,6 +27,8 @@ struct UsagePopoverView: View {
     var body: some View {
         VStack(spacing: 0) {
             toolbar
+                .padding(10)
+                .liquidGlassSurface(cornerRadius: 14)
                 .padding(12)
 
             Divider()
@@ -36,11 +38,14 @@ struct UsagePopoverView: View {
             Divider()
 
             footer
+                .padding(10)
+                .liquidGlassSurface(cornerRadius: 14)
                 .padding(12)
         }
         // 让窗口按内容自然撑开，避免固定高度造成不必要的竖向滚动条。
         .frame(width: 440)
         .fixedSize(horizontal: false, vertical: true)
+        .liquidGlassWindowBackground()
     }
 }
 
@@ -53,6 +58,7 @@ private extension UsagePopoverView {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
+            .liquidGlassControlSurface()
             .accessibilityLabel("用量显示周期")
 
             Button {
@@ -62,11 +68,12 @@ private extension UsagePopoverView {
                     ProgressView()
                         .controlSize(.small)
                         .frame(width: 16, height: 16)
+                        .liquidGlassProgressSurface()
                 } else {
                     Image(systemName: "arrow.clockwise")
                 }
             }
-            .buttonStyle(.borderless)
+            .liquidGlassButton()
             .disabled(store.isRefreshing || store.orderedKeyIDs.isEmpty)
             .help("刷新全部 Key")
             .accessibilityLabel(store.isRefreshing ? "正在刷新全部 Key" : "刷新全部 Key")
@@ -120,7 +127,7 @@ private extension UsagePopoverView {
                     Button("安装") {
                         Task { await installAvailableUpdate() }
                     }
-                    .buttonStyle(.borderless)
+                    .liquidGlassButton(prominent: true)
                 }
                 .font(.caption)
                 .accessibilityElement(children: .combine)
@@ -141,6 +148,7 @@ private extension UsagePopoverView {
                 Button("设置") {
                     openWindow(id: "settings")
                 }
+                .liquidGlassButton()
                 .keyboardShortcut(",")
 
                 Spacer()
@@ -148,6 +156,7 @@ private extension UsagePopoverView {
                 Button("退出 MyRoutin") {
                     NSApplication.shared.terminate(nil)
                 }
+                .liquidGlassButton()
                 .keyboardShortcut("q")
             }
         }
