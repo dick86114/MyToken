@@ -7,30 +7,33 @@ struct UsageRowView: View {
     let dimension: DisplayDimension
 
     var body: some View {
-        Button {
-            store.selectKey(state.configuration.id)
-        } label: {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: isSelected ? "circle.fill" : "circle")
-                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-                    .font(.system(size: 9, weight: .semibold))
-                    .padding(.top, 5)
-                    .accessibilityHidden(true)
+        TimelineView(.periodic(from: .now, by: 60)) { timeline in
+            Button {
+                store.selectKey(state.configuration.id)
+            } label: {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: isSelected ? "circle.fill" : "circle")
+                        .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                        .font(.system(size: 9, weight: .semibold))
+                        .padding(.top, 5)
+                        .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: 7) {
-                    header
-                    content
+                    VStack(alignment: .leading, spacing: 7) {
+                        header
+                        content(now: timeline.date)
+                    }
                 }
+                .contentShape(Rectangle())
+                .padding(.vertical, 7)
+                .padding(.horizontal, 4)
             }
-            .contentShape(Rectangle())
-            .padding(.vertical, 7)
-            .padding(.horizontal, 4)
+            .buttonStyle(.plain)
+            .liquidGlassSurface(cornerRadius: 12)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(accessibilityLabel(now: timeline.date))
+            .accessibilityHint(accessibilityHint)
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
         }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(accessibilityLabel)
-        .accessibilityHint(accessibilityHint)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -39,33 +42,48 @@ enum UsageRowAccessibility {
         state: KeyUsageState,
         metric: UsageMetric?,
         dimension: DisplayDimension,
-        isSelected: Bool
+        isSelected: Bool,
+        now: Date = .now
     ) -> String {
         let currentPrefix = isSelected ? "当前，" : ""
         let prefix = "\(currentPrefix)\(state.configuration.displayName)，"
+        let summary: String
         if state.isStale, metric != nil {
-            return prefix + UsageFormatter.statusText(state: state, dimension: dimension)
+            summary = prefix + UsageFormatter.statusText(state: state, dimension: dimension)
                 + "，当前显示上次成功数据"
-        }
-        if state.isRefreshing, state.snapshot == nil {
-            return prefix + "正在加载"
-        }
-        if state.error == .noSubscription {
-            return prefix + UsageFormatter.statusText(state: state, dimension: dimension)
-        }
-        if state.error != nil, state.snapshot == nil {
-            return prefix + UsageFormatter.statusText(state: state, dimension: dimension)
+        } else if state.isRefreshing, state.snapshot == nil {
+            summary = prefix + "正在加载"
+        } else if state.error == .noSubscription {
+            summary = prefix + UsageFormatter.statusText(state: state, dimension: dimension)
+        } else if state.error != nil, state.snapshot == nil {
+            summary = prefix + UsageFormatter.statusText(state: state, dimension: dimension)
                 + "，没有缓存"
+        } else if let metric,
+                  let percentText = UsageFormatter.percentText(metric) {
+            summary = prefix + "已使用 \(percentText)，\(UsageFormatter.fullAmount(metric))"
+        } else {
+            summary = prefix + UsageFormatter.statusText(state: state, dimension: dimension)
         }
-        if let metric,
-           let percentText = UsageFormatter.percentText(metric) {
-            return prefix + "已使用 \(percentText)，\(UsageFormatter.fullAmount(metric))"
+
+        guard let snapshot = state.snapshot else { return summary }
+        var details: [String] = []
+        if snapshot.kind == .periodic {
+            details.append("5 小时剩余 \(remainingDuration(for: snapshot.fiveHour, now: now))")
+            details.append("周剩余 \(remainingDuration(for: snapshot.weekly, now: now))")
         }
-        return prefix + UsageFormatter.statusText(state: state, dimension: dimension)
+        if !snapshot.groupMultipliers.isEmpty {
+            details.append(UsageFormatter.groupMultiplierText(snapshot.groupMultipliers))
+        }
+        return ([summary] + details).joined(separator: "，")
     }
 
     static func hint(isSelected: Bool) -> String {
         isSelected ? "已是菜单栏当前 Key" : "点击后设为菜单栏当前 Key"
+    }
+
+    private static func remainingDuration(for metric: UsageMetric?, now: Date) -> String {
+        guard let end = metric?.windowEnd else { return "—" }
+        return UsageFormatter.remainingDurationText(until: end, now: now)
     }
 }
 
@@ -114,13 +132,14 @@ private extension UsageRowView {
     }
 
     @ViewBuilder
-    var content: some View {
+    func content(now: Date) -> some View {
         if let metric {
             ProgressView(
                 value: min(max(metric.percent, 0), 100),
                 total: 100
             )
             .tint(progressColor)
+            .liquidGlassProgressSurface()
 
             HStack(spacing: 8) {
                 Text(UsageFormatter.amount(metric))
@@ -135,7 +154,7 @@ private extension UsageRowView {
             .foregroundStyle(.secondary)
             .monospacedDigit()
 
-            details
+            details(now: now)
 
             if state.isStale {
                 Label(
@@ -152,37 +171,38 @@ private extension UsageRowView {
 
     /// 显示窗口剩余时长和按名称配对的分组倍率。
     @ViewBuilder
-    var details: some View {
-        TimelineView(.periodic(from: .now, by: 60)) { timeline in
-            VStack(alignment: .leading, spacing: 3) {
-                if state.snapshot?.kind == .periodic {
+    func details(now: Date) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            if state.snapshot?.kind == .periodic {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
                     detailLine(
                         "5 小时剩余",
                         value: remainingDuration(
                             for: state.snapshot?.fiveHour,
-                            now: timeline.date
+                            now: now
                         )
                     )
+                    Spacer(minLength: 8)
                     detailLine(
                         "周剩余",
                         value: remainingDuration(
                             for: state.snapshot?.weekly,
-                            now: timeline.date
+                            now: now
                         )
                     )
                 }
-                if let groupMultipliers = state.snapshot?.groupMultipliers,
-                   !groupMultipliers.isEmpty {
-                    detailLine(
-                        "分组倍率",
-                        value: UsageFormatter.groupMultiplierText(groupMultipliers)
-                    )
+            }
+            if let groupMultipliers = state.snapshot?.groupMultipliers,
+               !groupMultipliers.isEmpty {
+                HStack {
+                    Spacer()
+                    Text(UsageFormatter.groupMultiplierText(groupMultipliers))
                 }
             }
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-            .textSelection(.enabled)
         }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .textSelection(.enabled)
     }
 
     func detailLine(_ title: String, value: String) -> some View {
@@ -258,12 +278,13 @@ private extension UsageRowView {
         }
     }
 
-    var accessibilityLabel: String {
+    func accessibilityLabel(now: Date) -> String {
         UsageRowAccessibility.label(
             state: state,
             metric: metric,
             dimension: dimension,
-            isSelected: isSelected
+            isSelected: isSelected,
+            now: now
         )
     }
 

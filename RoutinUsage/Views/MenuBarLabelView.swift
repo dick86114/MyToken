@@ -31,18 +31,23 @@ struct MenuBarLabelView: View {
 private extension MenuBarLabelView {
     @ViewBuilder
     var labelContent: some View {
-        let text = UsageFormatter.menuBarText(
+        let alias = UsageFormatter.menuBarText(
             state: selectedState,
             dimension: settings.displayDimension,
             style: settings.menuBarStyle
         )
 
         if let metric = verticalMetric {
-            Image(nsImage: MenuBarAliasVerticalUsageIcon.image(alias: text, percent: metric.percent))
-                .flipsForRightToLeftLayoutDirection(false)
-                .accessibilityLabel(verticalBarAccessibilityLabel(metric: metric))
+            HStack(spacing: 0) {
+                // 菜单栏承载组合视图时会反向呈现子视图；先声明竖条，实际显示才会保持别名在前。
+                Image(nsImage: MenuBarVerticalUsageIcon.image(percent: metric.percent))
+                // 保持为原生文字，让系统根据菜单栏实际背景自动选择深浅色。
+                Text(alias + " · ")
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(verticalBarAccessibilityLabel(metric: metric))
         } else {
-            Text(text)
+            Text(alias)
         }
     }
 
@@ -151,6 +156,19 @@ enum MenuBarUsageRisk: Equatable {
 enum MenuBarVerticalUsageIcon {
     static let size = NSSize(width: 7, height: 18)
 
+    static func image(percent: Double) -> NSImage {
+        let image = NSImage(size: size)
+        image.lockFocus()
+        defer { image.unlockFocus() }
+
+        draw(
+            percent: percent,
+            in: NSRect(origin: .zero, size: size)
+        )
+        image.isTemplate = false
+        return image
+    }
+
     static func draw(percent: Double, in trackRect: NSRect) {
         let track = NSBezierPath(
             roundedRect: trackRect,
@@ -196,44 +214,5 @@ enum MenuBarVerticalUsageIcon {
         case .critical:
             return .systemRed
         }
-    }
-}
-
-@MainActor
-enum MenuBarAliasVerticalUsageIcon {
-    private static let textFont = NSFont.systemFont(ofSize: NSFont.systemFontSize)
-    private static let barGap: CGFloat = 5
-
-    static func image(alias: String, percent: Double) -> NSImage {
-        let text = alias + " · "
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: textFont,
-            .foregroundColor: NSColor.labelColor,
-        ]
-        let textSize = (text as NSString).size(withAttributes: attributes)
-        let size = NSSize(
-            width: ceil(textSize.width) + barGap + MenuBarVerticalUsageIcon.size.width,
-            height: MenuBarVerticalUsageIcon.size.height
-        )
-        let image = NSImage(size: size)
-        image.lockFocus()
-        defer { image.unlockFocus() }
-
-        let textOrigin = NSPoint(
-            x: 0,
-            y: floor((size.height - textSize.height) / 2)
-        )
-        (text as NSString).draw(at: textOrigin, withAttributes: attributes)
-        MenuBarVerticalUsageIcon.draw(
-            percent: percent,
-            in: NSRect(
-                x: ceil(textSize.width) + barGap,
-                y: 0,
-                width: MenuBarVerticalUsageIcon.size.width,
-                height: MenuBarVerticalUsageIcon.size.height
-            )
-        )
-        image.isTemplate = false
-        return image
     }
 }

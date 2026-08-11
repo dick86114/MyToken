@@ -37,13 +37,16 @@ struct OnboardingView: View {
             Button("添加第一个 Key") {
                 showsKeyEditor = true
             }
-            .buttonStyle(.borderedProminent)
+            .liquidGlassButton(prominent: true)
             .keyboardShortcut(.defaultAction)
             .accessibilityHint("打开 Key 编辑表单")
         }
+        .padding(28)
+        .liquidGlassSurface(cornerRadius: 24)
         .padding(36)
         .frame(width: 460)
         .frame(minHeight: 330)
+        .liquidGlassWindowBackground()
         .sheet(isPresented: $showsKeyEditor) {
             KeyEditorView(save: addFirstKey) {
                 completeOnboarding()

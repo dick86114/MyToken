@@ -9,6 +9,27 @@ final class DeliveryScriptTests: XCTestCase {
         )
     }
 
+    func testXcode26校验脚本接受Xcode26与macOS26SDK() throws {
+        let result = try runXcodeVerification(
+            xcodeVersion: "Xcode 26.6\nBuild version 17F113",
+            sdkVersion: "26.6"
+        )
+
+        XCTAssertEqual(result.status, 0, result.output)
+        XCTAssertTrue(result.output.contains("Xcode 26.6"), result.output)
+        XCTAssertTrue(result.output.contains("macOS SDK 26.6"), result.output)
+    }
+
+    func testXcode26校验脚本拒绝旧版Xcode() throws {
+        let result = try runXcodeVerification(
+            xcodeVersion: "Xcode 16.4\nBuild version 16F6",
+            sdkVersion: "15.5"
+        )
+
+        XCTAssertNotEqual(result.status, 0)
+        XCTAssertTrue(result.output.contains("需要 Xcode 26"), result.output)
+    }
+
     func test测试脚本将偏好设置隔离至临时目录() throws {
         let script = try XCTUnwrap(
             Bundle(for: DeliveryScriptTests.self)
@@ -118,6 +139,58 @@ final class DeliveryScriptTests: XCTestCase {
             process.terminationStatus,
             String(data: data, encoding: .utf8) ?? ""
         )
+    }
+
+    private func runXcodeVerification(
+        xcodeVersion: String,
+        sdkVersion: String
+    ) throws -> (status: Int32, output: String) {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RoutinUsage-XcodeVerificationTests-\(UUID().uuidString)")
+        let bin = root.appendingPathComponent("bin")
+        try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try makeExecutable(
+            at: bin.appendingPathComponent("xcodebuild"),
+            contents: "#!/bin/bash\nprintf '%s\\n' \(shellQuoted(xcodeVersion))\n"
+        )
+        try makeExecutable(
+            at: bin.appendingPathComponent("xcrun"),
+            contents: "#!/bin/bash\nprintf '%s\\n' \(shellQuoted(sdkVersion))\n"
+        )
+        let script = try XCTUnwrap(
+            Bundle(for: DeliveryScriptTests.self)
+                .url(forResource: "verify-xcode-26", withExtension: "sh")
+        )
+        let process = Process()
+        let output = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = [script.path]
+        process.standardOutput = output
+        process.standardError = output
+        var environment = ProcessInfo.processInfo.environment
+        environment["PATH"] = "\(bin.path):/usr/bin:/bin"
+        process.environment = environment
+        try process.run()
+        process.waitUntilExit()
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        return (
+            process.terminationStatus,
+            String(data: data, encoding: .utf8) ?? ""
+        )
+    }
+
+    private func makeExecutable(at url: URL, contents: String) throws {
+        try Data(contents.utf8).write(to: url)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: url.path
+        )
+    }
+
+    private func shellQuoted(_ value: String) -> String {
+        "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 }
 
