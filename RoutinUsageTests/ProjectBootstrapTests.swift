@@ -96,6 +96,13 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(releaseWorkflow.contains("Routin Usage"))
     }
 
+    func test发布工作流要求手动Markdown更新日志() throws {
+        let workflow = try sourceText(at: ".github/workflows/release.yml")
+        XCTAssertTrue(workflow.contains("release_notes:"))
+        XCTAssertTrue(workflow.contains("body: ${{ inputs.release_notes }}"))
+        XCTAssertTrue(workflow.contains("generate_release_notes: false"))
+    }
+
     func test弹窗详情显示剩余时长与配对分组倍率且不显示允许模型() throws {
         let usageRowView = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
 
