@@ -98,6 +98,14 @@ final class ProjectBootstrapTests: XCTestCase {
 
     func test发布工作流要求手动Markdown更新日志() throws {
         let workflow = try sourceText(at: ".github/workflows/release.yml")
+        let releaseNotesInput = """
+              release_notes:
+                description: '发布说明（Markdown）'
+                required: true
+                type: string
+        """
+
+        XCTAssertTrue(workflow.contains(releaseNotesInput))
         XCTAssertTrue(workflow.contains("release_notes:"))
         XCTAssertTrue(workflow.contains("body: ${{ inputs.release_notes }}"))
         XCTAssertTrue(workflow.contains("generate_release_notes: false"))
