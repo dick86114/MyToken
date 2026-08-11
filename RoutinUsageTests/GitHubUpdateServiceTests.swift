@@ -28,6 +28,43 @@ final class GitHubUpdateServiceTests: XCTestCase {
         XCTAssertNil(update)
     }
 
+    func testGitHubAPI限流时回退到AtomFeed() async throws {
+        let atom = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <feed xmlns="http://www.w3.org/2005/Atom">
+          <entry>
+            <id>tag:github.com,2008:Repository/1/v1.3.0</id>
+            <link rel="alternate" href="https://github.com/dick86114/MyRoutin/releases/tag/v1.3.0" />
+            <title>MyRoutin v1.3.0</title>
+            <content type="html">修复 API 限流检查</content>
+          </entry>
+        </feed>
+        """
+        let stub = URLProtocolStub.makeSession { request in
+            let url = try XCTUnwrap(request.url)
+            if url == GitHubUpdateService.releasesURL {
+                let response = try XCTUnwrap(
+                    HTTPURLResponse(url: url, statusCode: 403, httpVersion: nil, headerFields: nil)
+                )
+                return (response, Data(#"{"message":"API rate limit exceeded"}"#.utf8))
+            }
+            XCTAssertEqual(url, GitHubUpdateService.releasesAtomURL)
+            let response = try XCTUnwrap(
+                HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)
+            )
+            return (response, Data(atom.utf8))
+        }
+        let service = GitHubUpdateService(session: stub.session, currentVersion: "1.2.0")
+
+        let update = try await service.checkForUpdate()
+
+        XCTAssertEqual(update?.version, "1.3.0")
+        XCTAssertEqual(
+            update?.downloadURL.absoluteString,
+            "https://github.com/dick86114/MyRoutin/releases/download/v1.3.0/MyRoutin.dmg"
+        )
+    }
+
     func test下载更新逐步报告百分比并保存完整文件() async throws {
         let payload = Data(repeating: 7, count: 100)
         let stub = URLProtocolStub.makeSession { request in

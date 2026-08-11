@@ -50,6 +50,7 @@ struct NoUpdateService: UpdateChecking {
 struct GitHubUpdateService: UpdateChecking, Sendable {
     static let repository = "dick86114/MyRoutin"
     static let releasesURL = URL(string: "https://api.github.com/repos/\(repository)/releases/latest")!
+    static let releasesAtomURL = URL(string: "https://github.com/\(repository)/releases.atom")!
 
     let session: URLSession
     let currentVersion: String
@@ -60,7 +61,11 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
     }
 
     func checkForUpdate() async throws -> AppUpdate? {
-        var request = URLRequest(url: Self.releasesURL)
+        var request = URLRequest(
+            url: Self.releasesURL,
+            cachePolicy: .reloadIgnoringLocalCacheData,
+            timeoutInterval: 30
+        )
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("MyRoutin/\(currentVersion)", forHTTPHeaderField: "User-Agent")
         let data: Data
@@ -72,7 +77,15 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
         } catch {
             throw UpdateServiceError.unavailable
         }
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+        guard let http = response as? HTTPURLResponse else {
+            throw UpdateServiceError.unavailable
+        }
+        if http.statusCode == 403 || http.statusCode == 429 {
+            // GitHub API 的未登录请求按出口 IP 共享限额，桌面用户很容易撞到 403。
+            // Atom feed 不走同一套 API 限额，且足够提供版本和发布页信息。
+            return try await checkForUpdateFromAtom()
+        }
+        guard (200..<300).contains(http.statusCode) else {
             throw UpdateServiceError.unavailable
         }
         let release: ReleaseDTO
@@ -87,6 +100,48 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
         }
         guard let releaseURL = URL(string: release.htmlURL) else { throw UpdateServiceError.invalidResponse }
         return AppUpdate(version: version, releaseURL: releaseURL, downloadURL: downloadURL, notes: release.body ?? "")
+    }
+
+    private func checkForUpdateFromAtom() async throws -> AppUpdate? {
+        var request = URLRequest(
+            url: Self.releasesAtomURL,
+            cachePolicy: .reloadIgnoringLocalCacheData,
+            timeoutInterval: 30
+        )
+        request.setValue("application/atom+xml", forHTTPHeaderField: "Accept")
+        request.setValue("MyRoutin/\(currentVersion)", forHTTPHeaderField: "User-Agent")
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw UpdateServiceError.unavailable
+        }
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw UpdateServiceError.unavailable
+        }
+
+        let parser = AtomReleaseParser()
+        guard let release = parser.parse(data: data) else {
+            throw UpdateServiceError.invalidResponse
+        }
+        let version = Self.normalize(release.version)
+        guard Self.compare(version, currentVersion) == .orderedDescending else { return nil }
+
+        let tag = release.version.hasPrefix("v") ? release.version : "v\(release.version)"
+        guard let downloadURL = URL(string: "https://github.com/\(Self.repository)/releases/download/\(tag)/MyRoutin.dmg"),
+              let releaseURL = URL(string: release.releaseURL) else {
+            throw UpdateServiceError.invalidResponse
+        }
+        return AppUpdate(
+            version: version,
+            releaseURL: releaseURL,
+            downloadURL: downloadURL,
+            notes: release.notes
+        )
     }
 
     func download(
@@ -164,6 +219,77 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
     }
 }
 
+private struct AtomRelease {
+    let version: String
+    let releaseURL: String
+    let notes: String
+}
+
+private final class AtomReleaseParser: NSObject, XMLParserDelegate {
+    private var currentText = ""
+    private var inEntry = false
+    private var version: String?
+    private var releaseURL: String?
+    private var notes = ""
+
+    func parse(data: Data) -> AtomRelease? {
+        let parser = XMLParser(data: data)
+        parser.delegate = self
+        guard parser.parse(), let version, let releaseURL else { return nil }
+        return AtomRelease(version: version, releaseURL: releaseURL, notes: notes)
+    }
+
+    func parser(
+        _ parser: XMLParser,
+        didStartElement elementName: String,
+        namespaceURI: String?,
+        qualifiedName qName: String?,
+        attributes attributeDict: [String: String] = [:]
+    ) {
+        guard !inEntry else {
+            currentText = ""
+            if elementName == "link", attributeDict["rel"] == "alternate" {
+                releaseURL = attributeDict["href"]
+            }
+            return
+        }
+        if elementName == "entry" {
+            inEntry = true
+            currentText = ""
+        }
+    }
+
+    func parser(_ parser: XMLParser, foundCharacters string: String) {
+        guard inEntry else { return }
+        currentText.append(string)
+    }
+
+    func parser(
+        _ parser: XMLParser,
+        didEndElement elementName: String,
+        namespaceURI: String?,
+        qualifiedName qName: String?
+    ) {
+        guard inEntry else { return }
+        let text = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch elementName {
+        case "id" where version == nil:
+            version = text.split(separator: "/").last.map(String.init)
+        case "title":
+            if version == nil {
+                version = text.split(whereSeparator: { $0 == "v" || $0 == " " }).last.map(String.init)
+            }
+        case "content":
+            notes = text
+        case "entry":
+            inEntry = false
+        default:
+            break
+        }
+        currentText = ""
+    }
+}
+
 @MainActor
 enum UpdateInstaller {
     static func install(
@@ -192,8 +318,23 @@ enum UpdateInstaller {
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.createsNewApplicationInstance = true
         configuration.activates = true
-        NSWorkspace.shared.openApplication(at: destination, configuration: configuration)
-        NSApplication.shared.terminate(nil)
+        NSWorkspace.shared.openApplication(at: destination, configuration: configuration) { _, error in
+            Task { @MainActor in
+                if error == nil {
+                    NSApplication.shared.terminate(nil)
+                    return
+                }
+
+                // 新版本已复制完成但系统拒绝自动启动时，保留旧进程并给出可操作提示。
+                let alert = NSAlert()
+                alert.messageText = "更新已安装"
+                alert.informativeText = "新版本已安装到“应用程序”文件夹，请手动重新打开 MyRoutin。"
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "好")
+                NSApp.activate(ignoringOtherApps: true)
+                alert.runModal()
+            }
+        }
     }
 
     private static func run(_ path: String, _ arguments: [String]) -> Int32 {

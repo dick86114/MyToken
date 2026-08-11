@@ -259,6 +259,7 @@ final class AppEnvironment {
         alert.informativeText = "MyRoutin 已更新到 \(version)，应用已重新启动。"
         alert.alertStyle = .informational
         alert.addButton(withTitle: "好")
+        NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
     }
 
