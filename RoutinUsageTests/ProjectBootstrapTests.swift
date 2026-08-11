@@ -14,6 +14,14 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(source.contains("MenuBarExtra"))
     }
 
+    func test关闭最后一个设置窗口后应用仍驻留菜单栏() throws {
+        let source = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
+
+        XCTAssertTrue(source.contains("@NSApplicationDelegateAdaptor(RoutinUsageAppDelegate.self)"))
+        XCTAssertTrue(source.contains("applicationShouldTerminateAfterLastWindowClosed"))
+        XCTAssertTrue(source.contains("return false"))
+    }
+
     func test菜单栏标签提供右键账号与应用操作菜单() throws {
         let statusBarController = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
 
@@ -22,6 +30,8 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(statusBarController.contains("NSApp.currentEvent?.type == .rightMouseUp"))
         XCTAssertTrue(statusBarController.contains("切换账号"))
         XCTAssertTrue(statusBarController.contains("environment.store.selectKey(id)"))
+        XCTAssertTrue(statusBarController.contains("设置"))
+        XCTAssertTrue(statusBarController.contains("Notification.Name.showSettingsWindow"))
         XCTAssertTrue(statusBarController.contains("检查更新"))
         XCTAssertTrue(statusBarController.contains("NSApplication.shared.terminate(nil)"))
     }

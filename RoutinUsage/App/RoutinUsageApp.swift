@@ -1,10 +1,18 @@
+import AppKit
 import SwiftUI
+
+final class RoutinUsageAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        return false
+    }
+}
 
 @main
 @MainActor
 struct RoutinUsageApp: App {
     nonisolated static let applicationName = "MyRoutin"
 
+    @NSApplicationDelegateAdaptor(RoutinUsageAppDelegate.self) private var appDelegate
     @State private var environment: AppEnvironment
     @State private var statusBarController: StatusBarController
 
