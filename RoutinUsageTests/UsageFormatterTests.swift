@@ -111,11 +111,11 @@ final class UsageFormatterTests: XCTestCase {
         )
     }
 
-    func test菜单栏竖条风险等级在80和95分界() {
-        XCTAssertEqual(MenuBarUsageRisk.level(for: 79.9), .normal)
-        XCTAssertEqual(MenuBarUsageRisk.level(for: 80), .warning)
-        XCTAssertEqual(MenuBarUsageRisk.level(for: 94.9), .warning)
-        XCTAssertEqual(MenuBarUsageRisk.level(for: 95), .critical)
+    func test菜单栏竖条风险等级在50和80分界() {
+        XCTAssertEqual(MenuBarUsageRisk.level(for: 49.9), .normal)
+        XCTAssertEqual(MenuBarUsageRisk.level(for: 50), .warning)
+        XCTAssertEqual(MenuBarUsageRisk.level(for: 79.9), .warning)
+        XCTAssertEqual(MenuBarUsageRisk.level(for: 80), .critical)
     }
 
     func test菜单栏只为竖条样式的有效周期指标提供竖条数据() throws {

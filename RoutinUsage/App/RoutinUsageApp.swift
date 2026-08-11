@@ -57,7 +57,8 @@ private struct AppMenuBarLabel: View {
     var body: some View {
         MenuBarLabelView(
             store: environment.store,
-            settings: environment.settings
+            settings: environment.settings,
+            checkForUpdates: environment.checkForUpdates
         )
         .task {
             await environment.start()
