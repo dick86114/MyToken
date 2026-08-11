@@ -9,6 +9,23 @@ final class DeliveryScriptTests: XCTestCase {
         )
     }
 
+    func test测试脚本将偏好设置隔离至临时目录() throws {
+        let script = try XCTUnwrap(
+            Bundle(for: DeliveryScriptTests.self)
+                .url(forResource: "test", withExtension: "sh")
+        )
+        let source = try String(contentsOf: script, encoding: .utf8)
+
+        XCTAssertTrue(source.contains("CFFIXED_USER_HOME"))
+        XCTAssertTrue(source.contains("mktemp -d"))
+        XCTAssertTrue(source.contains("trap cleanup_test_home EXIT"))
+        XCTAssertTrue(source.contains("cleanup_test_preferences"))
+        XCTAssertTrue(source.contains("sleep 10"))
+        XCTAssertTrue(source.contains("ai.routin.usage-monitor.*-tests.*.plist"))
+        XCTAssertTrue(source.contains("AppSettingsTests.*.plist"))
+        XCTAssertTrue(source.contains("AppLifecycleTests.*.plist"))
+    }
+
     func test构建脚本从仓库外调用仍固定使用脚本所在仓库() throws {
         let fixture = try makeFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
