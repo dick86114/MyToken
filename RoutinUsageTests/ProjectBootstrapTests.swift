@@ -161,7 +161,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(countdowns.contains("\"5 小时剩余\""))
         XCTAssertTrue(countdowns.contains("\"周剩余\""))
         XCTAssertTrue(countdowns.contains("Spacer(minLength: 8)"))
-        XCTAssertTrue(usageRowView.contains("HStack {\n                        Spacer()"))
+        XCTAssertTrue(usageRowView.contains("HStack {\n                    Spacer()"))
     }
 
     func test本地Key相关文案不再声称使用系统钥匙串() throws {
@@ -204,6 +204,15 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(workflow.contains("release_notes:"))
         XCTAssertTrue(workflow.contains("body: ${{ inputs.release_notes }}"))
         XCTAssertTrue(workflow.contains("generate_release_notes: false"))
+    }
+
+    func test发布工作流显式选择并校验Xcode26() throws {
+        let workflow = try sourceText(at: ".github/workflows/release.yml")
+
+        XCTAssertTrue(
+            workflow.contains("DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer")
+        )
+        XCTAssertTrue(workflow.contains("scripts/verify-xcode-26.sh"))
     }
 
     func test弹窗详情显示剩余时长与配对分组倍率且不显示允许模型() throws {
