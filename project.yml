@@ -51,6 +51,7 @@ targets:
           cp "$PROJECT_DIR/RoutinUsage/App/StatusBarController.swift" "$resource_dir/StatusBarController.swift.txt"
           cp "$PROJECT_DIR/RoutinUsage/Views/UsagePopoverView.swift" "$resource_dir/UsagePopoverView.swift.txt"
           cp "$PROJECT_DIR/RoutinUsage/Views/LiquidGlassSurface.swift" "$resource_dir/LiquidGlassSurface.swift.txt"
+          cp "$PROJECT_DIR/.github/workflows/ci.yml" "$resource_dir/ci.yml"
           cp "$PROJECT_DIR/.github/workflows/release.yml" "$resource_dir/release.yml"
     settings:
       base:

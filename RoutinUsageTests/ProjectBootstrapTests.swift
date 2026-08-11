@@ -252,6 +252,15 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(workflow.contains("scripts/verify-xcode-26.sh"))
     }
 
+    func test持续集成显式选择并校验Xcode26() throws {
+        let workflow = try sourceText(at: ".github/workflows/ci.yml")
+
+        XCTAssertTrue(
+            workflow.contains("DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer")
+        )
+        XCTAssertTrue(workflow.contains("scripts/verify-xcode-26.sh"))
+    }
+
     func test弹窗详情显示剩余时长与配对分组倍率且不显示允许模型() throws {
         let usageRowView = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
 
@@ -307,6 +316,8 @@ final class ProjectBootstrapTests: XCTestCase {
             resource = ("project", "yml")
         case ".github/workflows/release.yml":
             resource = ("release", "yml")
+        case ".github/workflows/ci.yml":
+            resource = ("ci", "yml")
         case "RoutinUsage/App/RoutinUsageApp.swift":
             resource = ("RoutinUsageApp.swift", "txt")
         case "RoutinUsage/App/StatusBarController.swift":
