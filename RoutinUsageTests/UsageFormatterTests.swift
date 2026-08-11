@@ -5,10 +5,10 @@ import XCTest
 
 final class UsageFormatterTests: XCTestCase {
     @MainActor
-    func test别名竖条标签使用单张原生图像承载完整布局() {
-        let image = MenuBarAliasVerticalUsageIcon.image(alias: "京", percent: 35)
+    func test菜单栏独立竖条图像只承载彩色用量条() {
+        let image = MenuBarVerticalUsageIcon.image(percent: 35)
 
-        XCTAssertGreaterThan(image.size.width, 7)
+        XCTAssertEqual(image.size.width, 7)
         XCTAssertEqual(image.size.height, 18)
         XCTAssertFalse(image.isTemplate)
     }
@@ -374,7 +374,7 @@ final class UsageFormatterTests: XCTestCase {
                 dimension: .fiveHour,
                 isSelected: true
             ),
-            "当前，主账号，已使用 68%，$6.80 / $10.00"
+            "当前，主账号，已使用 68%，$6.80 / $10.00，5 小时剩余 —，周剩余 —"
         )
         XCTAssertEqual(
             UsageRowAccessibility.hint(isSelected: true),
@@ -393,12 +393,87 @@ final class UsageFormatterTests: XCTestCase {
                 dimension: .fiveHour,
                 isSelected: false
             ),
-            "主账号，已使用 68%，$6.80 / $10.00"
+            "主账号，已使用 68%，$6.80 / $10.00，5 小时剩余 —，周剩余 —"
         )
         XCTAssertEqual(
             UsageRowAccessibility.hint(isSelected: false),
             "点击后设为菜单栏当前 Key"
         )
+    }
+
+    func test周期套餐可访问性标签包含两个倒计时与分组倍率() throws {
+        let now = Date(timeIntervalSince1970: 1_786_320_000)
+        let snapshot = UsageSnapshot(
+            planName: "Pro",
+            kind: .periodic,
+            fiveHour: makeMetric(
+                used: 6.8,
+                limit: 10,
+                remaining: 3.2,
+                unit: .usd,
+                windowEnd: now.addingTimeInterval(3 * 60 * 60 + 45 * 60)
+            ),
+            weekly: makeMetric(
+                used: 20,
+                limit: 50,
+                remaining: 30,
+                percent: 40,
+                unit: .usd,
+                windowEnd: now.addingTimeInterval(2 * 24 * 60 * 60 + 15 * 60)
+            ),
+            token: nil,
+            allowedModels: [],
+            fetchedAt: now,
+            groupMultipliers: [
+                UsageGroupMultiplier(name: "Codex", multiplier: 1),
+                UsageGroupMultiplier(name: "Codex Pro", multiplier: 2),
+            ]
+        )
+        let state = makeState(snapshot: snapshot)
+        let metric = try XCTUnwrap(snapshot.fiveHour)
+
+        XCTAssertEqual(
+            UsageRowAccessibility.label(
+                state: state,
+                metric: metric,
+                dimension: .fiveHour,
+                isSelected: false,
+                now: now
+            ),
+            "主账号，已使用 68%，$6.80 / $10.00，5 小时剩余 3h45m，周剩余 2d0h15m，Codex ×1、Codex Pro ×2"
+        )
+    }
+
+    func testToken资源包可访问性标签朗读倍率但省略周期倒计时() throws {
+        let snapshot = UsageSnapshot(
+            planName: "资源包",
+            kind: .tokenPack,
+            fiveHour: nil,
+            weekly: nil,
+            token: makeMetric(
+                used: 9_200_000,
+                limit: 10_000_000,
+                remaining: 800_000,
+                percent: 92.4,
+                unit: .token
+            ),
+            allowedModels: [],
+            fetchedAt: Date(timeIntervalSince1970: 1_786_320_000),
+            groupMultipliers: [UsageGroupMultiplier(name: "Fast", multiplier: 1.5)]
+        )
+        let state = makeState(snapshot: snapshot)
+        let metric = try XCTUnwrap(snapshot.token)
+
+        let label = UsageRowAccessibility.label(
+            state: state,
+            metric: metric,
+            dimension: .fiveHour,
+            isSelected: false
+        )
+
+        XCTAssertTrue(label.contains("Fast ×1.5"))
+        XCTAssertFalse(label.contains("5 小时剩余"))
+        XCTAssertFalse(label.contains("周剩余"))
     }
 }
 
