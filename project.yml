@@ -1,0 +1,60 @@
+name: RoutinUsage
+options:
+  projectFormat: xcode15_3
+  deploymentTarget:
+    macOS: "14.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    PRODUCT_BUNDLE_IDENTIFIER: ai.routin.usage-monitor
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: 1
+    GENERATE_INFOPLIST_FILE: YES
+    INFOPLIST_KEY_LSUIElement: YES
+    ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+targets:
+  RoutinUsage:
+    type: application
+    platform: macOS
+    sources: [RoutinUsage]
+    settings:
+      base:
+        PRODUCT_NAME: "MyRoutin"
+        PRODUCT_MODULE_NAME: RoutinUsage
+  RoutinUsageTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - RoutinUsageTests
+      - path: scripts/build-dmg.sh
+        buildPhase: resources
+      - path: project.yml
+        buildPhase: resources
+    preBuildScripts:
+      - name: 同步静态源码测试资源
+        basedOnDependencyAnalysis: false
+        script: |
+          set -euo pipefail
+          resource_dir="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
+          mkdir -p "$resource_dir"
+          cp "$PROJECT_DIR/RoutinUsage/App/RoutinUsageApp.swift" "$resource_dir/RoutinUsageApp.swift.txt"
+          cp "$PROJECT_DIR/RoutinUsage/Views/SettingsView.swift" "$resource_dir/SettingsView.swift.txt"
+          cp "$PROJECT_DIR/RoutinUsage/Views/KeyEditorView.swift" "$resource_dir/KeyEditorView.swift.txt"
+          cp "$PROJECT_DIR/RoutinUsage/Views/OnboardingView.swift" "$resource_dir/OnboardingView.swift.txt"
+          cp "$PROJECT_DIR/RoutinUsage/Views/UsageRowView.swift" "$resource_dir/UsageRowView.swift.txt"
+          cp "$PROJECT_DIR/RoutinUsage/Views/MenuBarLabelView.swift" "$resource_dir/MenuBarLabelView.swift.txt"
+          cp "$PROJECT_DIR/RoutinUsage/Views/UsagePopoverView.swift" "$resource_dir/UsagePopoverView.swift.txt"
+    settings:
+      base:
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/MyRoutin.app/Contents/MacOS/MyRoutin"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+    dependencies:
+      - target: RoutinUsage
+schemes:
+  RoutinUsage:
+    build:
+      targets:
+        RoutinUsage: all
+        RoutinUsageTests: [test]
+    test:
+      targets: [RoutinUsageTests]
