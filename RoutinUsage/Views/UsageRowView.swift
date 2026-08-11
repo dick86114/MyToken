@@ -158,27 +158,30 @@ private extension UsageRowView {
         TimelineView(.periodic(from: .now, by: 60)) { timeline in
             VStack(alignment: .leading, spacing: 3) {
                 if state.snapshot?.kind == .periodic {
-                    detailLine(
-                        "5 小时剩余",
-                        value: remainingDuration(
-                            for: state.snapshot?.fiveHour,
-                            now: timeline.date
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        detailLine(
+                            "5 小时剩余",
+                            value: remainingDuration(
+                                for: state.snapshot?.fiveHour,
+                                now: timeline.date
+                            )
                         )
-                    )
-                    detailLine(
-                        "周剩余",
-                        value: remainingDuration(
-                            for: state.snapshot?.weekly,
-                            now: timeline.date
+                        Spacer(minLength: 8)
+                        detailLine(
+                            "周剩余",
+                            value: remainingDuration(
+                                for: state.snapshot?.weekly,
+                                now: timeline.date
+                            )
                         )
-                    )
+                    }
                 }
                 if let groupMultipliers = state.snapshot?.groupMultipliers,
                    !groupMultipliers.isEmpty {
-                    detailLine(
-                        "分组倍率",
-                        value: UsageFormatter.groupMultiplierText(groupMultipliers)
-                    )
+                    HStack {
+                        Spacer()
+                        Text(UsageFormatter.groupMultiplierText(groupMultipliers))
+                    }
                 }
             }
             .font(.caption2)
