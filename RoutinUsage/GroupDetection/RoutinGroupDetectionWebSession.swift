@@ -67,6 +67,10 @@ enum RoutinGroupDetectionPageParser {
         }
         return groupName
     }
+
+    static func isLogPageReady(bodyText _: String, hasTable: Bool) -> Bool {
+        hasTable
+    }
 }
 
 @MainActor
@@ -102,7 +106,7 @@ final class RoutinGroupDetectionWebSession: RoutinGroupDetectionWebSessionManagi
     }
 
     func findGroupName(marker: CodexGroupProbeRequestMarker) async throws -> String {
-        try await load(Self.logsURL)
+        try await loadLogsPage()
 
         for _ in 0..<15 {
             if let json = try await logRowsJSON() {
@@ -117,6 +121,41 @@ final class RoutinGroupDetectionWebSession: RoutinGroupDetectionWebSessionManagi
         }
 
         throw RoutinGroupDetectionWebError.logTimeout
+    }
+
+    private func loadLogsPage() async throws {
+        session.webView.load(URLRequest(url: Self.logsURL))
+        for _ in 0..<20 {
+            try await Task.sleep(for: .milliseconds(500))
+            guard isCurrentPage(Self.logsURL) else {
+                continue
+            }
+            let content = try await evaluate("""
+            JSON.stringify({
+              bodyText: document.body ? document.body.innerText : '',
+              hasTable: Boolean(document.querySelector('table'))
+            })
+            """)
+            guard
+                let json = content as? String,
+                let data = json.data(using: .utf8),
+                let page = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                let bodyText = page["bodyText"] as? String,
+                let hasTable = page["hasTable"] as? Bool
+            else {
+                continue
+            }
+            if isLoginPage(bodyText) {
+                throw RoutinGroupDetectionWebError.needsLogin
+            }
+            if RoutinGroupDetectionPageParser.isLogPageReady(
+                bodyText: bodyText,
+                hasTable: hasTable
+            ) {
+                return
+            }
+        }
+        throw RoutinGroupDetectionWebError.pageChanged
     }
 
     private func load(_ url: URL) async throws {
