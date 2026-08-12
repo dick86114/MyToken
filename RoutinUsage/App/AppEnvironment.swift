@@ -60,6 +60,7 @@ final class AppEnvironment {
     let store: UsageStore
     let loginItemManager: any LoginItemManaging
     let routinCheckIn: RoutinCheckInService
+    let codexGroupDetection: CodexGroupDetectionService
     let routinWebSession: RoutinWebSession?
     var showsOnboarding = false
     private(set) var updateStatus: AppUpdateStatus = .idle
@@ -96,6 +97,7 @@ final class AppEnvironment {
         notificationTaskYield: @escaping @Sendable () async -> Void = { await Task.yield() },
         logWriter: any AppLogWriting = NoopAppLogWriter(),
         routinCheckIn: RoutinCheckInService? = nil,
+        codexGroupDetection: CodexGroupDetectionService? = nil,
         routinWebSession: RoutinWebSession? = nil
     ) {
         self.settings = settings
@@ -112,6 +114,11 @@ final class AppEnvironment {
         self.notificationTaskYield = notificationTaskYield
         self.routinWebSession = routinWebSession
         self.routinCheckIn = routinCheckIn ?? RoutinCheckInService(session: UnavailableRoutinWebSession())
+        self.codexGroupDetection = codexGroupDetection ?? CodexGroupDetectionService(
+            webSession: UnavailableRoutinGroupDetectionWebSession(),
+            probeClient: UnavailableCodexGroupProbeClient(),
+            repository: CodexGroupDetectionRepository(defaults: UserDefaults())
+        )
         updateCompletionNotice = UpdateCompletionNotice.consume()
     }
 
@@ -129,9 +136,15 @@ final class AppEnvironment {
         )
         let routinWebSession = RoutinWebSession()
         let routinCheckIn = RoutinCheckInService(session: routinWebSession)
+        let codexGroupDetection = CodexGroupDetectionService(
+            webSession: RoutinGroupDetectionWebSession(session: routinWebSession),
+            probeClient: CodexGroupProbeClient(session: .shared),
+            repository: CodexGroupDetectionRepository(defaults: defaults)
+        )
         routinWebSession.onLoginCompleted = {
             Task { @MainActor in
                 await routinCheckIn.didFinishLogin()
+                await codexGroupDetection.didFinishLogin()
             }
         }
         let store = UsageStore(
@@ -159,6 +172,7 @@ final class AppEnvironment {
             updateCheckScheduler: UpdateCheckScheduler(),
             logWriter: logWriter,
             routinCheckIn: routinCheckIn,
+            codexGroupDetection: codexGroupDetection,
             routinWebSession: routinWebSession
         )
     }
@@ -350,7 +364,11 @@ final class AppEnvironment {
         }
 
         do {
+            let previousSecret = try keyRepository.read(id: id)
             _ = try keyRepository.update(id: id, name: input.name, secret: input.secret)
+            if previousSecret != input.secret {
+                codexGroupDetection.clearRecord(for: id)
+            }
         } catch {
             throw UsageStoreError.persistence
         }
@@ -365,6 +383,23 @@ final class AppEnvironment {
 
     func readKey(id: UUID) -> String? {
         try? keyRepository.read(id: id)
+    }
+
+    func startCodexGroupDetection(for keyID: UUID) async {
+        guard let secret = try? keyRepository.read(id: keyID) else {
+            codexGroupDetection.clearRecord(for: keyID)
+            return
+        }
+        await codexGroupDetection.start(keyID: keyID, secret: secret)
+    }
+
+    func clearCodexGroupDetection(for keyID: UUID) {
+        codexGroupDetection.clearRecord(for: keyID)
+    }
+
+    func deleteKey(_ keyID: UUID) throws {
+        try store.deleteKey(keyID)
+        codexGroupDetection.clearRecord(for: keyID)
     }
 
     func startRoutinCheckIn() async {
@@ -408,6 +443,23 @@ private actor UnavailableRoutinWebSession: RoutinWebSessionManaging {
     func prepareLogin() async {}
     func performCheckIn() async throws -> RoutinCheckInOutcome { .needsLogin }
     func clearRoutinWebsiteData() async {}
+}
+
+private actor UnavailableRoutinGroupDetectionWebSession: RoutinGroupDetectionWebSessionManaging {
+    func hasAuthenticatedSession() async -> Bool { false }
+    func prepareLogin() async {}
+    func readCurrentAccountIdentity() async throws -> RoutinAccountIdentity {
+        throw RoutinGroupDetectionWebError.accountUnavailable
+    }
+    func findGroupName(marker _: CodexGroupProbeRequestMarker) async throws -> String {
+        throw RoutinGroupDetectionWebError.pageChanged
+    }
+}
+
+private actor UnavailableCodexGroupProbeClient: CodexGroupProbing {
+    func probe(apiKey _: String, marker _: CodexGroupProbeRequestMarker) async throws {
+        throw CodexGroupProbeError.network
+    }
 }
 
 private extension AppEnvironment {

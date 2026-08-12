@@ -5,30 +5,38 @@ import SwiftUI
 struct UsagePopoverView: View {
     typealias InstallAvailableUpdate = @MainActor () async -> Void
     typealias StartRoutinCheckIn = @MainActor () async -> Void
+    typealias StartCodexGroupDetection = @MainActor (UUID) async -> Void
 
     @Bindable var store: UsageStore
     @Bindable var settings: AppSettings
+    @Bindable var codexGroupDetection: CodexGroupDetectionService
     let updateStatus: AppUpdateStatus
     let installAvailableUpdate: InstallAvailableUpdate
     let checkInState: RoutinCheckInState
     let startRoutinCheckIn: StartRoutinCheckIn
+    let startCodexGroupDetection: StartCodexGroupDetection
 
     @Environment(\.openWindow) private var openWindow
+    @State private var pendingDetectionKeyID: UUID?
 
     init(
         store: UsageStore,
         settings: AppSettings,
+        codexGroupDetection: CodexGroupDetectionService,
         updateStatus: AppUpdateStatus = .idle,
         installAvailableUpdate: @escaping InstallAvailableUpdate = {},
         checkInState: RoutinCheckInState = .idle,
-        startRoutinCheckIn: @escaping StartRoutinCheckIn = {}
+        startRoutinCheckIn: @escaping StartRoutinCheckIn = {},
+        startCodexGroupDetection: @escaping StartCodexGroupDetection = { _ in }
     ) {
         self.store = store
         self.settings = settings
+        self.codexGroupDetection = codexGroupDetection
         self.updateStatus = updateStatus
         self.installAvailableUpdate = installAvailableUpdate
         self.checkInState = checkInState
         self.startRoutinCheckIn = startRoutinCheckIn
+        self.startCodexGroupDetection = startCodexGroupDetection
     }
 
     var body: some View {
@@ -52,6 +60,23 @@ struct UsagePopoverView: View {
         .frame(width: 440)
         .fixedSize(horizontal: false, vertical: true)
         .liquidGlassWindowBackground()
+        .confirmationDialog(
+            "获取 Codex 当前分组？",
+            isPresented: Binding(
+                get: { pendingDetectionKeyID != nil },
+                set: { if !$0 { pendingDetectionKeyID = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("继续") {
+                guard let keyID = pendingDetectionKeyID else { return }
+                pendingDetectionKeyID = nil
+                Task { await startCodexGroupDetection(keyID) }
+            }
+            Button("取消", role: .cancel) { pendingDetectionKeyID = nil }
+        } message: {
+            Text("将发送一次真实 Codex 请求并产生极少量额度消耗。")
+        }
     }
 }
 
@@ -142,7 +167,12 @@ private extension UsagePopoverView {
                     if let state = store.state(for: id) {
                         UsageRowView(
                             store: store,
-                            state: state
+                            state: state,
+                            detectionState: codexGroupDetection.state(for: id),
+                            detectionRecord: codexGroupDetection.record(for: id),
+                            isAnotherDetectionActive: codexGroupDetection.activeKeyID != nil
+                                && codexGroupDetection.activeKeyID != id,
+                            requestDetection: { pendingDetectionKeyID = id }
                         )
                         if id != store.orderedKeyIDs.last {
                             Divider()

@@ -131,6 +131,9 @@ final class RoutinGroupDetectionWebSession: RoutinGroupDetectionWebSessionManagi
         session.webView.load(URLRequest(url: url))
         for _ in 0..<20 {
             try await Task.sleep(for: .milliseconds(500))
+            guard isCurrentPage(url) else {
+                continue
+            }
             let content = try await evaluate("document.body ? document.body.innerText : ''")
             let text = content as? String ?? ""
             if isLoginPage(text) {
@@ -141,6 +144,14 @@ final class RoutinGroupDetectionWebSession: RoutinGroupDetectionWebSessionManagi
             }
         }
         throw RoutinGroupDetectionWebError.pageChanged
+    }
+
+    private func isCurrentPage(_ expectedURL: URL) -> Bool {
+        guard let currentURL = session.webView.url else {
+            return false
+        }
+        return currentURL.host?.lowercased() == expectedURL.host?.lowercased()
+            && currentURL.path == expectedURL.path
     }
 
     private func logRowsJSON() async throws -> String? {

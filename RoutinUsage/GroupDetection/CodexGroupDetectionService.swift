@@ -89,8 +89,8 @@ final class CodexGroupDetectionService {
     }
 
     func clearRecord(for keyID: UUID) {
-        activeTask?.cancel()
         if activeKeyID == keyID {
+            activeTask?.cancel()
             activeTask = nil
             activeKeyID = nil
         }

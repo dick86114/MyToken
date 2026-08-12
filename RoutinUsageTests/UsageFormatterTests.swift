@@ -4,6 +4,18 @@ import XCTest
 @testable import RoutinUsage
 
 final class UsageFormatterTests: XCTestCase {
+    func test分组倍率分段仅精确匹配检测分组() {
+        let segments = UsageFormatter.groupMultiplierSegments(
+            [
+                UsageGroupMultiplier(name: "Codex", multiplier: 1.5),
+                UsageGroupMultiplier(name: "Codex Pro", multiplier: 2)
+            ],
+            highlightedGroupName: "Codex"
+        )
+
+        XCTAssertEqual(segments.map(\.text), ["Codex ×1.5", "Codex Pro ×2"])
+        XCTAssertEqual(segments.map(\.isHighlighted), [true, false])
+    }
     @MainActor
     func test菜单栏独立竖条图像只承载彩色用量条() {
         let image = MenuBarVerticalUsageIcon.image(percent: 35)
