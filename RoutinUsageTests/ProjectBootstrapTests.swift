@@ -107,6 +107,16 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(statusBarController.contains("NSApplication.shared.terminate(nil)"))
     }
 
+    func test菜单栏右键菜单交由系统状态项定位并使用常规展示样式() throws {
+        let statusBarController = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
+
+        XCTAssertTrue(statusBarController.contains("menu.presentationStyle = .regular"))
+        XCTAssertTrue(statusBarController.contains("statusItem.menu = menu"))
+        XCTAssertTrue(statusBarController.contains("button.performClick(nil)"))
+        XCTAssertTrue(statusBarController.contains("statusItem.menu = nil"))
+        XCTAssertFalse(statusBarController.contains("menu.popUp(positioning: nil"))
+    }
+
     func test菜单栏和设置页提供问题提交入口() throws {
         let statusBarController = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
         let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")

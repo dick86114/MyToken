@@ -172,6 +172,7 @@ final class StatusBarController: NSObject {
         popover.performClose(nil)
         let menu = NSMenu()
         menu.autoenablesItems = false
+        menu.presentationStyle = .regular
 
         let accountsItem = NSMenuItem(title: "切换账号", action: nil, keyEquivalent: "")
         accountsItem.submenu = accountMenu()
@@ -214,7 +215,9 @@ final class StatusBarController: NSObject {
         quitItem.target = self
         menu.addItem(quitItem)
 
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height), in: button)
+        statusItem.menu = menu
+        defer { statusItem.menu = nil }
+        button.performClick(nil)
     }
 
     private func accountMenu() -> NSMenu {
