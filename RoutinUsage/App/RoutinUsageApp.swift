@@ -11,6 +11,7 @@ final class RoutinUsageAppDelegate: NSObject, NSApplicationDelegate {
 @MainActor
 struct RoutinUsageApp: App {
     nonisolated static let applicationName = "MyRoutin"
+    nonisolated static let websiteURL = URL(string: "https://routin.ai")!
     nonisolated static let githubURL = URL(string: "https://github.com/dick86114/MyRoutin")!
 
     nonisolated static var currentVersion: String {

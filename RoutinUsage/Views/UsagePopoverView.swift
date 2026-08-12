@@ -105,12 +105,17 @@ private extension UsagePopoverView {
             .accessibilityLabel(checkInHelpText)
         }
         .overlay(alignment: .center) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .interpolation(.high)
-                .scaledToFit()
-                .frame(width: 22, height: 22)
-                .accessibilityLabel("MyRoutin")
+            Link(destination: RoutinUsageApp.websiteURL) {
+                Image(nsImage: NSImage(named: "PopoverBrandLogo") ?? NSApp.applicationIconImage)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(width: 42, height: 42)
+                    .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
+            }
+            .buttonStyle(.plain)
+            .help("打开 Routin 官网")
+            .accessibilityLabel("打开 Routin 官网")
         }
     }
 
