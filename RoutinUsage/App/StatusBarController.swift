@@ -111,10 +111,21 @@ final class StatusBarController: NSObject {
         )
 
         if let metric {
-            button.title = text + " · "
-            button.image = MenuBarVerticalUsageIcon.image(percent: metric.percent)
+            button.title = text.isEmpty ? "" : text + " · "
+            button.image = switch environment.settings.menuBarStyle {
+            case .aliasLogoProgress, .logoProgress:
+                MenuBarLogoUsageIcon.image(percent: metric.percent)
+            case .aliasVerticalBar:
+                MenuBarVerticalUsageIcon.image(percent: metric.percent)
+            case .percent, .aliasPercent:
+                nil
+            }
             button.imagePosition = .imageRight
-            button.setAccessibilityLabel("\(text)，已使用 \(UsageFormatter.percentText(metric) ?? "")")
+            let usedPercent = UsageFormatter.percentText(metric) ?? ""
+            let accessibilityText = text.isEmpty
+                ? "已使用 \(usedPercent)"
+                : "\(text)，已使用 \(usedPercent)"
+            button.setAccessibilityLabel(accessibilityText)
         } else {
             button.title = text
             button.image = nil

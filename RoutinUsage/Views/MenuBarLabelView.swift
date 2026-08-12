@@ -6,7 +6,7 @@ enum MenuBarVerticalUsage {
         dimension: DisplayDimension,
         style: MenuBarStyle
     ) -> UsageMetric? {
-        guard style == .aliasVerticalBar,
+        guard (style == .aliasLogoProgress || style == .logoProgress || style == .aliasVerticalBar),
               let snapshot = state?.snapshot,
               snapshot.kind == .periodic,
               let metric = UsageFormatter.metric(in: snapshot, dimension: dimension),
@@ -75,6 +75,71 @@ enum MenuBarVerticalUsageIcon {
             )
         )
         .fill()
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
+    private static func clampedPercent(_ percent: Double) -> Double {
+        guard percent.isFinite else {
+            return 0
+        }
+        return min(max(percent, 0), 100)
+    }
+
+    private static func color(for percent: Double) -> NSColor {
+        switch MenuBarUsageRisk.level(for: percent) {
+        case .normal:
+            return .systemGreen
+        case .warning:
+            return .systemOrange
+        case .critical:
+            return .systemRed
+        }
+    }
+}
+
+enum MenuBarLogoUsageIcon {
+    static let size = NSSize(width: 18, height: 18)
+
+    static func image(percent: Double) -> NSImage {
+        let image = NSImage(size: size)
+        image.lockFocus()
+        defer { image.unlockFocus() }
+
+        let rect = NSRect(origin: .zero, size: size)
+        draw(percent: percent, in: rect)
+        image.isTemplate = false
+        return image
+    }
+
+    static func draw(percent: Double, in rect: NSRect) {
+        guard
+            let outline = NSImage(named: "MenuBarLogoOutline"),
+            let mask = NSImage(named: "MenuBarLogoMask")
+        else {
+            return
+        }
+
+        let height = rect.height * clampedPercent(percent) / 100
+        if height > 0 {
+            NSGraphicsContext.saveGraphicsState()
+            color(for: percent).setFill()
+            NSBezierPath(
+                rect: NSRect(
+                    x: rect.minX,
+                    y: rect.minY,
+                    width: rect.width,
+                    height: height
+                )
+            )
+            .fill()
+            mask.draw(in: rect, from: .zero, operation: .destinationIn, fraction: 1)
+            NSGraphicsContext.restoreGraphicsState()
+        }
+
+        NSGraphicsContext.saveGraphicsState()
+        NSColor.labelColor.setFill()
+        NSBezierPath(rect: rect).fill()
+        outline.draw(in: rect, from: .zero, operation: .destinationIn, fraction: 1)
         NSGraphicsContext.restoreGraphicsState()
     }
 

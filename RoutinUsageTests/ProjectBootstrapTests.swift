@@ -175,7 +175,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(settings.contains("UserDefaults"))
     }
 
-    func test设置页与菜单栏视图真实接入三种显示样式() throws {
+    func test设置页与菜单栏视图真实接入四种显示样式() throws {
         let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
         let statusBarController = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
 
@@ -184,6 +184,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(statusBarController.contains("style: environment.settings.menuBarStyle"))
         XCTAssertTrue(statusBarController.contains("MenuBarVerticalUsage.metric"))
         XCTAssertTrue(statusBarController.contains("button.imagePosition = .imageRight"))
+        XCTAssertTrue(statusBarController.contains(".aliasLogoProgress, .logoProgress"))
     }
 
     func test统一玻璃辅助层使用系统玻璃并保留旧系统材质回退() throws {
@@ -244,10 +245,15 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(onboarding.contains(".liquidGlassWindowBackground()"))
     }
 
-    func test菜单栏别名竖条提供辅助功能描述() throws {
+    func test菜单栏Logo进度样式提供辅助功能描述() throws {
         let statusBarController = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
+        let menuBarStyle = try sourceText(at: "RoutinUsage/Models/MenuBarStyle.swift")
 
         XCTAssertTrue(statusBarController.contains("MenuBarVerticalUsageIcon.image(percent: metric.percent)"))
+        XCTAssertTrue(statusBarController.contains("MenuBarLogoUsageIcon.image(percent: metric.percent)"))
+        XCTAssertTrue(menuBarStyle.contains("case logoProgress"))
+        XCTAssertTrue(menuBarStyle.contains("case aliasLogoProgress"))
+        XCTAssertTrue(statusBarController.contains("let accessibilityText"))
         XCTAssertTrue(statusBarController.contains("button.setAccessibilityLabel"))
     }
 
@@ -497,6 +503,8 @@ final class ProjectBootstrapTests: XCTestCase {
             resource = ("OnboardingView.swift", "txt")
         case "RoutinUsage/Views/UsageRowView.swift":
             resource = ("UsageRowView.swift", "txt")
+        case "RoutinUsage/Models/MenuBarStyle.swift":
+            resource = ("MenuBarStyle.swift", "txt")
         case "RoutinUsage/Views/UsagePopoverView.swift":
             resource = ("UsagePopoverView.swift", "txt")
         case "RoutinUsage/Views/LiquidGlassSurface.swift":
