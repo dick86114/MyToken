@@ -55,7 +55,7 @@ enum RoutinGroupDetectionPageParser {
             throw RoutinGroupDetectionWebError.pageChanged
         }
 
-        let matches = rows.filter { $0.userAgent == marker.userAgent }
+        let matches = rows.filter { $0.userAgent.contains(marker.userAgent) }
         guard matches.count == 1, let groupName = matches.first?.groupName
             .trimmingCharacters(in: .whitespacesAndNewlines),
               !groupName.isEmpty
