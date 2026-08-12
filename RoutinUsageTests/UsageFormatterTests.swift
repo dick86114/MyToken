@@ -25,6 +25,37 @@ final class UsageFormatterTests: XCTestCase {
     }
 
     @MainActor
+    func test菜单栏Logo轮廓跟随深色系统外观保持可见() throws {
+        let appearance = try XCTUnwrap(NSAppearance(named: .darkAqua))
+        var brightPixelCount = 0
+
+        appearance.performAsCurrentDrawingAppearance {
+            let image = MenuBarLogoUsageIcon.image(percent: 0)
+            let representation = try? NSBitmapImageRep(
+                data: try XCTUnwrap(image.tiffRepresentation)
+            )
+            guard let representation else {
+                return
+            }
+            for x in 0..<representation.pixelsWide {
+                for y in 0..<representation.pixelsHigh {
+                    guard let color = representation.colorAt(x: x, y: y)?
+                        .usingColorSpace(.deviceRGB) else {
+                        continue
+                    }
+                    if color.redComponent > 0.7,
+                       color.greenComponent > 0.7,
+                       color.blueComponent > 0.7 {
+                        brightPixelCount += 1
+                    }
+                }
+            }
+        }
+
+        XCTAssertGreaterThan(brightPixelCount, 50)
+    }
+
+    @MainActor
     func test菜单栏Logo进度图标在有用量时绘制彩色填充() throws {
         let image = MenuBarLogoUsageIcon.image(percent: 35)
         let representation = try XCTUnwrap(

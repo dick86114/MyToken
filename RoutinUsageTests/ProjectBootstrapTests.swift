@@ -67,6 +67,17 @@ final class ProjectBootstrapTests: XCTestCase {
         }
     }
 
+    func test菜单栏Logo原图使用最新品牌资源() throws {
+        let projectRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let menuBarLogo = projectRoot
+            .appendingPathComponent("docs/brand-assets/routin-menu-bar-logo-source.png")
+        let image = try XCTUnwrap(NSImage(contentsOf: menuBarLogo))
+
+        XCTAssertEqual(image.size, NSSize(width: 1675, height: 1782))
+    }
+
     func test菜单栏弹窗同屏展示五小时与周用量() throws {
         let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
         let row = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")

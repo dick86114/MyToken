@@ -136,7 +136,18 @@ enum MenuBarLogoUsageIcon {
             NSGraphicsContext.restoreGraphicsState()
         }
 
-        outline.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
+        let tintedOutline = NSImage(size: rect.size)
+        tintedOutline.lockFocus()
+        NSColor.labelColor.setFill()
+        NSBezierPath(rect: NSRect(origin: .zero, size: rect.size)).fill()
+        outline.draw(
+            in: NSRect(origin: .zero, size: rect.size),
+            from: .zero,
+            operation: .destinationIn,
+            fraction: 1
+        )
+        tintedOutline.unlockFocus()
+        tintedOutline.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
     }
 
     private static func clampedPercent(_ percent: Double) -> Double {
