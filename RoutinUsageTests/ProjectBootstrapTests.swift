@@ -505,8 +505,12 @@ final class ProjectBootstrapTests: XCTestCase {
 
         XCTAssertTrue(popover.contains("获取 Codex 当前分组？"))
         XCTAssertTrue(popover.contains("真实 Codex 请求"))
+        XCTAssertTrue(popover.contains("openWindow(id: \"routin-check-in\")"))
+        XCTAssertTrue(popover.contains("codexGroupDetectionStatus"))
+        XCTAssertTrue(popover.contains("ProgressView()"))
         XCTAssertTrue(row.contains("location.magnifyingglass"))
         XCTAssertTrue(row.contains("Color.green"))
+        XCTAssertTrue(row.contains("Codex 分组检测"))
         XCTAssertTrue(row.contains(".isButton"))
         XCTAssertTrue(settings.contains("已关联账号"))
         XCTAssertTrue(settings.contains("解除关联"))

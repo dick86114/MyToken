@@ -3,6 +3,15 @@ import XCTest
 @testable import RoutinUsage
 
 final class CodexGroupDetectionServiceTests: XCTestCase {
+    func test分组检测状态提供明确中文反馈() {
+        XCTAssertEqual(CodexGroupDetectionState.checkingAccount.statusText, "正在确认 Routin 登录状态")
+        XCTAssertEqual(CodexGroupDetectionState.waitingForLog.statusText, "请求已发送，正在等待 Routin 请求日志")
+        XCTAssertEqual(CodexGroupDetectionState.failed(.logTimeout).statusText, "已发送请求，但 30 秒内未找到对应日志")
+        XCTAssertTrue(CodexGroupDetectionState.checkingAccount.isBusy)
+        XCTAssertTrue(CodexGroupDetectionState.failed(.network).isFailure)
+        XCTAssertFalse(CodexGroupDetectionState.succeeded.isFailure)
+    }
+
     func test成功检测会保存当前账号和分组记录() async throws {
         let keyID = UUID()
         let web = GroupDetectionWebFake(
