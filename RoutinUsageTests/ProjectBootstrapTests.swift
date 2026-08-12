@@ -524,6 +524,10 @@ final class ProjectBootstrapTests: XCTestCase {
 
         XCTAssertTrue(webSession.contains("displayName: String?"))
         XCTAssertTrue(webSession.contains("displayName: displayName?.isEmpty == false ? displayName! : \"Routin 账号\""))
+        XCTAssertTrue(webSession.contains("window.localStorage.getItem('meteor_user')"))
+        XCTAssertFalse(webSession.contains("window.localStorage.getItem('meteor_access_token')"))
+        XCTAssertFalse(webSession.contains("window.localStorage.getItem('meteor_refresh_token')"))
+        XCTAssertTrue(webSession.contains("for _ in 0..<20"))
     }
 
     private func sourceText(at relativePath: String) throws -> String {
