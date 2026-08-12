@@ -1,0 +1,73 @@
+import Foundation
+import XCTest
+@testable import RoutinUsage
+
+final class RoutinGroupDetectionWebSessionTests: XCTestCase {
+    func test账户页面结果要求邮箱和昵称并生成账号摘要() throws {
+        let identity = try XCTUnwrap(
+            RoutinGroupDetectionPageParser.accountIdentity(
+                from: #"{"email":"  MEMBER@EXAMPLE.COM ","displayName":"测试账号"}"#
+            )
+        )
+
+        XCTAssertEqual(identity, RoutinAccountIdentity.make(
+            email: "member@example.com",
+            displayName: "测试账号"
+        ))
+    }
+
+    func test账户页面缺少邮箱不会退化使用昵称() {
+        XCTAssertNil(
+            RoutinGroupDetectionPageParser.accountIdentity(
+                from: #"{"email":"","displayName":"测试账号"}"#
+            )
+        )
+    }
+
+    func test日志结果只接受唯一UserAgent匹配并提取完整分组名() throws {
+        let marker = CodexGroupProbeRequestMarker(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000123")!,
+            startedAt: Date(timeIntervalSince1970: 1_786_400_000)
+        )
+        let rows = """
+        [
+          {"userAgent":"Codex Desktop","groupName":"Codex"},
+          {"userAgent":"MyRoutin-Group-Probe/00000000-0000-0000-0000-000000000123","groupName":"Codex Pro"}
+        ]
+        """
+
+        XCTAssertEqual(
+            try RoutinGroupDetectionPageParser.groupName(from: rows, marker: marker),
+            "Codex Pro"
+        )
+    }
+
+    func test日志匹配不到标识时返回未找到() {
+        let marker = CodexGroupProbeRequestMarker(id: UUID())
+
+        XCTAssertThrowsError(
+            try RoutinGroupDetectionPageParser.groupName(
+                from: #"[{"userAgent":"Codex Desktop","groupName":"Codex"}]"#,
+                marker: marker
+            )
+        ) { error in
+            XCTAssertEqual(error as? RoutinGroupDetectionWebError, .logNotFound)
+        }
+    }
+
+    func test日志有多个相同标识时拒绝猜测() {
+        let marker = CodexGroupProbeRequestMarker(id: UUID())
+        let rows = """
+        [
+          {"userAgent":"\(marker.userAgent)","groupName":"Codex"},
+          {"userAgent":"\(marker.userAgent)","groupName":"Codex Pro"}
+        ]
+        """
+
+        XCTAssertThrowsError(
+            try RoutinGroupDetectionPageParser.groupName(from: rows, marker: marker)
+        ) { error in
+            XCTAssertEqual(error as? RoutinGroupDetectionWebError, .ambiguousLog)
+        }
+    }
+}
