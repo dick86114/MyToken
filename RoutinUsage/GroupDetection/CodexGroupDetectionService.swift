@@ -39,7 +39,7 @@ enum CodexGroupDetectionState: Equatable, Sendable {
         case .probing:
             return "正在发送 Codex 探测请求"
         case .waitingForLog:
-            return "请求已发送，正在等待 Routin 请求日志"
+            return "请求已发送，正在定位日志并读取分组详情"
         case .succeeded:
             return "已获取 Codex 当前分组"
         case .accountMismatch:
@@ -59,7 +59,7 @@ enum CodexGroupDetectionState: Equatable, Sendable {
             case .network:
                 return "网络错误，未能完成 Codex 分组获取"
             case .logTimeout:
-                return "已发送请求，但 30 秒内未找到对应日志"
+                return "已发送请求，但 30 秒内未能读取对应日志详情"
             case .pageChanged:
                 return "无法识别 Routin 页面结构，请稍后重试"
             case .logNotFound:

@@ -105,4 +105,33 @@ final class RoutinGroupDetectionWebSessionTests: XCTestCase {
             )
         )
     }
+
+    func test日志详情提取分组名称() throws {
+        XCTAssertEqual(
+            try RoutinGroupDetectionPageParser.detailGroupName(
+                from: #"{"state":"ready","groupName":"Codex Pro"}"#
+            ),
+            "Codex Pro"
+        )
+    }
+
+    func test日志详情加载中不会误读分组名称() {
+        XCTAssertThrowsError(
+            try RoutinGroupDetectionPageParser.detailGroupName(
+                from: #"{"state":"loading"}"#
+            )
+        ) { error in
+            XCTAssertEqual(error as? RoutinGroupDetectionWebError, .logNotFound)
+        }
+    }
+
+    func test日志详情就绪但分组名称为空时拒绝写入记录() {
+        XCTAssertThrowsError(
+            try RoutinGroupDetectionPageParser.detailGroupName(
+                from: #"{"state":"ready","groupName":"  "}"#
+            )
+        ) { error in
+            XCTAssertEqual(error as? RoutinGroupDetectionWebError, .pageChanged)
+        }
+    }
 }
