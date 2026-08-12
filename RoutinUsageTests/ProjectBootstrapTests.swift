@@ -6,8 +6,9 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertEqual(RoutinUsageApp.applicationName, "MyRoutin")
     }
 
-    func test应用提供版本号和GitHub项目地址() throws {
+    func test应用提供版本号与官网和GitHub地址() throws {
         XCTAssertFalse(RoutinUsageApp.currentVersion.isEmpty)
+        XCTAssertEqual(RoutinUsageApp.websiteURL.absoluteString, "https://routin.ai")
         XCTAssertEqual(
             RoutinUsageApp.githubURL.absoluteString,
             "https://github.com/dick86114/MyRoutin"
@@ -27,10 +28,15 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(popover.contains("arrow.up.right.square"))
     }
 
-    func test菜单栏弹窗顶部使用左版本中Logo右刷新布局() throws {
+    func test菜单栏弹窗顶部使用左版本中透明Logo右刷新布局() throws {
         let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
+        let app = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
 
-        XCTAssertTrue(popover.contains("Image(nsImage: NSApp.applicationIconImage)"))
+        XCTAssertTrue(app.contains("nonisolated static let websiteURL"))
+        XCTAssertTrue(popover.contains("Link(destination: RoutinUsageApp.websiteURL)"))
+        XCTAssertTrue(popover.contains("Image(nsImage: NSImage(named: \"PopoverBrandLogo\")"))
+        XCTAssertTrue(popover.contains("frame(width: 42, height: 42)"))
+        XCTAssertTrue(popover.contains("打开 Routin 官网"))
         XCTAssertTrue(popover.contains(".overlay(alignment: .center)"))
         XCTAssertTrue(popover.contains("Image(systemName: \"arrow.clockwise\")"))
         XCTAssertFalse(popover.contains("Picker(\"用量周期\""))
