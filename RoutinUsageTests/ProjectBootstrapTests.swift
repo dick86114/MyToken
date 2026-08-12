@@ -519,6 +519,13 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(statusBarController.contains("codexGroupDetection: environment.codexGroupDetection"))
     }
 
+    func testCodex账号关联只依赖邮箱摘要而不要求昵称() throws {
+        let webSession = try sourceText(at: "RoutinUsage/GroupDetection/RoutinGroupDetectionWebSession.swift")
+
+        XCTAssertTrue(webSession.contains("displayName: String?"))
+        XCTAssertTrue(webSession.contains("displayName: displayName?.isEmpty == false ? displayName! : \"Routin 账号\""))
+    }
+
     private func sourceText(at relativePath: String) throws -> String {
         guard let source = try optionalSourceText(at: relativePath) else {
             throw CocoaError(.fileNoSuchFile)
@@ -559,6 +566,8 @@ final class ProjectBootstrapTests: XCTestCase {
             resource = ("UsagePopoverView.swift", "txt")
         case "RoutinUsage/Views/LiquidGlassSurface.swift":
             resource = ("LiquidGlassSurface.swift", "txt")
+        case "RoutinUsage/GroupDetection/RoutinGroupDetectionWebSession.swift":
+            resource = ("RoutinGroupDetectionWebSession.swift", "txt")
         default:
             throw CocoaError(.fileNoSuchFile)
         }
