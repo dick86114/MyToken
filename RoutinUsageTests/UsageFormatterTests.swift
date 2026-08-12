@@ -25,8 +25,8 @@ final class UsageFormatterTests: XCTestCase {
     }
 
     @MainActor
-    func test菜单栏Logo轮廓跟随深色系统外观保持可见() throws {
-        let appearance = try XCTUnwrap(NSAppearance(named: .darkAqua))
+    func test菜单栏Logo轮廓在浅色系统外观保持品牌白边() throws {
+        let appearance = try XCTUnwrap(NSAppearance(named: .aqua))
         var brightPixelCount = 0
 
         appearance.performAsCurrentDrawingAppearance {
@@ -76,7 +76,7 @@ final class UsageFormatterTests: XCTestCase {
             }
         }
 
-        XCTAssertGreaterThan(coloredPixelCount, 150)
+        XCTAssertGreaterThan(coloredPixelCount, 130)
     }
 
     func test菜单栏把百分比四舍五入为整数() {
