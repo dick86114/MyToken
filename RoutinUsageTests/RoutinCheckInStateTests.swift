@@ -5,6 +5,7 @@ final class RoutinCheckInStateTests: XCTestCase {
     func test签到状态提供明确的中文文案() {
         XCTAssertEqual(RoutinCheckInState.idle.statusText, "尚未登录 Routin")
         XCTAssertEqual(RoutinCheckInState.needsLogin.statusText, "请先登录 Routin")
+        XCTAssertEqual(RoutinCheckInState.loggedIn.statusText, "已登录 Routin")
         XCTAssertEqual(RoutinCheckInState.succeeded.statusText, "签到成功")
         XCTAssertEqual(RoutinCheckInState.alreadyCheckedIn.statusText, "今天已签到")
         XCTAssertEqual(
@@ -17,6 +18,7 @@ final class RoutinCheckInStateTests: XCTestCase {
         XCTAssertTrue(RoutinCheckInState.loggingIn.isBusy)
         XCTAssertTrue(RoutinCheckInState.checkingIn.isBusy)
         XCTAssertFalse(RoutinCheckInState.needsLogin.isBusy)
+        XCTAssertFalse(RoutinCheckInState.loggedIn.isBusy)
         XCTAssertFalse(RoutinCheckInState.succeeded.isBusy)
     }
 

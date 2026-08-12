@@ -4,6 +4,7 @@ import SwiftUI
 
 extension Notification.Name {
     static let showSettingsWindow = Notification.Name("showSettingsWindow")
+    static let showRoutinCheckInWindow = Notification.Name("showRoutinCheckInWindow")
 }
 
 @MainActor
@@ -64,6 +65,7 @@ final class StatusBarController: NSObject {
             _ = environment.store.selectedKeyID
             _ = environment.store.states
             _ = environment.updateStatus
+            _ = environment.routinCheckIn.state
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 self?.synchronizeEnvironmentChanges()
@@ -276,7 +278,9 @@ private struct StatusPopoverContent: View {
             store: environment.store,
             settings: environment.settings,
             updateStatus: environment.updateStatus,
-            installAvailableUpdate: environment.installAvailableUpdate
+            installAvailableUpdate: environment.installAvailableUpdate,
+            checkInState: environment.routinCheckIn.state,
+            startRoutinCheckIn: environment.startRoutinCheckIn
         )
         .sheet(isPresented: $environment.showsOnboarding) {
             OnboardingView(store: environment.store) {
@@ -285,6 +289,9 @@ private struct StatusPopoverContent: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name.showSettingsWindow)) { _ in
             openWindow(id: "settings")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name.showRoutinCheckInWindow)) { _ in
+            openWindow(id: "routin-check-in")
         }
     }
 }

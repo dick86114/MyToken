@@ -39,7 +39,22 @@ final class RoutinWebSession: NSObject, RoutinWebSessionManaging {
 
     func hasAuthenticatedSession() async -> Bool {
         // 网站的认证状态由页面自己判定，应用既不读取也不导出 Cookie。
-        true
+        webView.load(URLRequest(url: Self.lotteryURL))
+        for _ in 0..<20 {
+            do {
+                try await Task.sleep(for: .milliseconds(500))
+                let page = try await readPage()
+                if isLoginPage(page) {
+                    return false
+                }
+                if isLotteryPage(page) {
+                    return true
+                }
+            } catch {
+                return false
+            }
+        }
+        return false
     }
 
     func prepareLogin() async {
@@ -141,6 +156,14 @@ private extension RoutinWebSession {
             || text.contains("登录") && text.contains("密码")
     }
 
+    func isLotteryPage(_ page: PageContent) -> Bool {
+        let text = [page.title ?? "", page.bodyText].joined(separator: "\n")
+        return text.contains("签到抽奖")
+            || text.contains("Daily Lottery")
+            || text.contains("立即抽奖")
+            || text.contains("今日已抽")
+    }
+
     func clickDrawButtonIfAvailable() async throws -> Bool {
         let result = try await evaluateJavaScript("""
             (() => {
@@ -211,7 +234,10 @@ extension RoutinWebSession: WKNavigationDelegate {
         guard isAwaitingLogin, let url = webView.url else {
             return
         }
-        guard url.host?.lowercased().hasSuffix("routin.ai") == true, url.path != "/login" else {
+        guard
+            url.host?.lowercased().hasSuffix("routin.ai") == true,
+            url.path.hasPrefix("/dashboard")
+        else {
             return
         }
         isAwaitingLogin = false
