@@ -138,7 +138,7 @@ enum MenuBarLogoUsageIcon {
 
         let tintedOutline = NSImage(size: rect.size)
         tintedOutline.lockFocus()
-        NSColor.labelColor.setFill()
+        NSColor.white.setFill()
         NSBezierPath(rect: NSRect(origin: .zero, size: rect.size)).fill()
         outline.draw(
             in: NSRect(origin: .zero, size: rect.size),
