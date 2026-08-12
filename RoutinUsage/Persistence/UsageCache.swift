@@ -50,7 +50,7 @@ final class UsageCache: UsageCaching, @unchecked Sendable {
 
 enum UsageFreshness {
     static func isStale(lastSuccess: Date, now: Date, refreshMinutes: Int) -> Bool {
-        let threshold = max(300, TimeInterval(refreshMinutes * 120))
+        let threshold = max(60, TimeInterval(refreshMinutes * 60))
         return now.timeIntervalSince(lastSuccess) >= threshold
     }
 }

@@ -132,8 +132,8 @@ final class StatusBarController: NSObject {
         } else {
             parts.append("尚未更新")
         }
-        if state.isStale {
-            parts.append("缓存已过期")
+        if state.isRefreshing || state.isStale || state.error != nil {
+            parts.append(UsageFormatter.statusText(state: state))
         }
         return parts.joined(separator: " · ")
     }

@@ -172,16 +172,19 @@ enum UsageFormatter {
            percentText(metric) == nil {
             return "用量数据异常"
         }
+        if state.isRefreshing {
+            return state.snapshot == nil ? "正在加载" : "正在刷新，当前显示上次数据"
+        }
         if state.isStale, state.snapshot != nil {
             guard let error = state.error else {
                 return "缓存已过期"
             }
             return "缓存已过期，\(errorText(error))"
         }
-        if state.isRefreshing, state.snapshot == nil {
-            return "正在加载"
-        }
         if let error = state.error {
+            if state.snapshot != nil {
+                return "刷新失败，暂显示上次数据：\(errorText(error))"
+            }
             return errorText(error)
         }
         return state.snapshot == nil ? "等待首次刷新" : "用量数据可用"
@@ -244,7 +247,7 @@ private extension UsageFormatter {
         case .invalidKey:
             return "Key 无效"
         case .network:
-            return "网络错误，请刷新重试"
+            return "网络错误，将自动重试"
         case .invalidResponse:
             return "接口数据异常，请刷新重试"
         case let .server(statusCode):

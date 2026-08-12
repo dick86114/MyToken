@@ -195,6 +195,32 @@ final class UsageFormatterTests: XCTestCase {
         )
     }
 
+    func test缓存仍新鲜但刷新失败时说明暂显示上次数据() {
+        let state = makeState(
+            snapshot: makePeriodicSnapshot(fiveHourPercent: 81.2),
+            error: .network
+        )
+
+        XCTAssertEqual(
+            UsageFormatter.statusText(state: state),
+            "刷新失败，暂显示上次数据：网络错误，将自动重试"
+        )
+    }
+
+    func test刷新进行中优先说明当前显示上次数据() {
+        let state = makeState(
+            snapshot: makePeriodicSnapshot(fiveHourPercent: 81.2),
+            isRefreshing: true,
+            isStale: true,
+            error: .network
+        )
+
+        XCTAssertEqual(
+            UsageFormatter.statusText(state: state),
+            "正在刷新，当前显示上次数据"
+        )
+    }
+
     func test美元金额固定显示两位小数() {
         let metric = makeMetric(used: 6.8, limit: 10, remaining: 3.2, unit: .usd)
 
@@ -332,7 +358,7 @@ final class UsageFormatterTests: XCTestCase {
     func test无缓存网络错误提供可操作文案() {
         let state = makeState(snapshot: nil, error: .network)
 
-        XCTAssertEqual(UsageFormatter.statusText(state: state), "网络错误，请刷新重试")
+        XCTAssertEqual(UsageFormatter.statusText(state: state), "网络错误，将自动重试")
     }
 
     func test非有限百分比显示安全错误状态() {

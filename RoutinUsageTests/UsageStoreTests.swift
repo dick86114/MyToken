@@ -18,6 +18,29 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertTrue(store.state(for: key.id)?.isStale == true)
     }
 
+    func test刷新设置变化不会把新鲜缓存的网络错误误标为过期() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let key = try context.addKey(name: "主账号", secret: "plan-settings-fresh-0001")
+        let cached = makeSnapshot(planName: "缓存版", fetchedAt: context.now.addingTimeInterval(-30))
+        try context.cache.save(cached, for: key.id)
+        let store = context.makeStore(fetcher: ScriptedUsageFetcher(responses: [
+            "plan-settings-fresh-0001": .failure(.transport)
+        ]))
+
+        await store.refresh(keyID: key.id)
+        XCTAssertEqual(store.state(for: key.id)?.error, .network)
+        XCTAssertFalse(store.state(for: key.id)?.isStale == true)
+
+        store.updateSettings(
+            refreshMinutes: 1,
+            thresholds: AlertThresholds(),
+            notificationsEnabled: true
+        )
+
+        XCTAssertFalse(store.state(for: key.id)?.isStale == true)
+    }
+
     func test刷新全部时单个Key失败不阻塞其他Key() async throws {
         let context = try makeContext()
         defer { context.cleanUp() }
@@ -78,7 +101,7 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertEqual(store.state(for: emptyKey.id)?.error, .noSubscription)
     }
 
-    func test失败刷新保留缓存并标记为过期() async throws {
+    func test失败刷新保留仍新鲜的缓存但不标记为过期() async throws {
         let context = try makeContext()
         defer { context.cleanUp() }
         let key = try context.addKey(name: "主账号", secret: "plan-offline-0001")
@@ -91,6 +114,24 @@ final class UsageStoreTests: XCTestCase {
 
         XCTAssertEqual(store.state(for: key.id)?.snapshot, cached)
         XCTAssertEqual(try context.cache.load(for: key.id), cached)
+        XCTAssertEqual(store.state(for: key.id)?.error, .network)
+        XCTAssertFalse(store.state(for: key.id)?.isStale == true)
+    }
+
+    func test失败刷新保留过期缓存并标记为过期() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let key = try context.addKey(name: "主账号", secret: "plan-offline-stale-0001")
+        let cached = makeSnapshot(planName: "缓存版", fetchedAt: context.now.addingTimeInterval(-600))
+        try context.cache.save(cached, for: key.id)
+        let fetcher = ScriptedUsageFetcher(responses: [
+            "plan-offline-stale-0001": .failure(.transport)
+        ])
+        let store = context.makeStore(fetcher: fetcher)
+
+        await store.refresh(keyID: key.id)
+
+        XCTAssertEqual(store.state(for: key.id)?.snapshot, cached)
         XCTAssertEqual(store.state(for: key.id)?.error, .network)
         XCTAssertTrue(store.state(for: key.id)?.isStale == true)
     }
@@ -187,7 +228,7 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertEqual(store.state(for: key.id)?.snapshot, cached)
         XCTAssertEqual(store.state(for: key.id)?.lastSuccessAt, cached.fetchedAt)
         XCTAssertEqual(store.state(for: key.id)?.error, .network)
-        XCTAssertTrue(store.state(for: key.id)?.isStale == true)
+        XCTAssertFalse(store.state(for: key.id)?.isStale == true)
         XCTAssertFalse(store.state(for: key.id)?.isRefreshing == true)
         XCTAssertFalse(store.isRefreshing)
         XCTAssertEqual(try context.cache.load(for: key.id), cached)

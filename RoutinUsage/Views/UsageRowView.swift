@@ -4,7 +4,6 @@ import SwiftUI
 struct UsageRowView: View {
     let store: UsageStore
     let state: KeyUsageState
-    let dimension: DisplayDimension
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { timeline in
@@ -53,7 +52,9 @@ enum UsageRowAccessibility {
         let currentPrefix = isSelected ? "当前，" : ""
         let prefix = "\(currentPrefix)\(state.configuration.displayName)，"
         let summary: String
-        if state.isStale, metric != nil {
+        if state.isRefreshing || (state.error != nil && metric != nil) {
+            summary = prefix + UsageFormatter.statusText(state: state, dimension: dimension)
+        } else if state.isStale, metric != nil {
             summary = prefix + UsageFormatter.statusText(state: state, dimension: dimension)
                 + "，当前显示上次成功数据"
         } else if state.isRefreshing, state.snapshot == nil {
@@ -97,24 +98,6 @@ private extension UsageRowView {
         store.selectedKeyID == state.configuration.id
     }
 
-    var metric: UsageMetric? {
-        guard let rawMetric,
-              UsageFormatter.percentText(rawMetric) != nil else {
-            return nil
-        }
-        return rawMetric
-    }
-
-    var rawMetric: UsageMetric? {
-        state.snapshot.flatMap {
-            UsageFormatter.metric(in: $0, dimension: dimension)
-        }
-    }
-
-    var hasInvalidMetric: Bool {
-        rawMetric.map { UsageFormatter.percentText($0) == nil } ?? false
-    }
-
     var header: some View {
         HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
@@ -126,13 +109,16 @@ private extension UsageRowView {
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)
-            if let metric,
-               let percentText = UsageFormatter.percentText(metric) {
+            if validMetric(state.snapshot?.token) != nil
+                || !(state.snapshot?.groupMultipliers.isEmpty ?? true) {
                 VStack(alignment: .trailing, spacing: 3) {
-                    Text(percentText)
-                        .font(.system(.headline, design: .rounded, weight: .semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(progressColor)
+                    if let metric = validMetric(state.snapshot?.token),
+                       let percentText = UsageFormatter.percentText(metric) {
+                        Text(percentText)
+                            .font(.system(.headline, design: .rounded, weight: .semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(progressColor(for: metric))
+                    }
 
                     if let groupMultipliers = state.snapshot?.groupMultipliers,
                        !groupMultipliers.isEmpty {
@@ -148,77 +134,80 @@ private extension UsageRowView {
 
     @ViewBuilder
     func content(now: Date) -> some View {
-        if let metric {
-            ProgressView(
-                value: min(max(metric.percent, 0), 100),
-                total: 100
-            )
-            .tint(progressColor)
-
-            HStack(spacing: 8) {
-                Text(UsageFormatter.amount(metric))
-                    .help(UsageFormatter.fullAmount(metric))
-                Spacer(minLength: 8)
-                Text("剩余 \(UsageFormatter.remaining(metric))")
-                if metric.windowEnd != nil {
-                    Text("重置 \(UsageFormatter.resetTime(metric))")
+        if let snapshot = state.snapshot {
+            VStack(alignment: .leading, spacing: 7) {
+                switch snapshot.kind {
+                case .periodic:
+                    periodicContent(snapshot: snapshot, now: now)
+                case .tokenPack:
+                    if let metric = validMetric(snapshot.token) {
+                        metricContent(title: "Token", metric: metric, now: now)
+                    } else {
+                        statusLabel
+                    }
                 }
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .monospacedDigit()
 
-            details(now: now)
-
-            if state.isStale {
-                Label(
-                    UsageFormatter.statusText(state: state, dimension: dimension),
-                    systemImage: "clock.badge.exclamationmark"
-                )
-                    .font(.caption)
-                    .foregroundStyle(.orange)
+                if state.isRefreshing || state.isStale || state.error != nil {
+                    Label(
+                        UsageFormatter.statusText(state: state),
+                        systemImage: "clock.badge.exclamationmark"
+                    )
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
             }
         } else {
             statusLabel
         }
     }
 
-    /// 显示窗口剩余时长。
     @ViewBuilder
-    func details(now: Date) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            if state.snapshot?.kind == .periodic {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    detailLine(
-                        "5 小时剩余",
-                        value: remainingDuration(
-                            for: state.snapshot?.fiveHour,
-                            now: now
-                        )
-                    )
-                    Spacer(minLength: 8)
-                    detailLine(
-                        "周剩余",
-                        value: remainingDuration(
-                            for: state.snapshot?.weekly,
-                            now: now
-                        )
-                    )
-                }
-            }
+    func periodicContent(snapshot: UsageSnapshot, now: Date) -> some View {
+        HStack(alignment: .top, spacing: 16) {
+            metricContent(title: "5 小时", metric: validMetric(snapshot.fiveHour), now: now)
+            metricContent(title: "周", metric: validMetric(snapshot.weekly), now: now)
         }
-        .font(.caption2)
-        .foregroundStyle(.secondary)
-        .textSelection(.enabled)
     }
 
-    func detailLine(_ title: String, value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 4) {
-            Text(title + "：")
-                .foregroundStyle(.tertiary)
-            Text(value)
-                .lineLimit(2)
-                .truncationMode(.middle)
+    @ViewBuilder
+    func metricContent(title: String, metric: UsageMetric?, now: Date) -> some View {
+        if let metric {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack {
+                    Text(title)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 4)
+                    Text(UsageFormatter.percentText(metric) ?? "—")
+                        .font(.system(.headline, design: .rounded, weight: .semibold))
+                        .foregroundStyle(progressColor(for: metric))
+                        .monospacedDigit()
+                }
+
+                ProgressView(value: min(max(metric.percent, 0), 100), total: 100)
+                    .tint(progressColor(for: metric))
+
+                Text(UsageFormatter.amount(metric))
+                    .help(UsageFormatter.fullAmount(metric))
+                Text("剩余 \(UsageFormatter.remaining(metric))")
+                if metric.windowEnd != nil {
+                    Text("重置 \(UsageFormatter.resetTime(metric))")
+                    Text("剩余 \(remainingDuration(for: metric, now: now))")
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .monospacedDigit()
+            .textSelection(.enabled)
+        } else {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                Text("—")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
     }
 
@@ -235,16 +224,21 @@ private extension UsageRowView {
         }
         switch snapshot.kind {
         case .periodic:
-            return "\(snapshot.planName) · \(dimension == .fiveHour ? "5 小时" : "周")"
+            return "\(snapshot.planName) · 5 小时与周"
         case .tokenPack:
             return "\(snapshot.planName) · Token 资源包"
         }
     }
 
-    var progressColor: Color {
-        guard let metric else {
-            return .gray
+    func validMetric(_ metric: UsageMetric?) -> UsageMetric? {
+        guard let metric,
+              UsageFormatter.percentText(metric) != nil else {
+            return nil
         }
+        return metric
+    }
+
+    func progressColor(for metric: UsageMetric) -> Color {
         switch MenuBarUsageRisk.level(for: metric.percent) {
         case .critical:
             return .red
@@ -257,29 +251,24 @@ private extension UsageRowView {
 
     @ViewBuilder
     var statusLabel: some View {
-        if hasInvalidMetric {
+        if state.isRefreshing && state.snapshot == nil {
             Label(
-                UsageFormatter.statusText(state: state, dimension: dimension),
-                systemImage: "exclamationmark.triangle"
-            )
-        } else if state.isRefreshing && state.snapshot == nil {
-            Label(
-                UsageFormatter.statusText(state: state, dimension: dimension),
+                UsageFormatter.statusText(state: state),
                 systemImage: "arrow.triangle.2.circlepath"
             )
         } else if state.error == .noSubscription {
             Label(
-                UsageFormatter.statusText(state: state, dimension: dimension),
+                UsageFormatter.statusText(state: state),
                 systemImage: "minus.circle"
             )
         } else if state.error != nil {
             Label(
-                UsageFormatter.statusText(state: state, dimension: dimension),
+                UsageFormatter.statusText(state: state),
                 systemImage: "exclamationmark.triangle"
             )
         } else {
             Label(
-                UsageFormatter.statusText(state: state, dimension: dimension),
+                UsageFormatter.statusText(state: state),
                 systemImage: "clock"
             )
         }
@@ -288,8 +277,8 @@ private extension UsageRowView {
     func accessibilityLabel(now: Date) -> String {
         UsageRowAccessibility.label(
             state: state,
-            metric: metric,
-            dimension: dimension,
+            metric: validMetric(state.snapshot?.fiveHour) ?? validMetric(state.snapshot?.token),
+            dimension: .fiveHour,
             isSelected: isSelected,
             now: now
         )

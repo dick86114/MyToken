@@ -51,14 +51,16 @@ struct UsagePopoverView: View {
 private extension UsagePopoverView {
     var toolbar: some View {
         HStack(spacing: 10) {
-            Picker("用量周期", selection: $settings.displayDimension) {
-                Text("5 小时").tag(DisplayDimension.fiveHour)
-                Text("周").tag(DisplayDimension.weekly)
+            Link(destination: RoutinUsageApp.githubURL) {
+                Text("v\(RoutinUsageApp.currentVersion)")
+                    .underline()
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .accessibilityLabel("用量显示周期")
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help("打开 GitHub 项目")
+            .accessibilityLabel("当前版本 v\(RoutinUsageApp.currentVersion)，打开 GitHub 项目")
 
+            Spacer()
             Button {
                 Task { await store.refreshAll() }
             } label: {
@@ -74,6 +76,14 @@ private extension UsagePopoverView {
             .disabled(store.isRefreshing || store.orderedKeyIDs.isEmpty)
             .help("刷新全部 Key")
             .accessibilityLabel(store.isRefreshing ? "正在刷新全部 Key" : "刷新全部 Key")
+        }
+        .overlay(alignment: .center) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .interpolation(.high)
+                .scaledToFit()
+                .frame(width: 22, height: 22)
+                .accessibilityLabel("MyRoutin")
         }
     }
 
@@ -100,8 +110,7 @@ private extension UsagePopoverView {
                     if let state = store.state(for: id) {
                         UsageRowView(
                             store: store,
-                            state: state,
-                            dimension: settings.displayDimension
+                            state: state
                         )
                         if id != store.orderedKeyIDs.last {
                             Divider()

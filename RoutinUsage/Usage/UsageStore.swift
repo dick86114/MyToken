@@ -112,16 +112,13 @@ final class UsageStore {
             guard var state = states[keyID] else {
                 continue
             }
-            state.isStale = state.snapshot != nil && (
-                state.error != nil
-                    || state.lastSuccessAt.map {
-                        UsageFreshness.isStale(
-                            lastSuccess: $0,
-                            now: currentTime,
-                            refreshMinutes: refreshMinutes
-                        )
-                    } == true
-            )
+            state.isStale = state.snapshot != nil && state.lastSuccessAt.map {
+                UsageFreshness.isStale(
+                    lastSuccess: $0,
+                    now: currentTime,
+                    refreshMinutes: refreshMinutes
+                )
+            } == true
             states[keyID] = state
         }
     }
@@ -493,7 +490,13 @@ final class UsageStore {
             return
         }
         state.error = error
-        state.isStale = state.snapshot != nil
+        state.isStale = state.snapshot != nil && state.lastSuccessAt.map {
+            UsageFreshness.isStale(
+                lastSuccess: $0,
+                now: now(),
+                refreshMinutes: refreshMinutes
+            )
+        } == true
         states[keyID] = state
     }
 
