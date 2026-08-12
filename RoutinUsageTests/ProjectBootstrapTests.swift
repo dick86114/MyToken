@@ -54,20 +54,10 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(settings.contains("Picker(\"显示样式\", selection: $settings.menuBarStyle)"))
         XCTAssertTrue(settings.contains("MenuBarStyle.allCases"))
         XCTAssertTrue(menuBarLabel.contains("style: settings.menuBarStyle"))
-        XCTAssertTrue(menuBarLabel.contains("Text(alias + \" · \")"))
-        XCTAssertTrue(menuBarLabel.contains("Image(nsImage: MenuBarVerticalUsageIcon.image(percent: metric.percent))"))
-        XCTAssertFalse(menuBarLabel.contains("MenuBarAliasVerticalUsageIcon"))
-        XCTAssertFalse(menuBarLabel.contains("NSColor.labelColor"))
-        XCTAssertTrue(menuBarLabel.contains("alias + \" · \""))
-        let progressBar = try XCTUnwrap(
-            menuBarLabel.range(of: "Image(nsImage: MenuBarVerticalUsageIcon.image(percent: metric.percent))")
-        )
-        let alias = try XCTUnwrap(menuBarLabel.range(of: "Text(alias + \" · \")"))
-        XCTAssertLessThan(
-            progressBar.lowerBound,
-            alias.lowerBound,
-            "菜单栏承载组合视图时会反向呈现子视图，源码必须先声明竖条以确保实际显示为别名在前"
-        )
+        XCTAssertTrue(menuBarLabel.contains("MenuBarAliasVerticalUsageIcon.image(alias: alias, percent: metric.percent)"))
+        XCTAssertTrue(menuBarLabel.contains("DynamicMenuBarAliasVerticalUsageImageRep"))
+        XCTAssertTrue(menuBarLabel.contains("override func draw("))
+        XCTAssertFalse(menuBarLabel.contains("HStack(spacing: 0)"))
     }
 
     func test统一玻璃辅助层使用系统玻璃并保留旧系统材质回退() throws {
@@ -137,8 +127,8 @@ final class ProjectBootstrapTests: XCTestCase {
     func test菜单栏别名竖条作为单一辅助功能元素朗读() throws {
         let menuBarLabel = try sourceText(at: "RoutinUsage/Views/MenuBarLabelView.swift")
 
-        XCTAssertTrue(menuBarLabel.contains("Text(alias + \" · \")"))
-        XCTAssertTrue(menuBarLabel.contains("MenuBarVerticalUsageIcon.image(percent: metric.percent)"))
+        XCTAssertTrue(menuBarLabel.contains("MenuBarAliasVerticalUsageIcon.image(alias: alias, percent: metric.percent)"))
+        XCTAssertTrue(menuBarLabel.contains("DynamicMenuBarAliasVerticalUsageImageRep"))
         XCTAssertFalse(menuBarLabel.contains("NSAttributedString.Key"))
         XCTAssertFalse(menuBarLabel.contains("CGWindowListCreateImage"))
         XCTAssertFalse(menuBarLabel.contains("desktopImageURL"))
