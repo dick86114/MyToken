@@ -22,12 +22,7 @@ private extension MenuBarLabelView {
         )
 
         if let metric = verticalMetric {
-            HStack(spacing: 0) {
-                // 菜单栏承载组合视图时会反向呈现子视图；先声明竖条，实际显示才会保持别名在前。
-                Image(nsImage: MenuBarVerticalUsageIcon.image(percent: metric.percent))
-                // 保持为原生文字，让系统根据菜单栏实际背景自动选择深浅色。
-                Text(alias + " · ")
-            }
+            Image(nsImage: MenuBarAliasVerticalUsageIcon.image(alias: alias, percent: metric.percent))
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(verticalBarAccessibilityLabel(metric: metric))
         } else {
@@ -164,5 +159,100 @@ enum MenuBarVerticalUsageIcon {
         case .critical:
             return .systemRed
         }
+    }
+}
+
+@MainActor
+enum MenuBarAliasVerticalUsageIcon {
+    private static let textFont = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+    private static let barGap: CGFloat = 5
+
+    static func image(alias: String, percent: Double) -> NSImage {
+        let representation = DynamicMenuBarAliasVerticalUsageImageRep(
+            alias: alias,
+            percent: percent,
+            fontSize: textFont.pointSize,
+            barGap: barGap
+        )
+        let image = NSImage(size: representation.size)
+        image.addRepresentation(representation)
+        image.isTemplate = false
+        return image
+    }
+}
+
+/// 在状态栏实际绘制时再解析系统前景色，避免将文字颜色烘焙进静态位图。
+private final class DynamicMenuBarAliasVerticalUsageImageRep: NSImageRep, @unchecked Sendable {
+    private let text: String
+    private let percent: Double
+    private let fontSize: CGFloat
+    private let textSize: NSSize
+    private let barGap: CGFloat
+
+    init(alias: String, percent: Double, fontSize: CGFloat, barGap: CGFloat) {
+        self.text = alias + " · "
+        self.percent = percent
+        self.fontSize = fontSize
+        self.textSize = (alias + " · " as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: fontSize)])
+        self.barGap = barGap
+        super.init()
+        size = NSSize(
+            width: ceil(textSize.width) + barGap + MenuBarVerticalUsageIcon.size.width,
+            height: MenuBarVerticalUsageIcon.size.height
+        )
+    }
+
+    required convenience init?(pasteboardPropertyList propertyList: Any, ofType type: NSPasteboard.PasteboardType) {
+        self.init(alias: "", percent: 0, fontSize: NSFont.systemFontSize, barGap: 5)
+    }
+
+    required init(coder: NSCoder) {
+        text = " · "
+        percent = 0
+        fontSize = NSFont.systemFontSize
+        textSize = (text as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: fontSize)])
+        barGap = 5
+        super.init()
+        size = NSSize(
+            width: ceil(textSize.width) + barGap + MenuBarVerticalUsageIcon.size.width,
+            height: MenuBarVerticalUsageIcon.size.height
+        )
+    }
+
+    override func draw(
+        in rect: NSRect,
+        from fromRect: NSRect,
+        operation op: NSCompositingOperation,
+        fraction delta: CGFloat,
+        respectFlipped respectContextIsFlipped: Bool,
+        hints: [NSImageRep.HintKey: Any]? = nil
+    ) -> Bool {
+        guard let context = NSGraphicsContext.current?.cgContext else {
+            return false
+        }
+        context.saveGState()
+        defer { context.restoreGState() }
+
+        context.translateBy(x: rect.minX, y: rect.minY)
+        context.scaleBy(x: rect.width / size.width, y: rect.height / size.height)
+
+        (text as NSString).draw(
+            at: NSPoint(x: 0, y: floor((size.height - textSize.height) / 2)),
+            withAttributes: [
+                .font: NSFont.systemFont(ofSize: fontSize),
+                // 在状态栏控件的绘制上下文中解析，随菜单栏背景自动选择黑/白前景色。
+                .foregroundColor: NSColor.labelColor,
+            ]
+        )
+        MenuBarVerticalUsageIcon.draw(
+            percent: percent,
+            in: NSRect(
+                x: ceil(textSize.width) + barGap,
+                y: 0,
+                width: MenuBarVerticalUsageIcon.size.width,
+                height: MenuBarVerticalUsageIcon.size.height
+            )
+        )
+        return true
     }
 }
