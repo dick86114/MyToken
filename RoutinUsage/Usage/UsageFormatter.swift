@@ -1,6 +1,10 @@
 import Foundation
 
 enum UsageFormatter {
+    struct GroupMultiplierSegment: Equatable, Sendable {
+        let text: String
+        let isHighlighted: Bool
+    }
     static func menuBarText(
         state: KeyUsageState?,
         dimension: DisplayDimension
@@ -126,6 +130,18 @@ enum UsageFormatter {
             "\(group.name) ×\(NSDecimalNumber(decimal: group.multiplier).stringValue)"
         }
         .joined(separator: "、")
+    }
+
+    static func groupMultiplierSegments(
+        _ groups: [UsageGroupMultiplier],
+        highlightedGroupName: String?
+    ) -> [GroupMultiplierSegment] {
+        groups.map { group in
+            GroupMultiplierSegment(
+                text: "\(group.name) ×\(NSDecimalNumber(decimal: group.multiplier).stringValue)",
+                isHighlighted: group.name == highlightedGroupName
+            )
+        }
     }
 
     /// 以完整日期时间显示窗口结束时刻，便于跨天查看。

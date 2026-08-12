@@ -65,6 +65,7 @@ final class StatusBarController: NSObject {
             _ = environment.store.states
             _ = environment.updateStatus
             _ = environment.routinCheckIn.state
+            _ = environment.codexGroupDetection.states
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 self?.synchronizeEnvironmentChanges()
@@ -290,10 +291,12 @@ private struct StatusPopoverContent: View {
         UsagePopoverView(
             store: environment.store,
             settings: environment.settings,
+            codexGroupDetection: environment.codexGroupDetection,
             updateStatus: environment.updateStatus,
             installAvailableUpdate: environment.installAvailableUpdate,
             checkInState: environment.routinCheckIn.state,
-            startRoutinCheckIn: environment.startRoutinCheckIn
+            startRoutinCheckIn: environment.startRoutinCheckIn,
+            startCodexGroupDetection: environment.startCodexGroupDetection(for:)
         )
         .sheet(isPresented: $environment.showsOnboarding) {
             OnboardingView(store: environment.store) {

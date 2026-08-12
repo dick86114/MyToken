@@ -56,7 +56,10 @@ struct RoutinUsageApp: App {
                 routinCheckInState: environment.routinCheckIn.state,
                 startRoutinCheckIn: environment.startRoutinCheckIn,
                 beginRoutinLogin: environment.beginRoutinLogin,
-                signOutRoutin: environment.signOutRoutin
+                signOutRoutin: environment.signOutRoutin,
+                deleteKey: environment.deleteKey(_:),
+                codexGroupDetectionRecord: environment.codexGroupDetection.record(for:),
+                clearCodexGroupDetection: environment.clearCodexGroupDetection(for:)
             )
         }
         .defaultSize(

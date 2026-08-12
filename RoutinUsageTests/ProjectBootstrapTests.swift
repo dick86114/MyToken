@@ -303,7 +303,7 @@ final class ProjectBootstrapTests: XCTestCase {
         let header = usageRowView[headerStart.lowerBound..<progressStart.lowerBound]
 
         XCTAssertTrue(header.contains("VStack(alignment: .trailing"))
-        XCTAssertTrue(header.contains("Text(UsageFormatter.groupMultiplierText(groupMultipliers))"))
+        XCTAssertTrue(header.contains("groupMultiplierText(groupMultipliers)"))
         XCTAssertTrue(header.contains("Spacer(minLength: 8)"))
         XCTAssertFalse(usageRowView.contains("HStack {\n                    Spacer()\n                    Text(UsageFormatter.groupMultiplierText(groupMultipliers))"))
     }
@@ -494,6 +494,25 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(popover.contains("checkmark.circle.fill"))
         XCTAssertTrue(popover.contains("Color.green"))
         XCTAssertTrue(popover.contains("今天已签到"))
+    }
+
+    func testCodex当前分组检测已接入菜单栏设置和Key生命周期() throws {
+        let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
+        let row = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
+        let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+        let environment = try sourceText(at: "RoutinUsage/App/AppEnvironment.swift")
+        let statusBarController = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
+
+        XCTAssertTrue(popover.contains("获取 Codex 当前分组？"))
+        XCTAssertTrue(popover.contains("真实 Codex 请求"))
+        XCTAssertTrue(row.contains("location.magnifyingglass"))
+        XCTAssertTrue(row.contains("Color.green"))
+        XCTAssertTrue(row.contains(".isButton"))
+        XCTAssertTrue(settings.contains("已关联账号"))
+        XCTAssertTrue(settings.contains("解除关联"))
+        XCTAssertTrue(environment.contains("previousSecret != input.secret"))
+        XCTAssertTrue(environment.contains("func deleteKey(_ keyID: UUID)"))
+        XCTAssertTrue(statusBarController.contains("codexGroupDetection: environment.codexGroupDetection"))
     }
 
     private func sourceText(at relativePath: String) throws -> String {

@@ -4,13 +4,14 @@ import SwiftUI
 struct UsageRowView: View {
     let store: UsageStore
     let state: KeyUsageState
+    let detectionState: CodexGroupDetectionState
+    let detectionRecord: CodexGroupDetectionRecord?
+    let isAnotherDetectionActive: Bool
+    let requestDetection: () -> Void
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { timeline in
-            Button {
-                store.selectKey(state.configuration.id)
-            } label: {
-                HStack(alignment: .top, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
                     Image(systemName: isSelected ? "circle.fill" : "circle")
                         .foregroundStyle(isSelected ? Color.accentColor : .secondary)
                         .font(.system(size: 9, weight: .semibold))
@@ -21,12 +22,10 @@ struct UsageRowView: View {
                         header
                         content(now: timeline.date)
                     }
-                }
-                .contentShape(Rectangle())
-                .padding(.vertical, 7)
-                .padding(.horizontal, 4)
             }
-            .buttonStyle(.plain)
+            .contentShape(Rectangle())
+            .padding(.vertical, 7)
+            .padding(.horizontal, 4)
             .background {
                 if isSelected {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -36,7 +35,9 @@ struct UsageRowView: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel(accessibilityLabel(now: timeline.date))
             .accessibilityHint(accessibilityHint)
-            .accessibilityAddTraits(isSelected ? .isSelected : [])
+            .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : [.isButton])
+            .accessibilityAction { store.selectKey(state.configuration.id) }
+            .onTapGesture { store.selectKey(state.configuration.id) }
         }
     }
 }
@@ -122,14 +123,72 @@ private extension UsageRowView {
 
                     if let groupMultipliers = state.snapshot?.groupMultipliers,
                        !groupMultipliers.isEmpty {
-                        Text(UsageFormatter.groupMultiplierText(groupMultipliers))
+                        groupMultiplierText(groupMultipliers)
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    func groupMultiplierText(_ groups: [UsageGroupMultiplier]) -> some View {
+        let highlightedGroupName = detectionRecord.flatMap { record in
+            groups.contains(where: { $0.name == record.groupName }) ? record.groupName : nil
+        }
+        let segments = UsageFormatter.groupMultiplierSegments(
+            groups,
+            highlightedGroupName: highlightedGroupName
+        )
+        HStack(spacing: 0) {
+            ForEach(Array(segments.enumerated()), id: \.offset) { index, segment in
+                if index > 0 {
+                    Text("、")
+                        .foregroundStyle(.secondary)
+                }
+                Text(segment.text)
+                    .foregroundStyle(segment.isHighlighted ? Color.green : Color.secondary)
+            }
+            probeButton
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(groupMultiplierAccessibilityLabel(groups: groups, highlightedGroupName: highlightedGroupName))
+    }
+
+    @ViewBuilder
+    var probeButton: some View {
+        if detectionState.isBusy {
+            ProgressView()
+                .controlSize(.small)
+                .frame(width: 16, height: 16)
+                .padding(.leading, 5)
+                .accessibilityLabel("正在获取 Codex 当前分组")
+        } else {
+            Button(action: requestDetection) {
+                Image(systemName: "location.magnifyingglass")
+                    .frame(width: 16, height: 16)
+            }
+            .buttonStyle(.plain)
+            .disabled(isAnotherDetectionActive)
+            .help("获取 Codex 当前分组")
+            .accessibilityLabel("获取 Codex 当前分组")
+            .padding(.leading, 5)
+        }
+    }
+
+    func groupMultiplierAccessibilityLabel(
+        groups: [UsageGroupMultiplier],
+        highlightedGroupName: String?
+    ) -> String {
+        var label = UsageFormatter.groupMultiplierText(groups)
+        if let highlightedGroupName {
+            label += "，Codex 当前分组为 \(highlightedGroupName)"
+        }
+        if let detectedAt = detectionRecord?.detectedAt {
+            label += "，检测于 \(detectedAt.formatted(date: .omitted, time: .shortened))"
+        }
+        return label
     }
 
     @ViewBuilder

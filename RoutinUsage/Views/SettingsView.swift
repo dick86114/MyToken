@@ -24,6 +24,9 @@ struct SettingsView: View {
     typealias StartRoutinCheckIn = @MainActor () async -> Void
     typealias BeginRoutinLogin = @MainActor () async -> Void
     typealias SignOutRoutin = @MainActor () async -> Void
+    typealias DeleteKey = @MainActor (UUID) throws -> Void
+    typealias CodexGroupDetectionRecordForKey = @MainActor (UUID) -> CodexGroupDetectionRecord?
+    typealias ClearCodexGroupDetection = @MainActor (UUID) -> Void
 
     private enum EditorPresentation: Identifiable {
         case add
@@ -54,6 +57,9 @@ struct SettingsView: View {
     private let startRoutinCheckIn: StartRoutinCheckIn
     private let beginRoutinLogin: BeginRoutinLogin
     private let signOutRoutin: SignOutRoutin
+    private let deleteKey: DeleteKey
+    private let codexGroupDetectionRecord: CodexGroupDetectionRecordForKey
+    private let clearCodexGroupDetection: ClearCodexGroupDetection
 
     @Environment(\.openWindow) private var openWindow
 
@@ -79,7 +85,10 @@ struct SettingsView: View {
         routinCheckInState: RoutinCheckInState = .idle,
         startRoutinCheckIn: @escaping StartRoutinCheckIn = {},
         beginRoutinLogin: @escaping BeginRoutinLogin = {},
-        signOutRoutin: @escaping SignOutRoutin = {}
+        signOutRoutin: @escaping SignOutRoutin = {},
+        deleteKey: @escaping DeleteKey = { _ in },
+        codexGroupDetectionRecord: @escaping CodexGroupDetectionRecordForKey = { _ in nil },
+        clearCodexGroupDetection: @escaping ClearCodexGroupDetection = { _ in }
     ) {
         self.store = store
         self.settings = settings
@@ -95,6 +104,9 @@ struct SettingsView: View {
         self.startRoutinCheckIn = startRoutinCheckIn
         self.beginRoutinLogin = beginRoutinLogin
         self.signOutRoutin = signOutRoutin
+        self.deleteKey = deleteKey
+        self.codexGroupDetectionRecord = codexGroupDetectionRecord
+        self.clearCodexGroupDetection = clearCodexGroupDetection
         _orderedKeyIDs = State(initialValue: store.orderedKeyIDs)
         _lowThreshold = State(initialValue: settings.thresholds.low)
         _highThreshold = State(initialValue: settings.thresholds.high)
@@ -292,6 +304,19 @@ private extension SettingsView {
                         ? "—"
                         : UsageFormatter.groupMultiplierText(snapshot.groupMultipliers)
                 )
+
+                if let record = codexGroupDetectionRecord(state.configuration.id) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        detailItem("已关联账号", record.accountDisplayName)
+                        Button("解除关联", role: .destructive) {
+                            clearCodexGroupDetection(state.configuration.id)
+                        }
+                        .liquidGlassButton()
+                        .accessibilityLabel("解除 \(state.configuration.displayName) 的 Routin 账号关联")
+                    }
+                    Text("Codex 当前分组：\(record.groupName)，检测于 \(record.detectedAt.formatted(date: .omitted, time: .shortened))")
+                        .foregroundStyle(.secondary)
+                }
 
                 if !snapshot.allowedModels.isEmpty {
                     detailItem("允许模型", snapshot.allowedModels.joined(separator: "、"))
@@ -614,7 +639,7 @@ private extension SettingsView {
         }
         pendingDeletion = nil
         do {
-            try store.deleteKey(configuration.id)
+            try deleteKey(configuration.id)
             orderedKeyIDs.removeAll { $0 == configuration.id }
         } catch {
             operationError = "无法删除 Key，请稍后重试"

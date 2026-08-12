@@ -104,6 +104,32 @@ final class CodexGroupDetectionServiceTests: XCTestCase {
         let record = try await repository.load(for: keyID)
         XCTAssertEqual(record?.groupName, "Codex")
     }
+
+    func test清除其他Key的记录不会取消当前探测() async throws {
+        let activeKeyID = UUID()
+        let otherKeyID = UUID()
+        let web = GroupDetectionWebFake(
+            authenticated: true,
+            identity: RoutinAccountIdentity.make(email: "member@example.com", displayName: "会员")
+        )
+        await web.setGroupName("Codex")
+        let probe = GroupDetectionProbeFake()
+        let repository = GroupDetectionRecordFake()
+        let service = await MainActor.run {
+            CodexGroupDetectionService(webSession: web, probeClient: probe, repository: repository)
+        }
+
+        await service.start(keyID: activeKeyID, secret: "plan-test-1234")
+        await MainActor.run {
+            service.clearRecord(for: otherKeyID)
+        }
+
+        let record = try await repository.load(for: activeKeyID)
+        XCTAssertEqual(record?.groupName, "Codex")
+        await MainActor.run {
+            XCTAssertEqual(service.state(for: activeKeyID), .succeeded)
+        }
+    }
 }
 
 actor GroupDetectionWebFake: RoutinGroupDetectionWebSessionManaging {
@@ -156,6 +182,6 @@ final class GroupDetectionRecordFake: CodexGroupDetectionStoring, @unchecked Sen
     }
 
     func delete(for keyID: UUID) throws {
-        lock.withLock { records.removeValue(forKey: keyID) }
+        _ = lock.withLock { records.removeValue(forKey: keyID) }
     }
 }
