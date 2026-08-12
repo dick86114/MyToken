@@ -35,7 +35,7 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertTrue(settings.notificationsEnabled)
         XCTAssertEqual(settings.thresholds, AlertThresholds(low: 80, high: 95))
         XCTAssertFalse(settings.launchAtLogin)
-        XCTAssertEqual(settings.menuBarStyle, .aliasVerticalBar)
+        XCTAssertEqual(settings.menuBarStyle, .aliasLogoProgress)
     }
 
     func test菜单栏样式可持久化并重新载入() throws {
@@ -46,18 +46,24 @@ final class AppSettingsTests: XCTestCase {
         settings.menuBarStyle = .aliasVerticalBar
         XCTAssertEqual(AppSettings(defaults: context.defaults).menuBarStyle, .aliasVerticalBar)
 
+        settings.menuBarStyle = .aliasLogoProgress
+        XCTAssertEqual(AppSettings(defaults: context.defaults).menuBarStyle, .aliasLogoProgress)
+
+        settings.menuBarStyle = .logoProgress
+        XCTAssertEqual(AppSettings(defaults: context.defaults).menuBarStyle, .logoProgress)
+
         settings.menuBarStyle = .aliasPercent
         XCTAssertEqual(AppSettings(defaults: context.defaults).menuBarStyle, .aliasPercent)
     }
 
-    func test缺失或未知菜单栏样式回退为别名加竖形进度条() throws {
+    func test缺失或未知菜单栏样式回退为别名加Logo进度() throws {
         let context = try makeContext()
         defer { context.cleanUp() }
 
-        XCTAssertEqual(AppSettings(defaults: context.defaults).menuBarStyle, .aliasVerticalBar)
+        XCTAssertEqual(AppSettings(defaults: context.defaults).menuBarStyle, .aliasLogoProgress)
 
         context.defaults.set("broken", forKey: "menuBarStyle")
-        XCTAssertEqual(AppSettings(defaults: context.defaults).menuBarStyle, .aliasVerticalBar)
+        XCTAssertEqual(AppSettings(defaults: context.defaults).menuBarStyle, .aliasLogoProgress)
     }
 
     @MainActor

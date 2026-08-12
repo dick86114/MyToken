@@ -13,6 +13,17 @@ final class UsageFormatterTests: XCTestCase {
         XCTAssertFalse(image.isTemplate)
     }
 
+    @MainActor
+    func test菜单栏Logo进度图标使用品牌轮廓和填充蒙版() {
+        let image = MenuBarLogoUsageIcon.image(percent: 35)
+
+        XCTAssertEqual(image.size.width, 18)
+        XCTAssertEqual(image.size.height, 18)
+        XCTAssertFalse(image.isTemplate)
+        XCTAssertNotNil(NSImage(named: "MenuBarLogoOutline"))
+        XCTAssertNotNil(NSImage(named: "MenuBarLogoMask"))
+    }
+
     func test菜单栏把百分比四舍五入为整数() {
         let state = makeState(snapshot: makePeriodicSnapshot(fiveHourPercent: 67.5))
 
@@ -98,6 +109,41 @@ final class UsageFormatterTests: XCTestCase {
         )
     }
 
+    func test菜单栏别名Logo进度样式有效时返回别名加载时返回省略号() {
+        let state = makeState(snapshot: makePeriodicSnapshot(fiveHourPercent: 67.5))
+        XCTAssertEqual(
+            UsageFormatter.menuBarText(
+                state: state,
+                dimension: .fiveHour,
+                style: .aliasLogoProgress
+            ),
+            "主账号"
+        )
+
+        let loadingState = makeState(snapshot: nil, isRefreshing: true)
+        XCTAssertEqual(
+            UsageFormatter.menuBarText(
+                state: loadingState,
+                dimension: .fiveHour,
+                style: .aliasLogoProgress
+            ),
+            "…"
+        )
+    }
+
+    func test菜单栏仅Logo进度样式有效时不显示别名() {
+        let state = makeState(snapshot: makePeriodicSnapshot(fiveHourPercent: 67.5))
+
+        XCTAssertEqual(
+            UsageFormatter.menuBarText(
+                state: state,
+                dimension: .fiveHour,
+                style: .logoProgress
+            ),
+            ""
+        )
+    }
+
     func test菜单栏别名竖线样式资源包仍返回Token百分比() {
         let state = makeState(snapshot: makeTokenSnapshot(percent: 92.4))
 
@@ -118,7 +164,7 @@ final class UsageFormatterTests: XCTestCase {
         XCTAssertEqual(MenuBarUsageRisk.level(for: 80), .critical)
     }
 
-    func test菜单栏只为竖条样式的有效周期指标提供竖条数据() throws {
+    func test菜单栏为竖条和Logo进度样式提供有效周期指标() throws {
         let periodicState = makeState(snapshot: makePeriodicSnapshot(fiveHourPercent: 67.5))
 
         XCTAssertEqual(
@@ -131,12 +177,32 @@ final class UsageFormatterTests: XCTestCase {
             ).percent,
             67.5
         )
+        XCTAssertEqual(
+            try XCTUnwrap(
+                MenuBarVerticalUsage.metric(
+                    state: periodicState,
+                    dimension: .fiveHour,
+                    style: .logoProgress
+                )
+            ).percent,
+            67.5
+        )
         XCTAssertNil(
             MenuBarVerticalUsage.metric(
                 state: periodicState,
                 dimension: .fiveHour,
                 style: .percent
             )
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(
+                MenuBarVerticalUsage.metric(
+                    state: periodicState,
+                    dimension: .fiveHour,
+                    style: .aliasLogoProgress
+                )
+            ).percent,
+            67.5
         )
         XCTAssertNil(
             MenuBarVerticalUsage.metric(

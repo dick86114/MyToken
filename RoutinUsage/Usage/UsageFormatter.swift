@@ -39,8 +39,10 @@ enum UsageFormatter {
             return percent
         case .aliasPercent:
             return "\(truncatedMenuBarAlias(state.configuration.displayName)) \(percent)"
-        case .aliasVerticalBar:
+        case .aliasLogoProgress, .aliasVerticalBar:
             return truncatedMenuBarAlias(state.configuration.displayName)
+        case .logoProgress:
+            return ""
         }
     }
 

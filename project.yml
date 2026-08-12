@@ -48,6 +48,7 @@ targets:
           cp "$PROJECT_DIR/RoutinUsage/Views/KeyEditorView.swift" "$resource_dir/KeyEditorView.swift.txt"
           cp "$PROJECT_DIR/RoutinUsage/Views/OnboardingView.swift" "$resource_dir/OnboardingView.swift.txt"
           cp "$PROJECT_DIR/RoutinUsage/Views/UsageRowView.swift" "$resource_dir/UsageRowView.swift.txt"
+          cp "$PROJECT_DIR/RoutinUsage/Models/MenuBarStyle.swift" "$resource_dir/MenuBarStyle.swift.txt"
           cp "$PROJECT_DIR/RoutinUsage/App/StatusBarController.swift" "$resource_dir/StatusBarController.swift.txt"
           cp "$PROJECT_DIR/RoutinUsage/Updates/GitHubUpdateService.swift" "$resource_dir/GitHubUpdateService.swift.txt"
           cp "$PROJECT_DIR/RoutinUsage/Views/UsagePopoverView.swift" "$resource_dir/UsagePopoverView.swift.txt"
