@@ -87,4 +87,22 @@ final class RoutinGroupDetectionWebSessionTests: XCTestCase {
             XCTAssertEqual(error as? RoutinGroupDetectionWebError, .ambiguousLog)
         }
     }
+
+    func test日志页面表格已出现时不受页面其他Loading文案影响() {
+        XCTAssertTrue(
+            RoutinGroupDetectionPageParser.isLogPageReady(
+                bodyText: "模型请求日志\nLoading...\nHelp Center",
+                hasTable: true
+            )
+        )
+    }
+
+    func test日志页面没有表格时仍等待加载() {
+        XCTAssertFalse(
+            RoutinGroupDetectionPageParser.isLogPageReady(
+                bodyText: "模型请求日志\nLoading...",
+                hasTable: false
+            )
+        )
+    }
 }
