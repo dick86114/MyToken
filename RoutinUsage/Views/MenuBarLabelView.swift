@@ -136,11 +136,7 @@ enum MenuBarLogoUsageIcon {
             NSGraphicsContext.restoreGraphicsState()
         }
 
-        NSGraphicsContext.saveGraphicsState()
-        NSColor.labelColor.setFill()
-        NSBezierPath(rect: rect).fill()
-        outline.draw(in: rect, from: .zero, operation: .destinationIn, fraction: 1)
-        NSGraphicsContext.restoreGraphicsState()
+        outline.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
     }
 
     private static func clampedPercent(_ percent: Double) -> Double {
