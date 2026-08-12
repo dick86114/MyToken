@@ -91,14 +91,17 @@ private extension UsagePopoverView {
                     ProgressView()
                         .controlSize(.small)
                         .frame(width: 16, height: 16)
+                } else if checkInState == .alreadyCheckedIn {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Color.green)
                 } else {
                     Image(systemName: "checkmark.circle")
                 }
             }
             .liquidGlassButton()
             .disabled(checkInState.isBusy)
-            .help("Routin 签到")
-            .accessibilityLabel(checkInState.isBusy ? "正在处理 Routin 签到" : "Routin 签到")
+            .help(checkInHelpText)
+            .accessibilityLabel(checkInHelpText)
         }
         .overlay(alignment: .center) {
             Image(nsImage: NSApp.applicationIconImage)
@@ -213,6 +216,18 @@ private extension UsagePopoverView {
                 .keyboardShortcut("q")
             }
         }
+    }
+
+    var checkInHelpText: String {
+        if checkInState.isBusy {
+            return "正在处理 Routin 签到"
+        }
+
+        if checkInState == .alreadyCheckedIn {
+            return "今天已签到"
+        }
+
+        return "Routin 签到"
     }
 
     @ViewBuilder
