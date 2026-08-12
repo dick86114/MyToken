@@ -39,7 +39,7 @@ final class URLProtocolStub: URLProtocol, @unchecked Sendable {
             return
         }
 
-        state.lastRequest = request
+        state.lastRequest = capturedRequest(request)
 
         do {
             let (response, data) = try state.handler(request)
@@ -52,6 +52,28 @@ final class URLProtocolStub: URLProtocol, @unchecked Sendable {
     }
 
     override func stopLoading() {}
+
+    private func capturedRequest(_ request: URLRequest) -> URLRequest {
+        guard request.httpBody == nil, let bodyStream = request.httpBodyStream else {
+            return request
+        }
+
+        var captured = request
+        bodyStream.open()
+        defer { bodyStream.close() }
+
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 4_096)
+        while bodyStream.hasBytesAvailable {
+            let count = bodyStream.read(&buffer, maxLength: buffer.count)
+            guard count > 0 else {
+                break
+            }
+            data.append(buffer, count: count)
+        }
+        captured.httpBody = data
+        return captured
+    }
 }
 
 extension URLProtocolStub {
@@ -68,6 +90,10 @@ extension URLProtocolStub {
             state.lastRequest
         }
 
+        var requestCount: Int {
+            state.requestCount
+        }
+
         deinit {
             URLProtocolStub.registry.unregister(identifier: identifier, state: state)
         }
@@ -78,6 +104,7 @@ private extension URLProtocolStub {
     final class SessionState: @unchecked Sendable {
         private let lock = NSLock()
         private var storedLastRequest: URLRequest?
+        private var storedRequestCount = 0
         let handler: Handler
 
         init(handler: @escaping Handler) {
@@ -86,7 +113,16 @@ private extension URLProtocolStub {
 
         var lastRequest: URLRequest? {
             get { lock.withLock { storedLastRequest } }
-            set { lock.withLock { storedLastRequest = newValue } }
+            set {
+                lock.withLock {
+                    storedLastRequest = newValue
+                    storedRequestCount += 1
+                }
+            }
+        }
+
+        var requestCount: Int {
+            lock.withLock { storedRequestCount }
         }
     }
 
