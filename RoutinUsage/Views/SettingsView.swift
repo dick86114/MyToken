@@ -411,32 +411,7 @@ private extension SettingsView {
                     Text(routinCheckInState.statusText)
                         .accessibilityLabel("Routin 登录状态，\(routinCheckInState.statusText)")
                 }
-
-                Button("立即签到") {
-                    Task { await startRoutinCheckIn() }
-                }
-                .liquidGlassButton(prominent: true)
-                .disabled(routinCheckInState.isBusy)
-
-                if routinCheckInState.requiresLogin {
-                    Button("登录 Routin") {
-                        Task { await beginRoutinLogin() }
-                    }
-                    .liquidGlassButton()
-                    .disabled(routinCheckInState.isBusy)
-                } else {
-                    Button("重新登录") {
-                        Task { await beginRoutinLogin() }
-                    }
-                    .liquidGlassButton()
-                    .disabled(routinCheckInState.isBusy)
-
-                    Button("退出登录", role: .destructive) {
-                        Task { await signOutRoutin() }
-                    }
-                    .liquidGlassButton()
-                    .disabled(routinCheckInState.isBusy)
-                }
+                routinCheckInControls
             }
 
             Section("软件更新") {
@@ -445,8 +420,6 @@ private extension SettingsView {
                         .accessibilityLabel("当前版本 \(currentVersion)")
                 }
                 updateControls
-                Button("提交问题") { Task { await submitIssueReport() } }
-                    .liquidGlassButton()
             }
         }
         .formStyle(.grouped)
@@ -480,28 +453,52 @@ private extension SettingsView {
         )
     }
 
+    var routinCheckInControls: some View {
+        HStack(spacing: 8) {
+            Button("立即签到") {
+                Task { await startRoutinCheckIn() }
+            }
+            .liquidGlassButton(prominent: true)
+            .disabled(routinCheckInState.isBusy)
+
+            if routinCheckInState.requiresLogin {
+                Button("立即登录") {
+                    Task { await beginRoutinLogin() }
+                }
+                .liquidGlassButton()
+                .disabled(routinCheckInState.isBusy)
+            } else {
+                Button("退出登录", role: .destructive) {
+                    Task { await signOutRoutin() }
+                }
+                .liquidGlassButton()
+                .disabled(routinCheckInState.isBusy)
+            }
+
+            Spacer(minLength: 0)
+        }
+    }
+
     @ViewBuilder
     var updateControls: some View {
         switch updateStatus {
         case .idle:
-            Button("检查更新") { Task { await checkForUpdates() } }
-                .liquidGlassButton()
+            HStack(spacing: 8) {
+                Button("检查更新") { Task { await checkForUpdates() } }
+                    .liquidGlassButton()
+                issueReportButton
+                Spacer(minLength: 0)
+            }
         case .checking:
-            LabeledContent("正在检查更新") {
-                ProgressView()
-                    .controlSize(.small)
+            HStack(spacing: 8) {
+                LabeledContent("正在检查更新") {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+                issueReportButton
             }
         case let .available(update):
-            VStack(alignment: .leading, spacing: 6) {
-                Text("发现新版本 \(update.version)")
-                    .fontWeight(.medium)
-                UpdateNotesView(notes: update.notes)
-                HStack {
-                    Button("安装更新") { Task { await installAvailableUpdate() } }
-                        .liquidGlassButton(prominent: true)
-                    Link("查看发布说明", destination: update.releaseURL)
-                }
-            }
+            availableUpdateControls(update)
         case let .downloading(progress):
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
@@ -517,17 +514,49 @@ private extension SettingsView {
                 } else {
                     ProgressView()
                 }
+                HStack {
+                    issueReportButton
+                    Spacer(minLength: 0)
+                }
             }
         case let .completed(version):
-            Label("更新完成，当前版本 \(version)", systemImage: "checkmark.circle.fill")
-                .foregroundStyle(.green)
+            HStack(spacing: 8) {
+                Label("更新完成，当前版本 \(version)", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                issueReportButton
+                Spacer(minLength: 0)
+            }
         case let .failed(message):
             VStack(alignment: .leading, spacing: 6) {
                 Text(message).foregroundStyle(.red)
-                Button("重试") { Task { await checkForUpdates() } }
-                    .liquidGlassButton()
+                HStack(spacing: 8) {
+                    Button("重试") { Task { await checkForUpdates() } }
+                        .liquidGlassButton()
+                    issueReportButton
+                    Spacer(minLength: 0)
+                }
             }
         }
+    }
+
+    func availableUpdateControls(_ update: AppUpdate) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("发现新版本 \(update.version)")
+                .fontWeight(.medium)
+            UpdateNotesView(notes: update.notes)
+            HStack(spacing: 8) {
+                Button("安装更新") { Task { await installAvailableUpdate() } }
+                    .liquidGlassButton(prominent: true)
+                Link("查看发布说明", destination: update.releaseURL)
+                issueReportButton
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    var issueReportButton: some View {
+        Button("提交问题") { Task { await submitIssueReport() } }
+            .liquidGlassButton()
     }
 
     var currentVersion: String {

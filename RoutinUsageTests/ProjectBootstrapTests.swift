@@ -387,7 +387,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(popover.contains("checkmark.circle"))
         XCTAssertTrue(popover.contains("startRoutinCheckIn"))
         XCTAssertTrue(settings.contains("Section(\"Routin 签到\")"))
-        XCTAssertTrue(settings.contains("登录 Routin"))
+        XCTAssertTrue(settings.contains("立即登录"))
         XCTAssertTrue(settings.contains("退出登录"))
     }
 
@@ -398,6 +398,16 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(settings.contains("TextField(\"账号"))
         XCTAssertFalse(settings.contains("TextField(\"密码"))
         XCTAssertFalse(settings.contains("Cookie"))
+    }
+
+    func test签到和更新操作在设置页使用紧凑按钮组() throws {
+        let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+
+        XCTAssertTrue(settings.contains("var routinCheckInControls: some View"))
+        XCTAssertTrue(settings.contains("Button(\"立即登录\")"))
+        XCTAssertFalse(settings.contains("重新登录"))
+        XCTAssertTrue(settings.contains("func availableUpdateControls(_ update: AppUpdate) -> some View"))
+        XCTAssertTrue(settings.contains("Button(\"提交问题\")"))
     }
 
     func test菜单栏弹窗会以绿色实心图标标记今天已签到() throws {
