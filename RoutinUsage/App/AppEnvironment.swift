@@ -59,6 +59,8 @@ final class AppEnvironment {
     let settings: AppSettings
     let store: UsageStore
     let loginItemManager: any LoginItemManaging
+    let routinCheckIn: RoutinCheckInService
+    let routinWebSession: RoutinWebSession?
     var showsOnboarding = false
     private(set) var updateStatus: AppUpdateStatus = .idle
     private(set) var updateCompletionNotice: String?
@@ -92,7 +94,9 @@ final class AppEnvironment {
         updateService: any UpdateChecking = NoUpdateService(),
         updateCheckScheduler: (any UpdateCheckScheduling)? = nil,
         notificationTaskYield: @escaping @Sendable () async -> Void = { await Task.yield() },
-        logWriter: any AppLogWriting = NoopAppLogWriter()
+        logWriter: any AppLogWriting = NoopAppLogWriter(),
+        routinCheckIn: RoutinCheckInService? = nil,
+        routinWebSession: RoutinWebSession? = nil
     ) {
         self.settings = settings
         self.store = store
@@ -106,6 +110,8 @@ final class AppEnvironment {
         self.logWriter = logWriter
         self.updateCheckScheduler = updateCheckScheduler ?? UpdateCheckScheduler()
         self.notificationTaskYield = notificationTaskYield
+        self.routinWebSession = routinWebSession
+        self.routinCheckIn = routinCheckIn ?? RoutinCheckInService(session: UnavailableRoutinWebSession())
         updateCompletionNotice = UpdateCompletionNotice.consume()
     }
 
@@ -121,6 +127,13 @@ final class AppEnvironment {
         let notificationSender = AuthorizationCachingNotificationSender(
             sender: UserNotificationSender()
         )
+        let routinWebSession = RoutinWebSession()
+        let routinCheckIn = RoutinCheckInService(session: routinWebSession)
+        routinWebSession.onLoginCompleted = {
+            Task { @MainActor in
+                await routinCheckIn.didFinishLogin()
+            }
+        }
         let store = UsageStore(
             keyRepository: keyRepository,
             localStore: localStore,
@@ -144,7 +157,9 @@ final class AppEnvironment {
             notificationSender: notificationSender,
             updateService: GitHubUpdateService(logWriter: logWriter),
             updateCheckScheduler: UpdateCheckScheduler(),
-            logWriter: logWriter
+            logWriter: logWriter,
+            routinCheckIn: routinCheckIn,
+            routinWebSession: routinWebSession
         )
     }
 
@@ -352,6 +367,28 @@ final class AppEnvironment {
         try? keyRepository.read(id: id)
     }
 
+    func startRoutinCheckIn() async {
+        if routinWebSession != nil {
+            NotificationCenter.default.post(name: .showRoutinCheckInWindow, object: nil)
+        }
+        await routinCheckIn.startCheckIn()
+        if routinCheckIn.state == .needsLogin {
+            await beginRoutinLogin()
+        }
+    }
+
+    func beginRoutinLogin() async {
+        guard routinWebSession != nil else {
+            return
+        }
+        await routinCheckIn.beginLogin()
+        NotificationCenter.default.post(name: .showRoutinCheckInWindow, object: nil)
+    }
+
+    func signOutRoutin() async {
+        await routinCheckIn.signOut()
+    }
+
     func stop() {
         guard isStarted else {
             return
@@ -368,6 +405,13 @@ final class AppEnvironment {
     deinit {
         updateCheckTask?.cancel()
     }
+}
+
+private actor UnavailableRoutinWebSession: RoutinWebSessionManaging {
+    func hasAuthenticatedSession() async -> Bool { false }
+    func prepareLogin() async {}
+    func performCheckIn() async throws -> RoutinCheckInOutcome { .needsLogin }
+    func clearRoutinWebsiteData() async {}
 }
 
 private extension AppEnvironment {

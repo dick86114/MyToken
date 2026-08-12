@@ -4,11 +4,14 @@ import SwiftUI
 @MainActor
 struct UsagePopoverView: View {
     typealias InstallAvailableUpdate = @MainActor () async -> Void
+    typealias StartRoutinCheckIn = @MainActor () async -> Void
 
     @Bindable var store: UsageStore
     @Bindable var settings: AppSettings
     let updateStatus: AppUpdateStatus
     let installAvailableUpdate: InstallAvailableUpdate
+    let checkInState: RoutinCheckInState
+    let startRoutinCheckIn: StartRoutinCheckIn
 
     @Environment(\.openWindow) private var openWindow
 
@@ -16,12 +19,16 @@ struct UsagePopoverView: View {
         store: UsageStore,
         settings: AppSettings,
         updateStatus: AppUpdateStatus = .idle,
-        installAvailableUpdate: @escaping InstallAvailableUpdate = {}
+        installAvailableUpdate: @escaping InstallAvailableUpdate = {},
+        checkInState: RoutinCheckInState = .idle,
+        startRoutinCheckIn: @escaping StartRoutinCheckIn = {}
     ) {
         self.store = store
         self.settings = settings
         self.updateStatus = updateStatus
         self.installAvailableUpdate = installAvailableUpdate
+        self.checkInState = checkInState
+        self.startRoutinCheckIn = startRoutinCheckIn
     }
 
     var body: some View {
@@ -76,6 +83,22 @@ private extension UsagePopoverView {
             .disabled(store.isRefreshing || store.orderedKeyIDs.isEmpty)
             .help("刷新全部 Key")
             .accessibilityLabel(store.isRefreshing ? "正在刷新全部 Key" : "刷新全部 Key")
+
+            Button {
+                Task { await startRoutinCheckIn() }
+            } label: {
+                if checkInState.isBusy {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(width: 16, height: 16)
+                } else {
+                    Image(systemName: "checkmark.circle")
+                }
+            }
+            .liquidGlassButton()
+            .disabled(checkInState.isBusy)
+            .help("Routin 签到")
+            .accessibilityLabel(checkInState.isBusy ? "正在处理 Routin 签到" : "Routin 签到")
         }
         .overlay(alignment: .center) {
             Image(nsImage: NSApp.applicationIconImage)
@@ -148,6 +171,19 @@ private extension UsagePopoverView {
                     .font(.caption)
                     .foregroundStyle(.green)
                     .accessibilityElement(children: .combine)
+            }
+
+            if checkInState != .idle {
+                HStack(spacing: 6) {
+                    Image(systemName: checkInState.isTerminalResult ? "checkmark.circle" : "checkmark.circle.badge.questionmark")
+                        .accessibilityHidden(true)
+                    Text(checkInState.statusText)
+                        .lineLimit(2)
+                }
+                .font(.caption)
+                .foregroundStyle(checkInState.isTerminalResult ? Color.secondary : Color.orange)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Routin 签到：\(checkInState.statusText)")
             }
 
             HStack(spacing: 6) {

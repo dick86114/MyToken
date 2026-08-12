@@ -51,13 +51,27 @@ struct RoutinUsageApp: App {
                 checkForUpdates: environment.checkForUpdates,
                 installAvailableUpdate: environment.installAvailableUpdate,
                 submitIssueReport: environment.openIssueReport,
-                readKey: environment.readKey(id:)
+                readKey: environment.readKey(id:),
+                routinCheckInState: environment.routinCheckIn.state,
+                startRoutinCheckIn: environment.startRoutinCheckIn,
+                beginRoutinLogin: environment.beginRoutinLogin,
+                signOutRoutin: environment.signOutRoutin
             )
         }
         .defaultSize(
             width: WindowFramePersistence.defaultSize.width,
             height: WindowFramePersistence.defaultSize.height
         )
+        .windowResizability(.contentMinSize)
+
+        Window("Routin 签到", id: "routin-check-in") {
+            if let session = environment.routinWebSession {
+                RoutinCheckInWindow(service: environment.routinCheckIn, session: session)
+            } else {
+                ContentUnavailableView("Routin 签到暂不可用", systemImage: "wifi.exclamationmark")
+            }
+        }
+        .defaultSize(width: 720, height: 760)
         .windowResizability(.contentMinSize)
     }
 }

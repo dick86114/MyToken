@@ -31,6 +31,21 @@ final class RoutinCheckInServiceTests: XCTestCase {
         XCTAssertEqual(checkInCalls, 1)
     }
 
+    func test未发起签到时登录成功会保留已登录状态() async {
+        let session = RoutinWebSessionFake(isAuthenticated: false, outcome: .succeeded)
+        let service = await MainActor.run { RoutinCheckInService(session: session) }
+
+        await service.beginLogin()
+        await session.setAuthenticated(true)
+        await service.didFinishLogin()
+
+        await MainActor.run {
+            XCTAssertEqual(service.state, .loggedIn)
+        }
+        let checkInCalls = await session.checkInCallCount()
+        XCTAssertEqual(checkInCalls, 0)
+    }
+
     func test签到进行中重复点击只发起一次请求() async {
         let session = RoutinWebSessionFake(isAuthenticated: true, outcome: .suspended)
         let service = await MainActor.run { RoutinCheckInService(session: session) }

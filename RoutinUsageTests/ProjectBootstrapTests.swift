@@ -370,6 +370,36 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(usagePopoverView.contains("SettingsLink"))
     }
 
+    func test应用提供受控的Routin签到窗口和双入口() throws {
+        let app = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
+        let environment = try sourceText(at: "RoutinUsage/App/AppEnvironment.swift")
+        let statusBarController = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
+        let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
+        let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+
+        XCTAssertTrue(app.contains("Window(\"Routin 签到\", id: \"routin-check-in\")"))
+        XCTAssertTrue(app.contains("RoutinCheckInWindow"))
+        XCTAssertTrue(environment.contains("let routinCheckIn: RoutinCheckInService"))
+        XCTAssertTrue(environment.contains("func startRoutinCheckIn() async"))
+        XCTAssertTrue(environment.contains("func beginRoutinLogin() async"))
+        XCTAssertTrue(environment.contains("func signOutRoutin() async"))
+        XCTAssertTrue(statusBarController.contains("environment.routinCheckIn.state"))
+        XCTAssertTrue(popover.contains("checkmark.circle"))
+        XCTAssertTrue(popover.contains("startRoutinCheckIn"))
+        XCTAssertTrue(settings.contains("Section(\"Routin 签到\")"))
+        XCTAssertTrue(settings.contains("登录 Routin"))
+        XCTAssertTrue(settings.contains("退出登录"))
+    }
+
+    func test签到设置页不保存Routin账号密码或Cookie() throws {
+        let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+
+        XCTAssertFalse(settings.contains("SecureField(\"Routin"))
+        XCTAssertFalse(settings.contains("TextField(\"账号"))
+        XCTAssertFalse(settings.contains("TextField(\"密码"))
+        XCTAssertFalse(settings.contains("Cookie"))
+    }
+
     private func sourceText(at relativePath: String) throws -> String {
         guard let source = try optionalSourceText(at: relativePath) else {
             throw CocoaError(.fileNoSuchFile)

@@ -18,6 +18,7 @@ enum RoutinCheckInState: Equatable, Sendable {
     case idle
     case needsLogin
     case loggingIn
+    case loggedIn
     case checkingIn
     case succeeded
     case alreadyCheckedIn
@@ -31,6 +32,8 @@ enum RoutinCheckInState: Equatable, Sendable {
             return "请先登录 Routin"
         case .loggingIn:
             return "正在登录 Routin"
+        case .loggedIn:
+            return "已登录 Routin"
         case .checkingIn:
             return "正在签到"
         case .succeeded:
@@ -57,7 +60,7 @@ enum RoutinCheckInState: Equatable, Sendable {
         switch self {
         case .succeeded, .alreadyCheckedIn, .failed:
             return true
-        case .idle, .needsLogin, .loggingIn, .checkingIn:
+        case .idle, .needsLogin, .loggingIn, .loggedIn, .checkingIn:
             return false
         }
     }

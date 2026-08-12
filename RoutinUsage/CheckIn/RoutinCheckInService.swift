@@ -33,6 +33,10 @@ final class RoutinCheckInService {
             state = .needsLogin
             return
         }
+        guard pendingAction != nil else {
+            state = .loggedIn
+            return
+        }
         await performPendingAction()
     }
 
@@ -50,6 +54,10 @@ final class RoutinCheckInService {
         }
         guard await session.hasAuthenticatedSession() else {
             state = .needsLogin
+            return
+        }
+        guard pendingAction != nil else {
+            state = .loggedIn
             return
         }
         await performPendingAction()
@@ -74,7 +82,7 @@ final class RoutinCheckInService {
 
     private func performPendingAction() async {
         guard pendingAction != nil else {
-            state = .idle
+            state = .loggedIn
             return
         }
         state = .checkingIn

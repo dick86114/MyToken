@@ -21,6 +21,9 @@ struct SettingsView: View {
     typealias InstallAvailableUpdate = @MainActor () async -> Void
     typealias SubmitIssueReport = @MainActor () async -> Void
     typealias ReadKey = @MainActor (UUID) -> String?
+    typealias StartRoutinCheckIn = @MainActor () async -> Void
+    typealias BeginRoutinLogin = @MainActor () async -> Void
+    typealias SignOutRoutin = @MainActor () async -> Void
 
     private enum EditorPresentation: Identifiable {
         case add
@@ -47,6 +50,10 @@ struct SettingsView: View {
     private let installAvailableUpdate: InstallAvailableUpdate
     private let submitIssueReport: SubmitIssueReport
     private let readKey: ReadKey
+    private let routinCheckInState: RoutinCheckInState
+    private let startRoutinCheckIn: StartRoutinCheckIn
+    private let beginRoutinLogin: BeginRoutinLogin
+    private let signOutRoutin: SignOutRoutin
 
     @State private var editor: EditorPresentation?
     @State private var pendingDeletion: KeyConfiguration?
@@ -66,7 +73,11 @@ struct SettingsView: View {
         checkForUpdates: @escaping CheckForUpdates = {},
         installAvailableUpdate: @escaping InstallAvailableUpdate = {},
         submitIssueReport: @escaping SubmitIssueReport = {},
-        readKey: @escaping ReadKey = { _ in nil }
+        readKey: @escaping ReadKey = { _ in nil },
+        routinCheckInState: RoutinCheckInState = .idle,
+        startRoutinCheckIn: @escaping StartRoutinCheckIn = {},
+        beginRoutinLogin: @escaping BeginRoutinLogin = {},
+        signOutRoutin: @escaping SignOutRoutin = {}
     ) {
         self.store = store
         self.settings = settings
@@ -78,6 +89,10 @@ struct SettingsView: View {
         self.installAvailableUpdate = installAvailableUpdate
         self.submitIssueReport = submitIssueReport
         self.readKey = readKey
+        self.routinCheckInState = routinCheckInState
+        self.startRoutinCheckIn = startRoutinCheckIn
+        self.beginRoutinLogin = beginRoutinLogin
+        self.signOutRoutin = signOutRoutin
         _orderedKeyIDs = State(initialValue: store.orderedKeyIDs)
         _lowThreshold = State(initialValue: settings.thresholds.low)
         _highThreshold = State(initialValue: settings.thresholds.high)
@@ -389,6 +404,39 @@ private extension SettingsView {
             Section("系统") {
                 Toggle("登录时启动", isOn: launchAtLoginBinding)
                     .accessibilityLabel("登录时启动")
+            }
+
+            Section("Routin 签到") {
+                LabeledContent("登录状态") {
+                    Text(routinCheckInState.statusText)
+                        .accessibilityLabel("Routin 登录状态，\(routinCheckInState.statusText)")
+                }
+
+                Button("立即签到") {
+                    Task { await startRoutinCheckIn() }
+                }
+                .liquidGlassButton(prominent: true)
+                .disabled(routinCheckInState.isBusy)
+
+                if routinCheckInState.requiresLogin {
+                    Button("登录 Routin") {
+                        Task { await beginRoutinLogin() }
+                    }
+                    .liquidGlassButton()
+                    .disabled(routinCheckInState.isBusy)
+                } else {
+                    Button("重新登录") {
+                        Task { await beginRoutinLogin() }
+                    }
+                    .liquidGlassButton()
+                    .disabled(routinCheckInState.isBusy)
+
+                    Button("退出登录", role: .destructive) {
+                        Task { await signOutRoutin() }
+                    }
+                    .liquidGlassButton()
+                    .disabled(routinCheckInState.isBusy)
+                }
             }
 
             Section("软件更新") {
