@@ -71,7 +71,12 @@ struct UsagePopoverView: View {
             Button("继续") {
                 guard let keyID = pendingDetectionKeyID else { return }
                 pendingDetectionKeyID = nil
-                Task { await startCodexGroupDetection(keyID) }
+                Task {
+                    await startCodexGroupDetection(keyID)
+                    if codexGroupDetection.state(for: keyID) == .needsLogin {
+                        openWindow(id: "routin-check-in")
+                    }
+                }
             }
             Button("取消", role: .cancel) { pendingDetectionKeyID = nil }
         } message: {
@@ -225,6 +230,8 @@ private extension UsagePopoverView {
                 .accessibilityLabel("Routin 签到：\(checkInState.statusText)")
             }
 
+            codexGroupDetectionStatus
+
             HStack(spacing: 6) {
                 Image(systemName: store.isRefreshing ? "arrow.triangle.2.circlepath" : "clock")
                     .accessibilityHidden(true)
@@ -252,6 +259,78 @@ private extension UsagePopoverView {
                 .keyboardShortcut("q")
             }
         }
+    }
+
+    @ViewBuilder
+    var codexGroupDetectionStatus: some View {
+        let activeStates = store.orderedKeyIDs.compactMap { keyID -> (KeyUsageState, CodexGroupDetectionState)? in
+            guard let keyState = store.state(for: keyID) else {
+                return nil
+            }
+            let detectionState = codexGroupDetection.state(for: keyID)
+            guard detectionState != .idle else {
+                return nil
+            }
+            return (keyState, detectionState)
+        }
+
+        if let (keyState, detectionState) = activeStates.first(where: { $0.1.isBusy || $0.1 == .needsLogin })
+            ?? activeStates.first {
+            HStack(alignment: .top, spacing: 6) {
+                codexGroupDetectionStatusIcon(for: detectionState)
+                Text("Codex 分组：\(keyState.configuration.displayName)，\(codexGroupDetectionText(for: keyState, state: detectionState))")
+                    .lineLimit(2)
+                Spacer(minLength: 4)
+            }
+            .font(.caption)
+            .foregroundStyle(codexGroupDetectionColor(for: detectionState))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Codex 分组检测：\(keyState.configuration.displayName)，\(codexGroupDetectionText(for: keyState, state: detectionState))")
+        }
+    }
+
+    @ViewBuilder
+    func codexGroupDetectionStatusIcon(for state: CodexGroupDetectionState) -> some View {
+        if state.isBusy {
+            ProgressView()
+                .controlSize(.small)
+                .frame(width: 14, height: 14)
+                .accessibilityHidden(true)
+        } else {
+            Image(systemName: codexGroupDetectionSymbol(for: state))
+                .accessibilityHidden(true)
+        }
+    }
+
+    func codexGroupDetectionText(
+        for keyState: KeyUsageState,
+        state: CodexGroupDetectionState
+    ) -> String {
+        if state == .succeeded,
+           let groupName = codexGroupDetection.record(for: keyState.configuration.id)?.groupName {
+            return "已获取当前分组：\(groupName)"
+        }
+        return state.statusText
+    }
+
+    func codexGroupDetectionSymbol(for state: CodexGroupDetectionState) -> String {
+        if state.isBusy {
+            return "arrow.triangle.2.circlepath"
+        }
+        if state == .succeeded {
+            return "checkmark.circle.fill"
+        }
+        if state == .needsLogin {
+            return "person.crop.circle.badge.exclamationmark"
+        }
+        return state.isFailure ? "exclamationmark.triangle.fill" : "info.circle"
+    }
+
+    func codexGroupDetectionColor(for state: CodexGroupDetectionState) -> Color {
+        if state == .succeeded {
+            return .green
+        }
+        return state.isFailure ? .orange : .secondary
     }
 
     var checkInHelpText: String {

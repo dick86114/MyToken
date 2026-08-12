@@ -14,6 +14,7 @@ enum CodexGroupDetectionFailure: Equatable, Sendable {
 
 enum CodexGroupDetectionState: Equatable, Sendable {
     case idle
+    case checkingAccount
     case needsLogin
     case probing
     case waitingForLog
@@ -22,7 +23,52 @@ enum CodexGroupDetectionState: Equatable, Sendable {
     case failed(CodexGroupDetectionFailure)
 
     var isBusy: Bool {
-        self == .probing || self == .waitingForLog
+        self == .checkingAccount || self == .probing || self == .waitingForLog
+    }
+
+    var statusText: String {
+        switch self {
+        case .idle:
+            return ""
+        case .checkingAccount:
+            return "正在确认 Routin 登录状态"
+        case .needsLogin:
+            return "请在打开的 Routin 页面完成登录，随后会继续获取"
+        case .probing:
+            return "正在发送 Codex 探测请求"
+        case .waitingForLog:
+            return "请求已发送，正在等待 Routin 请求日志"
+        case .succeeded:
+            return "已获取 Codex 当前分组"
+        case .accountMismatch:
+            return "当前登录账号与此 Key 的已关联账号不同，请先解除关联"
+        case let .failed(failure):
+            switch failure {
+            case .accountUnavailable:
+                return "无法读取 Routin 账号信息，请重新登录后重试"
+            case .invalidKey:
+                return "Key 无效，未能发送 Codex 探测请求"
+            case .modelUnavailable:
+                return "Codex 探测模型暂不可用，请稍后重试"
+            case .network:
+                return "网络错误，未能完成 Codex 分组获取"
+            case .logTimeout:
+                return "已发送请求，但 30 秒内未找到对应日志"
+            case .pageChanged:
+                return "无法识别 Routin 页面结构，请稍后重试"
+            case .logNotFound:
+                return "未找到对应请求日志，请稍后重试"
+            case .unknown:
+                return "获取 Codex 当前分组失败，请稍后重试"
+            }
+        }
+    }
+
+    var isFailure: Bool {
+        if case .failed = self {
+            return true
+        }
+        return self == .accountMismatch
     }
 }
 
@@ -66,6 +112,7 @@ final class CodexGroupDetectionService {
             return
         }
         pendingDetection = PendingDetection(keyID: keyID, secret: secret)
+        states[keyID] = .checkingAccount
 
         guard await webSession.hasAuthenticatedSession() else {
             states[keyID] = .needsLogin
@@ -78,6 +125,9 @@ final class CodexGroupDetectionService {
     func didFinishLogin() async {
         guard pendingDetection != nil, activeTask == nil else {
             return
+        }
+        if let pendingDetection {
+            states[pendingDetection.keyID] = .checkingAccount
         }
         guard await webSession.hasAuthenticatedSession() else {
             if let pendingDetection {

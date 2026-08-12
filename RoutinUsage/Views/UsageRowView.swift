@@ -206,6 +206,8 @@ private extension UsageRowView {
                     }
                 }
 
+                codexGroupDetectionStatus
+
                 if state.isRefreshing || state.isStale || state.error != nil {
                     Label(
                         UsageFormatter.statusText(state: state),
@@ -218,6 +220,57 @@ private extension UsageRowView {
         } else {
             statusLabel
         }
+    }
+
+    @ViewBuilder
+    var codexGroupDetectionStatus: some View {
+        if detectionState == .idle {
+            EmptyView()
+        } else {
+            HStack(spacing: 5) {
+                if detectionState.isBusy {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(width: 12, height: 12)
+                        .accessibilityHidden(true)
+                } else {
+                    Image(systemName: codexGroupDetectionSymbol)
+                        .accessibilityHidden(true)
+                }
+                Text(codexGroupDetectionStatusText)
+            }
+            .font(.caption)
+            .foregroundStyle(codexGroupDetectionColor)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Codex 分组检测：\(codexGroupDetectionStatusText)")
+        }
+    }
+
+    var codexGroupDetectionStatusText: String {
+        if detectionState == .succeeded, let groupName = detectionRecord?.groupName {
+            return "Codex 当前分组：\(groupName)"
+        }
+        return detectionState.statusText
+    }
+
+    var codexGroupDetectionSymbol: String {
+        if detectionState.isBusy {
+            return "arrow.triangle.2.circlepath"
+        }
+        if detectionState == .succeeded {
+            return "checkmark.circle.fill"
+        }
+        if detectionState == .needsLogin {
+            return "person.crop.circle.badge.exclamationmark"
+        }
+        return detectionState.isFailure ? "exclamationmark.triangle.fill" : "info.circle"
+    }
+
+    var codexGroupDetectionColor: Color {
+        if detectionState == .succeeded {
+            return .green
+        }
+        return detectionState.isFailure ? .orange : .secondary
     }
 
     @ViewBuilder
