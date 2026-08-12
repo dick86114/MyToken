@@ -20,7 +20,7 @@ protocol RoutinGroupDetectionWebSessionManaging: Sendable {
 enum RoutinGroupDetectionPageParser {
     private struct AccountPayload: Decodable {
         let email: String
-        let displayName: String
+        let displayName: String?
     }
 
     private struct LogRow: Decodable {
@@ -32,12 +32,16 @@ enum RoutinGroupDetectionPageParser {
         guard
             let data = json.data(using: .utf8),
             let payload = try? JSONDecoder().decode(AccountPayload.self, from: data),
-            !payload.email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-            !payload.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            !payload.email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         else {
             return nil
         }
-        return RoutinAccountIdentity.make(email: payload.email, displayName: payload.displayName)
+        let displayName = payload.displayName?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return RoutinAccountIdentity.make(
+            email: payload.email,
+            displayName: displayName?.isEmpty == false ? displayName! : "Routin 账号"
+        )
     }
 
     static func groupName(
@@ -90,13 +94,15 @@ final class RoutinGroupDetectionWebSession: RoutinGroupDetectionWebSessionManagi
         (() => {
           const text = document.body?.innerText || '';
           const email = (text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/i) || [''])[0];
-          const usernameLabel = Array.from(document.querySelectorAll('*')).find((element) => {
-            return (element.textContent || '').trim() === '用户名';
+          const labels = new Set(['用户名', '昵称', '账号名称']);
+          const label = Array.from(document.querySelectorAll('*')).find((element) => {
+            return labels.has((element.textContent || '').trim());
           });
-          const displayName = usernameLabel?.parentElement?.innerText
-            ?.split('\n')
+          const values = (label?.parentElement?.innerText || '')
+            .split('\n')
             .map((value) => value.trim())
-            .find((value) => value && value !== '用户名') || '';
+            .filter((value) => value && !labels.has(value) && value !== email);
+          const displayName = values[0] || '';
           return JSON.stringify({ email, displayName });
         })()
         """)

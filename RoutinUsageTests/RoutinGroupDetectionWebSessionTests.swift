@@ -3,7 +3,7 @@ import XCTest
 @testable import RoutinUsage
 
 final class RoutinGroupDetectionWebSessionTests: XCTestCase {
-    func test账户页面结果要求邮箱和昵称并生成账号摘要() throws {
+    func test账户页面结果使用邮箱和昵称生成账号摘要() throws {
         let identity = try XCTUnwrap(
             RoutinGroupDetectionPageParser.accountIdentity(
                 from: #"{"email":"  MEMBER@EXAMPLE.COM ","displayName":"测试账号"}"#
@@ -21,6 +21,23 @@ final class RoutinGroupDetectionWebSessionTests: XCTestCase {
             RoutinGroupDetectionPageParser.accountIdentity(
                 from: #"{"email":"","displayName":"测试账号"}"#
             )
+        )
+    }
+
+    func test账户页面缺少昵称时仍使用邮箱创建关联摘要() throws {
+        let identity = try XCTUnwrap(
+            RoutinGroupDetectionPageParser.accountIdentity(
+                from: #"{"email":"member@example.com","displayName":""}"#
+            )
+        )
+
+        XCTAssertEqual(identity.displayName, "Routin 账号")
+        XCTAssertEqual(
+            identity.fingerprint,
+            RoutinAccountIdentity.make(
+                email: "member@example.com",
+                displayName: "任意显示名"
+            ).fingerprint
         )
     }
 
