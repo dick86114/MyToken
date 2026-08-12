@@ -6,6 +6,46 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertEqual(RoutinUsageApp.applicationName, "MyRoutin")
     }
 
+    func test应用提供版本号和GitHub项目地址() throws {
+        XCTAssertFalse(RoutinUsageApp.currentVersion.isEmpty)
+        XCTAssertEqual(
+            RoutinUsageApp.githubURL.absoluteString,
+            "https://github.com/dick86114/MyRoutin"
+        )
+    }
+
+    func test菜单栏弹窗左侧版本号可点击并链接到GitHub() throws {
+        let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
+        let app = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
+
+        XCTAssertTrue(app.contains("nonisolated static var currentVersion"))
+        XCTAssertTrue(app.contains("nonisolated static let githubURL"))
+        XCTAssertTrue(popover.contains("Link(destination: RoutinUsageApp.githubURL)"))
+        XCTAssertTrue(popover.contains("RoutinUsageApp.currentVersion"))
+        XCTAssertTrue(popover.contains("打开 GitHub 项目"))
+        XCTAssertTrue(popover.contains(".underline()"))
+        XCTAssertFalse(popover.contains("arrow.up.right.square"))
+    }
+
+    func test菜单栏弹窗顶部使用左版本中Logo右刷新布局() throws {
+        let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
+
+        XCTAssertTrue(popover.contains("Image(nsImage: NSApp.applicationIconImage)"))
+        XCTAssertTrue(popover.contains(".overlay(alignment: .center)"))
+        XCTAssertTrue(popover.contains("Image(systemName: \"arrow.clockwise\")"))
+        XCTAssertFalse(popover.contains("Picker(\"用量周期\""))
+    }
+
+    func test菜单栏弹窗同屏展示五小时与周用量() throws {
+        let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
+        let row = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
+
+        XCTAssertFalse(popover.contains("dimension: settings.displayDimension"))
+        XCTAssertTrue(row.contains("periodicContent"))
+        XCTAssertTrue(row.contains("metricContent(title: \"5 小时\""))
+        XCTAssertTrue(row.contains("metricContent(title: \"周\""))
+    }
+
     func test菜单栏使用原生状态栏按钮承载左右键交互() throws {
         let source = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
 
@@ -274,8 +314,8 @@ final class ProjectBootstrapTests: XCTestCase {
     func test弹窗详情显示剩余时长与配对分组倍率且不显示允许模型() throws {
         let usageRowView = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
 
-        XCTAssertTrue(usageRowView.contains("\"5 小时剩余\""))
-        XCTAssertTrue(usageRowView.contains("\"周剩余\""))
+        XCTAssertTrue(usageRowView.contains("metricContent(title: \"5 小时\""))
+        XCTAssertTrue(usageRowView.contains("metricContent(title: \"周\""))
         XCTAssertTrue(usageRowView.contains("UsageFormatter.remainingDurationText"))
         XCTAssertTrue(usageRowView.contains("groupMultipliers"))
         XCTAssertFalse(usageRowView.contains("allowedModels"))

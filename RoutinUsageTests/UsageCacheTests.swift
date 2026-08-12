@@ -56,32 +56,32 @@ final class UsageCacheTests: XCTestCase {
         XCTAssertNil(context.defaults.data(forKey: "usageSnapshots"))
     }
 
-    func test刷新间隔一分钟时四分五十九秒仍新鲜五分钟过期() {
+    func test刷新间隔一分钟时五十九秒仍新鲜一分钟过期() {
         let lastSuccess = Date(timeIntervalSince1970: 1_000)
 
         XCTAssertFalse(UsageFreshness.isStale(
             lastSuccess: lastSuccess,
-            now: lastSuccess.addingTimeInterval(299),
+            now: lastSuccess.addingTimeInterval(59),
             refreshMinutes: 1
         ))
         XCTAssertTrue(UsageFreshness.isStale(
             lastSuccess: lastSuccess,
-            now: lastSuccess.addingTimeInterval(300),
+            now: lastSuccess.addingTimeInterval(60),
             refreshMinutes: 1
         ))
     }
 
-    func test刷新间隔十五分钟时二十九分五十九秒仍新鲜三十分钟过期() {
+    func test刷新间隔十五分钟时十四分五十九秒仍新鲜十五分钟过期() {
         let lastSuccess = Date(timeIntervalSince1970: 1_000)
 
         XCTAssertFalse(UsageFreshness.isStale(
             lastSuccess: lastSuccess,
-            now: lastSuccess.addingTimeInterval(1_799),
+            now: lastSuccess.addingTimeInterval(899),
             refreshMinutes: 15
         ))
         XCTAssertTrue(UsageFreshness.isStale(
             lastSuccess: lastSuccess,
-            now: lastSuccess.addingTimeInterval(1_800),
+            now: lastSuccess.addingTimeInterval(900),
             refreshMinutes: 15
         ))
     }

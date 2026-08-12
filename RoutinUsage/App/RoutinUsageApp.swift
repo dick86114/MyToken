@@ -11,6 +11,11 @@ final class RoutinUsageAppDelegate: NSObject, NSApplicationDelegate {
 @MainActor
 struct RoutinUsageApp: App {
     nonisolated static let applicationName = "MyRoutin"
+    nonisolated static let githubURL = URL(string: "https://github.com/dick86114/MyRoutin")!
+
+    nonisolated static var currentVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+    }
 
     @NSApplicationDelegateAdaptor(RoutinUsageAppDelegate.self) private var appDelegate
     @State private var environment: AppEnvironment

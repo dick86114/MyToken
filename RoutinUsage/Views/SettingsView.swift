@@ -483,7 +483,7 @@ private extension SettingsView {
     }
 
     var currentVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+        RoutinUsageApp.currentVersion
     }
 
     @ViewBuilder
