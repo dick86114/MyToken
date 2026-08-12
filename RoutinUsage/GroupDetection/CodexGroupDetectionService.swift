@@ -5,6 +5,8 @@ enum CodexGroupDetectionFailure: Equatable, Sendable {
     case accountUnavailable
     case invalidKey
     case modelUnavailable
+    case timeout
+    case secureConnection
     case network
     case logTimeout
     case pageChanged
@@ -50,6 +52,10 @@ enum CodexGroupDetectionState: Equatable, Sendable {
                 return "Key 无效，未能发送 Codex 探测请求"
             case .modelUnavailable:
                 return "Codex 探测模型暂不可用，请稍后重试"
+            case .timeout:
+                return "Codex 探测请求等待超过 45 秒，未再次发起请求"
+            case .secureConnection:
+                return "无法建立安全连接，请检查代理、VPN 或根证书后重试"
             case .network:
                 return "网络错误，未能完成 Codex 分组获取"
             case .logTimeout:
@@ -234,6 +240,10 @@ final class CodexGroupDetectionService {
             return .invalidKey
         case .modelUnavailable:
             return .modelUnavailable
+        case .timeout:
+            return .timeout
+        case .secureConnection:
+            return .secureConnection
         case .network:
             return .network
         case .invalidResponse, .server:

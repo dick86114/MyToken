@@ -21,6 +21,8 @@ struct CodexGroupProbeRequestMarker: Equatable, Sendable {
 enum CodexGroupProbeError: Error, Equatable, Sendable {
     case invalidKey
     case modelUnavailable
+    case timeout
+    case secureConnection
     case network
     case invalidResponse
     case server(statusCode: Int)
@@ -29,13 +31,23 @@ enum CodexGroupProbeError: Error, Equatable, Sendable {
 struct CodexGroupProbeClient: CodexGroupProbing {
     static let endpoint = URL(string: "https://api.routin.ai/plan/v1/responses")!
     static let model = "gpt-5.6-luna"
+    static let timeout: TimeInterval = 45
 
     let session: URLSession
+    let logWriter: any AppLogWriting
+
+    init(
+        session: URLSession,
+        logWriter: any AppLogWriting = NoopAppLogWriter()
+    ) {
+        self.session = session
+        self.logWriter = logWriter
+    }
 
     func probe(apiKey: String, marker: CodexGroupProbeRequestMarker) async throws {
         var request = URLRequest(url: Self.endpoint)
         request.httpMethod = "POST"
-        request.timeoutInterval = 15
+        request.timeoutInterval = Self.timeout
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue(marker.userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -53,6 +65,18 @@ struct CodexGroupProbeClient: CodexGroupProbing {
         } catch {
             if error is CancellationError || Task.isCancelled {
                 throw CancellationError()
+            }
+            let foundationError = error as NSError
+            await logWriter.log(
+                level: .warning,
+                event: "codex_group_probe_transport_failed",
+                details: "domain=\(foundationError.domain) code=\(foundationError.code)"
+            )
+            if let error = error as? URLError, error.code == .timedOut {
+                throw CodexGroupProbeError.timeout
+            }
+            if let error = error as? URLError, error.code == .secureConnectionFailed {
+                throw CodexGroupProbeError.secureConnection
             }
             throw CodexGroupProbeError.network
         }
