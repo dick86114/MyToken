@@ -41,7 +41,7 @@ final class RoutinGroupDetectionWebSessionTests: XCTestCase {
         )
     }
 
-    func test日志结果只接受唯一UserAgent匹配并提取完整分组名() throws {
+    func test日志结果接受包含唯一标识的UserAgent单元格并提取完整分组名() throws {
         let marker = CodexGroupProbeRequestMarker(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000123")!,
             startedAt: Date(timeIntervalSince1970: 1_786_400_000)
@@ -49,7 +49,7 @@ final class RoutinGroupDetectionWebSessionTests: XCTestCase {
         let rows = """
         [
           {"userAgent":"Codex Desktop","groupName":"Codex"},
-          {"userAgent":"MyRoutin-Group-Probe/00000000-0000-0000-0000-000000000123","groupName":"Codex Pro"}
+          {"userAgent":"C MyRoutin-Group-Probe/00000000-0000-0000-0000-000000000123 Client","groupName":"Codex Pro"}
         ]
         """
 
