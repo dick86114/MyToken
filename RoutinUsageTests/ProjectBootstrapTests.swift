@@ -36,6 +36,37 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(popover.contains("Picker(\"用量周期\""))
     }
 
+    func test应用图标使用已归档的Routin品牌原图生成完整尺寸集() throws {
+        let projectRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let brandLogo = projectRoot
+            .appendingPathComponent("docs/brand-assets/routin-brand-logo.png")
+        let appIconDirectory = projectRoot
+            .appendingPathComponent("RoutinUsage/Assets.xcassets/AppIcon.appiconset")
+        let expectedIconNames = [
+            "icon_16x16.png",
+            "icon_16x16@2x.png",
+            "icon_32x32.png",
+            "icon_32x32@2x.png",
+            "icon_128x128.png",
+            "icon_128x128@2x.png",
+            "icon_256x256.png",
+            "icon_256x256@2x.png",
+            "icon_512x512.png",
+            "icon_512x512@2x.png"
+        ]
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: brandLogo.path))
+        for iconName in expectedIconNames {
+            XCTAssertTrue(
+                FileManager.default.fileExists(
+                    atPath: appIconDirectory.appendingPathComponent(iconName).path
+                )
+            )
+        }
+    }
+
     func test菜单栏弹窗同屏展示五小时与周用量() throws {
         let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
         let row = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
