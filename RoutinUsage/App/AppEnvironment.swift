@@ -138,7 +138,7 @@ final class AppEnvironment {
         let routinCheckIn = RoutinCheckInService(session: routinWebSession)
         let codexGroupDetection = CodexGroupDetectionService(
             webSession: RoutinGroupDetectionWebSession(session: routinWebSession),
-            probeClient: CodexGroupProbeClient(session: .shared),
+            probeClient: CodexGroupProbeClient(session: .shared, logWriter: logWriter),
             repository: CodexGroupDetectionRepository(defaults: defaults)
         )
         routinWebSession.onLoginCompleted = {

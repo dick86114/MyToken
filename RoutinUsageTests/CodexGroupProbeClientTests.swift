@@ -15,7 +15,7 @@ final class CodexGroupProbeClientTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer plan-probe-1234")
         XCTAssertEqual(request.value(forHTTPHeaderField: "User-Agent"), marker.userAgent)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
-        XCTAssertEqual(request.timeoutInterval, 15)
+        XCTAssertEqual(request.timeoutInterval, 45)
 
         let body = try XCTUnwrap(request.httpBody)
         let payload = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
@@ -48,6 +48,51 @@ final class CodexGroupProbeClientTests: XCTestCase {
         XCTAssertEqual(client.requestCount, 1)
     }
 
+    func test超时映射为单独错误且不自行重试() async {
+        let client = makeErrorClient(URLError(.timedOut))
+
+        await XCTAssert抛出Codex探测错误(.timeout) {
+            try await client.probe(
+                apiKey: "plan-probe-1234",
+                marker: CodexGroupProbeRequestMarker(id: UUID())
+            )
+        }
+        XCTAssertEqual(client.requestCount, 1)
+    }
+
+    func test安全连接失败映射为单独错误且不自行重试() async {
+        let client = makeErrorClient(URLError(.secureConnectionFailed))
+
+        await XCTAssert抛出Codex探测错误(.secureConnection) {
+            try await client.probe(
+                apiKey: "plan-probe-1234",
+                marker: CodexGroupProbeRequestMarker(id: UUID())
+            )
+        }
+        XCTAssertEqual(client.requestCount, 1)
+    }
+
+    func test传输失败只记录脱敏的系统错误分类() async {
+        let logWriter = CodexGroupProbeLogFake()
+        let client = makeErrorClient(
+            URLError(.cannotFindHost),
+            logWriter: logWriter
+        )
+
+        await XCTAssert抛出Codex探测错误(.network) {
+            try await client.probe(
+                apiKey: "plan-secret-1234",
+                marker: CodexGroupProbeRequestMarker(id: UUID())
+            )
+        }
+
+        let entries = await logWriter.entries()
+        XCTAssertEqual(entries.count, 1)
+        XCTAssertEqual(entries.first?.event, "codex_group_probe_transport_failed")
+        XCTAssertEqual(entries.first?.details, "domain=NSURLErrorDomain code=-1003")
+        XCTAssertFalse(entries.contains { $0.details?.contains("plan-secret-1234") == true })
+    }
+
     private func makeClient(statusCode: Int, body: String) -> StubbedCodexGroupProbeClient {
         let stub = URLProtocolStub.makeSession { request in
             let response = try XCTUnwrap(
@@ -62,6 +107,19 @@ final class CodexGroupProbeClientTests: XCTestCase {
         }
         return StubbedCodexGroupProbeClient(
             client: CodexGroupProbeClient(session: stub.session),
+            registration: stub.registration
+        )
+    }
+
+    private func makeErrorClient(
+        _ error: Error,
+        logWriter: any AppLogWriting = NoopAppLogWriter()
+    ) -> StubbedCodexGroupProbeClient {
+        let stub = URLProtocolStub.makeSession { _ in
+            throw error
+        }
+        return StubbedCodexGroupProbeClient(
+            client: CodexGroupProbeClient(session: stub.session, logWriter: logWriter),
             registration: stub.registration
         )
     }
@@ -87,6 +145,23 @@ private final class StubbedCodexGroupProbeClient: CodexGroupProbing, @unchecked 
     func probe(apiKey: String, marker: CodexGroupProbeRequestMarker) async throws {
         try await client.probe(apiKey: apiKey, marker: marker)
     }
+}
+
+actor CodexGroupProbeLogFake: AppLogWriting {
+    struct Entry: Equatable, Sendable {
+        let event: String
+        let details: String?
+    }
+
+    private var storedEntries: [Entry] = []
+
+    func log(level _: AppLogLevel, event: String, details: String?) async {
+        storedEntries.append(Entry(event: event, details: details))
+    }
+
+    func recentText(maxCharacters _: Int) async -> String { "" }
+
+    func entries() -> [Entry] { storedEntries }
 }
 
 func XCTAssert抛出Codex探测错误(
