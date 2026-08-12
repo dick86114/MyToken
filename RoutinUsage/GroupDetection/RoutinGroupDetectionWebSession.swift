@@ -28,6 +28,11 @@ enum RoutinGroupDetectionPageParser {
         let groupName: String
     }
 
+    private struct LogDetailPayload: Decodable {
+        let state: String
+        let groupName: String?
+    }
+
     static func accountIdentity(from json: String) -> RoutinAccountIdentity? {
         guard
             let data = json.data(using: .utf8),
@@ -64,6 +69,29 @@ enum RoutinGroupDetectionPageParser {
                 throw RoutinGroupDetectionWebError.logNotFound
             }
             throw RoutinGroupDetectionWebError.ambiguousLog
+        }
+        return groupName
+    }
+
+    static func detailGroupName(from json: String) throws -> String {
+        guard
+            let data = json.data(using: .utf8),
+            let payload = try? JSONDecoder().decode(LogDetailPayload.self, from: data)
+        else {
+            throw RoutinGroupDetectionWebError.pageChanged
+        }
+
+        guard payload.state == "ready" else {
+            if payload.state == "loading" {
+                throw RoutinGroupDetectionWebError.logNotFound
+            }
+            throw RoutinGroupDetectionWebError.pageChanged
+        }
+
+        guard let groupName = payload.groupName?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !groupName.isEmpty
+        else {
+            throw RoutinGroupDetectionWebError.pageChanged
         }
         return groupName
     }
@@ -109,15 +137,16 @@ final class RoutinGroupDetectionWebSession: RoutinGroupDetectionWebSessionManagi
         try await loadLogsPage()
 
         for _ in 0..<15 {
-            if let json = try await logRowsJSON() {
-                do {
-                    return try RoutinGroupDetectionPageParser.groupName(from: json, marker: marker)
-                } catch RoutinGroupDetectionWebError.logNotFound {
-                    try await Task.sleep(for: .seconds(2))
-                    continue
-                }
+            switch try await openLogDetail(marker: marker) {
+            case .opened:
+                return try await readOpenedLogDetail()
+            case .notFound:
+                try await Task.sleep(for: .seconds(2))
+            case .ambiguous:
+                throw RoutinGroupDetectionWebError.ambiguousLog
+            case .pageChanged:
+                throw RoutinGroupDetectionWebError.pageChanged
             }
-            throw RoutinGroupDetectionWebError.pageChanged
         }
 
         throw RoutinGroupDetectionWebError.logTimeout
@@ -185,31 +214,87 @@ final class RoutinGroupDetectionWebSession: RoutinGroupDetectionWebSessionManagi
             && currentURL.path == expectedURL.path
     }
 
-    private func logRowsJSON() async throws -> String? {
+    private enum LogDetailOpeningResult {
+        case opened
+        case notFound
+        case ambiguous
+        case pageChanged
+    }
+
+    private func openLogDetail(
+        marker: CodexGroupProbeRequestMarker
+    ) async throws -> LogDetailOpeningResult {
         let value = try await evaluate("""
         (() => {
           const table = document.querySelector('table');
-          if (!table) return null;
+          if (!table) return JSON.stringify({ state: 'pageChanged' });
           const headers = Array.from(table.querySelectorAll('thead th')).map((cell) =>
             (cell.innerText || cell.textContent || '').trim()
           );
           const userAgentIndex = headers.findIndex((label) => label === 'User Agent');
-          const tokenIndex = headers.findIndex((label) => label === '令牌');
-          if (userAgentIndex < 0 || tokenIndex < 0) return null;
-
-          return JSON.stringify(Array.from(table.querySelectorAll('tbody tr')).map((row) => {
+          if (userAgentIndex < 0) return JSON.stringify({ state: 'pageChanged' });
+          const matches = Array.from(table.querySelectorAll('tbody tr')).filter((row) => {
             const cells = Array.from(row.querySelectorAll('td'));
-            const tokenText = (cells[tokenIndex]?.innerText || '').trim().split('\n')
-              .map((value) => value.trim())
-              .filter(Boolean);
-            return {
-              userAgent: (cells[userAgentIndex]?.innerText || '').trim(),
-              groupName: tokenText.length > 1 ? tokenText[tokenText.length - 1] : ''
-            };
-          }));
+            return (cells[userAgentIndex]?.innerText || '').includes('\(marker.userAgent)');
+          });
+          if (matches.length === 0) return JSON.stringify({ state: 'notFound' });
+          if (matches.length > 1) return JSON.stringify({ state: 'ambiguous' });
+          matches[0].click();
+          return JSON.stringify({ state: 'opened' });
         })()
         """)
-        return value as? String
+        guard
+            let json = value as? String,
+            let data = json.data(using: .utf8),
+            let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let state = payload["state"] as? String
+        else {
+            return .pageChanged
+        }
+
+        switch state {
+        case "opened":
+            return .opened
+        case "notFound":
+            return .notFound
+        case "ambiguous":
+            return .ambiguous
+        default:
+            return .pageChanged
+        }
+    }
+
+    private func readOpenedLogDetail() async throws -> String {
+        for _ in 0..<60 {
+            let value = try await evaluate("""
+            (() => {
+              const dialogs = Array.from(document.querySelectorAll('[role="dialog"]'));
+              const dialog = dialogs.find((element) => {
+                const text = element.innerText || '';
+                return text.includes('日志详情') || text.includes('分组名称');
+              });
+              if (!dialog) return JSON.stringify({ state: 'loading' });
+
+              const label = Array.from(dialog.querySelectorAll('p')).find((element) =>
+                (element.innerText || '').trim() === '分组名称'
+              );
+              const groupName = (label?.nextElementSibling?.innerText || '').trim();
+              if (!groupName) return JSON.stringify({ state: 'loading' });
+              return JSON.stringify({ state: 'ready', groupName });
+            })()
+            """)
+
+            if let json = value as? String {
+                do {
+                    return try RoutinGroupDetectionPageParser.detailGroupName(from: json)
+                } catch RoutinGroupDetectionWebError.logNotFound {
+                    try await Task.sleep(for: .milliseconds(500))
+                    continue
+                }
+            }
+            throw RoutinGroupDetectionWebError.pageChanged
+        }
+        throw RoutinGroupDetectionWebError.logTimeout
     }
 
     private func isLoginPage(_ text: String) -> Bool {
