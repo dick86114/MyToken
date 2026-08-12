@@ -4,7 +4,6 @@ import SwiftUI
 
 extension Notification.Name {
     static let showSettingsWindow = Notification.Name("showSettingsWindow")
-    static let showRoutinCheckInWindow = Notification.Name("showRoutinCheckInWindow")
 }
 
 @MainActor
@@ -289,9 +288,6 @@ private struct StatusPopoverContent: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name.showSettingsWindow)) { _ in
             openWindow(id: "settings")
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name.showRoutinCheckInWindow)) { _ in
-            openWindow(id: "routin-check-in")
         }
     }
 }

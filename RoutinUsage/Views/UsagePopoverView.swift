@@ -85,6 +85,7 @@ private extension UsagePopoverView {
             .accessibilityLabel(store.isRefreshing ? "正在刷新全部 Key" : "刷新全部 Key")
 
             Button {
+                openWindow(id: "routin-check-in")
                 Task { await startRoutinCheckIn() }
             } label: {
                 if checkInState.isBusy {

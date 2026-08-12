@@ -55,6 +55,8 @@ struct SettingsView: View {
     private let beginRoutinLogin: BeginRoutinLogin
     private let signOutRoutin: SignOutRoutin
 
+    @Environment(\.openWindow) private var openWindow
+
     @State private var editor: EditorPresentation?
     @State private var pendingDeletion: KeyConfiguration?
     @State private var orderedKeyIDs: [UUID]
@@ -456,6 +458,7 @@ private extension SettingsView {
     var routinCheckInControls: some View {
         HStack(spacing: 8) {
             Button("立即签到") {
+                openWindow(id: "routin-check-in")
                 Task { await startRoutinCheckIn() }
             }
             .liquidGlassButton(prominent: true)
@@ -463,6 +466,7 @@ private extension SettingsView {
 
             if routinCheckInState.requiresLogin {
                 Button("立即登录") {
+                    openWindow(id: "routin-check-in")
                     Task { await beginRoutinLogin() }
                 }
                 .liquidGlassButton()
