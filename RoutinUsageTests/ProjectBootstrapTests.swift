@@ -28,13 +28,13 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(popover.contains("arrow.up.right.square"))
     }
 
-    func test菜单栏弹窗顶部使用左版本中透明Logo右刷新布局() throws {
+    func test菜单栏弹窗顶部使用左版本中彩色透明Logo右刷新布局() throws {
         let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
         let app = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
 
         XCTAssertTrue(app.contains("nonisolated static let websiteURL"))
         XCTAssertTrue(popover.contains("Link(destination: RoutinUsageApp.websiteURL)"))
-        XCTAssertTrue(popover.contains("Image(nsImage: NSImage(named: \"PopoverBrandLogo\")"))
+        XCTAssertTrue(popover.contains("Image(nsImage: NSImage(named: \"PopoverColorBrandLogo\")"))
         XCTAssertTrue(popover.contains("frame(width: 42, height: 42)"))
         XCTAssertTrue(popover.contains("打开 Routin 官网"))
         XCTAssertTrue(popover.contains(".overlay(alignment: .center)"))

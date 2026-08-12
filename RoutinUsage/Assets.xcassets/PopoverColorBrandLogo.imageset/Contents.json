@@ -1,0 +1,7 @@
+{
+  "images" : [
+    { "filename" : "popover-color-brand-logo.png", "idiom" : "universal", "scale" : "1x" },
+    { "filename" : "popover-color-brand-logo@2x.png", "idiom" : "universal", "scale" : "2x" }
+  ],
+  "info" : { "author" : "xcode", "version" : 1 }
+}

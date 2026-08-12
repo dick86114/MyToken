@@ -106,7 +106,7 @@ private extension UsagePopoverView {
         }
         .overlay(alignment: .center) {
             Link(destination: RoutinUsageApp.websiteURL) {
-                Image(nsImage: NSImage(named: "PopoverBrandLogo") ?? NSApp.applicationIconImage)
+                Image(nsImage: NSImage(named: "PopoverColorBrandLogo") ?? NSApp.applicationIconImage)
                     .resizable()
                     .interpolation(.high)
                     .scaledToFit()
