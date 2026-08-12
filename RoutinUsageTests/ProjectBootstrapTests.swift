@@ -400,6 +400,15 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(settings.contains("Cookie"))
     }
 
+    func test菜单栏弹窗会以绿色实心图标标记今天已签到() throws {
+        let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
+
+        XCTAssertTrue(popover.contains("checkInState == .alreadyCheckedIn"))
+        XCTAssertTrue(popover.contains("checkmark.circle.fill"))
+        XCTAssertTrue(popover.contains("Color.green"))
+        XCTAssertTrue(popover.contains("今天已签到"))
+    }
+
     private func sourceText(at relativePath: String) throws -> String {
         guard let source = try optionalSourceText(at: relativePath) else {
             throw CocoaError(.fileNoSuchFile)
