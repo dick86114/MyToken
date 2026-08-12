@@ -90,29 +90,15 @@ final class RoutinGroupDetectionWebSession: RoutinGroupDetectionWebSessionManagi
 
     func readCurrentAccountIdentity() async throws -> RoutinAccountIdentity {
         try await load(Self.accountURL)
-        let content = try await evaluate("""
-        (() => {
-          const text = document.body?.innerText || '';
-          const email = (text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/i) || [''])[0];
-          const labels = new Set(['用户名', '昵称', '账号名称']);
-          const label = Array.from(document.querySelectorAll('*')).find((element) => {
-            return labels.has((element.textContent || '').trim());
-          });
-          const values = (label?.parentElement?.innerText || '')
-            .split('\n')
-            .map((value) => value.trim())
-            .filter((value) => value && !labels.has(value) && value !== email);
-          const displayName = values[0] || '';
-          return JSON.stringify({ email, displayName });
-        })()
-        """)
-        guard
-            let json = content as? String,
-            let identity = RoutinGroupDetectionPageParser.accountIdentity(from: json)
-        else {
-            throw RoutinGroupDetectionWebError.accountUnavailable
+        for _ in 0..<20 {
+            let content = try await evaluate(Self.accountIdentityScript)
+            if let json = content as? String,
+               let identity = RoutinGroupDetectionPageParser.accountIdentity(from: json) {
+                return identity
+            }
+            try await Task.sleep(for: .milliseconds(500))
         }
-        return identity
+        throw RoutinGroupDetectionWebError.accountUnavailable
     }
 
     func findGroupName(marker: CodexGroupProbeRequestMarker) async throws -> String {
@@ -206,4 +192,20 @@ final class RoutinGroupDetectionWebSession: RoutinGroupDetectionWebSessionManagi
             }
         }
     }
+
+    private static let accountIdentityScript = """
+    (() => {
+      let user = null;
+      try {
+        user = JSON.parse(window.localStorage.getItem('meteor_user') || 'null');
+      } catch (_) {}
+
+      const text = document.body?.innerText || '';
+      const bodyEmail = (text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/i) || [''])[0];
+      const email = typeof user?.email === 'string' ? user.email : bodyEmail;
+      const displayName = [user?.nickname, user?.username]
+        .find((value) => typeof value === 'string' && value.trim()) || '';
+      return JSON.stringify({ email, displayName });
+    })()
+    """
 }
