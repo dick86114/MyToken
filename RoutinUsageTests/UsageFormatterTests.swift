@@ -57,26 +57,33 @@ final class UsageFormatterTests: XCTestCase {
 
     @MainActor
     func test菜单栏Logo进度图标在有用量时绘制彩色填充() throws {
-        let image = MenuBarLogoUsageIcon.image(percent: 35)
-        let representation = try XCTUnwrap(
-            NSBitmapImageRep(data: try XCTUnwrap(image.tiffRepresentation))
-        )
-        var coloredPixelCount = 0
+        func greenPixelCount(in image: NSImage) throws -> Int {
+            let representation = try XCTUnwrap(
+                NSBitmapImageRep(data: try XCTUnwrap(image.tiffRepresentation))
+            )
 
-        for x in 0..<representation.pixelsWide {
-            for y in 0..<representation.pixelsHigh {
-                guard let color = representation.colorAt(x: x, y: y)?
-                    .usingColorSpace(.deviceRGB) else {
-                    continue
-                }
-                if color.greenComponent > color.redComponent * 1.2,
-                   color.greenComponent > color.blueComponent * 1.2 {
-                    coloredPixelCount += 1
+            return (0..<representation.pixelsWide).reduce(into: 0) { count, x in
+                for y in 0..<representation.pixelsHigh {
+                    guard let color = representation.colorAt(x: x, y: y)?
+                        .usingColorSpace(.deviceRGB) else {
+                        continue
+                    }
+                    if color.greenComponent > color.redComponent * 1.2,
+                       color.greenComponent > color.blueComponent * 1.2 {
+                        count += 1
+                    }
                 }
             }
         }
 
-        XCTAssertGreaterThan(coloredPixelCount, 130)
+        let emptyGreenPixelCount = try greenPixelCount(
+            in: MenuBarLogoUsageIcon.image(percent: 0)
+        )
+        let progressGreenPixelCount = try greenPixelCount(
+            in: MenuBarLogoUsageIcon.image(percent: 35)
+        )
+
+        XCTAssertGreaterThan(progressGreenPixelCount, emptyGreenPixelCount)
     }
 
     func test菜单栏把百分比四舍五入为整数() {
