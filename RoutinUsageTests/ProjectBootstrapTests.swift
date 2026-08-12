@@ -422,6 +422,19 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(settings.contains("退出登录"))
     }
 
+    func test设置页和菜单栏弹窗独立打开Routin登录窗口() throws {
+        let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+        let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
+        let environment = try sourceText(at: "RoutinUsage/App/AppEnvironment.swift")
+        let statusBarController = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
+
+        XCTAssertTrue(settings.contains("@Environment(\\.openWindow)"))
+        XCTAssertTrue(settings.contains("openWindow(id: \"routin-check-in\")"))
+        XCTAssertTrue(popover.contains("openWindow(id: \"routin-check-in\")"))
+        XCTAssertFalse(environment.contains("showRoutinCheckInWindow"))
+        XCTAssertFalse(statusBarController.contains("showRoutinCheckInWindow"))
+    }
+
     func test签到设置页不保存Routin账号密码或Cookie() throws {
         let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
 

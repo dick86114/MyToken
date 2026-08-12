@@ -368,9 +368,6 @@ final class AppEnvironment {
     }
 
     func startRoutinCheckIn() async {
-        if routinWebSession != nil {
-            NotificationCenter.default.post(name: .showRoutinCheckInWindow, object: nil)
-        }
         await routinCheckIn.startCheckIn()
         if routinCheckIn.state == .needsLogin {
             await beginRoutinLogin()
@@ -382,7 +379,6 @@ final class AppEnvironment {
             return
         }
         await routinCheckIn.beginLogin()
-        NotificationCenter.default.post(name: .showRoutinCheckInWindow, object: nil)
     }
 
     func signOutRoutin() async {
