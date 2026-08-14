@@ -42,6 +42,36 @@ struct SettingsView: View {
         }
     }
 
+    private enum SettingsSection: CaseIterable, Hashable, Identifiable {
+        case accounts
+        case display
+        case system
+
+        var id: Self { self }
+
+        var title: String {
+            switch self {
+            case .accounts:
+                return "账户"
+            case .display:
+                return "显示与刷新"
+            case .system:
+                return "通知与系统"
+            }
+        }
+
+        var symbol: String {
+            switch self {
+            case .accounts:
+                return "key.horizontal"
+            case .display:
+                return "rectangle.3.group"
+            case .system:
+                return "bell.badge"
+            }
+        }
+    }
+
     @Bindable var store: UsageStore
     @Bindable var settings: AppSettings
 
@@ -65,6 +95,8 @@ struct SettingsView: View {
 
     @State private var editor: EditorPresentation?
     @State private var pendingDeletion: KeyConfiguration?
+    @State private var selectedSection: SettingsSection? = .accounts
+    @State private var expandedKeyID: UUID?
     @State private var orderedKeyIDs: [UUID]
     @State private var lowThreshold: Int
     @State private var highThreshold: Int
@@ -113,18 +145,21 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        TabView {
-            keyManagement
-                .tabItem { Label("Key", systemImage: "key") }
-
-            displayAndRefresh
-                .tabItem { Label("显示与刷新", systemImage: "slider.horizontal.3") }
-
-            notificationsAndSystem
-                .tabItem { Label("通知与系统", systemImage: "bell") }
+        NavigationSplitView {
+            List(SettingsSection.allCases, selection: $selectedSection) { section in
+                Label(section.title, systemImage: section.symbol)
+                    .tag(section)
+            }
+            .listStyle(.sidebar)
+            .navigationTitle("MyRoutin")
+            .frame(minWidth: 176, idealWidth: 196)
+        } detail: {
+            detailContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .background(.regularMaterial)
         }
-        .padding(20)
-        .frame(minWidth: 520, idealWidth: 560, minHeight: 420, idealHeight: 500)
+        .navigationSplitViewStyle(.balanced)
+        .frame(minWidth: 760, idealWidth: 860, minHeight: 520, idealHeight: 620)
         .liquidGlassWindowBackground()
         .background(WindowFramePersistence())
         .onChange(of: store.orderedKeyIDs) { _, ids in
@@ -178,13 +213,25 @@ struct SettingsView: View {
 }
 
 private extension SettingsView {
+    @ViewBuilder
+    var detailContent: some View {
+        switch selectedSection ?? .accounts {
+        case .accounts:
+            keyManagement
+        case .display:
+            displayAndRefresh
+        case .system:
+            notificationsAndSystem
+        }
+    }
+
     var keyManagement: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Key 管理")
-                        .font(.headline)
-                    Text("拖动列表可调整菜单中的显示顺序")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("账户")
+                        .font(.title2.weight(.semibold))
+                    Text("拖动列表可调整菜单栏中的显示顺序")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -215,130 +262,211 @@ private extension SettingsView {
                     }
                     .onMove(perform: move)
                 }
+                .listStyle(.plain)
                 .accessibilityLabel("Key 列表，可拖动排序")
                 .scrollContentBackground(.hidden)
             }
         }
-        .padding(4)
+        .padding(24)
     }
 
     func keyRow(_ configuration: KeyConfiguration) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-            Image(systemName: store.selectedKeyID == configuration.id ? "circle.inset.filled" : "circle")
-                .foregroundStyle(store.selectedKeyID == configuration.id ? Color.accentColor : Color.secondary)
-                .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: store.selectedKeyID == configuration.id ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(store.selectedKeyID == configuration.id ? Color.accentColor : Color.secondary)
+                    .font(.system(size: 15, weight: .medium))
+                    .padding(.top, 2)
+                    .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(configuration.displayName)
-                Text(KeyDisplayMask.masked(suffix: configuration.keySuffix))
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.secondary)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(configuration.displayName)，\(KeyDisplayMask.masked(suffix: configuration.keySuffix))")
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(configuration.displayName)
+                        .font(.headline)
+                    Text(KeyDisplayMask.masked(suffix: configuration.keySuffix))
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(configuration.displayName)，\(KeyDisplayMask.masked(suffix: configuration.keySuffix))")
 
-            Spacer()
+                Spacer()
 
-            Button("编辑") { editor = .edit(configuration) }
-                .liquidGlassButton()
+                Button {
+                    editor = .edit(configuration)
+                } label: {
+                    Image(systemName: "pencil")
+                }
+                .buttonStyle(.borderless)
+                .help("编辑 \(configuration.displayName)")
                 .accessibilityLabel("编辑 \(configuration.displayName)")
 
-            Button(role: .destructive) {
-                pendingDeletion = configuration
-            } label: {
-                Image(systemName: "trash")
-            }
-            .liquidGlassButton()
-            .accessibilityLabel("删除 \(configuration.displayName)")
+                Button(role: .destructive) {
+                    pendingDeletion = configuration
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.borderless)
+                .help("删除 \(configuration.displayName)")
+                .accessibilityLabel("删除 \(configuration.displayName)")
             }
 
             if let state = store.state(for: configuration.id) {
-                keyUsageDetails(state)
-                    .padding(.leading, 24)
+                keyUsageOverview(state)
+
+                if expandedKeyID == configuration.id {
+                    keyUsageDetails(state)
+                        .padding(.top, 4)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 4)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 8)
         .contentShape(Rectangle())
-        .onTapGesture { store.selectKey(configuration.id) }
+        .onTapGesture {
+            store.selectKey(configuration.id)
+            expandedKeyID = configuration.id
+        }
+        .listRowSeparator(.hidden)
+        .listRowBackground(
+            store.selectedKeyID == configuration.id
+                ? Color.accentColor.opacity(0.10)
+                : Color.clear
+        )
     }
 
     @ViewBuilder
-    func keyUsageDetails(_ state: KeyUsageState) -> some View {
+    func keyUsageOverview(_ state: KeyUsageState) -> some View {
         if let snapshot = state.snapshot {
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 12) {
-                    detailItem("套餐", snapshot.planName.isEmpty ? "未命名套餐" : snapshot.planName)
-                    detailItem("类型", snapshot.kind == .periodic ? "周期订阅" : "Token 资源包")
-                    detailItem("状态", subscriptionStatus(snapshot.status, state: state))
-                }
-
-                HStack(spacing: 12) {
-                    detailItem("订阅开始", UsageFormatter.fullDateTime(snapshot.subscriptionStartAt))
-                    detailItem("订阅结束", UsageFormatter.fullDateTime(snapshot.subscriptionEndAt))
-                }
-
+            VStack(alignment: .leading, spacing: 10) {
                 if snapshot.kind == .periodic {
-                    VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .top, spacing: 16) {
                         if let metric = snapshot.fiveHour {
-                            HStack(spacing: 12) {
-                            usageDetailItem("5 小时用量", metric)
-                            detailItem("5 小时结束", UsageFormatter.fullDateTime(metric.windowEnd))
-                            }
+                            usageDetailItem("5 小时", metric)
+                        }
+                        if snapshot.fiveHour != nil, snapshot.weekly != nil {
+                            Divider().frame(height: 74)
                         }
                         if let metric = snapshot.weekly {
-                            HStack(spacing: 12) {
-                            usageDetailItem("周用量", metric)
-                            detailItem("周结束", UsageFormatter.fullDateTime(metric.windowEnd))
-                            }
+                            usageDetailItem("周", metric)
                         }
                     }
                 } else if let token = snapshot.token {
-                    usageDetailItem("Token 用量", token)
+                    usageDetailItem("Token", token)
                 }
 
-                detailItem(
-                    "分组倍率",
-                    snapshot.groupMultipliers.isEmpty
-                        ? "—"
-                        : UsageFormatter.groupMultiplierText(snapshot.groupMultipliers)
-                )
-
-                if let record = codexGroupDetectionRecord(state.configuration.id) {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        detailItem("已关联账号", record.accountDisplayName)
-                        Button("解除关联", role: .destructive) {
-                            clearCodexGroupDetection(state.configuration.id)
-                        }
-                        .liquidGlassButton()
-                        .accessibilityLabel("解除 \(state.configuration.displayName) 的 Routin 账号关联")
-                    }
-                    Text("Codex 当前分组：\(record.groupName)，检测于 \(record.detectedAt.formatted(date: .omitted, time: .shortened))")
-                        .foregroundStyle(.secondary)
-                }
-
-                if !snapshot.allowedModels.isEmpty {
-                    detailItem("允许模型", snapshot.allowedModels.joined(separator: "、"))
-                }
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
         } else {
-            Text(UsageFormatter.statusText(state: state))
+            Label(UsageFormatter.statusText(state: state), systemImage: "clock.badge.exclamationmark")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
     }
 
-    func detailItem(_ title: String, _ value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 3) {
-            Text(title + "：")
+    @ViewBuilder
+    func keyUsageDetails(_ state: KeyUsageState) -> some View {
+        if let snapshot = state.snapshot {
+            VStack(alignment: .leading, spacing: 12) {
+                Divider()
+                    .padding(.top, 2)
+
+                detailSection("套餐状态", symbol: "checklist") {
+                    Grid(horizontalSpacing: 20, verticalSpacing: 8) {
+                        GridRow {
+                            detailValue("套餐", snapshot.planName.isEmpty ? "未命名套餐" : snapshot.planName)
+                            detailValue("类型", snapshot.kind == .periodic ? "周期订阅" : "Token 资源包")
+                            detailValue("状态", subscriptionStatus(snapshot.status, state: state))
+                        }
+                    }
+                }
+
+                detailSection("订阅与周期", symbol: "calendar") {
+                    Grid(horizontalSpacing: 20, verticalSpacing: 8) {
+                        GridRow {
+                            detailValue("订阅开始", UsageFormatter.fullDateTime(snapshot.subscriptionStartAt))
+                            detailValue("订阅结束", UsageFormatter.fullDateTime(snapshot.subscriptionEndAt))
+                        }
+
+                        if snapshot.kind == .periodic {
+                            GridRow {
+                                if let metric = snapshot.fiveHour {
+                                    detailValue("5 小时结束", UsageFormatter.fullDateTime(metric.windowEnd))
+                                } else {
+                                    Color.clear
+                                }
+                                if let metric = snapshot.weekly {
+                                    detailValue("周结束", UsageFormatter.fullDateTime(metric.windowEnd))
+                                } else {
+                                    Color.clear
+                                }
+                            }
+                        }
+                    }
+                }
+
+                detailSection("账户与模型", symbol: "person.crop.circle") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        detailValue(
+                            "分组倍率",
+                            snapshot.groupMultipliers.isEmpty
+                                ? "—"
+                                : UsageFormatter.groupMultiplierText(snapshot.groupMultipliers)
+                        )
+
+                        if let record = codexGroupDetectionRecord(state.configuration.id) {
+                            HStack(alignment: .lastTextBaseline, spacing: 10) {
+                                detailValue("已关联账号", record.accountDisplayName)
+                                Button("解除关联", role: .destructive) {
+                                    clearCodexGroupDetection(state.configuration.id)
+                                }
+                                .controlSize(.small)
+                                .liquidGlassButton()
+                                .help("解除 \(state.configuration.displayName) 的 Routin 账号关联")
+                                .accessibilityLabel("解除 \(state.configuration.displayName) 的 Routin 账号关联")
+                            }
+
+                            detailValue(
+                                "Codex 当前分组",
+                                "\(record.groupName)，检测于 \(record.detectedAt.formatted(date: .omitted, time: .shortened))"
+                            )
+                        }
+
+                        if !snapshot.allowedModels.isEmpty {
+                            detailValue("允许模型", snapshot.allowedModels.joined(separator: "、"))
+                        }
+                    }
+                }
+            }
+            .textSelection(.enabled)
+        } else {
+            EmptyView()
+        }
+    }
+
+    func detailSection<Content: View>(
+        _ title: String,
+        symbol: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Label(title, systemImage: symbol)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+            content()
+        }
+    }
+
+    func detailValue(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.caption2)
                 .foregroundStyle(.tertiary)
             Text(value)
-                .lineLimit(2)
-                .textSelection(.enabled)
+                .font(.caption)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     func usageDetailItem(_ title: String, _ metric: UsageMetric) -> some View {
@@ -350,38 +478,34 @@ private extension SettingsView {
                     .foregroundStyle(.tertiary)
                 Spacer(minLength: 4)
                 Text(percentText)
-                    .font(.system(.caption, design: .rounded, weight: .semibold))
-                    .foregroundStyle(usageProgressColor(for: metric))
+                    .font(.system(.headline, design: .rounded, weight: .semibold))
+                    .foregroundStyle(UsageMetricPresentation.color(for: metric.percent))
                     .monospacedDigit()
             }
 
-            ProgressView(value: min(max(metric.percent, 0), 100), total: 100)
-                .tint(usageProgressColor(for: metric))
+            UsageMetricProgressBar(metric: metric)
 
             HStack(spacing: 8) {
                 Text(UsageFormatter.amount(metric))
-                Text("剩余 \(UsageFormatter.remaining(metric))")
+                Spacer(minLength: 8)
+                if metric.windowEnd != nil {
+                    Text("重置 \(UsageFormatter.resetTime(metric))")
+                }
             }
             .font(.caption2)
             .foregroundStyle(.secondary)
             .monospacedDigit()
+
+            Text("剩余 \(UsageFormatter.remaining(metric))")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
         }
-        .frame(minWidth: 190, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
             "\(title)，已使用 \(percentText)，\(UsageFormatter.amount(metric))，剩余 \(UsageFormatter.remaining(metric))"
         )
-    }
-
-    func usageProgressColor(for metric: UsageMetric) -> Color {
-        switch MenuBarUsageRisk.level(for: metric.percent) {
-        case .critical:
-            return .red
-        case .warning:
-            return .orange
-        case .normal:
-            return .green
-        }
     }
 
     func subscriptionStatus(_ status: Int?, state: KeyUsageState) -> String {
@@ -401,91 +525,111 @@ private extension SettingsView {
         return UsageFormatter.statusText(state: state)
     }
 
+    func settingsPageHeader(_ title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.title2.weight(.semibold))
+            Text(subtitle)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
     var displayAndRefresh: some View {
-        Form {
-            Section("菜单栏显示") {
-                Picker("当前 Key", selection: selectedKeyBinding) {
-                    ForEach(orderedKeyIDs, id: \.self) { id in
-                        if let configuration = store.state(for: id)?.configuration {
-                            Text(configuration.displayName).tag(Optional(id))
+        VStack(alignment: .leading, spacing: 16) {
+            settingsPageHeader("显示与刷新", subtitle: "控制菜单栏展示内容与后台刷新频率")
+
+            Form {
+                Section("菜单栏显示") {
+                    Picker("当前 Key", selection: selectedKeyBinding) {
+                        ForEach(orderedKeyIDs, id: \.self) { id in
+                            if let configuration = store.state(for: id)?.configuration {
+                                Text(configuration.displayName).tag(Optional(id))
+                            }
                         }
                     }
-                }
-                .disabled(orderedKeyIDs.isEmpty)
-                .accessibilityLabel("菜单栏当前 Key")
+                    .disabled(orderedKeyIDs.isEmpty)
+                    .accessibilityLabel("菜单栏当前 Key")
 
-                Picker("周期维度", selection: $settings.displayDimension) {
-                    Text("5 小时").tag(DisplayDimension.fiveHour)
-                    Text("周").tag(DisplayDimension.weekly)
-                }
-                .accessibilityLabel("周期订阅显示维度")
-
-                Picker("显示样式", selection: $settings.menuBarStyle) {
-                    ForEach(MenuBarStyle.allCases, id: \.rawValue) { style in
-                        Text(style.title).tag(style)
+                    Picker("周期维度", selection: $settings.displayDimension) {
+                        Text("5 小时").tag(DisplayDimension.fiveHour)
+                        Text("周").tag(DisplayDimension.weekly)
                     }
-                }
-                .accessibilityLabel("菜单栏显示样式")
-            }
+                    .accessibilityLabel("周期订阅显示维度")
 
-            Section("自动刷新") {
-                Picker("刷新间隔", selection: $settings.refreshMinutes) {
-                    ForEach(AppSettings.allowedRefreshMinutes, id: \.self) { minutes in
-                        Text("\(minutes) 分钟").tag(minutes)
+                    Picker("显示样式", selection: $settings.menuBarStyle) {
+                        ForEach(MenuBarStyle.allCases, id: \.rawValue) { style in
+                            Text(style.title).tag(style)
+                        }
                     }
+                    .accessibilityLabel("菜单栏显示样式")
                 }
-                .accessibilityLabel("自动刷新间隔")
+
+                Section("自动刷新") {
+                    Picker("刷新间隔", selection: $settings.refreshMinutes) {
+                        ForEach(AppSettings.allowedRefreshMinutes, id: \.self) { minutes in
+                            Text("\(minutes) 分钟").tag(minutes)
+                        }
+                    }
+                    .accessibilityLabel("自动刷新间隔")
+                }
             }
+            .formStyle(.grouped)
         }
-        .formStyle(.grouped)
+        .padding(24)
     }
 
     var notificationsAndSystem: some View {
-        Form {
-            Section("额度通知") {
-                Toggle("启用额度通知", isOn: $settings.notificationsEnabled)
-                    .accessibilityLabel("启用额度通知")
+        VStack(alignment: .leading, spacing: 16) {
+            settingsPageHeader("通知与系统", subtitle: "管理额度预警、登录启动、签到与软件更新")
 
-                Stepper("低阈值：\(lowThreshold)%", value: $lowThreshold, in: 1...100)
-                    .disabled(!settings.notificationsEnabled)
-                    .accessibilityLabel("低通知阈值，\(lowThreshold)%")
-                    .onChange(of: lowThreshold) { _, _ in applyThresholds() }
+            Form {
+                Section("额度通知") {
+                    Toggle("启用额度通知", isOn: $settings.notificationsEnabled)
+                        .accessibilityLabel("启用额度通知")
 
-                Stepper("高阈值：\(highThreshold)%", value: $highThreshold, in: 1...100)
-                    .disabled(!settings.notificationsEnabled)
-                    .accessibilityLabel("高通知阈值，\(highThreshold)%")
-                    .onChange(of: highThreshold) { _, _ in applyThresholds() }
+                    Stepper("低阈值：\(lowThreshold)%", value: $lowThreshold, in: 1...100)
+                        .disabled(!settings.notificationsEnabled)
+                        .accessibilityLabel("低通知阈值，\(lowThreshold)%")
+                        .onChange(of: lowThreshold) { _, _ in applyThresholds() }
 
-                if let thresholdError {
-                    Text(thresholdError)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .accessibilityLabel("阈值错误，\(thresholdError)")
+                    Stepper("高阈值：\(highThreshold)%", value: $highThreshold, in: 1...100)
+                        .disabled(!settings.notificationsEnabled)
+                        .accessibilityLabel("高通知阈值，\(highThreshold)%")
+                        .onChange(of: highThreshold) { _, _ in applyThresholds() }
+
+                    if let thresholdError {
+                        Text(thresholdError)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .accessibilityLabel("阈值错误，\(thresholdError)")
+                    }
+                }
+
+                Section("系统") {
+                    Toggle("登录时启动", isOn: launchAtLoginBinding)
+                        .accessibilityLabel("登录时启动")
+                }
+
+                Section("Routin 签到") {
+                    LabeledContent("登录状态") {
+                        Text(routinCheckInState.statusText)
+                            .accessibilityLabel("Routin 登录状态，\(routinCheckInState.statusText)")
+                    }
+                    routinCheckInControls
+                }
+
+                Section("软件更新") {
+                    LabeledContent("当前版本") {
+                        Text(currentVersion)
+                            .accessibilityLabel("当前版本 \(currentVersion)")
+                    }
+                    updateControls
                 }
             }
-
-            Section("系统") {
-                Toggle("登录时启动", isOn: launchAtLoginBinding)
-                    .accessibilityLabel("登录时启动")
-            }
-
-            Section("Routin 签到") {
-                LabeledContent("登录状态") {
-                    Text(routinCheckInState.statusText)
-                        .accessibilityLabel("Routin 登录状态，\(routinCheckInState.statusText)")
-                }
-                routinCheckInControls
-            }
-
-            Section("软件更新") {
-                LabeledContent("当前版本") {
-                    Text(currentVersion)
-                        .accessibilityLabel("当前版本 \(currentVersion)")
-                }
-                updateControls
-            }
+            .formStyle(.grouped)
         }
-        .formStyle(.grouped)
+        .padding(24)
     }
 
     var selectedKeyBinding: Binding<UUID?> {

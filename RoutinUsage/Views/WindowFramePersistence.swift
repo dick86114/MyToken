@@ -4,8 +4,8 @@ import SwiftUI
 /// 负责设置窗口尺寸的恢复、保存和最小尺寸约束。
 @MainActor
 struct WindowFramePersistence: NSViewRepresentable {
-    nonisolated static let defaultSize = CGSize(width: 560, height: 500)
-    nonisolated static let minimumSize = CGSize(width: 520, height: 420)
+    nonisolated static let defaultSize = CGSize(width: 860, height: 620)
+    nonisolated static let minimumSize = CGSize(width: 760, height: 520)
 
     private nonisolated static let widthKey = "settingsWindowWidth"
     private nonisolated static let heightKey = "settingsWindowHeight"

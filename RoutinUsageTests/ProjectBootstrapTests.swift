@@ -35,7 +35,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(app.contains("nonisolated static let websiteURL"))
         XCTAssertTrue(popover.contains("Link(destination: RoutinUsageApp.websiteURL)"))
         XCTAssertTrue(popover.contains("Image(nsImage: NSImage(named: \"PopoverColorBrandLogo\")"))
-        XCTAssertTrue(popover.contains("frame(width: 32, height: 32)"))
+        XCTAssertTrue(popover.contains("frame(width: 28, height: 28)"))
         XCTAssertTrue(popover.contains("打开 Routin 官网"))
         XCTAssertTrue(popover.contains(".overlay(alignment: .center)"))
         XCTAssertTrue(popover.contains("Image(systemName: \"arrow.clockwise\")"))
@@ -161,10 +161,22 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertLessThan(start.lowerBound, notice.lowerBound)
     }
 
-    func test弹窗进度条复用菜单栏的用量风险分级() throws {
+    func test弹窗进度条复用共享用量风险呈现() throws {
         let usageRowView = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
 
-        XCTAssertTrue(usageRowView.contains("MenuBarUsageRisk.level(for: metric.percent)"))
+        XCTAssertTrue(usageRowView.contains("UsageMetricProgressBar(metric: metric)"))
+        XCTAssertTrue(usageRowView.contains("UsageMetricPresentation.color(for: metric.percent)"))
+    }
+
+    func test菜单栏弹窗以账户概览突出当前Key() throws {
+        let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
+        let row = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
+
+        XCTAssertTrue(popover.contains("usageListHeader"))
+        XCTAssertTrue(popover.contains("账户用量"))
+        XCTAssertTrue(popover.contains("当前账户"))
+        XCTAssertTrue(row.contains("当前账户"))
+        XCTAssertTrue(row.contains("RoundedRectangle(cornerRadius: 10"))
     }
 
     func test设置使用独立可缩放窗口场景而不是系统固定设置场景() throws {
@@ -202,6 +214,14 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(settings.contains("UserDefaults"))
     }
 
+    func test首次引导使用Routin品牌图并聚焦添加首个Key() throws {
+        let onboarding = try sourceText(at: "RoutinUsage/Views/OnboardingView.swift")
+
+        XCTAssertTrue(onboarding.contains("PopoverColorBrandLogo"))
+        XCTAssertFalse(onboarding.contains("chart.bar.xaxis"))
+        XCTAssertTrue(onboarding.contains("添加第一个 Key"))
+    }
+
     func test设置页与菜单栏视图真实接入四种显示样式() throws {
         let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
         let statusBarController = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
@@ -217,9 +237,36 @@ final class ProjectBootstrapTests: XCTestCase {
     func test设置页用量详情使用彩色进度条和风险百分比() throws {
         let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
 
-        XCTAssertTrue(settings.contains("ProgressView(value: min(max(metric.percent, 0), 100), total: 100)"))
-        XCTAssertTrue(settings.contains("MenuBarUsageRisk.level(for: metric.percent)"))
-        XCTAssertTrue(settings.contains("usageProgressColor(for: metric)"))
+        XCTAssertTrue(settings.contains("UsageMetricProgressBar(metric: metric)"))
+        XCTAssertTrue(settings.contains("UsageMetricPresentation.color(for: metric.percent)"))
+        XCTAssertTrue(settings.contains("keyUsageDetails(state)"))
+        XCTAssertFalse(settings.contains("DisclosureGroup("))
+    }
+
+    func test账户详情保留两个周期的完整结束时间() throws {
+        let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+
+        XCTAssertTrue(settings.contains("5 小时结束"))
+        XCTAssertTrue(settings.contains("周结束"))
+        XCTAssertTrue(settings.contains("UsageFormatter.fullDateTime(metric.windowEnd)"))
+    }
+
+    func test点击Key时仅展开当前账户详情并保留关联操作按钮() throws {
+        let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+
+        XCTAssertTrue(settings.contains("detailSection(\"套餐状态\""))
+        XCTAssertTrue(settings.contains("detailSection(\"订阅与周期\""))
+        XCTAssertTrue(settings.contains("detailSection(\"账户与模型\""))
+        XCTAssertTrue(settings.contains("func detailValue("))
+        XCTAssertTrue(settings.contains("@State private var expandedKeyID: UUID?"))
+        XCTAssertTrue(settings.contains("if expandedKeyID == configuration.id"))
+        XCTAssertTrue(settings.contains("expandedKeyID = configuration.id"))
+        let unlinkStart = try XCTUnwrap(settings.range(of: "Button(\"解除关联\", role: .destructive)"))
+        let unlinkEnd = try XCTUnwrap(settings[unlinkStart.lowerBound...].range(of: ".accessibilityLabel("))
+        let unlinkButton = settings[unlinkStart.lowerBound..<unlinkEnd.lowerBound]
+        XCTAssertTrue(unlinkButton.contains(".liquidGlassButton()"))
+        XCTAssertFalse(settings.contains("DisclosureGroup("))
+        XCTAssertFalse(settings.contains(".lineLimit(3)"))
     }
 
     func test统一玻璃辅助层使用系统玻璃并保留旧系统材质回退() throws {
@@ -249,12 +296,12 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(popover.contains(".liquidGlassWindowBackground()"))
     }
 
-    func test设置页保留玻璃按钮并移除嵌套玻璃容器() throws {
+    func test设置页使用原生侧栏并避免嵌套玻璃容器() throws {
         let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
 
-        XCTAssertTrue(settings.contains(".liquidGlassButton()"))
+        XCTAssertTrue(settings.contains("NavigationSplitView"))
+        XCTAssertTrue(settings.contains("SettingsSection"))
         XCTAssertTrue(settings.contains(".liquidGlassWindowBackground()"))
-        XCTAssertTrue(settings.contains("TabView {"))
         XCTAssertTrue(settings.contains("List {"))
         XCTAssertTrue(settings.contains("Button(role: .destructive)"))
         XCTAssertFalse(settings.contains(".liquidGlassControlSurface()"))
@@ -308,7 +355,7 @@ final class ProjectBootstrapTests: XCTestCase {
         let headerStart = try XCTUnwrap(
             usageRowView.range(of: "var header: some View")
         )
-        let progressStart = try XCTUnwrap(usageRowView.range(of: "ProgressView("))
+        let progressStart = try XCTUnwrap(usageRowView.range(of: "UsageMetricProgressBar"))
         let header = usageRowView[headerStart.lowerBound..<progressStart.lowerBound]
 
         XCTAssertTrue(header.contains("VStack(alignment: .trailing"))
@@ -403,10 +450,11 @@ final class ProjectBootstrapTests: XCTestCase {
 
     func test设置页显示当前版本与完整更新日志() throws {
         let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+        let updateNotes = try sourceText(at: "RoutinUsage/Views/UpdateNotesView.swift")
 
         XCTAssertTrue(settings.contains("当前版本"))
         XCTAssertTrue(settings.contains("UpdateNotesView(notes: update.notes)"))
-        XCTAssertFalse(settings.contains(".lineLimit(3)"))
+        XCTAssertFalse(updateNotes.contains(".lineLimit("))
     }
 
     func test更新日志视图使用Markdown并为无日志版本提供提示() throws {
