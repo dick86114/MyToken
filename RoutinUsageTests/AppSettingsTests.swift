@@ -20,7 +20,7 @@ final class AppSettingsTests: XCTestCase {
 
         XCTAssertEqual(
             WindowFramePersistence.loadSize(defaults: context.defaults),
-            CGSize(width: 720, height: 640)
+            CGSize(width: 760, height: 640)
         )
     }
 

@@ -12,10 +12,10 @@ struct UsageRowView: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { timeline in
             HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: isSelected ? "circle.fill" : "circle")
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                         .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-                        .font(.system(size: 9, weight: .semibold))
-                        .padding(.top, 5)
+                        .font(.system(size: 12, weight: .semibold))
+                        .padding(.top, 4)
                         .accessibilityHidden(true)
 
                     VStack(alignment: .leading, spacing: 7) {
@@ -24,12 +24,18 @@ struct UsageRowView: View {
                     }
             }
             .contentShape(Rectangle())
-            .padding(.vertical, 7)
-            .padding(.horizontal, 4)
+            .padding(.vertical, 10)
+            .padding(.horizontal, 8)
             .background {
                 if isSelected {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(Color.accentColor.opacity(0.10))
+                }
+            }
+            .overlay {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color.accentColor.opacity(0.18), lineWidth: 1)
                 }
             }
             .accessibilityElement(children: .combine)
@@ -102,9 +108,16 @@ private extension UsageRowView {
     var header: some View {
         HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(state.configuration.displayName)
-                    .font(.headline)
-                    .lineLimit(1)
+                HStack(spacing: 5) {
+                    Text(state.configuration.displayName)
+                        .font(.headline)
+                        .lineLimit(1)
+                    if isSelected {
+                        Text("当前账户")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(Color.accentColor)
+                    }
+                }
                 Text(subscriptionDescription)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -296,8 +309,7 @@ private extension UsageRowView {
                         .monospacedDigit()
                 }
 
-                ProgressView(value: min(max(metric.percent, 0), 100), total: 100)
-                    .tint(progressColor(for: metric))
+                UsageMetricProgressBar(metric: metric)
 
                 Text(UsageFormatter.amount(metric))
                     .help(UsageFormatter.fullAmount(metric))
@@ -351,14 +363,7 @@ private extension UsageRowView {
     }
 
     func progressColor(for metric: UsageMetric) -> Color {
-        switch MenuBarUsageRisk.level(for: metric.percent) {
-        case .critical:
-            return .red
-        case .warning:
-            return .orange
-        case .normal:
-            return .green
-        }
+        UsageMetricPresentation.color(for: metric.percent)
     }
 
     @ViewBuilder

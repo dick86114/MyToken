@@ -15,4 +15,11 @@ final class UpdateNotesAccessibilityTests: XCTestCase {
             "更新日志，此版本未提供更新日志"
         )
     }
+
+    func testHTML更新日志去除标签后再朗读() {
+        XCTAssertEqual(
+            UpdateNotesAccessibility.label(notes: "<p><strong>Full Changelog</strong>: https://example.com/releases</p>"),
+            "更新日志，Full Changelog: https://example.com/releases"
+        )
+    }
 }

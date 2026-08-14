@@ -204,9 +204,9 @@ struct KeyEditorView: View {
     var body: some View {
         @Bindable var model = model
 
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 20) {
             Text(title)
-                .font(.title2.weight(.semibold))
+                .font(.title3.weight(.semibold))
 
             Form {
                 TextField("名称", text: $model.name)
@@ -250,7 +250,8 @@ struct KeyEditorView: View {
                     model.cancelSaving()
                     dismiss()
                 }
-                    .keyboardShortcut(.cancelAction)
+                .buttonStyle(.borderless)
+                .keyboardShortcut(.cancelAction)
 
                 Spacer()
 
@@ -264,12 +265,13 @@ struct KeyEditorView: View {
                     }
                 }
                 .keyboardShortcut(.defaultAction)
+                .liquidGlassButton(prominent: true)
                 .disabled(model.isSaving)
                 .accessibilityLabel(model.isSaving ? "正在验证并保存 Key" : "验证并保存 Key")
             }
         }
-        .padding(24)
-        .frame(width: 430)
+        .padding(28)
+        .frame(width: 440)
         .onAppear { focusedField = .name }
         .onDisappear { model.cancelSaving() }
         .onChange(of: model.saveResult) { _, result in

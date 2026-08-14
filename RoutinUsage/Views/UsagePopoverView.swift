@@ -47,6 +47,8 @@ struct UsagePopoverView: View {
 
             Divider()
 
+            usageListHeader
+
             usageList
                 .padding(.vertical, 4)
 
@@ -140,7 +142,7 @@ private extension UsagePopoverView {
                     .resizable()
                     .interpolation(.high)
                     .scaledToFit()
-                    .frame(width: 32, height: 32)
+                    .frame(width: 28, height: 28)
                     .shadow(color: .black.opacity(0.22), radius: 1.5, y: 1)
             }
             .buttonStyle(.plain)
@@ -187,6 +189,36 @@ private extension UsagePopoverView {
             }
             .padding(.horizontal, 12)
         }
+    }
+
+    var usageListHeader: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("账户用量")
+                    .font(.subheadline.weight(.semibold))
+                Text("\(store.orderedKeyIDs.count) 个 Key")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 8)
+
+            if let selectedState = store.selectedKeyID.flatMap(store.state(for:)) {
+                Label("当前账户 · \(selectedState.configuration.displayName)", systemImage: "checkmark.circle.fill")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(Color.accentColor)
+                    .lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
+        .padding(.bottom, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            store.selectedKeyID.flatMap(store.state(for:)).map {
+                "账户用量，共 \(store.orderedKeyIDs.count) 个 Key，当前账户 \($0.configuration.displayName)"
+            } ?? "账户用量，共 \(store.orderedKeyIDs.count) 个 Key"
+        )
     }
 
     var footer: some View {
@@ -243,20 +275,30 @@ private extension UsagePopoverView {
             .foregroundStyle(.secondary)
             .accessibilityLabel(refreshAccessibilityLabel)
 
-            HStack {
-                Button("设置") {
+            HStack(spacing: 10) {
+                Button {
                     openWindow(id: "settings")
+                } label: {
+                    Image(systemName: "gearshape")
+                        .frame(width: 18, height: 18)
                 }
                 .liquidGlassButton()
                 .keyboardShortcut(",")
+                .help("设置")
+                .accessibilityLabel("打开设置")
 
                 Spacer()
 
-                Button("退出 MyRoutin") {
+                Button {
                     NSApplication.shared.terminate(nil)
+                } label: {
+                    Image(systemName: "power")
+                        .frame(width: 18, height: 18)
                 }
                 .liquidGlassButton()
                 .keyboardShortcut("q")
+                .help("退出 MyRoutin")
+                .accessibilityLabel("退出 MyRoutin")
             }
         }
     }
