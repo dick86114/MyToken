@@ -35,7 +35,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(app.contains("nonisolated static let websiteURL"))
         XCTAssertTrue(popover.contains("Link(destination: RoutinUsageApp.websiteURL)"))
         XCTAssertTrue(popover.contains("Image(nsImage: NSImage(named: \"PopoverColorBrandLogo\")"))
-        XCTAssertTrue(popover.contains("frame(width: 42, height: 42)"))
+        XCTAssertTrue(popover.contains("frame(width: 32, height: 32)"))
         XCTAssertTrue(popover.contains("打开 Routin 官网"))
         XCTAssertTrue(popover.contains(".overlay(alignment: .center)"))
         XCTAssertTrue(popover.contains("Image(systemName: \"arrow.clockwise\")"))
@@ -214,6 +214,14 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(statusBarController.contains(".aliasLogoProgress, .logoProgress"))
     }
 
+    func test设置页用量详情使用彩色进度条和风险百分比() throws {
+        let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+
+        XCTAssertTrue(settings.contains("ProgressView(value: min(max(metric.percent, 0), 100), total: 100)"))
+        XCTAssertTrue(settings.contains("MenuBarUsageRisk.level(for: metric.percent)"))
+        XCTAssertTrue(settings.contains("usageProgressColor(for: metric)"))
+    }
+
     func test统一玻璃辅助层使用系统玻璃并保留旧系统材质回退() throws {
         guard let surface = try optionalSourceText(at: "RoutinUsage/Views/LiquidGlassSurface.swift") else {
             XCTFail("缺少统一玻璃辅助层")
@@ -277,7 +285,8 @@ final class ProjectBootstrapTests: XCTestCase {
         let menuBarStyle = try sourceText(at: "RoutinUsage/Models/MenuBarStyle.swift")
 
         XCTAssertTrue(statusBarController.contains("MenuBarVerticalUsageIcon.image(percent: metric.percent)"))
-        XCTAssertTrue(statusBarController.contains("MenuBarLogoUsageIcon.image(percent: metric.percent)"))
+        XCTAssertTrue(statusBarController.contains("MenuBarLogoUsageIcon.image("))
+        XCTAssertTrue(statusBarController.contains("appearance: button.effectiveAppearance"))
         XCTAssertTrue(menuBarStyle.contains("case logoProgress"))
         XCTAssertTrue(menuBarStyle.contains("case aliasLogoProgress"))
         XCTAssertTrue(statusBarController.contains("let accessibilityText"))

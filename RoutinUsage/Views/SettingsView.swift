@@ -342,10 +342,46 @@ private extension SettingsView {
     }
 
     func usageDetailItem(_ title: String, _ metric: UsageMetric) -> some View {
-        detailItem(
-            title,
-            "\(UsageFormatter.amount(metric))（\(UsageFormatter.percentText(metric) ?? "—")）"
+        let percentText = UsageFormatter.percentText(metric) ?? "—"
+
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(title)
+                    .foregroundStyle(.tertiary)
+                Spacer(minLength: 4)
+                Text(percentText)
+                    .font(.system(.caption, design: .rounded, weight: .semibold))
+                    .foregroundStyle(usageProgressColor(for: metric))
+                    .monospacedDigit()
+            }
+
+            ProgressView(value: min(max(metric.percent, 0), 100), total: 100)
+                .tint(usageProgressColor(for: metric))
+
+            HStack(spacing: 8) {
+                Text(UsageFormatter.amount(metric))
+                Text("剩余 \(UsageFormatter.remaining(metric))")
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .monospacedDigit()
+        }
+        .frame(minWidth: 190, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "\(title)，已使用 \(percentText)，\(UsageFormatter.amount(metric))，剩余 \(UsageFormatter.remaining(metric))"
         )
+    }
+
+    func usageProgressColor(for metric: UsageMetric) -> Color {
+        switch MenuBarUsageRisk.level(for: metric.percent) {
+        case .critical:
+            return .red
+        case .warning:
+            return .orange
+        case .normal:
+            return .green
+        }
     }
 
     func subscriptionStatus(_ status: Int?, state: KeyUsageState) -> String {

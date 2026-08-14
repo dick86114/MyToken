@@ -37,9 +37,9 @@ final class UsageFormatterTests: XCTestCase {
     }
 
     @MainActor
-    func test菜单栏Logo轮廓在浅色系统外观保持品牌白边() throws {
+    func test菜单栏Logo轮廓在浅色系统外观使用黑色() throws {
         let appearance = try XCTUnwrap(NSAppearance(named: .aqua))
-        var brightPixelCount = 0
+        var darkPixelCount = 0
 
         appearance.performAsCurrentDrawingAppearance {
             let image = MenuBarLogoUsageIcon.image(percent: 0)
@@ -55,16 +55,16 @@ final class UsageFormatterTests: XCTestCase {
                         .usingColorSpace(.deviceRGB) else {
                         continue
                     }
-                    if color.redComponent > 0.7,
-                       color.greenComponent > 0.7,
-                       color.blueComponent > 0.7 {
-                        brightPixelCount += 1
+                    if color.redComponent < 0.3,
+                       color.greenComponent < 0.3,
+                       color.blueComponent < 0.3 {
+                        darkPixelCount += 1
                     }
                 }
             }
         }
 
-        XCTAssertGreaterThan(brightPixelCount, 50)
+        XCTAssertGreaterThan(darkPixelCount, 50)
     }
 
     @MainActor

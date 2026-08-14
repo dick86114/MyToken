@@ -33,6 +33,14 @@ enum MenuBarUsageRisk: Equatable {
     }
 }
 
+enum MenuBarLogoAppearance {
+    static func outlineColor(for appearance: NSAppearance) -> NSColor {
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? .white
+            : .black
+    }
+}
+
 enum MenuBarVerticalUsageIcon {
     static let size = NSSize(width: 7, height: 18)
 
@@ -100,18 +108,30 @@ enum MenuBarVerticalUsageIcon {
 enum MenuBarLogoUsageIcon {
     static let size = NSSize(width: 18, height: 18)
 
-    static func image(percent: Double) -> NSImage {
+    static func image(
+        percent: Double,
+        appearance: NSAppearance? = nil
+    ) -> NSImage {
         let image = NSImage(size: size)
         image.lockFocus()
         defer { image.unlockFocus() }
 
         let rect = NSRect(origin: .zero, size: size)
-        draw(percent: percent, in: rect)
+        draw(
+            percent: percent,
+            in: rect,
+            appearance: appearance ?? NSApp?.effectiveAppearance
+                ?? NSAppearance(named: .aqua)!
+        )
         image.isTemplate = false
         return image
     }
 
-    static func draw(percent: Double, in rect: NSRect) {
+    static func draw(
+        percent: Double,
+        in rect: NSRect,
+        appearance: NSAppearance
+    ) {
         guard
             let outline = NSImage(named: "MenuBarLogoOutline"),
             let mask = NSImage(named: "MenuBarLogoMask")
@@ -138,7 +158,7 @@ enum MenuBarLogoUsageIcon {
 
         let tintedOutline = NSImage(size: rect.size)
         tintedOutline.lockFocus()
-        NSColor.white.setFill()
+        MenuBarLogoAppearance.outlineColor(for: appearance).setFill()
         NSBezierPath(rect: NSRect(origin: .zero, size: rect.size)).fill()
         outline.draw(
             in: NSRect(origin: .zero, size: rect.size),
