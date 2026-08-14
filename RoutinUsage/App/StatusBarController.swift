@@ -15,6 +15,7 @@ final class StatusBarController: NSObject {
     private var notificationsEnabled: Bool
     private var thresholds: AlertThresholds
     private var selectedKeyID: UUID?
+    private var appearanceObservation: NSKeyValueObservation?
 
     init(environment: AppEnvironment) {
         self.environment = environment
@@ -27,6 +28,7 @@ final class StatusBarController: NSObject {
         configurePopover()
         configureStatusButton()
         updateStatusButton()
+        observeStatusBarAppearance()
         observeEnvironment()
 
         // 先完成常驻应用的启动流程，再显示更新完成提示，避免同步模态弹窗阻塞首次更新检查。
@@ -52,6 +54,15 @@ final class StatusBarController: NSObject {
         button.action = #selector(handleStatusButtonClick(_:))
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         button.imagePosition = .imageRight
+    }
+
+    private func observeStatusBarAppearance() {
+        appearanceObservation = NSApp.observe(\NSApplication.effectiveAppearance, options: [.new]) {
+            [weak self] _, _ in
+            Task { @MainActor [weak self] in
+                self?.updateStatusButton()
+            }
+        }
     }
 
     private func observeEnvironment() {
@@ -115,7 +126,10 @@ final class StatusBarController: NSObject {
             button.title = text.isEmpty ? "" : text + " · "
             button.image = switch environment.settings.menuBarStyle {
             case .aliasLogoProgress, .logoProgress:
-                MenuBarLogoUsageIcon.image(percent: metric.percent)
+                MenuBarLogoUsageIcon.image(
+                    percent: metric.percent,
+                    appearance: button.effectiveAppearance
+                )
             case .aliasVerticalBar:
                 MenuBarVerticalUsageIcon.image(percent: metric.percent)
             case .percent, .aliasPercent:

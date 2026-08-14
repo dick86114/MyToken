@@ -140,8 +140,8 @@ private extension UsagePopoverView {
                     .resizable()
                     .interpolation(.high)
                     .scaledToFit()
-                    .frame(width: 42, height: 42)
-                    .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
+                    .frame(width: 32, height: 32)
+                    .shadow(color: .black.opacity(0.22), radius: 1.5, y: 1)
             }
             .buttonStyle(.plain)
             .help("打开 Routin 官网")
