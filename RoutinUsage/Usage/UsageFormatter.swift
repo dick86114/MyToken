@@ -98,15 +98,71 @@ enum UsageFormatter {
             return "已结束"
         }
 
-        let totalMinutes = Int(end.timeIntervalSince(now) / 60)
+        let totalMinutes = max(1, Int(end.timeIntervalSince(now) / 60))
         let days = totalMinutes / (24 * 60)
         let hours = (totalMinutes % (24 * 60)) / 60
         let minutes = totalMinutes % 60
 
+        var parts: [String] = []
         if days > 0 {
-            return "\(days)d\(hours)h\(minutes)m"
+            parts.append("\(days)天")
         }
-        return "\(hours)h\(minutes)m"
+        if hours > 0 {
+            parts.append("\(hours)小时")
+        }
+        if minutes > 0 || parts.isEmpty {
+            parts.append("\(minutes)分钟")
+        }
+        return parts.joined(separator: " ")
+    }
+
+    static func shouldHighlightRemainingDuration(
+        for metric: UsageMetric,
+        dimension: UsageDimension,
+        now: Date
+    ) -> Bool {
+        guard let end = metric.windowEnd, end > now else {
+            return false
+        }
+        switch dimension {
+        case .fiveHour:
+            return end.timeIntervalSince(now) < 60 * 60
+        case .weekly:
+            return end.timeIntervalSince(now) < 24 * 60 * 60
+        case .token:
+            return false
+        }
+    }
+
+    /// 在用量行中使用紧凑的本地订阅日期时间。
+    static func subscriptionDateText(
+        _ date: Date?,
+        timeZone: TimeZone = .current
+    ) -> String {
+        guard let date else {
+            return "—"
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter.string(from: date)
+    }
+
+    /// 仅在订阅结束时间进入未来七天时显示到期提示。
+    static func subscriptionExpiryText(until end: Date?, now: Date) -> String? {
+        guard let end else {
+            return nil
+        }
+        let interval = end.timeIntervalSince(now)
+        if interval <= 0 {
+            return "（已过期）"
+        }
+        let days = Int(interval / (24 * 60 * 60))
+        guard days < 7 else {
+            return nil
+        }
+        return "（\(max(days, 1))天后到期）"
     }
 
     /// 用于设置页和详情面板的完整本地时间；没有时间时统一显示占位符。
@@ -130,6 +186,16 @@ enum UsageFormatter {
             "\(group.name) ×\(NSDecimalNumber(decimal: group.multiplier).stringValue)"
         }
         .joined(separator: "、")
+    }
+
+    static func currentGroupMultiplier(
+        in groups: [UsageGroupMultiplier],
+        matching groupName: String?
+    ) -> UsageGroupMultiplier? {
+        guard let groupName else {
+            return nil
+        }
+        return groups.first { $0.name == groupName }
     }
 
     static func groupMultiplierSegments(

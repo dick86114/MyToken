@@ -50,6 +50,7 @@ final class UsageStore {
     @ObservationIgnored private let now: @Sendable () -> Date
     @ObservationIgnored private var refreshingKeyIDs: Set<UUID> = []
     @ObservationIgnored private var refreshGenerationByKeyID: [UUID: UUID] = [:]
+    @ObservationIgnored private var invalidKeyFingerprintsByKeyID: [UUID: CredentialFingerprint] = [:]
 
     private static let selectedKeyStorageKey = "selectedKeyID"
 
@@ -87,7 +88,12 @@ final class UsageStore {
 
     func refreshAll() async {
         synchronizeConfigurations()
-        let requests = orderedKeyIDs.compactMap(prepareRefreshRequest(for:))
+        let requests: [RefreshRequest] = orderedKeyIDs.compactMap { keyID -> RefreshRequest? in
+            guard !shouldSkipBatchRefresh(for: keyID) else {
+                return nil
+            }
+            return prepareRefreshRequest(for: keyID)
+        }
         await perform(requests)
     }
 
@@ -137,6 +143,7 @@ final class UsageStore {
             return
         }
         refreshGenerationByKeyID[keyID] = UUID()
+        invalidKeyFingerprintsByKeyID.removeValue(forKey: keyID)
         state.snapshot = snapshot
         state.lastSuccessAt = snapshot?.fetchedAt ?? validatedAt
         state.isRefreshing = refreshingKeyIDs.contains(keyID)
@@ -246,6 +253,7 @@ final class UsageStore {
         alertEvaluator.clearState(for: id)
         refreshingKeyIDs.remove(id)
         refreshGenerationByKeyID.removeValue(forKey: id)
+        invalidKeyFingerprintsByKeyID.removeValue(forKey: id)
         states.removeValue(forKey: id)
         orderedKeyIDs.removeAll { $0 == id }
         isRefreshing = !refreshingKeyIDs.isEmpty
@@ -294,6 +302,7 @@ final class UsageStore {
         let validIDs = Set(configurations.map(\.id))
         states = states.filter { validIDs.contains($0.key) }
         refreshGenerationByKeyID = refreshGenerationByKeyID.filter { validIDs.contains($0.key) }
+        invalidKeyFingerprintsByKeyID = invalidKeyFingerprintsByKeyID.filter { validIDs.contains($0.key) }
         orderedKeyIDs = configurations.map(\.id)
 
         for configuration in configurations {
@@ -461,6 +470,7 @@ final class UsageStore {
         }
         switch outcome.result {
         case let .success(snapshot):
+            invalidKeyFingerprintsByKeyID.removeValue(forKey: outcome.keyID)
             state.snapshot = snapshot
             state.lastSuccessAt = snapshot?.fetchedAt ?? outcome.requestedAt
             state.isStale = false
@@ -478,7 +488,11 @@ final class UsageStore {
                 try? cache.delete(for: outcome.keyID)
             }
         case let .failure(error):
-            applyFailure(Self.displayError(from: error), to: outcome.keyID)
+            let displayError = Self.displayError(from: error)
+            if displayError == .invalidKey {
+                invalidKeyFingerprintsByKeyID[outcome.keyID] = outcome.credentialFingerprint
+            }
+            applyFailure(displayError, to: outcome.keyID)
         case .cancelled:
             break
         }
@@ -498,6 +512,18 @@ final class UsageStore {
             )
         } == true
         states[keyID] = state
+    }
+
+    private func shouldSkipBatchRefresh(for keyID: UUID) -> Bool {
+        guard states[keyID]?.error == .invalidKey else {
+            return false
+        }
+
+        guard let failedFingerprint = invalidKeyFingerprintsByKeyID[keyID] else {
+            // 没有可读取的密钥时也跳过批量刷新；密钥恢复后会再次尝试。
+            return credentialFingerprint(for: keyID) == nil
+        }
+        return credentialFingerprint(for: keyID) == failedFingerprint
     }
 
     private func credentialFingerprint(for keyID: UUID) -> CredentialFingerprint? {

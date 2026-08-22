@@ -141,6 +141,39 @@ final class CodexGroupDetectionServiceTests: XCTestCase {
             XCTAssertEqual(service.state(for: activeKeyID), .succeeded)
         }
     }
+
+    func test自动刷新只探测已有记录的Key() async throws {
+        let recordedKeyID = UUID()
+        let unrecordedKeyID = UUID()
+        let identity = RoutinAccountIdentity.make(email: "member@example.com", displayName: "会员")
+        let web = GroupDetectionWebFake(authenticated: true, identity: identity)
+        let probe = GroupDetectionProbeFake()
+        let repository = GroupDetectionRecordFake()
+        try await repository.save(
+            CodexGroupDetectionRecord(
+                keyID: recordedKeyID,
+                accountFingerprint: identity.fingerprint,
+                accountDisplayName: identity.displayName,
+                groupName: "旧分组",
+                detectedAt: .distantPast
+            )
+        )
+        let service = await MainActor.run {
+            CodexGroupDetectionService(webSession: web, probeClient: probe, repository: repository)
+        }
+
+        await service.refreshSavedRecords([
+            .init(keyID: recordedKeyID, secret: "plan-recorded-0001"),
+            .init(keyID: unrecordedKeyID, secret: "plan-unrecorded-0002")
+        ])
+
+        let probeCallCount = await probe.callCount()
+        let updatedRecord = try await repository.load(for: recordedKeyID)
+        let unrecordedRecord = try await repository.load(for: unrecordedKeyID)
+        XCTAssertEqual(probeCallCount, 1)
+        XCTAssertEqual(updatedRecord?.groupName, "Codex")
+        XCTAssertNil(unrecordedRecord)
+    }
 }
 
 actor GroupDetectionWebFake: RoutinGroupDetectionWebSessionManaging {

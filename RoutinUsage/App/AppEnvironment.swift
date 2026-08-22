@@ -73,6 +73,7 @@ final class AppEnvironment {
     @ObservationIgnored private let updateService: any UpdateChecking
     @ObservationIgnored private let logWriter: any AppLogWriting
     @ObservationIgnored private let updateCheckScheduler: any UpdateCheckScheduling
+    @ObservationIgnored private let codexGroupDetectionScheduler: any UpdateCheckScheduling
     @ObservationIgnored private let notificationTaskYield: @Sendable () async -> Void
     @ObservationIgnored private let applicationNotificationCenter: NotificationCenter
     @ObservationIgnored private var terminationObservation: ApplicationTerminationObservation?
@@ -94,6 +95,7 @@ final class AppEnvironment {
         applicationNotificationCenter: NotificationCenter = .default,
         updateService: any UpdateChecking = NoUpdateService(),
         updateCheckScheduler: (any UpdateCheckScheduling)? = nil,
+        codexGroupDetectionScheduler: (any UpdateCheckScheduling)? = nil,
         notificationTaskYield: @escaping @Sendable () async -> Void = { await Task.yield() },
         logWriter: any AppLogWriting = NoopAppLogWriter(),
         routinCheckIn: RoutinCheckInService? = nil,
@@ -111,6 +113,8 @@ final class AppEnvironment {
         self.updateService = updateService
         self.logWriter = logWriter
         self.updateCheckScheduler = updateCheckScheduler ?? UpdateCheckScheduler()
+        self.codexGroupDetectionScheduler = codexGroupDetectionScheduler
+            ?? UpdateCheckScheduler(interval: 3_600)
         self.notificationTaskYield = notificationTaskYield
         self.routinWebSession = routinWebSession
         self.routinCheckIn = routinCheckIn ?? RoutinCheckInService(session: UnavailableRoutinWebSession())
@@ -170,6 +174,7 @@ final class AppEnvironment {
             notificationSender: notificationSender,
             updateService: GitHubUpdateService(logWriter: logWriter),
             updateCheckScheduler: UpdateCheckScheduler(),
+            codexGroupDetectionScheduler: UpdateCheckScheduler(interval: 3_600),
             logWriter: logWriter,
             routinCheckIn: routinCheckIn,
             codexGroupDetection: codexGroupDetection,
@@ -205,6 +210,11 @@ final class AppEnvironment {
         refreshScheduler.start(minutes: settings.refreshMinutes) { [weak self] in
             Task { @MainActor [weak self] in
                 await self?.store.refreshAll()
+            }
+        }
+        codexGroupDetectionScheduler.start { [weak self] in
+            Task { @MainActor [weak self] in
+                await self?.refreshSavedCodexGroups()
             }
         }
         await notificationsDidChange(enabled: settings.notificationsEnabled)
@@ -430,6 +440,7 @@ final class AppEnvironment {
         notificationAuthorizationTask = nil
         refreshScheduler.stop()
         updateCheckScheduler.stop()
+        codexGroupDetectionScheduler.stop()
         cancelActiveUpdateCheck()
     }
 
@@ -463,6 +474,19 @@ private actor UnavailableCodexGroupProbeClient: CodexGroupProbing {
 }
 
 private extension AppEnvironment {
+    func refreshSavedCodexGroups() async {
+        guard isStarted else {
+            return
+        }
+        let requests = store.orderedKeyIDs.compactMap { keyID -> CodexGroupDetectionRefreshRequest? in
+            guard let secret = try? keyRepository.read(id: keyID) else {
+                return nil
+            }
+            return CodexGroupDetectionRefreshRequest(keyID: keyID, secret: secret)
+        }
+        await codexGroupDetection.refreshSavedRecords(requests)
+    }
+
     enum UpdateCheckOutcome {
         case success(AppUpdate?)
         case cancelled

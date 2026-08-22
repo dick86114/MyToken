@@ -16,6 +16,7 @@ final class StatusBarController: NSObject {
     private var thresholds: AlertThresholds
     private var selectedKeyID: UUID?
     private var appearanceObservation: NSKeyValueObservation?
+    private var popoverWindowResignObserver: NSObjectProtocol?
 
     init(environment: AppEnvironment) {
         self.environment = environment
@@ -179,7 +180,26 @@ final class StatusBarController: NSObject {
         } else {
             NSApp.activate(ignoringOtherApps: true)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            popover.contentViewController?.view.window?.makeKey()
+            configurePopoverWindow()
+        }
+    }
+
+    private func configurePopoverWindow() {
+        guard let window = popover.contentViewController?.view.window else {
+            return
+        }
+        window.level = .statusBar
+        window.makeKeyAndOrderFront(nil)
+
+        if let popoverWindowResignObserver {
+            NotificationCenter.default.removeObserver(popoverWindowResignObserver)
+        }
+        popoverWindowResignObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResignKeyNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            self?.popover.performClose(nil)
         }
     }
 

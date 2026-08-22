@@ -324,7 +324,6 @@ private extension SettingsView {
         .padding(.horizontal, 8)
         .contentShape(Rectangle())
         .onTapGesture {
-            store.selectKey(configuration.id)
             expandedKeyID = configuration.id
         }
         .listRowSeparator(.hidden)

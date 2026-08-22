@@ -90,8 +90,8 @@ final class ProjectBootstrapTests: XCTestCase {
 
         XCTAssertFalse(popover.contains("dimension: settings.displayDimension"))
         XCTAssertTrue(row.contains("periodicContent"))
-        XCTAssertTrue(row.contains("metricContent(title: \"5 小时\""))
-        XCTAssertTrue(row.contains("metricContent(title: \"周\""))
+        XCTAssertTrue(row.contains("title: \"5 小时\""))
+        XCTAssertTrue(row.contains("title: \"周\""))
     }
 
     func test菜单栏使用原生状态栏按钮承载左右键交互() throws {
@@ -150,7 +150,7 @@ final class ProjectBootstrapTests: XCTestCase {
         let source = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
 
         XCTAssertTrue(source.contains("NSApp.activate(ignoringOtherApps: true)"))
-        XCTAssertTrue(source.contains("popover.contentViewController?.view.window?.makeKey()"))
+        XCTAssertTrue(source.contains("window.makeKeyAndOrderFront(nil)"))
     }
 
     func test更新完成提示不会阻塞首次启动检查() throws {
@@ -353,13 +353,14 @@ final class ProjectBootstrapTests: XCTestCase {
         let usageRowView = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
 
         let headerStart = try XCTUnwrap(
-            usageRowView.range(of: "var header: some View")
+            usageRowView.range(of: "func headerView(now: Date) -> some View")
         )
         let progressStart = try XCTUnwrap(usageRowView.range(of: "UsageMetricProgressBar"))
         let header = usageRowView[headerStart.lowerBound..<progressStart.lowerBound]
 
         XCTAssertTrue(header.contains("VStack(alignment: .trailing"))
-        XCTAssertTrue(header.contains("groupMultiplierText(groupMultipliers)"))
+        XCTAssertTrue(header.contains("groupMultiplierText(currentGroupMultiplier)"))
+        XCTAssertTrue(header.contains("hasGroupMultipliers"))
         XCTAssertTrue(header.contains("Spacer(minLength: 8)"))
         XCTAssertFalse(usageRowView.contains("HStack {\n                    Spacer()\n                    Text(UsageFormatter.groupMultiplierText(groupMultipliers))"))
     }
@@ -434,18 +435,33 @@ final class ProjectBootstrapTests: XCTestCase {
     func test弹窗详情显示剩余时长与配对分组倍率且不显示允许模型() throws {
         let usageRowView = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
 
-        XCTAssertTrue(usageRowView.contains("metricContent(title: \"5 小时\""))
-        XCTAssertTrue(usageRowView.contains("metricContent(title: \"周\""))
+        XCTAssertTrue(usageRowView.contains("title: \"5 小时\""))
+        XCTAssertTrue(usageRowView.contains("title: \"周\""))
         XCTAssertTrue(usageRowView.contains("UsageFormatter.remainingDurationText"))
         XCTAssertTrue(usageRowView.contains("groupMultipliers"))
         XCTAssertFalse(usageRowView.contains("allowedModels"))
         XCTAssertFalse(usageRowView.contains("允许模型"))
     }
 
+    func test菜单栏弹窗失焦关闭并保持状态栏层级() throws {
+        let statusBarController = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
+
+        XCTAssertTrue(statusBarController.contains("NSWindow.didResignKeyNotification"))
+        XCTAssertTrue(statusBarController.contains("popover.performClose(nil)"))
+        XCTAssertTrue(statusBarController.contains("window.level = .statusBar"))
+    }
+
     func test设置详情显示全部按Key配对的分组倍率() throws {
         let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
 
         XCTAssertTrue(settings.contains("UsageFormatter.groupMultiplierText(snapshot.groupMultipliers)"))
+    }
+
+    func test设置页点击Key只展开详情不切换菜单栏当前Key() throws {
+        let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+
+        XCTAssertTrue(settings.contains("expandedKeyID = configuration.id"))
+        XCTAssertFalse(settings.contains("store.selectKey(configuration.id)"))
     }
 
     func test设置页显示当前版本与完整更新日志() throws {

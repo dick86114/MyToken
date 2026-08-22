@@ -60,6 +60,29 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertFalse(store.isRefreshing)
     }
 
+    func test首个Key失效后批量刷新跳过该Key但继续刷新其他Key() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let invalidKey = try context.addKey(name: "失效", secret: "plan-invalid-first-0001")
+        let activeKey = try context.addKey(name: "正常", secret: "plan-active-second-0002")
+        let fresh = makeSnapshot(planName: "Pro", fetchedAt: context.now)
+        let fetcher = ScriptedUsageFetcher(responses: [
+            "plan-invalid-first-0001": .failure(.invalidKey),
+            "plan-active-second-0002": .success(fresh)
+        ])
+        let store = context.makeStore(fetcher: fetcher)
+
+        await store.refreshAll()
+        await store.refreshAll()
+
+        let invalidRequestCount = await fetcher.requestCount(for: "plan-invalid-first-0001")
+        let activeRequestCount = await fetcher.requestCount(for: "plan-active-second-0002")
+        XCTAssertEqual(store.state(for: invalidKey.id)?.error, .invalidKey)
+        XCTAssertEqual(store.state(for: activeKey.id)?.snapshot, fresh)
+        XCTAssertEqual(invalidRequestCount, 1)
+        XCTAssertEqual(activeRequestCount, 2)
+    }
+
     func test成功刷新覆盖缓存并只对成功快照发送通知() async throws {
         let context = try makeContext()
         defer { context.cleanUp() }

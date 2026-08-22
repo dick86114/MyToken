@@ -16,6 +16,80 @@ final class UsageFormatterTests: XCTestCase {
         XCTAssertEqual(segments.map(\.text), ["Codex ×1.5", "Codex Pro ×2"])
         XCTAssertEqual(segments.map(\.isHighlighted), [true, false])
     }
+
+    func test仅返回检测到的当前分组倍率() {
+        let groups = [
+            UsageGroupMultiplier(name: "XAI 低价", multiplier: 0.5),
+            UsageGroupMultiplier(name: "Codex", multiplier: 1),
+            UsageGroupMultiplier(name: "Codex Pro", multiplier: 2)
+        ]
+
+        XCTAssertEqual(
+            UsageFormatter.currentGroupMultiplier(in: groups, matching: "Codex"),
+            UsageGroupMultiplier(name: "Codex", multiplier: 1)
+        )
+        XCTAssertNil(UsageFormatter.currentGroupMultiplier(in: groups, matching: nil))
+        XCTAssertNil(UsageFormatter.currentGroupMultiplier(in: groups, matching: "不存在"))
+    }
+
+    func test临近重置的窗口将剩余时间标为绿色() {
+        let now = Date(timeIntervalSince1970: 1_786_320_000)
+        let fiveHour = makeMetric(
+            used: 1,
+            limit: 10,
+            remaining: 9,
+            unit: .usd,
+            windowEnd: now.addingTimeInterval(59 * 60)
+        )
+        let weekly = makeMetric(
+            used: 1,
+            limit: 10,
+            remaining: 9,
+            unit: .usd,
+            windowEnd: now.addingTimeInterval(23 * 60 * 60)
+        )
+
+        XCTAssertTrue(
+            UsageFormatter.shouldHighlightRemainingDuration(
+                for: fiveHour,
+                dimension: .fiveHour,
+                now: now
+            )
+        )
+        XCTAssertTrue(
+            UsageFormatter.shouldHighlightRemainingDuration(
+                for: weekly,
+                dimension: .weekly,
+                now: now
+            )
+        )
+        XCTAssertFalse(
+            UsageFormatter.shouldHighlightRemainingDuration(
+                for: makeMetric(
+                    used: 1,
+                    limit: 10,
+                    remaining: 9,
+                    unit: .usd,
+                    windowEnd: now.addingTimeInterval(60 * 60)
+                ),
+                dimension: .fiveHour,
+                now: now
+            )
+        )
+        XCTAssertFalse(
+            UsageFormatter.shouldHighlightRemainingDuration(
+                for: makeMetric(
+                    used: 1,
+                    limit: 10,
+                    remaining: 9,
+                    unit: .usd,
+                    windowEnd: now.addingTimeInterval(24 * 60 * 60)
+                ),
+                dimension: .weekly,
+                now: now
+            )
+        )
+    }
     @MainActor
     func test菜单栏独立竖条图像只承载彩色用量条() {
         let image = MenuBarVerticalUsageIcon.image(percent: 35)
@@ -315,10 +389,10 @@ final class UsageFormatterTests: XCTestCase {
         let now = Date(timeIntervalSince1970: 1_786_320_000)
         let end = now.addingTimeInterval(3 * 60 * 60 + 45 * 60)
 
-        XCTAssertEqual(UsageFormatter.remainingDurationText(until: end, now: now), "3h45m")
+        XCTAssertEqual(UsageFormatter.remainingDurationText(until: end, now: now), "3小时 45分钟")
         XCTAssertEqual(
             UsageFormatter.remainingDurationText(until: end, now: now.addingTimeInterval(60)),
-            "3h44m"
+            "3小时 44分钟"
         )
     }
 
@@ -428,7 +502,7 @@ final class UsageFormatterTests: XCTestCase {
 
         XCTAssertEqual(
             UsageFormatter.remainingDurationText(until: end, now: now),
-            "3h45m"
+            "3小时 45分钟"
         )
     }
 
@@ -439,7 +513,7 @@ final class UsageFormatterTests: XCTestCase {
 
         XCTAssertEqual(
             UsageFormatter.remainingDurationText(until: end, now: now),
-            "4d3h45m"
+            "4天 3小时 45分钟"
         )
     }
 
@@ -465,7 +539,45 @@ final class UsageFormatterTests: XCTestCase {
 
         XCTAssertEqual(
             UsageFormatter.remainingDurationText(until: end, now: now),
-            "3h45m"
+            "3小时 45分钟"
+        )
+    }
+
+    func test订阅日期使用紧凑本地格式() {
+        let 时区 = TimeZone(secondsFromGMT: 8 * 60 * 60)!
+
+        XCTAssertEqual(
+            UsageFormatter.subscriptionDateText(
+                Date(timeIntervalSince1970: 1_786_341_600),
+                timeZone: 时区
+            ),
+            "2026-08-10 14:00"
+        )
+        XCTAssertEqual(UsageFormatter.subscriptionDateText(nil, timeZone: 时区), "—")
+    }
+
+    func test订阅结束七天内显示到期提示超过七天不显示并识别已过期() {
+        let now = Date(timeIntervalSince1970: 1_786_320_000)
+
+        XCTAssertNil(
+            UsageFormatter.subscriptionExpiryText(
+                until: now.addingTimeInterval(7 * 24 * 60 * 60),
+                now: now
+            )
+        )
+        XCTAssertEqual(
+            UsageFormatter.subscriptionExpiryText(
+                until: now.addingTimeInterval(2 * 24 * 60 * 60 + 15 * 60),
+                now: now
+            ),
+            "（2天后到期）"
+        )
+        XCTAssertEqual(
+            UsageFormatter.subscriptionExpiryText(
+                until: now.addingTimeInterval(-60),
+                now: now
+            ),
+            "（已过期）"
         )
     }
 
@@ -606,7 +718,7 @@ final class UsageFormatterTests: XCTestCase {
                 isSelected: false,
                 now: now
             ),
-            "主账号，已使用 68%，$6.80 / $10.00，5 小时剩余 3h45m，周剩余 2d0h15m，Codex ×1、Codex Pro ×2"
+            "主账号，已使用 68%，$6.80 / $10.00，5 小时剩余 3小时 45分钟，周剩余 2天 15分钟，Codex ×1、Codex Pro ×2"
         )
     }
 

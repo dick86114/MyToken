@@ -795,6 +795,45 @@ final class AppLifecycleTests: XCTestCase {
         XCTAssertEqual(firstRequestCount, 1)
         XCTAssertEqual(secondRequestCount, 1)
     }
+
+    func test启动一小时分组定时刷新并在停止时取消() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let key = try context.repository.add(name: "主账号", secret: "plan-group-refresh-0001")
+        let identity = RoutinAccountIdentity.make(email: "member@example.com", displayName: "会员")
+        let records = GroupDetectionRecordFake()
+        try records.save(
+            CodexGroupDetectionRecord(
+                keyID: key.id,
+                accountFingerprint: identity.fingerprint,
+                accountDisplayName: identity.displayName,
+                groupName: "Codex",
+                detectedAt: .distantPast
+            )
+        )
+        let web = GroupDetectionWebFake(authenticated: true, identity: identity)
+        let probe = GroupDetectionProbeFake()
+        let detection = CodexGroupDetectionService(
+            webSession: web,
+            probeClient: probe,
+            repository: records
+        )
+        let scheduler = LifecycleUpdateSchedulerSpy()
+        let environment = context.makeEnvironment(
+            updateService: NoUpdateService(),
+            updateCheckScheduler: LifecycleUpdateSchedulerSpy(),
+            codexGroupDetection: detection,
+            codexGroupDetectionScheduler: scheduler
+        )
+
+        await environment.start()
+        XCTAssertEqual(scheduler.startCount, 1)
+        scheduler.fireTick()
+        await 等待条件 { await probe.callCount() == 1 }
+        environment.stop()
+
+        XCTAssertEqual(scheduler.stopCount, 1)
+    }
 }
 
 private extension AppLifecycleTests {
@@ -925,6 +964,8 @@ private struct AppLifecycleTestContext {
     func makeEnvironment(
         updateService: any UpdateChecking,
         updateCheckScheduler: any UpdateCheckScheduling,
+        codexGroupDetection: CodexGroupDetectionService? = nil,
+        codexGroupDetectionScheduler: (any UpdateCheckScheduling)? = nil,
         notificationTaskYield: @escaping @Sendable () async -> Void = { await Task.yield() },
         logWriter: any AppLogWriting = NoopAppLogWriter()
     ) -> AppEnvironment {
@@ -954,8 +995,10 @@ private struct AppLifecycleTestContext {
             applicationNotificationCenter: applicationNotificationCenter,
             updateService: updateService,
             updateCheckScheduler: updateCheckScheduler,
+            codexGroupDetectionScheduler: codexGroupDetectionScheduler,
             notificationTaskYield: notificationTaskYield,
-            logWriter: logWriter
+            logWriter: logWriter,
+            codexGroupDetection: codexGroupDetection
         )
     }
 

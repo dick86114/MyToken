@@ -78,6 +78,16 @@ enum CodexGroupDetectionState: Equatable, Sendable {
     }
 }
 
+struct CodexGroupDetectionRefreshRequest: Sendable {
+    let keyID: UUID
+    let secret: String
+
+    init(keyID: UUID, secret: String) {
+        self.keyID = keyID
+        self.secret = secret
+    }
+}
+
 @MainActor
 @Observable
 final class CodexGroupDetectionService {
@@ -142,6 +152,25 @@ final class CodexGroupDetectionService {
             return
         }
         await performPendingDetection()
+    }
+
+    func refreshSavedRecords(_ requests: [CodexGroupDetectionRefreshRequest]) async {
+        guard activeTask == nil, pendingDetection == nil else {
+            return
+        }
+        guard await webSession.hasAuthenticatedSession() else {
+            return
+        }
+
+        for request in requests {
+            guard (try? repository.load(for: request.keyID)) != nil else {
+                continue
+            }
+            guard await webSession.hasAuthenticatedSession() else {
+                return
+            }
+            await start(keyID: request.keyID, secret: request.secret)
+        }
     }
 
     func clearRecord(for keyID: UUID) {
