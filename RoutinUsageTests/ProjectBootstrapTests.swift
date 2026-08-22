@@ -464,6 +464,43 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(settings.contains("store.selectKey(configuration.id)"))
     }
 
+    func test设置页提供Key启用开关() throws {
+        let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+
+        XCTAssertTrue(settings.contains("Toggle"))
+        XCTAssertTrue(settings.contains("setKeyEnabled"))
+        XCTAssertTrue(settings.contains("isEnabled"))
+    }
+
+    func test菜单栏弹窗只使用启用Key() throws {
+        let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
+        let statusBar = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
+
+        XCTAssertTrue(popover.contains("store.visibleKeyIDs"))
+        XCTAssertTrue(statusBar.contains("environment.store.visibleKeyIDs"))
+    }
+
+    func test设置页提供排序模式并把拖动顺序交给持久化逻辑() throws {
+        let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+
+        XCTAssertTrue(settings.contains("isReordering"))
+        XCTAssertTrue(settings.contains(".onMove(perform: move)"))
+        XCTAssertTrue(settings.contains(".onDrag"))
+        XCTAssertTrue(settings.contains(".onDrop"))
+        XCTAssertTrue(settings.contains("arrow.up.arrow.down"))
+    }
+
+    func testKey行移除复选框使用手型光标并显示分隔() throws {
+        let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+        let rowStart = try XCTUnwrap(settings.range(of: "func keyRow"))
+        let overviewStart = try XCTUnwrap(settings.range(of: "func keyUsageOverview"))
+        let row = settings[rowStart.lowerBound..<overviewStart.lowerBound]
+
+        XCTAssertFalse(row.contains("checkmark.circle"))
+        XCTAssertTrue(row.contains("NSCursor.pointingHand"))
+        XCTAssertTrue(row.contains("listRowSeparator(.visible"))
+    }
+
     func test设置页显示当前版本与完整更新日志() throws {
         let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
         let updateNotes = try sourceText(at: "RoutinUsage/Views/UpdateNotesView.swift")

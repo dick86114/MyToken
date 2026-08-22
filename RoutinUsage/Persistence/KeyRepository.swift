@@ -50,7 +50,8 @@ final class KeyRepository {
             id: UUID(),
             name: normalizedName,
             keySuffix: KeyCredentialPolicy.metadataSuffix(for: secret),
-            sortOrder: configurations.count
+            sortOrder: configurations.count,
+            isEnabled: true
         )
 
         try localStore.save(secret, for: configuration.id)
@@ -70,7 +71,8 @@ final class KeyRepository {
             id: id,
             name: normalizedName,
             keySuffix: KeyCredentialPolicy.metadataSuffix(for: secret),
-            sortOrder: configurations[index].sortOrder
+            sortOrder: configurations[index].sortOrder,
+            isEnabled: configurations[index].isEnabled
         )
 
         try localStore.save(secret, for: id)
@@ -124,13 +126,33 @@ final class KeyRepository {
         return normalizedName
     }
 
+    @discardableResult
+    func setEnabled(id: UUID, enabled: Bool) throws -> KeyConfiguration {
+        var configurations = list()
+        guard let index = configurations.firstIndex(where: { $0.id == id }) else {
+            throw KeyRepositoryError.configurationNotFound
+        }
+        let current = configurations[index]
+        let updated = KeyConfiguration(
+            id: current.id,
+            name: current.name,
+            keySuffix: current.keySuffix,
+            sortOrder: current.sortOrder,
+            isEnabled: enabled
+        )
+        configurations[index] = updated
+        persist(configurations)
+        return updated
+    }
+
     private func normalized(_ configurations: [KeyConfiguration]) -> [KeyConfiguration] {
         configurations.enumerated().map { index, configuration in
             KeyConfiguration(
                 id: configuration.id,
                 name: configuration.name,
                 keySuffix: configuration.keySuffix,
-                sortOrder: index
+                sortOrder: index,
+                isEnabled: configuration.isEnabled
             )
         }
     }
@@ -154,7 +176,8 @@ final class KeyRepository {
                     persistedSuffix: configuration.keySuffix,
                     storedSecret: secret
                 ),
-                sortOrder: configuration.sortOrder
+                sortOrder: configuration.sortOrder,
+                isEnabled: configuration.isEnabled
             )
         }
         guard sanitized != configurations else {

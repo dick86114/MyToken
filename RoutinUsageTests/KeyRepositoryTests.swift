@@ -3,6 +3,25 @@ import XCTest
 @testable import RoutinUsage
 
 final class KeyRepositoryTests: XCTestCase {
+    func test旧配置缺少启用字段时默认启用() throws {
+        let data = Data(#"{"id":"00000000-0000-0000-0000-000000000001","name":"主账号","keySuffix":"8F2A","sortOrder":0}"#.utf8)
+
+        let configuration = try JSONDecoder().decode(KeyConfiguration.self, from: data)
+
+        XCTAssertTrue(configuration.isEnabled)
+    }
+
+    func test启用状态修改会持久化() throws {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let saved = try context.repository.add(name: "主账号", secret: "plan-secret-8F2A")
+
+        let disabled = try context.repository.setEnabled(id: saved.id, enabled: false)
+
+        XCTAssertFalse(disabled.isEnabled)
+        XCTAssertFalse(try XCTUnwrap(context.repository.list().first).isEnabled)
+    }
+
     func test添加配置将完整Key写入本地存储且元数据不含明文() throws {
         let context = makeContext()
         defer { context.cleanUp() }

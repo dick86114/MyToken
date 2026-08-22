@@ -37,6 +37,10 @@ final class UsageStore {
     private(set) var selectedKeyID: UUID?
     private(set) var isRefreshing = false
 
+    var visibleKeyIDs: [UUID] {
+        orderedKeyIDs.filter { states[$0]?.configuration.isEnabled == true }
+    }
+
     @ObservationIgnored private let keyRepository: KeyRepository
     @ObservationIgnored private let localStore: any LocalKeyStoring
     @ObservationIgnored private let apiClient: any UsageFetching
@@ -88,7 +92,7 @@ final class UsageStore {
 
     func refreshAll() async {
         synchronizeConfigurations()
-        let requests: [RefreshRequest] = orderedKeyIDs.compactMap { keyID -> RefreshRequest? in
+        let requests: [RefreshRequest] = visibleKeyIDs.compactMap { keyID -> RefreshRequest? in
             guard !shouldSkipBatchRefresh(for: keyID) else {
                 return nil
             }
@@ -165,11 +169,27 @@ final class UsageStore {
     }
 
     func selectKey(_ id: UUID) {
-        guard states[id] != nil else {
+        guard states[id]?.configuration.isEnabled == true else {
             return
         }
         selectedKeyID = id
         persistSelection()
+    }
+
+    func setKeyEnabled(_ id: UUID, enabled: Bool) throws {
+        do {
+            _ = try keyRepository.setEnabled(id: id, enabled: enabled)
+        } catch {
+            throw Self.storeError(from: error)
+        }
+        synchronizeConfigurations()
+        if !enabled, selectedKeyID == id {
+            selectedKeyID = visibleKeyIDs.first
+            persistSelection()
+        } else if enabled, selectedKeyID == nil {
+            selectedKeyID = id
+            persistSelection()
+        }
     }
 
     func addValidatedKey(name: String, secret: String) async throws {
@@ -293,7 +313,9 @@ final class UsageStore {
 
         let storedID = defaults.string(forKey: Self.selectedKeyStorageKey)
             .flatMap(UUID.init(uuidString:))
-        selectedKeyID = storedID.flatMap { states[$0] == nil ? nil : $0 } ?? orderedKeyIDs.first
+        selectedKeyID = storedID.flatMap { id in
+            states[id]?.configuration.isEnabled == true ? id : nil
+        } ?? orderedKeyIDs.first(where: { states[$0]?.configuration.isEnabled == true })
         persistSelection()
     }
 
@@ -328,8 +350,8 @@ final class UsageStore {
             }
         }
 
-        if selectedKeyID.flatMap({ states[$0] }) == nil {
-            selectedKeyID = orderedKeyIDs.first
+        if selectedKeyID.flatMap({ states[$0] })?.configuration.isEnabled != true {
+            selectedKeyID = orderedKeyIDs.first(where: { states[$0]?.configuration.isEnabled == true })
             persistSelection()
         }
     }
@@ -337,7 +359,8 @@ final class UsageStore {
     private func prepareRefreshRequest(for keyID: UUID) -> RefreshRequest? {
         guard
             !refreshingKeyIDs.contains(keyID),
-            var state = states[keyID]
+            var state = states[keyID],
+            state.configuration.isEnabled
         else {
             return nil
         }

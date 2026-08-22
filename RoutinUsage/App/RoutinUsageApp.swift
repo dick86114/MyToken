@@ -48,6 +48,7 @@ struct RoutinUsageApp: App {
                     )
                 },
                 moveKey: environment.moveKey(fromOffsets:toOffset:),
+                setKeyEnabled: environment.setKeyEnabled(_:enabled:),
                 updateStatus: environment.updateStatus,
                 checkForUpdates: environment.checkForUpdates,
                 installAvailableUpdate: environment.installAvailableUpdate,

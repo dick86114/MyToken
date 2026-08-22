@@ -112,7 +112,7 @@ private extension UsagePopoverView {
                 }
             }
             .liquidGlassButton()
-            .disabled(store.isRefreshing || store.orderedKeyIDs.isEmpty)
+            .disabled(store.isRefreshing || store.visibleKeyIDs.isEmpty)
             .help("刷新全部 Key")
             .accessibilityLabel(store.isRefreshing ? "正在刷新全部 Key" : "刷新全部 Key")
 
@@ -153,14 +153,14 @@ private extension UsagePopoverView {
 
     @ViewBuilder
     var usageList: some View {
-        if store.orderedKeyIDs.isEmpty {
+        if store.visibleKeyIDs.isEmpty {
             VStack(spacing: 8) {
                 Image(systemName: "key.slash")
                     .font(.title2)
                     .foregroundStyle(.secondary)
-                Text("尚未配置 Key")
+                Text(store.orderedKeyIDs.isEmpty ? "尚未配置 Key" : "没有启用的 Key")
                     .font(.headline)
-                Text("请在设置中添加一个 plan Key")
+                Text(store.orderedKeyIDs.isEmpty ? "请在设置中添加一个 plan Key" : "请在设置中启用至少一个 Key")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -170,7 +170,7 @@ private extension UsagePopoverView {
             .accessibilityLabel("空配置，尚未配置 Key")
         } else {
             VStack(spacing: 0) {
-                ForEach(store.orderedKeyIDs, id: \.self) { id in
+                ForEach(store.visibleKeyIDs, id: \.self) { id in
                     if let state = store.state(for: id) {
                         UsageRowView(
                             store: store,
@@ -181,7 +181,7 @@ private extension UsagePopoverView {
                                 && codexGroupDetection.activeKeyID != id,
                             requestDetection: { pendingDetectionKeyID = id }
                         )
-                        if id != store.orderedKeyIDs.last {
+                        if id != store.visibleKeyIDs.last {
                             Divider()
                         }
                     }
@@ -196,7 +196,7 @@ private extension UsagePopoverView {
             VStack(alignment: .leading, spacing: 2) {
                 Text("账户用量")
                     .font(.subheadline.weight(.semibold))
-                Text("\(store.orderedKeyIDs.count) 个 Key")
+                Text("\(store.visibleKeyIDs.count) 个 Key")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -216,8 +216,8 @@ private extension UsagePopoverView {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             store.selectedKeyID.flatMap(store.state(for:)).map {
-                "账户用量，共 \(store.orderedKeyIDs.count) 个 Key，当前账户 \($0.configuration.displayName)"
-            } ?? "账户用量，共 \(store.orderedKeyIDs.count) 个 Key"
+                "账户用量，共 \(store.visibleKeyIDs.count) 个 Key，当前账户 \($0.configuration.displayName)"
+            } ?? "账户用量，共 \(store.visibleKeyIDs.count) 个 Key"
         )
     }
 
@@ -305,7 +305,7 @@ private extension UsagePopoverView {
 
     @ViewBuilder
     var codexGroupDetectionStatus: some View {
-        let activeStates = store.orderedKeyIDs.compactMap { keyID -> (KeyUsageState, CodexGroupDetectionState)? in
+        let activeStates = store.visibleKeyIDs.compactMap { keyID -> (KeyUsageState, CodexGroupDetectionState)? in
             guard let keyState = store.state(for: keyID) else {
                 return nil
             }

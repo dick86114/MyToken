@@ -83,6 +83,28 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertEqual(activeRequestCount, 2)
     }
 
+    func test禁用Key不显示不刷新并将当前Key回退到启用Key() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let disabledKey = try context.addKey(name: "禁用", secret: "plan-disabled-0001")
+        let enabledKey = try context.addKey(name: "启用", secret: "plan-enabled-0002")
+        let fetcher = ScriptedUsageFetcher(responses: [
+            "plan-disabled-0001": .success(makeSnapshot(planName: "禁用数据", fetchedAt: context.now)),
+            "plan-enabled-0002": .success(makeSnapshot(planName: "启用数据", fetchedAt: context.now))
+        ])
+        let store = context.makeStore(fetcher: fetcher)
+
+        try store.setKeyEnabled(disabledKey.id, enabled: false)
+        await store.refreshAll()
+
+        let disabledRequestCount = await fetcher.requestCount(for: "plan-disabled-0001")
+        let enabledRequestCount = await fetcher.requestCount(for: "plan-enabled-0002")
+        XCTAssertEqual(store.visibleKeyIDs, [enabledKey.id])
+        XCTAssertEqual(store.selectedKeyID, enabledKey.id)
+        XCTAssertEqual(disabledRequestCount, 0)
+        XCTAssertEqual(enabledRequestCount, 1)
+    }
+
     func test成功刷新覆盖缓存并只对成功快照发送通知() async throws {
         let context = try makeContext()
         defer { context.cleanUp() }

@@ -5,6 +5,38 @@ struct KeyConfiguration: Codable, Equatable, Identifiable, Sendable {
     let name: String
     let keySuffix: String
     let sortOrder: Int
+    let isEnabled: Bool
+
+    init(
+        id: UUID,
+        name: String,
+        keySuffix: String,
+        sortOrder: Int,
+        isEnabled: Bool = true
+    ) {
+        self.id = id
+        self.name = name
+        self.keySuffix = keySuffix
+        self.sortOrder = sortOrder
+        self.isEnabled = isEnabled
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case keySuffix
+        case sortOrder
+        case isEnabled
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        keySuffix = try container.decode(String.self, forKey: .keySuffix)
+        sortOrder = try container.decode(Int.self, forKey: .sortOrder)
+        isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
+    }
 }
 
 enum KeyCredentialPolicy {

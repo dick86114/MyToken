@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 enum KeyDisplayMask {
     static func masked(suffix: String) -> String {
@@ -13,10 +14,34 @@ enum KeyDisplayMask {
     }
 }
 
+private struct KeyRowDropDelegate: DropDelegate {
+    let targetID: UUID
+    let move: @MainActor (UUID) -> Void
+
+    func performDrop(info: DropInfo) -> Bool {
+        guard let provider = info.itemProviders(for: [UTType.text]).first else {
+            return false
+        }
+        provider.loadObject(ofClass: NSString.self) { object, _ in
+            guard
+                let value = object as? String,
+                let draggedID = UUID(uuidString: value)
+            else {
+                return
+            }
+            Task { @MainActor in
+                move(draggedID)
+            }
+        }
+        return true
+    }
+}
+
 @MainActor
 struct SettingsView: View {
     typealias UpdateValidatedKey = @MainActor (UUID, String, String) async throws -> KeyEditorSaveResult
     typealias MoveKey = @MainActor (IndexSet, Int) -> Void
+    typealias SetKeyEnabled = @MainActor (UUID, Bool) throws -> Void
     typealias CheckForUpdates = @MainActor () async -> Void
     typealias InstallAvailableUpdate = @MainActor () async -> Void
     typealias SubmitIssueReport = @MainActor () async -> Void
@@ -78,6 +103,7 @@ struct SettingsView: View {
     private let loginItemManager: any LoginItemManaging
     private let updateValidatedKey: UpdateValidatedKey
     private let moveKey: MoveKey
+    private let setKeyEnabled: SetKeyEnabled
     private let updateStatus: AppUpdateStatus
     private let checkForUpdates: CheckForUpdates
     private let installAvailableUpdate: InstallAvailableUpdate
@@ -96,6 +122,7 @@ struct SettingsView: View {
     @State private var editor: EditorPresentation?
     @State private var pendingDeletion: KeyConfiguration?
     @State private var selectedSection: SettingsSection? = .accounts
+    @State private var isReordering = false
     @State private var expandedKeyID: UUID?
     @State private var orderedKeyIDs: [UUID]
     @State private var lowThreshold: Int
@@ -109,6 +136,7 @@ struct SettingsView: View {
         loginItemManager: any LoginItemManaging,
         updateValidatedKey: @escaping UpdateValidatedKey,
         moveKey: @escaping MoveKey,
+        setKeyEnabled: @escaping SetKeyEnabled = { _, _ in },
         updateStatus: AppUpdateStatus = .idle,
         checkForUpdates: @escaping CheckForUpdates = {},
         installAvailableUpdate: @escaping InstallAvailableUpdate = {},
@@ -127,6 +155,7 @@ struct SettingsView: View {
         self.loginItemManager = loginItemManager
         self.updateValidatedKey = updateValidatedKey
         self.moveKey = moveKey
+        self.setKeyEnabled = setKeyEnabled
         self.updateStatus = updateStatus
         self.checkForUpdates = checkForUpdates
         self.installAvailableUpdate = installAvailableUpdate
@@ -237,6 +266,16 @@ private extension SettingsView {
                 }
                 Spacer()
                 Button {
+                    isReordering.toggle()
+                } label: {
+                    Label(
+                        isReordering ? "完成" : "排序",
+                        systemImage: isReordering ? "checkmark" : "arrow.up.arrow.down"
+                    )
+                }
+                .liquidGlassButton()
+                .accessibilityLabel(isReordering ? "完成排序" : "调整 Key 排序")
+                Button {
                     editor = .add
                 } label: {
                     Label("添加", systemImage: "plus")
@@ -273,12 +312,6 @@ private extension SettingsView {
     func keyRow(_ configuration: KeyConfiguration) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 10) {
-                Image(systemName: store.selectedKeyID == configuration.id ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(store.selectedKeyID == configuration.id ? Color.accentColor : Color.secondary)
-                    .font(.system(size: 15, weight: .medium))
-                    .padding(.top, 2)
-                    .accessibilityHidden(true)
-
                 VStack(alignment: .leading, spacing: 3) {
                     Text(configuration.displayName)
                         .font(.headline)
@@ -290,6 +323,18 @@ private extension SettingsView {
                 .accessibilityLabel("\(configuration.displayName)，\(KeyDisplayMask.masked(suffix: configuration.keySuffix))")
 
                 Spacer()
+
+                Toggle(
+                    "在菜单栏显示",
+                    isOn: Binding(
+                        get: { configuration.isEnabled },
+                        set: { setEnabled(configuration, enabled: $0) }
+                    )
+                )
+                .labelsHidden()
+                .controlSize(.small)
+                .help(configuration.isEnabled ? "从菜单栏隐藏此 Key" : "在菜单栏显示此 Key")
+                .accessibilityLabel(configuration.isEnabled ? "禁用 \(configuration.displayName)" : "启用 \(configuration.displayName)")
 
                 Button {
                     editor = .edit(configuration)
@@ -322,11 +367,29 @@ private extension SettingsView {
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 8)
+        .opacity(configuration.isEnabled ? 1 : 0.55)
         .contentShape(Rectangle())
+        .onHover { isHovered in
+            if isHovered {
+                NSCursor.pointingHand.push()
+            } else {
+                NSCursor.pop()
+            }
+        }
+        .onDrag {
+            NSItemProvider(object: configuration.id.uuidString as NSString)
+        }
+        .onDrop(
+            of: [UTType.text],
+            delegate: KeyRowDropDelegate(targetID: configuration.id) { draggedID in
+                move(draggedID: draggedID, before: configuration.id)
+            }
+        )
         .onTapGesture {
             expandedKeyID = configuration.id
         }
-        .listRowSeparator(.hidden)
+        .listRowSeparator(.visible)
+        .listRowSeparatorTint(Color.secondary.opacity(0.28))
         .listRowBackground(
             store.selectedKeyID == configuration.id
                 ? Color.accentColor.opacity(0.10)
@@ -810,6 +873,25 @@ private extension SettingsView {
         let removedBeforeDestination = validOffsets.filter { $0 < toOffset }.count
         orderedKeyIDs.insert(contentsOf: moving, at: toOffset - removedBeforeDestination)
         moveKey(IndexSet(validOffsets), toOffset)
+    }
+
+    func move(draggedID: UUID, before targetID: UUID) {
+        guard
+            draggedID != targetID,
+            let sourceIndex = orderedKeyIDs.firstIndex(of: draggedID),
+            let targetIndex = orderedKeyIDs.firstIndex(of: targetID)
+        else {
+            return
+        }
+        move(fromOffsets: IndexSet(integer: sourceIndex), toOffset: targetIndex)
+    }
+
+    func setEnabled(_ configuration: KeyConfiguration, enabled: Bool) {
+        do {
+            try setKeyEnabled(configuration.id, enabled)
+        } catch {
+            operationError = "无法更新 Key 显示状态，请稍后重试"
+        }
     }
 
     func deletePendingKey() {

@@ -257,7 +257,7 @@ final class StatusBarController: NSObject {
 
     private func accountMenu() -> NSMenu {
         let menu = NSMenu()
-        let keyIDs = environment.store.orderedKeyIDs
+        let keyIDs = environment.store.visibleKeyIDs
         guard !keyIDs.isEmpty else {
             let emptyItem = NSMenuItem(title: "尚未配置账号", action: nil, keyEquivalent: "")
             emptyItem.isEnabled = false

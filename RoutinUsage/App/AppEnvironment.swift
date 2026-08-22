@@ -391,6 +391,10 @@ final class AppEnvironment {
         store.reloadConfigurations()
     }
 
+    func setKeyEnabled(_ keyID: UUID, enabled: Bool) throws {
+        try store.setKeyEnabled(keyID, enabled: enabled)
+    }
+
     func readKey(id: UUID) -> String? {
         try? keyRepository.read(id: id)
     }
@@ -478,7 +482,7 @@ private extension AppEnvironment {
         guard isStarted else {
             return
         }
-        let requests = store.orderedKeyIDs.compactMap { keyID -> CodexGroupDetectionRefreshRequest? in
+        let requests = store.visibleKeyIDs.compactMap { keyID -> CodexGroupDetectionRefreshRequest? in
             guard let secret = try? keyRepository.read(id: keyID) else {
                 return nil
             }
