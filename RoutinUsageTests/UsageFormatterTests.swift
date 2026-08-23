@@ -574,6 +574,20 @@ final class UsageFormatterTests: XCTestCase {
         )
         XCTAssertEqual(
             UsageFormatter.subscriptionExpiryText(
+                until: now.addingTimeInterval(23 * 60 * 60),
+                now: now
+            ),
+            "（23小时后到期）"
+        )
+        XCTAssertEqual(
+            UsageFormatter.subscriptionExpiryText(
+                until: now.addingTimeInterval(45 * 60),
+                now: now
+            ),
+            "（45分钟后到期）"
+        )
+        XCTAssertEqual(
+            UsageFormatter.subscriptionExpiryText(
                 until: now.addingTimeInterval(-60),
                 now: now
             ),

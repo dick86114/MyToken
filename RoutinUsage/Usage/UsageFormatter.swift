@@ -158,6 +158,14 @@ enum UsageFormatter {
         if interval <= 0 {
             return "（已过期）"
         }
+        if interval < 60 * 60 {
+            let minutes = max(1, Int(interval / 60))
+            return "（\(minutes)分钟后到期）"
+        }
+        if interval < 24 * 60 * 60 {
+            let hours = max(1, Int(interval / (60 * 60)))
+            return "（\(hours)小时后到期）"
+        }
         let days = Int(interval / (24 * 60 * 60))
         guard days < 7 else {
             return nil
