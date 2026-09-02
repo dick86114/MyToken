@@ -44,14 +44,34 @@ final class KeyRepository {
 
     @discardableResult
     func add(name: String, secret: String) throws -> KeyConfiguration {
-        let normalizedName = try validate(name: name, secret: secret)
+        try add(
+            name: name,
+            secret: secret,
+            providerID: .routin,
+            credentialKind: .bearerAPIKey,
+            metadata: [:]
+        )
+    }
+
+    @discardableResult
+    func add(
+        name: String,
+        secret: String,
+        providerID: ProviderID,
+        credentialKind: CredentialKind,
+        metadata: [String: String]
+    ) throws -> KeyConfiguration {
+        let normalizedName = try validate(name: name, secret: secret, providerID: providerID)
         var configurations = list()
         let configuration = KeyConfiguration(
             id: UUID(),
             name: normalizedName,
             keySuffix: KeyCredentialPolicy.metadataSuffix(for: secret),
             sortOrder: configurations.count,
-            isEnabled: true
+            isEnabled: true,
+            providerID: providerID,
+            credentialKind: credentialKind,
+            metadata: metadata
         )
 
         try localStore.save(secret, for: configuration.id)
@@ -62,7 +82,29 @@ final class KeyRepository {
 
     @discardableResult
     func update(id: UUID, name: String, secret: String) throws -> KeyConfiguration {
-        let normalizedName = try validate(name: name, secret: secret)
+        guard let current = list().first(where: { $0.id == id }) else {
+            throw KeyRepositoryError.configurationNotFound
+        }
+        return try update(
+            id: id,
+            name: name,
+            secret: secret,
+            providerID: current.providerID,
+            credentialKind: current.credentialKind,
+            metadata: current.metadata
+        )
+    }
+
+    @discardableResult
+    func update(
+        id: UUID,
+        name: String,
+        secret: String,
+        providerID: ProviderID,
+        credentialKind: CredentialKind,
+        metadata: [String: String]
+    ) throws -> KeyConfiguration {
+        let normalizedName = try validate(name: name, secret: secret, providerID: providerID)
         var configurations = list()
         guard let index = configurations.firstIndex(where: { $0.id == id }) else {
             throw KeyRepositoryError.configurationNotFound
@@ -72,7 +114,10 @@ final class KeyRepository {
             name: normalizedName,
             keySuffix: KeyCredentialPolicy.metadataSuffix(for: secret),
             sortOrder: configurations[index].sortOrder,
-            isEnabled: configurations[index].isEnabled
+            isEnabled: configurations[index].isEnabled,
+            providerID: providerID,
+            credentialKind: credentialKind,
+            metadata: metadata
         )
 
         try localStore.save(secret, for: id)
@@ -109,7 +154,7 @@ final class KeyRepository {
         persist(normalized(configurations))
     }
 
-    private func validate(name: String, secret: String) throws -> String {
+    private func validate(name: String, secret: String, providerID: ProviderID = .routin) throws -> String {
         let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedName.isEmpty else {
             throw KeyRepositoryError.invalidName
@@ -117,10 +162,14 @@ final class KeyRepository {
         guard KeyCredentialPolicy.isSafeDisplayName(normalizedName) else {
             throw KeyRepositoryError.invalidName
         }
-        guard
-            KeyCredentialPolicy.hasValidPrefix(secret),
-            KeyCredentialPolicy.hasSufficientSecretPayload(secret)
-        else {
+        if providerID == .routin {
+            guard
+                KeyCredentialPolicy.hasValidPrefix(secret),
+                KeyCredentialPolicy.hasSufficientSecretPayload(secret)
+            else {
+                throw KeyRepositoryError.invalidSecret
+            }
+        } else if secret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             throw KeyRepositoryError.invalidSecret
         }
         return normalizedName
@@ -138,7 +187,10 @@ final class KeyRepository {
             name: current.name,
             keySuffix: current.keySuffix,
             sortOrder: current.sortOrder,
-            isEnabled: enabled
+            isEnabled: enabled,
+            providerID: current.providerID,
+            credentialKind: current.credentialKind,
+            metadata: current.metadata
         )
         configurations[index] = updated
         persist(configurations)
@@ -152,7 +204,10 @@ final class KeyRepository {
                 name: configuration.name,
                 keySuffix: configuration.keySuffix,
                 sortOrder: index,
-                isEnabled: configuration.isEnabled
+                isEnabled: configuration.isEnabled,
+                providerID: configuration.providerID,
+                credentialKind: configuration.credentialKind,
+                metadata: configuration.metadata
             )
         }
     }
@@ -177,7 +232,10 @@ final class KeyRepository {
                     storedSecret: secret
                 ),
                 sortOrder: configuration.sortOrder,
-                isEnabled: configuration.isEnabled
+                isEnabled: configuration.isEnabled,
+                providerID: configuration.providerID,
+                credentialKind: configuration.credentialKind,
+                metadata: configuration.metadata
             )
         }
         guard sanitized != configurations else {

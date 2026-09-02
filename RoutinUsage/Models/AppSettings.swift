@@ -48,6 +48,17 @@ final class AppSettings {
         }
     }
 
+    var selectedCredentialIDs: [UUID] {
+        didSet {
+            let normalized = Self.normalizedSelection(selectedCredentialIDs)
+            if normalized != selectedCredentialIDs {
+                selectedCredentialIDs = normalized
+                return
+            }
+            defaults.set(normalized.map(\.uuidString), forKey: Keys.selectedCredentialIDs)
+        }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
@@ -82,6 +93,9 @@ final class AppSettings {
         }
 
         launchAtLogin = defaults.bool(forKey: Keys.launchAtLogin)
+
+        let storedSelection = defaults.stringArray(forKey: Keys.selectedCredentialIDs) ?? []
+        selectedCredentialIDs = Self.normalizedSelection(storedSelection.compactMap(UUID.init(uuidString:)))
     }
 }
 
@@ -94,5 +108,17 @@ private extension AppSettings {
         static let lowThreshold = "notificationLowThreshold"
         static let highThreshold = "notificationHighThreshold"
         static let launchAtLogin = "launchAtLogin"
+        static let selectedCredentialIDs = "selectedCredentialIDs"
+    }
+
+    static func normalizedSelection(_ ids: [UUID]) -> [UUID] {
+        Array(ids.uniqued().prefix(4))
+    }
+}
+
+private extension Array where Element: Hashable {
+    func uniqued() -> [Element] {
+        var seen = Set<Element>()
+        return filter { seen.insert($0).inserted }
     }
 }
