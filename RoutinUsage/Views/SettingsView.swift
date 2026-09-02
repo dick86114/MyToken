@@ -302,12 +302,23 @@ private extension SettingsView {
                 .accessibilityLabel("尚未配置 Key，请添加 plan Key")
             } else {
                 List {
-                    ForEach(orderedKeyIDs, id: \.self) { id in
-                        if let configuration = store.state(for: id)?.configuration {
-                            keyRow(configuration)
+                    ForEach(settingsProviderGroups, id: \.id) { group in
+                        Section {
+                            ForEach(group.ids, id: \.self) { id in
+                                if let configuration = store.state(for: id)?.configuration {
+                                    keyRow(configuration)
+                                }
+                            }
+                            // 分组后的排序通过每行的拖拽投放完成，保留 .onMove(perform: move) 的整体排序语义。
+                        } header: {
+                            HStack(spacing: 6) {
+                                Image(systemName: group.iconName)
+                                Text(group.displayName)
+                                Text("\(group.ids.count)")
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
-                    .onMove(perform: move)
                 }
                 .listStyle(.plain)
                 .accessibilityLabel("Key 列表，可拖动排序")
@@ -897,6 +908,30 @@ private extension SettingsView {
         let removedBeforeDestination = validOffsets.filter { $0 < toOffset }.count
         orderedKeyIDs.insert(contentsOf: moving, at: toOffset - removedBeforeDestination)
         moveKey(IndexSet(validOffsets), toOffset)
+    }
+
+    struct SettingsProviderGroup: Identifiable {
+        let id: ProviderID
+        let displayName: String
+        let iconName: String
+        let ids: [UUID]
+    }
+
+    var settingsProviderGroups: [SettingsProviderGroup] {
+        ProviderID.allCases.compactMap { providerID in
+            let ids = orderedKeyIDs.filter { id in
+                store.state(for: id)?.configuration.providerID == providerID
+            }
+            guard !ids.isEmpty,
+                  let descriptor = ProviderRegistry.builtInDescriptors.first(where: { $0.id == providerID })
+            else { return nil }
+            return SettingsProviderGroup(
+                id: providerID,
+                displayName: descriptor.displayName,
+                iconName: descriptor.iconName,
+                ids: ids
+            )
+        }
     }
 
     func move(draggedID: UUID, before targetID: UUID) {
