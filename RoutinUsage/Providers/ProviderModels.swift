@@ -81,6 +81,7 @@ struct ProviderDescriptor: Codable, Equatable, Identifiable, Sendable {
 }
 
 struct ProviderCredential: Sendable {
+    let credentialID: UUID?
     let providerID: ProviderID
     let kind: CredentialKind
     let secret: String
@@ -88,12 +89,14 @@ struct ProviderCredential: Sendable {
     let metadata: [String: String]
 
     init(
+        credentialID: UUID? = nil,
         providerID: ProviderID,
         kind: CredentialKind,
         secret: String,
         secondarySecret: String? = nil,
         metadata: [String: String] = [:]
     ) {
+        self.credentialID = credentialID
         self.providerID = providerID
         self.kind = kind
         self.secret = secret

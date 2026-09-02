@@ -157,6 +157,28 @@ struct UsageSnapshot: Codable, Equatable, Sendable {
         return result
     }
 
+    func assigningIdentity(providerID: ProviderID, credentialID: UUID?) -> UsageSnapshot {
+        UsageSnapshot(
+            planName: planName,
+            subscriptionId: subscriptionId,
+            planId: planId,
+            kind: kind,
+            fiveHour: fiveHour,
+            weekly: weekly,
+            token: token,
+            allowedModels: allowedModels,
+            fetchedAt: fetchedAt,
+            groupMultiplier: groupMultiplier,
+            groupMultipliers: groupMultipliers,
+            status: status,
+            subscriptionStartAt: subscriptionStartAt,
+            subscriptionEndAt: subscriptionEndAt,
+            providerID: providerID,
+            credentialID: credentialID,
+            metrics: metrics
+        )
+    }
+
     init(
         planName: String,
         subscriptionId: String? = nil,
