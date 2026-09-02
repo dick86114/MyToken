@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 protocol LocalKeyStoring: Sendable {
     func save(_ secret: String, for id: UUID) throws
@@ -29,5 +30,95 @@ final class LocalKeyStore: LocalKeyStoring, @unchecked Sendable {
 
     private func storageKey(for id: UUID) -> String {
         "\(keyPrefix)\(id.uuidString)"
+    }
+}
+
+final class KeychainSecretStore: LocalKeyStoring, @unchecked Sendable {
+    private let service: String
+
+    init(service: String = "ai.routin.usage-monitor.credentials") {
+        self.service = service
+    }
+
+    func save(_ secret: String, for id: UUID) throws {
+        let account = id.uuidString
+        let data = Data(secret.utf8)
+        let baseQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        let status = SecItemCopyMatching(baseQuery as CFDictionary, nil)
+        if status == errSecSuccess {
+            let updateStatus = SecItemUpdate(
+                baseQuery as CFDictionary,
+                [kSecValueData as String: data] as CFDictionary
+            )
+            guard updateStatus == errSecSuccess else {
+                throw KeychainSecretStoreError.status(updateStatus)
+            }
+            return
+        }
+        guard status == errSecItemNotFound else {
+            throw KeychainSecretStoreError.status(status)
+        }
+
+        var addQuery = baseQuery
+        addQuery[kSecValueData as String] = data
+        let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+        guard addStatus == errSecSuccess else {
+            throw KeychainSecretStoreError.status(addStatus)
+        }
+    }
+
+    func read(for id: UUID) throws -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: id.uuidString,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound {
+            return nil
+        }
+        guard status == errSecSuccess, let data = result as? Data else {
+            throw KeychainSecretStoreError.status(status)
+        }
+        return String(data: data, encoding: .utf8)
+    }
+
+    func delete(for id: UUID) throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: id.uuidString
+        ]
+        let status = SecItemDelete(query as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw KeychainSecretStoreError.status(status)
+        }
+    }
+}
+
+enum KeychainSecretStoreError: Error, Equatable, Sendable {
+    case status(OSStatus)
+}
+
+enum KeychainMigration {
+    static func migrate(
+        ids: [UUID],
+        from oldStore: any LocalKeyStoring,
+        to newStore: any LocalKeyStoring
+    ) throws {
+        for id in ids {
+            guard let secret = try oldStore.read(for: id) else {
+                continue
+            }
+            try newStore.save(secret, for: id)
+            try oldStore.delete(for: id)
+        }
     }
 }

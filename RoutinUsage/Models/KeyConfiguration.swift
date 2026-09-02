@@ -6,19 +6,28 @@ struct KeyConfiguration: Codable, Equatable, Identifiable, Sendable {
     let keySuffix: String
     let sortOrder: Int
     let isEnabled: Bool
+    let providerID: ProviderID
+    let credentialKind: CredentialKind
+    let metadata: [String: String]
 
     init(
         id: UUID,
         name: String,
         keySuffix: String,
         sortOrder: Int,
-        isEnabled: Bool = true
+        isEnabled: Bool = true,
+        providerID: ProviderID = .routin,
+        credentialKind: CredentialKind = .bearerAPIKey,
+        metadata: [String: String] = [:]
     ) {
         self.id = id
         self.name = name
         self.keySuffix = keySuffix
         self.sortOrder = sortOrder
         self.isEnabled = isEnabled
+        self.providerID = providerID
+        self.credentialKind = credentialKind
+        self.metadata = metadata
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -27,6 +36,9 @@ struct KeyConfiguration: Codable, Equatable, Identifiable, Sendable {
         case keySuffix
         case sortOrder
         case isEnabled
+        case providerID
+        case credentialKind
+        case metadata
     }
 
     init(from decoder: Decoder) throws {
@@ -36,6 +48,9 @@ struct KeyConfiguration: Codable, Equatable, Identifiable, Sendable {
         keySuffix = try container.decode(String.self, forKey: .keySuffix)
         sortOrder = try container.decode(Int.self, forKey: .sortOrder)
         isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
+        providerID = try container.decodeIfPresent(ProviderID.self, forKey: .providerID) ?? .routin
+        credentialKind = try container.decodeIfPresent(CredentialKind.self, forKey: .credentialKind) ?? .bearerAPIKey
+        metadata = try container.decodeIfPresent([String: String].self, forKey: .metadata) ?? [:]
     }
 }
 
