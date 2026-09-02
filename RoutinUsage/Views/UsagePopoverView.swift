@@ -116,25 +116,27 @@ private extension UsagePopoverView {
             .help("刷新全部 Key")
             .accessibilityLabel(store.isRefreshing ? "正在刷新全部 Key" : "刷新全部 Key")
 
-            Button {
-                openWindow(id: "routin-check-in")
-                Task { await startRoutinCheckIn() }
-            } label: {
-                if checkInState.isBusy {
-                    ProgressView()
-                        .controlSize(.small)
-                        .frame(width: 16, height: 16)
-                } else if checkInState == .alreadyCheckedIn {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(Color.green)
-                } else {
-                    Image(systemName: "checkmark.circle")
+            if isSelectedRoutin {
+                Button {
+                    openWindow(id: "routin-check-in")
+                    Task { await startRoutinCheckIn() }
+                } label: {
+                    if checkInState.isBusy {
+                        ProgressView()
+                            .controlSize(.small)
+                            .frame(width: 16, height: 16)
+                    } else if checkInState == .alreadyCheckedIn {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(Color.green)
+                    } else {
+                        Image(systemName: "checkmark.circle")
+                    }
                 }
+                .liquidGlassButton()
+                .disabled(checkInState.isBusy)
+                .help(checkInHelpText)
+                .accessibilityLabel(checkInHelpText)
             }
-            .liquidGlassButton()
-            .disabled(checkInState.isBusy)
-            .help(checkInHelpText)
-            .accessibilityLabel(checkInHelpText)
         }
         .overlay(alignment: .center) {
             Link(destination: RoutinUsageApp.websiteURL) {
@@ -169,26 +171,66 @@ private extension UsagePopoverView {
             .accessibilityElement(children: .combine)
             .accessibilityLabel("空配置，尚未配置 Key")
         } else {
-            VStack(spacing: 0) {
-                ForEach(store.visibleKeyIDs, id: \.self) { id in
-                    if let state = store.state(for: id) {
-                        UsageRowView(
-                            store: store,
-                            state: state,
-                            detectionState: codexGroupDetection.state(for: id),
-                            detectionRecord: codexGroupDetection.record(for: id),
-                            isAnotherDetectionActive: codexGroupDetection.activeKeyID != nil
-                                && codexGroupDetection.activeKeyID != id,
-                            requestDetection: { pendingDetectionKeyID = id }
-                        )
-                        if id != store.visibleKeyIDs.last {
-                            Divider()
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(providerGroups, id: \.id) { group in
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack(spacing: 6) {
+                            Image(systemName: group.iconName)
+                                .foregroundStyle(.secondary)
+                            Text(group.displayName)
+                                .font(.caption.weight(.semibold))
+                            Text("\(group.ids.count)")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        VStack(spacing: 0) {
+                            ForEach(group.ids, id: \.self) { id in
+                                if let state = store.state(for: id) {
+                                    UsageRowView(
+                                        store: store,
+                                        state: state,
+                                        detectionState: codexGroupDetection.state(for: id),
+                                        detectionRecord: codexGroupDetection.record(for: id),
+                                        isAnotherDetectionActive: codexGroupDetection.activeKeyID != nil
+                                            && codexGroupDetection.activeKeyID != id,
+                                        requestDetection: { pendingDetectionKeyID = id }
+                                    )
+                                    if id != group.ids.last {
+                                        Divider()
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
             .padding(.horizontal, 12)
         }
+    }
+
+    struct ProviderGroup: Identifiable {
+        let id: ProviderID
+        let displayName: String
+        let iconName: String
+        let ids: [UUID]
+    }
+
+    var providerGroups: [ProviderGroup] {
+        var groups: [ProviderID: [UUID]] = [:]
+        for id in store.visibleKeyIDs {
+            guard let state = store.state(for: id) else { continue }
+            groups[state.configuration.providerID, default: []].append(id)
+        }
+        return ProviderID.allCases.compactMap { id in
+            guard let ids = groups[id], !ids.isEmpty,
+                  let descriptor = ProviderRegistry.builtInDescriptors.first(where: { $0.id == id })
+            else { return nil }
+            return ProviderGroup(id: id, displayName: descriptor.displayName, iconName: descriptor.iconName, ids: ids)
+        }
+    }
+
+    var isSelectedRoutin: Bool {
+        store.selectedKeyID.flatMap(store.state(for:))?.configuration.providerID == .routin
     }
 
     var usageListHeader: some View {

@@ -220,18 +220,24 @@ private extension UsageRowView {
     func content(now: Date) -> some View {
         if let snapshot = state.snapshot {
             VStack(alignment: .leading, spacing: 7) {
-                switch snapshot.kind {
-                case .periodic:
-                    periodicContent(snapshot: snapshot, now: now)
-                case .tokenPack:
-                    if let metric = validMetric(snapshot.token) {
-                        metricContent(title: "Token", metric: metric, dimension: .token, now: now)
-                    } else {
-                        statusLabel
+                if !snapshot.metrics.isEmpty {
+                    normalizedMetricsContent(snapshot: snapshot, now: now)
+                } else {
+                    switch snapshot.kind {
+                    case .periodic:
+                        periodicContent(snapshot: snapshot, now: now)
+                    case .tokenPack:
+                        if let metric = validMetric(snapshot.token) {
+                            metricContent(title: "Token", metric: metric, dimension: .token, now: now)
+                        } else {
+                            statusLabel
+                        }
                     }
                 }
 
-                codexGroupDetectionStatus
+                if state.configuration.providerID == .routin {
+                    codexGroupDetectionStatus
+                }
 
                 if state.isRefreshing || state.isStale || state.error != nil {
                     Label(
@@ -313,6 +319,82 @@ private extension UsageRowView {
                 dimension: .weekly,
                 now: now
             )
+        }
+    }
+
+    @ViewBuilder
+    func normalizedMetricsContent(snapshot: UsageSnapshot, now: Date) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(snapshot.normalizedMetrics) { metric in
+                normalizedMetricContent(metric, now: now)
+            }
+        }
+    }
+
+    @ViewBuilder
+    func normalizedMetricContent(_ metric: NormalizedUsageMetric, now: Date) -> some View {
+        switch metric.presentation {
+        case .progress:
+            let used = metric.used ?? 0
+            let limit = metric.limit ?? 0
+            let percent = limit > 0
+                ? NSDecimalNumber(decimal: used).dividing(by: NSDecimalNumber(decimal: limit)).doubleValue * 100
+                : 0
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(metric.label)
+                    Spacer()
+                    Text("\(Int(percent.rounded()))%")
+                        .monospacedDigit()
+                        .foregroundStyle(normalizedMetricColor(metric.healthState))
+                }
+                UsageMetricProgressBar(percent: percent)
+                if let remaining = metric.remaining {
+                    Text("剩余 \(decimalText(remaining))")
+                }
+                if let windowEnd = metric.windowEnd {
+                    Text("重置 \(UsageFormatter.remainingDurationText(until: windowEnd, now: now))")
+                }
+            }
+        case .balance:
+            HStack {
+                Text(metric.label)
+                Spacer()
+                Text("余额 \(decimalText(metric.value)) \(metric.currencyCode ?? "")")
+                    .foregroundStyle(normalizedMetricColor(metric.healthState))
+                    .monospacedDigit()
+            }
+        case .status:
+            HStack(spacing: 5) {
+                Circle()
+                    .fill(normalizedMetricColor(metric.healthState))
+                    .frame(width: 7, height: 7)
+                Text(metric.label)
+                Spacer()
+                Text(metric.healthState == .unavailable ? "不可用" : "可用")
+            }
+        case .value:
+            HStack {
+                Text(metric.label)
+                Spacer()
+                Text(decimalText(metric.value))
+                    .monospacedDigit()
+            }
+        }
+    }
+
+    func decimalText(_ value: Decimal?) -> String {
+        guard let value else { return "—" }
+        return NSDecimalNumber(decimal: value).stringValue
+    }
+
+    func normalizedMetricColor(_ state: UsageMetricHealthState) -> Color {
+        switch state {
+        case .normal: return .green
+        case .warning: return .orange
+        case .critical, .unavailable: return .red
+        case .stale: return .secondary
+        case .unknown: return .secondary
         }
     }
 
@@ -412,6 +494,9 @@ private extension UsageRowView {
     }
 
     func subscriptionDescriptionText(for snapshot: UsageSnapshot) -> String {
+        if !snapshot.planName.isEmpty, !snapshot.metrics.isEmpty {
+            return snapshot.planName
+        }
         switch snapshot.kind {
         case .periodic:
             return "\(snapshot.planName) · 5 小时与周"
@@ -469,7 +554,23 @@ private extension UsageRowView {
     }
 
     func accessibilityLabel(now: Date) -> String {
-        UsageRowAccessibility.label(
+        if let snapshot = state.snapshot, !snapshot.metrics.isEmpty {
+            let metricText = snapshot.normalizedMetrics.map { metric in
+                if metric.presentation == .balance {
+                    return "余额 \(decimalText(metric.value)) \(metric.currencyCode ?? "")"
+                }
+                if let used = metric.used, let limit = metric.limit, limit > 0 {
+                    let percent = NSDecimalNumber(decimal: used)
+                        .dividing(by: NSDecimalNumber(decimal: limit))
+                        .multiplying(by: 100)
+                        .intValue
+                    return "\(metric.label) 已使用 \(percent)%"
+                }
+                return metric.label
+            }.joined(separator: "，")
+            return "\(isSelected ? "当前，" : "")\(state.configuration.displayName)，\(metricText)"
+        }
+        return UsageRowAccessibility.label(
             state: state,
             metric: validMetric(state.snapshot?.fiveHour) ?? validMetric(state.snapshot?.token),
             dimension: .fiveHour,
