@@ -135,7 +135,7 @@ private extension UsageRowView {
                     subscriptionDescription(now: now)
                 }
                 Spacer(minLength: 8)
-                if validMetric(state.snapshot?.token) != nil || hasGroupMultipliers {
+                if validMetric(state.snapshot?.token) != nil || hasGroupMultipliers || state.snapshot?.metrics.isEmpty == false {
                     VStack(alignment: .trailing, spacing: 3) {
                         if let metric = validMetric(state.snapshot?.token),
                            let percentText = UsageFormatter.percentText(metric) {
@@ -143,6 +143,10 @@ private extension UsageRowView {
                                 .font(.system(.headline, design: .rounded, weight: .semibold))
                                 .monospacedDigit()
                                 .foregroundStyle(progressColor(for: metric))
+                        }
+
+                        if let metric = state.snapshot?.normalizedMetrics.first {
+                            normalizedHeaderMetric(metric)
                         }
 
                         if let currentGroupMultiplier {
@@ -214,6 +218,48 @@ private extension UsageRowView {
             label += "，检测于 \(detectedAt.formatted(date: .omitted, time: .shortened))"
         }
         return label
+    }
+
+    @ViewBuilder
+    func normalizedHeaderMetric(_ metric: NormalizedUsageMetric) -> some View {
+        switch metric.presentation {
+        case .progress:
+            if let used = metric.used, let limit = metric.limit, limit > 0 {
+                let percent = NSDecimalNumber(decimal: used)
+                    .dividing(by: NSDecimalNumber(decimal: limit))
+                    .multiplying(by: 100)
+                    .intValue
+                Text("\(percent)%")
+                    .font(.system(.headline, design: .rounded, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(normalizedMetricColor(metric.healthState))
+            }
+        case .balance:
+            Text("余额 \(decimalText(metric.value)) 元")
+                .font(.caption.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(normalizedMetricColor(metric.healthState))
+        case .status:
+            Text(metric.healthState == .unavailable ? "不可用" : "可用")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(normalizedMetricColor(metric.healthState))
+        case .value:
+            EmptyView()
+        }
+    }
+
+    func decimalText(_ value: Decimal?) -> String {
+        guard let value else { return "—" }
+        return NSDecimalNumber(decimal: value).stringValue
+    }
+
+    func normalizedMetricColor(_ state: UsageMetricHealthState) -> Color {
+        switch state {
+        case .normal: return .green
+        case .warning: return .orange
+        case .critical, .unavailable: return .red
+        case .stale, .unknown: return .secondary
+        }
     }
 
     @ViewBuilder
@@ -380,21 +426,6 @@ private extension UsageRowView {
                 Text(decimalText(metric.value))
                     .monospacedDigit()
             }
-        }
-    }
-
-    func decimalText(_ value: Decimal?) -> String {
-        guard let value else { return "—" }
-        return NSDecimalNumber(decimal: value).stringValue
-    }
-
-    func normalizedMetricColor(_ state: UsageMetricHealthState) -> Color {
-        switch state {
-        case .normal: return .green
-        case .warning: return .orange
-        case .critical, .unavailable: return .red
-        case .stale: return .secondary
-        case .unknown: return .secondary
         }
     }
 

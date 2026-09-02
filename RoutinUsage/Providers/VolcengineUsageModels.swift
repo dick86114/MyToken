@@ -39,6 +39,7 @@ struct VolcengineUsageResult: Decodable, Sendable {
     let afpMonthly: VolcengineUsageWindow?
     let afpWeekly: VolcengineUsageWindow?
     let planType: String?
+    let quotaUsage: [VolcengineCodingUsageItem]
 
     private enum CodingKeys: String, CodingKey {
         case afpDaily = "AFPDaily"
@@ -46,6 +47,44 @@ struct VolcengineUsageResult: Decodable, Sendable {
         case afpMonthly = "AFPMonthly"
         case afpWeekly = "AFPWeekly"
         case planType = "PlanType"
+        case quotaUsage = "QuotaUsage"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        afpDaily = try container.decodeIfPresent(VolcengineUsageWindow.self, forKey: .afpDaily)
+        afpFiveHour = try container.decodeIfPresent(VolcengineUsageWindow.self, forKey: .afpFiveHour)
+        afpMonthly = try container.decodeIfPresent(VolcengineUsageWindow.self, forKey: .afpMonthly)
+        afpWeekly = try container.decodeIfPresent(VolcengineUsageWindow.self, forKey: .afpWeekly)
+        planType = try container.decodeIfPresent(String.self, forKey: .planType)
+        quotaUsage = try container.decodeIfPresent([VolcengineCodingUsageItem].self, forKey: .quotaUsage) ?? []
+    }
+}
+
+struct VolcengineCodingUsageItem: Decodable, Sendable {
+    let level: String
+    let percent: Decimal
+    let resetTimestamp: Int64?
+
+    private enum CodingKeys: String, CodingKey {
+        case level = "Level"
+        case percent = "Percent"
+        case resetTimestamp = "ResetTimestamp"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        level = try container.decodeIfPresent(String.self, forKey: .level) ?? "Coding Plan"
+        if let value = try? container.decode(Decimal.self, forKey: .percent) {
+            percent = value
+        } else {
+            let value = try container.decode(String.self, forKey: .percent)
+            guard let decimal = Decimal(string: value) else {
+                throw DecodingError.dataCorruptedError(forKey: .percent, in: container, debugDescription: "无法解析用量百分比")
+            }
+            percent = decimal
+        }
+        resetTimestamp = try container.decodeIfPresent(Int64.self, forKey: .resetTimestamp)
     }
 }
 
@@ -54,5 +93,27 @@ struct VolcengineUsageResponse: Decodable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case result = "Result"
+    }
+}
+
+struct VolcenginePersonalPlanResponse: Decodable, Sendable {
+    let result: VolcenginePersonalPlanResult?
+
+    private enum CodingKeys: String, CodingKey {
+        case result = "Result"
+    }
+}
+
+struct VolcenginePersonalPlanResult: Decodable, Sendable {
+    let planType: String?
+    let status: String?
+    let startTime: String?
+    let endTime: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case planType = "PlanType"
+        case status = "Status"
+        case startTime = "StartTime"
+        case endTime = "EndTime"
     }
 }

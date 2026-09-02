@@ -112,7 +112,7 @@ struct GLMUsageProvider: UsageProvider {
             limits = []
         }
 
-        return limits.compactMap { item in
+        return limits.enumerated().compactMap { index, item in
             guard case let .object(object) = item,
                   let percentage = object["percentage"]?.numberValue()
             else { return nil }
@@ -126,7 +126,7 @@ struct GLMUsageProvider: UsageProvider {
                 label = type
             }
             return NormalizedUsageMetric(
-                id: "quota-\(type)",
+                id: "quota-\(index)-\(type)",
                 label: label,
                 used: percentage,
                 limit: 100,

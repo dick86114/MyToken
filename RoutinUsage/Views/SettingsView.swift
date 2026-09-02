@@ -356,28 +356,35 @@ private extension SettingsView {
 
                 Spacer()
 
-                Toggle(
-                    "启用凭证",
-                    isOn: Binding(
-                        get: { configuration.isEnabled },
-                        set: { setEnabled(configuration, enabled: $0) }
+                Toggle(isOn: Binding(
+                    get: { configuration.isEnabled },
+                    set: { setEnabled(configuration, enabled: $0) }
+                )) {
+                    Label(
+                        configuration.isEnabled ? "启用" : "已停用",
+                        systemImage: "power"
                     )
-                )
-                .labelsHidden()
+                }
+                .toggleStyle(.button)
                 .controlSize(.small)
-                .help(configuration.isEnabled ? "从菜单栏隐藏此 Key" : "在菜单栏显示此 Key")
-                .accessibilityLabel(configuration.isEnabled ? "禁用 \(configuration.displayName)" : "启用 \(configuration.displayName)")
+                .tint(configuration.isEnabled ? .green : .secondary)
+                .help(configuration.isEnabled ? "点击停用此凭证" : "点击启用此凭证")
+                .accessibilityLabel(configuration.isEnabled ? "停用 \(configuration.displayName)" : "启用 \(configuration.displayName)")
 
-                Toggle(
-                    "菜单栏指标",
-                    isOn: Binding(
-                        get: { settings.selectedCredentialIDs.contains(configuration.id) },
-                        set: { setMenuBarSelection(configuration.id, selected: $0) }
+                Toggle(isOn: Binding(
+                    get: { settings.selectedCredentialIDs.contains(configuration.id) },
+                    set: { setMenuBarSelection(configuration.id, selected: $0) }
+                )) {
+                    Label(
+                        settings.selectedCredentialIDs.contains(configuration.id) ? "菜单栏" : "未显示",
+                        systemImage: "menubar.rectangle"
                     )
-                )
+                }
+                .toggleStyle(.button)
                 .controlSize(.small)
-                .help(settings.selectedCredentialIDs.contains(configuration.id) ? "从菜单栏指标中移除" : "添加到菜单栏指标（最多 4 个）")
-                .accessibilityLabel(settings.selectedCredentialIDs.contains(configuration.id) ? "移除菜单栏指标" : "添加菜单栏指标")
+                .tint(settings.selectedCredentialIDs.contains(configuration.id) ? .accentColor : .secondary)
+                .help(settings.selectedCredentialIDs.contains(configuration.id) ? "点击从菜单栏移除" : "点击添加到菜单栏（最多 4 个）")
+                .accessibilityLabel(settings.selectedCredentialIDs.contains(configuration.id) ? "从菜单栏移除" : "添加到菜单栏")
 
                 Button {
                     revealedConfiguration = configuration
@@ -453,7 +460,11 @@ private extension SettingsView {
     func keyUsageOverview(_ state: KeyUsageState) -> some View {
         if let snapshot = state.snapshot {
             VStack(alignment: .leading, spacing: 10) {
-                if snapshot.kind == .periodic {
+                if !snapshot.metrics.isEmpty {
+                    ForEach(snapshot.normalizedMetrics.prefix(3)) { metric in
+                        normalizedUsageDetailItem(metric)
+                    }
+                } else if snapshot.kind == .periodic {
                     HStack(alignment: .top, spacing: 16) {
                         if let metric = snapshot.fiveHour {
                             usageDetailItem("5 小时", metric)
@@ -513,6 +524,16 @@ private extension SettingsView {
                                 } else {
                                     Color.clear
                                 }
+                            }
+                        }
+                    }
+                }
+
+                if !snapshot.metrics.isEmpty {
+                    detailSection("用量明细", symbol: "chart.bar.xaxis") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(snapshot.normalizedMetrics) { metric in
+                                normalizedDetailValue(metric)
                             }
                         }
                     }
@@ -622,6 +643,93 @@ private extension SettingsView {
         )
     }
 
+    @ViewBuilder
+    func normalizedUsageDetailItem(_ metric: NormalizedUsageMetric) -> some View {
+        switch metric.presentation {
+        case .progress:
+            let used = metric.used ?? 0
+            let limit = metric.limit ?? 0
+            let percent = limit > 0
+                ? NSDecimalNumber(decimal: used).dividing(by: NSDecimalNumber(decimal: limit)).doubleValue * 100
+                : 0
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(metric.label).foregroundStyle(.tertiary)
+                    Spacer()
+                    Text("\(Int(percent.rounded()))%")
+                        .font(.system(.headline, design: .rounded, weight: .semibold))
+                        .foregroundStyle(normalizedMetricColor(metric.healthState))
+                        .monospacedDigit()
+                }
+                ProgressView(value: min(max(percent, 0), 100), total: 100)
+                    .tint(normalizedMetricColor(metric.healthState))
+                if let remaining = metric.remaining {
+                    Text("剩余 \(decimalText(remaining))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+            }
+        case .balance:
+            HStack {
+                Text(metric.label).foregroundStyle(.tertiary)
+                Spacer()
+                Text("\(decimalText(metric.value)) 元")
+                    .foregroundStyle(normalizedMetricColor(metric.healthState))
+                    .monospacedDigit()
+            }
+        case .status:
+            HStack {
+                Text(metric.label).foregroundStyle(.tertiary)
+                Spacer()
+                Text(metric.healthState == .unavailable ? "不可用" : "可用")
+                    .foregroundStyle(normalizedMetricColor(metric.healthState))
+            }
+        case .value:
+            HStack {
+                Text(metric.label).foregroundStyle(.tertiary)
+                Spacer()
+                Text(decimalText(metric.value)).monospacedDigit()
+            }
+        }
+    }
+
+    func normalizedDetailValue(_ metric: NormalizedUsageMetric) -> some View {
+        let value: String
+        switch metric.presentation {
+        case .balance:
+            value = "\(decimalText(metric.value)) 元"
+        case .status:
+            value = metric.healthState == .unavailable ? "不可用" : "可用"
+        case .progress:
+            let used = metric.used ?? 0
+            let limit = metric.limit ?? 0
+            if limit > 0 {
+                let percent = NSDecimalNumber(decimal: used).dividing(by: NSDecimalNumber(decimal: limit)).multiplying(by: 100).intValue
+                value = "已使用 \(percent)%，剩余 \(decimalText(metric.remaining))"
+            } else {
+                value = "—"
+            }
+        case .value:
+            value = decimalText(metric.value)
+        }
+        return detailValue(metric.label, value)
+    }
+
+    func decimalText(_ value: Decimal?) -> String {
+        guard let value else { return "—" }
+        return NSDecimalNumber(decimal: value).stringValue
+    }
+
+    func normalizedMetricColor(_ state: UsageMetricHealthState) -> Color {
+        switch state {
+        case .normal: return .green
+        case .warning: return .orange
+        case .critical, .unavailable: return .red
+        case .stale, .unknown: return .secondary
+        }
+    }
+
     func subscriptionStatus(_ status: Int?, state: KeyUsageState) -> String {
         if state.error == nil, state.snapshot != nil {
             if state.isStale {
@@ -651,10 +759,26 @@ private extension SettingsView {
 
     var displayAndRefresh: some View {
         VStack(alignment: .leading, spacing: 16) {
-            settingsPageHeader("显示与刷新", subtitle: "控制菜单栏展示内容与后台刷新频率")
+            settingsPageHeader("显示与刷新", subtitle: "选择菜单栏指标并控制后台刷新频率")
 
             Form {
-                Section("菜单栏显示") {
+                Section("菜单栏指标（\(settings.selectedCredentialIDs.count)/4）") {
+                    ForEach(orderedKeyIDs, id: \.self) { id in
+                        if let configuration = store.state(for: id)?.configuration, configuration.isEnabled {
+                            Toggle(configuration.displayName, isOn: Binding(
+                                get: { settings.selectedCredentialIDs.contains(id) },
+                                set: { setMenuBarSelection(id, selected: $0) }
+                            ))
+                            .disabled(!settings.selectedCredentialIDs.contains(id) && settings.selectedCredentialIDs.count >= 4)
+                        }
+                    }
+                    if orderedKeyIDs.isEmpty {
+                        Text("尚未添加凭证")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Section("兼容选项") {
                     Picker("当前 Key", selection: selectedKeyBinding) {
                         ForEach(orderedKeyIDs, id: \.self) { id in
                             if let configuration = store.state(for: id)?.configuration {
@@ -664,13 +788,6 @@ private extension SettingsView {
                     }
                     .disabled(orderedKeyIDs.isEmpty)
                     .accessibilityLabel("菜单栏当前 Key")
-
-                    Picker("周期维度", selection: $settings.displayDimension) {
-                        Text("5 小时").tag(DisplayDimension.fiveHour)
-                        Text("周").tag(DisplayDimension.weekly)
-                    }
-                    .accessibilityLabel("周期订阅显示维度")
-
                     Picker("显示样式", selection: $settings.menuBarStyle) {
                         ForEach(MenuBarStyle.allCases, id: \.rawValue) { style in
                             Text(style.title).tag(style)
@@ -682,10 +799,13 @@ private extension SettingsView {
                 Section("自动刷新") {
                     Picker("刷新间隔", selection: $settings.refreshMinutes) {
                         ForEach(AppSettings.allowedRefreshMinutes, id: \.self) { minutes in
-                            Text("\(minutes) 分钟").tag(minutes)
+                            Text("每 \(minutes) 分钟").tag(minutes)
                         }
                     }
                     .accessibilityLabel("自动刷新间隔")
+                    Text("只刷新已启用的凭证，每个凭证的用量保持独立。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
             .formStyle(.grouped)

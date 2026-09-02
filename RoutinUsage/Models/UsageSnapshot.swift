@@ -102,6 +102,23 @@ struct NormalizedUsageMetric: Codable, Equatable, Sendable, Identifiable {
         self.currencyCode = currencyCode
         self.healthState = healthState
     }
+
+    func withID(_ id: String) -> NormalizedUsageMetric {
+        NormalizedUsageMetric(
+            id: id,
+            label: label,
+            used: used,
+            limit: limit,
+            remaining: remaining,
+            value: value,
+            unit: unit,
+            windowStart: windowStart,
+            windowEnd: windowEnd,
+            presentation: presentation,
+            currencyCode: currencyCode,
+            healthState: healthState
+        )
+    }
 }
 
 struct UsageMetric: Codable, Equatable, Sendable {
@@ -283,6 +300,12 @@ struct UsageSnapshot: Codable, Equatable, Sendable {
         status = try container.decodeIfPresent(Int.self, forKey: .status)
         subscriptionStartAt = try container.decodeIfPresent(Date.self, forKey: .subscriptionStartAt)
         subscriptionEndAt = try container.decodeIfPresent(Date.self, forKey: .subscriptionEndAt)
-        metrics = try container.decodeIfPresent([NormalizedUsageMetric].self, forKey: .metrics) ?? []
+        let decodedMetrics = try container.decodeIfPresent([NormalizedUsageMetric].self, forKey: .metrics) ?? []
+        var seenIDs: [String: Int] = [:]
+        metrics = decodedMetrics.enumerated().map { index, metric in
+            let count = seenIDs[metric.id, default: 0]
+            seenIDs[metric.id] = count + 1
+            return count == 0 ? metric : metric.withID("\(metric.id)-\(index)")
+        }
     }
 }

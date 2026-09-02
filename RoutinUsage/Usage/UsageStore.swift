@@ -643,6 +643,8 @@ final class UsageStore {
             return .invalidResponse
         case .providerUnavailable:
             return .server(statusCode: 503)
+        case .providerMessage:
+            return .invalidResponse
         }
     }
 

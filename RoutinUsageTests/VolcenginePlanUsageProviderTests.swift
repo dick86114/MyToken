@@ -5,7 +5,7 @@ final class VolcenginePlanUsageProviderTests: XCTestCase {
     func test个人AFP窗口转换为进度型指标() async throws {
         let stub = URLProtocolStub.makeSession { request in
             XCTAssertEqual(request.httpMethod, "POST")
-            XCTAssertTrue(request.url?.absoluteString.contains("Action=GetAFPUsage") == true)
+            XCTAssertTrue(request.url?.absoluteString.contains("Action=GetAgentPlanAFPUsage") == true)
             XCTAssertNotNil(request.value(forHTTPHeaderField: "Authorization"))
             let response = try XCTUnwrap(HTTPURLResponse(
                 url: try XCTUnwrap(request.url),
@@ -62,7 +62,7 @@ final class VolcenginePlanUsageProviderTests: XCTestCase {
                 httpVersion: nil,
                 headerFields: nil
             ))
-            let body = #"{"Result":{"PlanType":"Coding","AFPFiveHour":{"Quota":"100","Used":"10"}}}"#
+            let body = #"{"Result":{"QuotaUsage":[{"Level":"5h","Percent":10,"ResetTimestamp":1893456000}]}}"#
             return (response, Data(body.utf8))
         }
         let provider = VolcenginePlanUsageProvider(session: stub.session, endpoint: URL(string: "https://ark.test/")!)
@@ -75,5 +75,32 @@ final class VolcenginePlanUsageProviderTests: XCTestCase {
 
         let fetched = try await provider.fetchUsage(credential, now: Date(timeIntervalSince1970: 1_700_000_000))
         XCTAssertEqual(fetched?.planName, "Coding Plan")
+    }
+
+    func test验证先确认个人套餐再查询用量() async throws {
+        let stub = URLProtocolStub.makeSession { request in
+            let action = request.url?.absoluteString ?? ""
+            let response = try XCTUnwrap(HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            if action.contains("GetPersonalPlan") {
+                return (response, Data(#"{"Result":{"PlanType":"Max","Status":"Running"}}"#.utf8))
+            }
+            return (response, Data(#"{"Result":{"PlanType":"Max","AFPFiveHour":{"Quota":"100","Used":"10"}}}"#.utf8))
+        }
+        let provider = VolcenginePlanUsageProvider(session: stub.session, endpoint: URL(string: "https://ark.test/")!)
+        let credential = ProviderCredential(
+            providerID: .volcengine,
+            kind: .accessKeyPair,
+            secret: "secret-key",
+            metadata: ["accessKeyID": "access-key", "region": "cn-beijing", "planType": "agent"]
+        )
+
+        let fetched = try await provider.validate(credential, now: Date(timeIntervalSince1970: 1_700_000_000))
+
+        XCTAssertEqual(fetched?.planName, "Max Plan")
     }
 }

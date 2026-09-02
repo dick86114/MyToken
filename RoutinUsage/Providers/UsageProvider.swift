@@ -6,7 +6,7 @@ protocol UsageProvider: Sendable {
     func fetchUsage(_ credential: ProviderCredential, now: Date) async throws -> UsageSnapshot?
 }
 
-enum UsageProviderError: Error, Equatable, Sendable {
+enum UsageProviderError: LocalizedError, Equatable, Sendable {
     case invalidCredential
     case unauthorized
     case rateLimited
@@ -14,6 +14,28 @@ enum UsageProviderError: Error, Equatable, Sendable {
     case timeout
     case invalidResponse
     case providerUnavailable
+    case providerMessage(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidCredential:
+            return "凭证字段不完整，请检查输入"
+        case .unauthorized:
+            return "凭证无效或没有该供应商权限"
+        case .rateLimited:
+            return "请求过于频繁，请稍后重试"
+        case .transport:
+            return "网络连接失败，请检查网络后重试"
+        case .timeout:
+            return "请求超时，请稍后重试"
+        case .invalidResponse:
+            return "供应商返回的数据无法识别"
+        case .providerUnavailable:
+            return "供应商服务暂时不可用"
+        case let .providerMessage(message):
+            return message
+        }
+    }
 }
 
 struct ProviderRegistry: Sendable {

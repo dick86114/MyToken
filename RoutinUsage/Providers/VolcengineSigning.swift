@@ -55,7 +55,7 @@ struct VolcengineRequestSigner: Sendable {
             Self.hexDigest(Data(canonicalRequest.utf8))
         ].joined(separator: "\n")
 
-        let kDate = Self.hmac(key: Data(("VOLC" + credential.secretAccessKey).utf8), message: dateStamp)
+        let kDate = Self.hmac(key: Data(credential.secretAccessKey.utf8), message: dateStamp)
         let kRegion = Self.hmac(key: kDate, message: credential.region)
         let kService = Self.hmac(key: kRegion, message: service)
         let kSigning = Self.hmac(key: kService, message: requestType)

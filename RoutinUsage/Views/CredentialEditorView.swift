@@ -64,7 +64,11 @@ enum CredentialEditorValidation {
                 credentialKind: .accessKeyPair,
                 name: normalizedName,
                 secret: secret,
-                metadata: ["accessKeyID": accessKey, "region": resolvedRegion]
+                metadata: [
+                    "accessKeyID": accessKey,
+                    "region": resolvedRegion,
+                    "planType": planType
+                ]
             )
         }
     }
@@ -130,6 +134,7 @@ struct CredentialEditorView: View {
                     }
                 }
                 TextField("名称", text: $name)
+                    .frame(minWidth: 360)
 
                 if providerID == .volcengine {
                     Picker("计划类型", selection: $planType) {
@@ -137,11 +142,14 @@ struct CredentialEditorView: View {
                         Text("Coding Plan").tag("coding")
                     }
                     TextField("AccessKey ID", text: $accessKeyID)
+                        .frame(minWidth: 360)
                     HStack(spacing: 8) {
                         if isSecretVisible {
                             TextField("SecretAccessKey", text: $secretAccessKey)
+                                .frame(minWidth: 360)
                         } else {
                             SecureField("SecretAccessKey", text: $secretAccessKey)
+                                .frame(minWidth: 360)
                         }
                         Button {
                             isSecretVisible.toggle()
@@ -149,6 +157,8 @@ struct CredentialEditorView: View {
                             Image(systemName: isSecretVisible ? "eye.slash" : "eye")
                         }
                         .buttonStyle(.borderless)
+                        .foregroundStyle(canRevealSecretAccessKey ? .primary : .tertiary)
+                        .disabled(!canRevealSecretAccessKey)
                         .help(isSecretVisible ? "隐藏 SecretAccessKey" : "显示 SecretAccessKey")
                         .accessibilityLabel(isSecretVisible ? "隐藏 SecretAccessKey" : "显示 SecretAccessKey")
                     }
@@ -157,8 +167,10 @@ struct CredentialEditorView: View {
                     HStack(spacing: 8) {
                         if isSecretVisible {
                             TextField(providerID == .routin ? "plan-…" : "API Key", text: $apiKey)
+                                .frame(minWidth: 360)
                         } else {
                             SecureField(providerID == .routin ? "plan-…" : "API Key", text: $apiKey)
+                                .frame(minWidth: 360)
                         }
                         Button {
                             isSecretVisible.toggle()
@@ -166,11 +178,17 @@ struct CredentialEditorView: View {
                             Image(systemName: isSecretVisible ? "eye.slash" : "eye")
                         }
                         .buttonStyle(.borderless)
+                        .foregroundStyle(canRevealAPIKey ? .primary : .tertiary)
+                        .disabled(!canRevealAPIKey)
                         .help(isSecretVisible ? "隐藏凭证" : "显示凭证")
                         .accessibilityLabel(isSecretVisible ? "隐藏凭证" : "显示凭证")
                     }
                     if providerID == .deepseek {
-                        TextField("低余额预警值（可选）", text: $balanceWarningThreshold)
+                        HStack(spacing: 8) {
+                            TextField("低余额预警值（可选）", text: $balanceWarningThreshold)
+                            Text("元")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
@@ -200,7 +218,15 @@ struct CredentialEditorView: View {
             }
         }
         .padding(28)
-        .frame(width: 480)
+        .frame(width: 680)
+    }
+
+    private var canRevealAPIKey: Bool {
+        !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var canRevealSecretAccessKey: Bool {
+        !secretAccessKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func submit() async {
