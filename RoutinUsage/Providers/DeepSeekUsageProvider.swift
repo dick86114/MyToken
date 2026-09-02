@@ -1,0 +1,154 @@
+import Foundation
+
+struct DeepSeekUsageProvider: UsageProvider {
+    static let endpoint = URL(string: "https://api.deepseek.com/user/balance")!
+
+    let descriptor: ProviderDescriptor
+    private let session: URLSession
+
+    init(session: URLSession = .shared) {
+        self.session = session
+        self.descriptor = ProviderRegistry.builtInDescriptors.first(where: { $0.id == .deepseek })!
+    }
+
+    func validate(_ credential: ProviderCredential, now: Date) async throws -> UsageSnapshot? {
+        try await fetchUsage(credential, now: now)
+    }
+
+    func fetchUsage(_ credential: ProviderCredential, now: Date) async throws -> UsageSnapshot? {
+        guard credential.providerID == .deepseek, credential.kind == .apiKey, !credential.secret.isEmpty else {
+            throw UsageProviderError.invalidCredential
+        }
+
+        var request = URLRequest(url: Self.endpoint)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 15
+        request.setValue("Bearer \(credential.secret)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw UsageProviderError.transport
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw UsageProviderError.invalidResponse
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            switch httpResponse.statusCode {
+            case 401, 403:
+                throw UsageProviderError.unauthorized
+            case 429:
+                throw UsageProviderError.rateLimited
+            case 500...599:
+                throw UsageProviderError.providerUnavailable
+            default:
+                throw UsageProviderError.invalidResponse
+            }
+        }
+
+        do {
+            let payload = try JSONDecoder().decode(DeepSeekBalanceResponse.self, from: data)
+            guard let balance = payload.balanceInfos.first else {
+                throw UsageProviderError.invalidResponse
+            }
+            let currency = balance.currency.isEmpty ? "CNY" : balance.currency
+            let total = Decimal(string: balance.totalBalance) ?? 0
+            let granted = Decimal(string: balance.grantedBalance) ?? 0
+            let toppedUp = Decimal(string: balance.toppedUpBalance) ?? 0
+            let warningThreshold: Decimal?
+            if let rawThreshold = credential.metadata["balanceWarningThreshold"] {
+                warningThreshold = Decimal(string: rawThreshold)
+            } else {
+                warningThreshold = nil
+            }
+            let health = UsageMetricHealthEvaluator.balanceState(
+                balance: total,
+                warningThreshold: warningThreshold,
+                isAvailable: payload.isAvailable
+            )
+
+            return UsageSnapshot(
+                planName: "API 余额",
+                kind: .periodic,
+                fiveHour: nil,
+                weekly: nil,
+                token: nil,
+                allowedModels: [],
+                fetchedAt: now,
+                providerID: .deepseek,
+                credentialID: credential.credentialID,
+                metrics: [
+                    NormalizedUsageMetric(
+                        id: "balance",
+                        label: "余额",
+                        value: total,
+                        unit: .currency,
+                        presentation: .balance,
+                        currencyCode: currency,
+                        healthState: health
+                    ),
+                    NormalizedUsageMetric(
+                        id: "grantedBalance",
+                        label: "赠金余额",
+                        value: granted,
+                        unit: .currency,
+                        presentation: .value,
+                        currencyCode: currency,
+                        healthState: health
+                    ),
+                    NormalizedUsageMetric(
+                        id: "toppedUpBalance",
+                        label: "充值余额",
+                        value: toppedUp,
+                        unit: .currency,
+                        presentation: .value,
+                        currencyCode: currency,
+                        healthState: health
+                    ),
+                    NormalizedUsageMetric(
+                        id: "availability",
+                        label: "账户状态",
+                        value: payload.isAvailable ? 1 : 0,
+                        unit: .boolean,
+                        presentation: .status,
+                        healthState: payload.isAvailable ? health : .unavailable
+                    )
+                ]
+            )
+        } catch let error as UsageProviderError {
+            throw error
+        } catch {
+            throw UsageProviderError.invalidResponse
+        }
+    }
+}
+
+private struct DeepSeekBalanceResponse: Decodable {
+    let isAvailable: Bool
+    let balanceInfos: [DeepSeekBalanceInfo]
+
+    private enum CodingKeys: String, CodingKey {
+        case isAvailable = "is_available"
+        case balanceInfos = "balance_infos"
+    }
+}
+
+private struct DeepSeekBalanceInfo: Decodable {
+    let currency: String
+    let totalBalance: String
+    let grantedBalance: String
+    let toppedUpBalance: String
+
+    private enum CodingKeys: String, CodingKey {
+        case currency
+        case totalBalance = "total_balance"
+        case grantedBalance = "granted_balance"
+        case toppedUpBalance = "topped_up_balance"
+    }
+}

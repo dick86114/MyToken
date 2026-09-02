@@ -36,6 +36,30 @@ enum UsageMetricUnit: String, Codable, Equatable, Sendable {
     case text
 }
 
+enum UsageMetricHealthState: String, Codable, Equatable, Sendable {
+    case normal
+    case warning
+    case critical
+    case unavailable
+    case stale
+    case unknown
+}
+
+enum UsageMetricHealthEvaluator {
+    static func balanceState(
+        balance: Decimal,
+        warningThreshold: Decimal?,
+        isAvailable: Bool
+    ) -> UsageMetricHealthState {
+        guard isAvailable else { return .unavailable }
+        guard balance > 0 else { return .critical }
+        if let warningThreshold, warningThreshold > 0, balance < warningThreshold {
+            return .warning
+        }
+        return .normal
+    }
+}
+
 struct NormalizedUsageMetric: Codable, Equatable, Sendable, Identifiable {
     let id: String
     let label: String
@@ -48,6 +72,7 @@ struct NormalizedUsageMetric: Codable, Equatable, Sendable, Identifiable {
     let windowEnd: Date?
     let presentation: NormalizedUsageMetricPresentation
     let currencyCode: String?
+    let healthState: UsageMetricHealthState
 
     init(
         id: String,
@@ -60,7 +85,8 @@ struct NormalizedUsageMetric: Codable, Equatable, Sendable, Identifiable {
         windowStart: Date? = nil,
         windowEnd: Date? = nil,
         presentation: NormalizedUsageMetricPresentation,
-        currencyCode: String? = nil
+        currencyCode: String? = nil,
+        healthState: UsageMetricHealthState = .unknown
     ) {
         self.id = id
         self.label = label
@@ -73,6 +99,7 @@ struct NormalizedUsageMetric: Codable, Equatable, Sendable, Identifiable {
         self.windowEnd = windowEnd
         self.presentation = presentation
         self.currencyCode = currencyCode
+        self.healthState = healthState
     }
 }
 
