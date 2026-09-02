@@ -37,6 +37,26 @@ private struct KeyRowDropDelegate: DropDelegate {
     }
 }
 
+private struct CredentialSortInteraction: ViewModifier {
+    let enabled: Bool
+    let targetID: UUID
+    let move: @MainActor (UUID, UUID) -> Void
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if enabled {
+            content.onDrop(
+                of: [UTType.text],
+                delegate: KeyRowDropDelegate(targetID: targetID) { draggedID in
+                    move(draggedID, targetID)
+                }
+            )
+        } else {
+            content
+        }
+    }
+}
+
 @MainActor
 struct SettingsView: View {
     typealias UpdateValidatedKey = @MainActor (UUID, String, String) async throws -> KeyEditorSaveResult
@@ -342,6 +362,25 @@ private extension SettingsView {
     func keyRow(_ configuration: KeyConfiguration) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 10) {
+                if isReordering {
+                    Image(systemName: "line.3.horizontal")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 22, height: 28)
+                        .contentShape(Rectangle())
+                        .onDrag {
+                            NSItemProvider(object: configuration.id.uuidString as NSString)
+                        }
+                        .onHover { isHovered in
+                            if isHovered {
+                                NSCursor.openHand.push()
+                            } else {
+                                NSCursor.pop()
+                            }
+                        }
+                        .help("拖动以调整排序")
+                        .accessibilityLabel("拖动 (configuration.displayName) 调整排序")
+                }
+
                 VStack(alignment: .leading, spacing: 3) {
                     Text(configuration.displayName)
                         .font(.headline)
@@ -430,22 +469,24 @@ private extension SettingsView {
         .contentShape(Rectangle())
         .onHover { isHovered in
             if isHovered {
-                NSCursor.pointingHand.push()
+                if !isReordering {
+                    NSCursor.pointingHand.push()
+                }
             } else {
                 NSCursor.pop()
             }
         }
-        .onDrag {
-            NSItemProvider(object: configuration.id.uuidString as NSString)
-        }
-        .onDrop(
-            of: [UTType.text],
-            delegate: KeyRowDropDelegate(targetID: configuration.id) { draggedID in
-                move(draggedID: draggedID, before: configuration.id)
+        .modifier(CredentialSortInteraction(
+            enabled: isReordering,
+            targetID: configuration.id,
+            move: { draggedID, targetID in
+                move(draggedID: draggedID, before: targetID)
             }
-        )
+        ))
         .onTapGesture {
-            expandedKeyID = configuration.id
+            if !isReordering {
+                expandedKeyID = configuration.id
+            }
         }
         .listRowSeparator(.visible)
         .listRowSeparatorTint(Color.secondary.opacity(0.28))
