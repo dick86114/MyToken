@@ -44,6 +44,7 @@ final class UsageStore {
     @ObservationIgnored private let keyRepository: KeyRepository
     @ObservationIgnored private let localStore: any LocalKeyStoring
     @ObservationIgnored private let apiClient: any UsageFetching
+    @ObservationIgnored private let providerRegistry: ProviderRegistry?
     @ObservationIgnored private let cache: any UsageCaching
     @ObservationIgnored private let alertEvaluator: AlertEvaluator
     @ObservationIgnored private let notificationSender: any NotificationSending
@@ -69,11 +70,13 @@ final class UsageStore {
         refreshMinutes: Int = 5,
         thresholds: AlertThresholds = AlertThresholds(),
         notificationsEnabled: Bool = true,
+        providerRegistry: ProviderRegistry? = nil,
         now: @escaping @Sendable () -> Date = Date.init
     ) {
         self.keyRepository = keyRepository
         self.localStore = localStore
         self.apiClient = apiClient
+        self.providerRegistry = providerRegistry
         self.cache = cache
         self.alertEvaluator = alertEvaluator
         self.notificationSender = notificationSender
@@ -386,6 +389,7 @@ final class UsageStore {
         return RefreshRequest(
             keyID: keyID,
             secret: secret,
+            configuration: state.configuration,
             credentialFingerprint: CredentialFingerprint(secret: secret),
             refreshGeneration: refreshGeneration,
             requestedAt: now()
@@ -399,15 +403,28 @@ final class UsageStore {
         }
 
         let apiClient = apiClient
+        let providerRegistry = providerRegistry
         var notificationWorks: [NotificationWork] = []
         await withTaskGroup(of: RefreshOutcome.self) { group in
             for request in requests {
                 group.addTask {
                     do {
-                        let snapshot = try await apiClient.fetchUsage(
-                            apiKey: request.secret,
-                            now: request.requestedAt
-                        )
+                        let snapshot: UsageSnapshot?
+                        if let provider = providerRegistry?.provider(for: request.configuration.providerID) {
+                            let credential = ProviderCredential(
+                                credentialID: request.configuration.id,
+                                providerID: request.configuration.providerID,
+                                kind: request.configuration.credentialKind,
+                                secret: request.secret,
+                                metadata: request.configuration.metadata
+                            )
+                            snapshot = try await provider.fetchUsage(credential, now: request.requestedAt)
+                        } else {
+                            snapshot = try await apiClient.fetchUsage(
+                                apiKey: request.secret,
+                                now: request.requestedAt
+                            )
+                        }
                         try Task.checkCancellation()
                         return RefreshOutcome(
                             keyID: request.keyID,
@@ -431,6 +448,14 @@ final class UsageStore {
                             refreshGeneration: request.refreshGeneration,
                             requestedAt: request.requestedAt,
                             result: Task.isCancelled ? .cancelled : .failure(error)
+                        )
+                    } catch let error as UsageProviderError {
+                        return RefreshOutcome(
+                            keyID: request.keyID,
+                            credentialFingerprint: request.credentialFingerprint,
+                            refreshGeneration: request.refreshGeneration,
+                            requestedAt: request.requestedAt,
+                            result: Task.isCancelled ? .cancelled : .failure(Self.apiError(from: error))
                         )
                     } catch {
                         return RefreshOutcome(
@@ -606,6 +631,21 @@ final class UsageStore {
         }
     }
 
+    nonisolated private static func apiError(from error: UsageProviderError) -> UsageAPIError {
+        switch error {
+        case .invalidCredential, .unauthorized:
+            return .invalidKey
+        case .rateLimited:
+            return .server(statusCode: 429)
+        case .transport, .timeout:
+            return .transport
+        case .invalidResponse:
+            return .invalidResponse
+        case .providerUnavailable:
+            return .server(statusCode: 503)
+        }
+    }
+
     private static func storeError(from error: Error) -> UsageStoreError {
         switch error {
         case KeyRepositoryError.invalidName:
@@ -634,6 +674,7 @@ final class UsageStore {
 private struct RefreshRequest: Sendable {
     let keyID: UUID
     let secret: String
+    let configuration: KeyConfiguration
     let credentialFingerprint: CredentialFingerprint
     let refreshGeneration: UUID
     let requestedAt: Date

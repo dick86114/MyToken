@@ -130,7 +130,15 @@ final class AppEnvironment {
         let defaults = UserDefaults.standard
         let logWriter = AppLogStore.shared
         let settings = AppSettings(defaults: defaults)
-        let localStore = LocalKeyStore(defaults: defaults)
+        let legacyStore = LocalKeyStore(defaults: defaults)
+        let legacyRepository = KeyRepository(defaults: defaults, localStore: legacyStore)
+        let keychainStore = KeychainSecretStore()
+        try? KeychainMigration.migrate(
+            ids: legacyRepository.list().map(\.id),
+            from: legacyStore,
+            to: keychainStore
+        )
+        let localStore: any LocalKeyStoring = keychainStore
         let keyRepository = KeyRepository(defaults: defaults, localStore: localStore)
         let cache = UsageCache(defaults: defaults)
         let apiClient = UsageAPIClient(session: .shared, mapper: UsageMapper())
@@ -145,6 +153,12 @@ final class AppEnvironment {
             probeClient: CodexGroupProbeClient(session: .shared, logWriter: logWriter),
             repository: CodexGroupDetectionRepository(defaults: defaults)
         )
+        let providerRegistry = ProviderRegistry(providers: [
+            RoutinUsageProvider(client: apiClient),
+            DeepSeekUsageProvider(session: .shared),
+            GLMUsageProvider(session: .shared),
+            VolcenginePlanUsageProvider(session: .shared)
+        ])
         routinWebSession.onLoginCompleted = {
             Task { @MainActor in
                 await routinCheckIn.didFinishLogin()
@@ -161,7 +175,8 @@ final class AppEnvironment {
             defaults: defaults,
             refreshMinutes: settings.refreshMinutes,
             thresholds: settings.thresholds,
-            notificationsEnabled: settings.notificationsEnabled
+            notificationsEnabled: settings.notificationsEnabled,
+            providerRegistry: providerRegistry
         )
 
         return AppEnvironment(

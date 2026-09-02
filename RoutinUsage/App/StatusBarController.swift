@@ -15,6 +15,7 @@ final class StatusBarController: NSObject {
     private var notificationsEnabled: Bool
     private var thresholds: AlertThresholds
     private var selectedKeyID: UUID?
+    private var selectedCredentialIDs: [UUID]
     private var appearanceObservation: NSKeyValueObservation?
     private var popoverWindowResignObserver: NSObjectProtocol?
 
@@ -24,6 +25,7 @@ final class StatusBarController: NSObject {
         notificationsEnabled = environment.settings.notificationsEnabled
         thresholds = environment.settings.thresholds
         selectedKeyID = environment.store.selectedKeyID
+        selectedCredentialIDs = environment.settings.selectedCredentialIDs
         super.init()
 
         configurePopover()
@@ -73,6 +75,7 @@ final class StatusBarController: NSObject {
             _ = environment.settings.refreshMinutes
             _ = environment.settings.notificationsEnabled
             _ = environment.settings.thresholds
+            _ = environment.settings.selectedCredentialIDs
             _ = environment.store.selectedKeyID
             _ = environment.store.states
             _ = environment.updateStatus
@@ -104,6 +107,9 @@ final class StatusBarController: NSObject {
             selectedKeyID = environment.store.selectedKeyID
             Task { await environment.selectedKeyDidChange(to: selectedKeyID) }
         }
+        if selectedCredentialIDs != settings.selectedCredentialIDs {
+            selectedCredentialIDs = settings.selectedCredentialIDs
+        }
         updateStatusButton()
     }
 
@@ -112,6 +118,24 @@ final class StatusBarController: NSObject {
             return
         }
         let state = environment.store.selectedKeyID.flatMap(environment.store.state(for:))
+        let selectedIndicators = environment.settings.selectedCredentialIDs.compactMap { id -> MenuBarIndicatorModel? in
+            guard let state = environment.store.state(for: id),
+                  let descriptor = ProviderRegistry.builtInDescriptors.first(where: { $0.id == state.configuration.providerID })
+            else { return nil }
+            return MenuBarIndicatorModel.make(
+                state: state,
+                descriptor: descriptor,
+                dimension: environment.settings.displayDimension
+            )
+        }
+        if !selectedIndicators.isEmpty {
+            button.title = ""
+            button.image = MenuBarMultiUsageIcon.image(indicators: selectedIndicators)
+            button.imagePosition = .imageOnly
+            button.setAccessibilityLabel(selectedIndicators.map(\.accessibilityLabel).joined(separator: "；"))
+            button.toolTip = selectedIndicators.map(\.accessibilityLabel).joined(separator: "；")
+            return
+        }
         let text = UsageFormatter.menuBarText(
             state: state,
             dimension: environment.settings.displayDimension,

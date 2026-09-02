@@ -260,7 +260,7 @@ private extension SettingsView {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("账户")
                         .font(.title2.weight(.semibold))
-                    Text("拖动列表可调整菜单栏中的显示顺序")
+                    Text("拖动列表可调整顺序；菜单栏最多显示 4 个凭证")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -315,7 +315,9 @@ private extension SettingsView {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(configuration.displayName)
                         .font(.headline)
-                    Text(KeyDisplayMask.masked(suffix: configuration.keySuffix))
+                    Text(configuration.providerID == .routin
+                        ? KeyDisplayMask.masked(suffix: configuration.keySuffix)
+                        : ProviderRegistry.builtInDescriptors.first(where: { $0.id == configuration.providerID })?.displayName ?? configuration.providerID.rawValue)
                         .font(.system(.caption, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
@@ -335,6 +337,18 @@ private extension SettingsView {
                 .controlSize(.small)
                 .help(configuration.isEnabled ? "从菜单栏隐藏此 Key" : "在菜单栏显示此 Key")
                 .accessibilityLabel(configuration.isEnabled ? "禁用 \(configuration.displayName)" : "启用 \(configuration.displayName)")
+
+                Toggle(
+                    "菜单栏指标",
+                    isOn: Binding(
+                        get: { settings.selectedCredentialIDs.contains(configuration.id) },
+                        set: { setMenuBarSelection(configuration.id, selected: $0) }
+                    )
+                )
+                .labelsHidden()
+                .controlSize(.small)
+                .help(settings.selectedCredentialIDs.contains(configuration.id) ? "从菜单栏指标中移除" : "添加到菜单栏指标（最多 4 个）")
+                .accessibilityLabel(settings.selectedCredentialIDs.contains(configuration.id) ? "移除菜单栏指标" : "添加菜单栏指标")
 
                 Button {
                     editor = .edit(configuration)
@@ -892,6 +906,17 @@ private extension SettingsView {
         } catch {
             operationError = "无法更新 Key 显示状态，请稍后重试"
         }
+    }
+
+    func setMenuBarSelection(_ id: UUID, selected: Bool) {
+        var ids = settings.selectedCredentialIDs
+        if selected {
+            guard !ids.contains(id), ids.count < 4 else { return }
+            ids.append(id)
+        } else {
+            ids.removeAll { $0 == id }
+        }
+        settings.selectedCredentialIDs = ids
     }
 
     func deletePendingKey() {
