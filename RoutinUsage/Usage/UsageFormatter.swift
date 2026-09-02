@@ -131,6 +131,8 @@ enum UsageFormatter {
             return end.timeIntervalSince(now) < 24 * 60 * 60
         case .token:
             return false
+        case .balance:
+            return false
         }
     }
 

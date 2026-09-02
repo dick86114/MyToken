@@ -14,6 +14,7 @@ enum UsageDimension: String, Codable, Equatable, Sendable {
     case fiveHour
     case weekly
     case token
+    case balance
 }
 
 enum DisplayDimension: String, Codable, Equatable, Sendable {

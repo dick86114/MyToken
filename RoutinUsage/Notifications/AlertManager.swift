@@ -28,6 +28,8 @@ struct UsageAlert: Equatable, Sendable {
     let level: AlertLevel
     let percent: Double
     let windowEnd: Date?
+    let balanceAmount: Decimal?
+    let currencyCode: String?
     fileprivate let reservationID: UUID
     fileprivate let triggeredWindows: Set<AlertWindowKey>
     fileprivate let replacedReservationOwners: [AlertWindowKey: UUID]
@@ -37,6 +39,11 @@ struct UsageAlert: Equatable, Sendable {
     }
 
     func notificationBody(timeZone: TimeZone = .autoupdatingCurrent) -> String {
+        if let balanceAmount {
+            let amount = NSDecimalNumber(decimal: balanceAmount).stringValue
+            let currency = currencyCode.map { " \($0)" } ?? ""
+            return "\(keyName) · 余额低于预警值，当前 \(amount)\(currency)"
+        }
         let base = "\(keyName) · \(dimension.notificationName)用量已达 \(formattedPercent)%"
         guard let windowEnd, dimension != .token else {
             return base
@@ -71,6 +78,8 @@ private extension UsageDimension {
             return "周"
         case .token:
             return "Token "
+        case .balance:
+            return "余额"
         }
     }
 }
@@ -165,9 +174,91 @@ final class AlertEvaluator: @unchecked Sendable {
             }
         }
 
+        for metric in snapshot.metrics where metric.presentation == .progress {
+            guard let used = metric.used, let limit = metric.limit, limit > 0 else { continue }
+            let percent = NSDecimalNumber(decimal: used)
+                .dividing(by: NSDecimalNumber(decimal: limit))
+                .multiplying(by: 100)
+                .doubleValue
+            let dimension: UsageDimension
+            if metric.id == "fiveHour" || metric.label.contains("5 小时") {
+                dimension = .fiveHour
+            } else if metric.id == "weekly" || metric.label.contains("周") {
+                dimension = .weekly
+            } else {
+                dimension = .token
+            }
+            let normalized = UsageMetric(
+                used: used,
+                limit: limit,
+                remaining: metric.remaining ?? max(0, limit - used),
+                percent: percent,
+                unit: .token,
+                windowEnd: metric.windowEnd
+            )
+            alerts += evaluate(
+                key: key,
+                metric: normalized,
+                dimension: dimension,
+                windowIdentifier: metric.windowEnd.map { String($0.timeIntervalSince1970) } ?? metric.id,
+                thresholds: thresholds,
+                clearsWhenBelowThreshold: metric.windowEnd == nil,
+                triggeredWindows: &triggeredWindows,
+                periodicWatermarks: &periodicWatermarks
+            )
+        }
+
+        if let thresholdText = key.metadata["balanceWarningThreshold"],
+           let threshold = Decimal(string: thresholdText),
+           let balance = snapshot.metrics.first(where: { $0.presentation == .balance })?.value {
+            alerts += evaluateBalance(
+                key: key,
+                balance: balance,
+                threshold: threshold,
+                currencyCode: snapshot.metrics.first(where: { $0.presentation == .balance })?.currencyCode,
+                triggeredWindows: &triggeredWindows
+            )
+        }
+
         persistTriggeredWindows(deliveredWindows.intersection(triggeredWindows))
         persistPeriodicWatermarks(periodicWatermarks)
         return alerts
+    }
+
+    private func evaluateBalance(
+        key: KeyConfiguration,
+        balance: Decimal,
+        threshold: Decimal,
+        currencyCode: String?,
+        triggeredWindows: inout Set<AlertWindowKey>
+    ) -> [UsageAlert] {
+        let windowKey = AlertWindowKey(
+            keyID: key.id,
+            dimension: .balance,
+            windowIdentifier: currencyCode ?? "currency",
+            threshold: 0
+        )
+        if balance > threshold {
+            removeState(for: [windowKey], triggeredWindows: &triggeredWindows)
+            return []
+        }
+        guard !triggeredWindows.contains(windowKey) else { return [] }
+        let reservationID = UUID()
+        triggeredWindows.insert(windowKey)
+        deliveryCoordinator.reservationOwners[windowKey] = reservationID
+        return [UsageAlert(
+            keyID: key.id,
+            keyName: key.displayName,
+            dimension: .balance,
+            level: .low,
+            percent: 0,
+            windowEnd: nil,
+            balanceAmount: balance,
+            currencyCode: currencyCode,
+            reservationID: reservationID,
+            triggeredWindows: [windowKey],
+            replacedReservationOwners: [:]
+        )]
     }
 
     func restoreEligibility(for alerts: ArraySlice<UsageAlert>) {
@@ -406,6 +497,8 @@ final class AlertEvaluator: @unchecked Sendable {
             level: highest.level,
             percent: metric.percent,
             windowEnd: metric.windowEnd,
+            balanceAmount: nil,
+            currencyCode: nil,
             reservationID: reservationID,
             triggeredWindows: reservedWindows,
             replacedReservationOwners: replacedReservationOwners
