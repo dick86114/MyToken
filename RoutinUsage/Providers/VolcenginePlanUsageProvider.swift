@@ -29,7 +29,12 @@ struct VolcenginePlanUsageProvider: UsageProvider {
               let region = credential.metadata["region"],
               !region.isEmpty,
               !credential.secret.isEmpty,
-              let planURL = URL(string: endpoint.absoluteString + "?Action=GetAFPUsage&Version=2024-01-01")
+              let planURL = Self.makeURL(
+                endpoint: endpoint,
+                action: credential.metadata["planType"] == "coding"
+                    ? "GetCodingPlanUsage"
+                    : "GetAFPUsage"
+              )
         else {
             throw UsageProviderError.invalidCredential
         }
@@ -106,8 +111,9 @@ struct VolcenginePlanUsageProvider: UsageProvider {
                 )
             }
             guard !metrics.isEmpty else { throw UsageProviderError.invalidResponse }
+            let configuredPlan = credential.metadata["planType"] == "coding" ? "Coding Plan" : "Agent Plan"
             return UsageSnapshot(
-                planName: result.planType.map { "\($0) Plan" } ?? "Agent Plan",
+                planName: result.planType.map { "\($0) Plan" } ?? configuredPlan,
                 kind: .periodic,
                 fiveHour: nil,
                 weekly: nil,
@@ -123,5 +129,9 @@ struct VolcenginePlanUsageProvider: UsageProvider {
         } catch {
             throw UsageProviderError.invalidResponse
         }
+    }
+
+    private static func makeURL(endpoint: URL, action: String) -> URL? {
+        URL(string: endpoint.absoluteString + "?Action=\(action)&Version=2024-01-01")
     }
 }

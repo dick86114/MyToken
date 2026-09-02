@@ -52,4 +52,28 @@ final class VolcenginePlanUsageProviderTests: XCTestCase {
             XCTAssertEqual(error as? UsageProviderError, .invalidCredential)
         }
     }
+
+    func testCodingPlan凭证使用CodingPlanAction() async throws {
+        let stub = URLProtocolStub.makeSession { request in
+            XCTAssertTrue(request.url?.absoluteString.contains("Action=GetCodingPlanUsage") == true)
+            let response = try XCTUnwrap(HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let body = #"{"Result":{"PlanType":"Coding","AFPFiveHour":{"Quota":"100","Used":"10"}}}"#
+            return (response, Data(body.utf8))
+        }
+        let provider = VolcenginePlanUsageProvider(session: stub.session, endpoint: URL(string: "https://ark.test/")!)
+        let credential = ProviderCredential(
+            providerID: .volcengine,
+            kind: .accessKeyPair,
+            secret: "secret-key",
+            metadata: ["accessKeyID": "access-key", "region": "cn-beijing", "planType": "coding"]
+        )
+
+        let fetched = try await provider.fetchUsage(credential, now: Date(timeIntervalSince1970: 1_700_000_000))
+        XCTAssertEqual(fetched?.planName, "Coding Plan")
+    }
 }

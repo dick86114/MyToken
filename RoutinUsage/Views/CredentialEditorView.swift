@@ -16,7 +16,8 @@ enum CredentialEditorValidation {
         accessKeyID: String,
         secretAccessKey: String,
         region: String,
-        balanceWarningThreshold: String
+        balanceWarningThreshold: String,
+        planType: String = "agent"
     ) throws -> ValidatedCredentialInput {
         let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedName.isEmpty else { throw UsageStoreError.invalidName }
@@ -32,7 +33,7 @@ enum CredentialEditorValidation {
                 credentialKind: .bearerAPIKey,
                 name: normalizedName,
                 secret: apiKey,
-                metadata: [:]
+                metadata: ["planType": planType]
             )
         case .deepseek, .glm:
             let secret = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -87,6 +88,7 @@ struct CredentialEditorView: View {
     @State private var secretAccessKey: String
     @State private var region: String
     @State private var balanceWarningThreshold: String
+    @State private var planType: String
     @State private var isSaving = false
     @State private var errorMessage: String?
 
@@ -113,6 +115,7 @@ struct CredentialEditorView: View {
         _secretAccessKey = State(initialValue: initialProviderID == .volcengine ? initialSecret : "")
         _region = State(initialValue: initialMetadata["region"] ?? "cn-beijing")
         _balanceWarningThreshold = State(initialValue: initialMetadata["balanceWarningThreshold"] ?? "")
+        _planType = State(initialValue: initialMetadata["planType"] ?? "agent")
     }
 
     var body: some View {
@@ -128,6 +131,10 @@ struct CredentialEditorView: View {
                 TextField("名称", text: $name)
 
                 if providerID == .volcengine {
+                    Picker("计划类型", selection: $planType) {
+                        Text("Agent Plan").tag("agent")
+                        Text("Coding Plan").tag("coding")
+                    }
                     TextField("AccessKey ID", text: $accessKeyID)
                     SecureField("SecretAccessKey", text: $secretAccessKey)
                     TextField("区域", text: $region)
@@ -177,7 +184,8 @@ struct CredentialEditorView: View {
                 accessKeyID: accessKeyID,
                 secretAccessKey: secretAccessKey,
                 region: region,
-                balanceWarningThreshold: balanceWarningThreshold
+                balanceWarningThreshold: balanceWarningThreshold,
+                planType: planType
             )
             isSaving = true
             errorMessage = nil
