@@ -84,7 +84,7 @@ CredentialConfiguration
   secretReference: String
 ```
 
-`metadata` 只保存展示和请求所需的非秘密配置，例如区域、计划类型提示、币种和余额预警值。所有秘密材料只通过 `secretReference` 访问 Keychain。
+`metadata` 只保存展示和请求所需的非秘密配置，例如区域、计划类型提示、币种和余额预警值。首期秘密材料继续通过应用本地存储访问，不调用系统钥匙串。
 
 推荐凭证类型：
 
@@ -202,7 +202,7 @@ UsageMetric
 → 选择凭证类型
 → 输入显示名称和秘密字段
 → 适配器验证
-→ 验证成功后写入 Keychain 和元数据
+→ 验证成功后写入应用本地存储和元数据
 → 保存首个快照
 ```
 
@@ -271,12 +271,12 @@ UsageMetric
 
 ## 8. 安全与数据迁移
 
-当前 `LocalKeyStore` 实际使用 `UserDefaults` 保存明文密钥。通用化改造必须同时完成 Keychain 迁移：
+当前 `LocalKeyStore` 使用 `UserDefaults` 保存本地凭证。由于上一轮实现曾短暂写入 Keychain，升级时提供一次性回迁：
 
-1. 启动时读取旧 `planKey.<UUID>`。
-2. 写入 Keychain，成功后删除旧 `UserDefaults` 秘密字段。
-3. 迁移失败时保留旧值并显示可恢复错误，不破坏现有 Routin 使用。
-4. 新增供应商从第一天起只使用 Keychain。
+1. 启动时读取旧 `planKey.<UUID>` 和遗留 Keychain 项。
+2. 遗留 Keychain 项复制回 `UserDefaults` 本地存储，成功后删除对应 Keychain 项。
+3. 迁移完成后写入一次性标记，后续启动不再访问 Keychain。
+4. 回迁失败时保留原值并在下一次启动重试，不破坏现有 Routin 使用。
 
 配置迁移：
 
@@ -319,7 +319,7 @@ staleData
 
 ### 存储与迁移
 
-- UserDefaults 到 Keychain 的迁移成功、重复启动和失败回滚。
+- 遗留 Keychain 到 UserDefaults 的一次性回迁、重复启动和失败重试。
 - 旧配置、旧缓存、旧 selectedKeyID 的兼容读取。
 - 删除凭证时只删除自己的秘密和缓存。
 

@@ -89,6 +89,7 @@ struct CredentialEditorView: View {
     @State private var region: String
     @State private var balanceWarningThreshold: String
     @State private var planType: String
+    @State private var isSecretVisible = false
     @State private var isSaving = false
     @State private var errorMessage: String?
 
@@ -136,10 +137,38 @@ struct CredentialEditorView: View {
                         Text("Coding Plan").tag("coding")
                     }
                     TextField("AccessKey ID", text: $accessKeyID)
-                    SecureField("SecretAccessKey", text: $secretAccessKey)
+                    HStack(spacing: 8) {
+                        if isSecretVisible {
+                            TextField("SecretAccessKey", text: $secretAccessKey)
+                        } else {
+                            SecureField("SecretAccessKey", text: $secretAccessKey)
+                        }
+                        Button {
+                            isSecretVisible.toggle()
+                        } label: {
+                            Image(systemName: isSecretVisible ? "eye.slash" : "eye")
+                        }
+                        .buttonStyle(.borderless)
+                        .help(isSecretVisible ? "隐藏 SecretAccessKey" : "显示 SecretAccessKey")
+                        .accessibilityLabel(isSecretVisible ? "隐藏 SecretAccessKey" : "显示 SecretAccessKey")
+                    }
                     TextField("区域", text: $region)
                 } else {
-                    SecureField(providerID == .routin ? "plan-…" : "API Key", text: $apiKey)
+                    HStack(spacing: 8) {
+                        if isSecretVisible {
+                            TextField(providerID == .routin ? "plan-…" : "API Key", text: $apiKey)
+                        } else {
+                            SecureField(providerID == .routin ? "plan-…" : "API Key", text: $apiKey)
+                        }
+                        Button {
+                            isSecretVisible.toggle()
+                        } label: {
+                            Image(systemName: isSecretVisible ? "eye.slash" : "eye")
+                        }
+                        .buttonStyle(.borderless)
+                        .help(isSecretVisible ? "隐藏凭证" : "显示凭证")
+                        .accessibilityLabel(isSecretVisible ? "隐藏凭证" : "显示凭证")
+                    }
                     if providerID == .deepseek {
                         TextField("低余额预警值（可选）", text: $balanceWarningThreshold)
                     }

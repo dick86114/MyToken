@@ -28,6 +28,17 @@ final class KeychainMigrationTests: XCTestCase {
         XCTAssertEqual(try? old.read(for: id), "plan-secret-1234")
         XCTAssertNil(try? new.read(for: id))
     }
+
+    func test回迁到App存储成功后删除旧Keychain值() throws {
+        let id = UUID()
+        let keychain = TestSecretStore(values: [id: "sk-existing"])
+        let app = TestSecretStore()
+
+        try KeychainMigration.restore(ids: [id], from: keychain, to: app)
+
+        XCTAssertEqual(try app.read(for: id), "sk-existing")
+        XCTAssertNil(try keychain.read(for: id))
+    }
 }
 
 private final class TestSecretStore: LocalKeyStoring, @unchecked Sendable {

@@ -121,4 +121,20 @@ enum KeychainMigration {
             try oldStore.delete(for: id)
         }
     }
+
+    static func restore(
+        ids: [UUID],
+        from keychainStore: any LocalKeyStoring,
+        to appStore: any LocalKeyStoring
+    ) throws {
+        for id in ids {
+            guard try appStore.read(for: id) == nil,
+                  let secret = try keychainStore.read(for: id)
+            else {
+                continue
+            }
+            try appStore.save(secret, for: id)
+            try keychainStore.delete(for: id)
+        }
+    }
 }

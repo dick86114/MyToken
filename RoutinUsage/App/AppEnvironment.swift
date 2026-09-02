@@ -135,14 +135,22 @@ final class AppEnvironment {
         let settings = AppSettings(defaults: defaults)
         let legacyStore = LocalKeyStore(defaults: defaults)
         let legacyRepository = KeyRepository(defaults: defaults, localStore: legacyStore)
-        let keychainStore = KeychainSecretStore()
-        try? KeychainMigration.migrate(
-            ids: legacyRepository.list().map(\.id),
-            from: legacyStore,
-            to: keychainStore
-        )
-        let localStore: any LocalKeyStoring = keychainStore
-        let keyRepository = KeyRepository(defaults: defaults, localStore: localStore)
+        if !defaults.bool(forKey: "didRestoreLegacyKeychainCredentials") {
+            let keychainStore = KeychainSecretStore()
+            // 兼容上一轮测试版本：仅回迁已存在的 Keychain 项，之后不再访问 Keychain。
+            do {
+                try KeychainMigration.restore(
+                    ids: legacyRepository.list().map(\.id),
+                    from: keychainStore,
+                    to: legacyStore
+                )
+                defaults.set(true, forKey: "didRestoreLegacyKeychainCredentials")
+            } catch {
+                // 回迁失败时不标记完成，下一次启动继续尝试。
+            }
+        }
+        let localStore: any LocalKeyStoring = legacyStore
+        let keyRepository = legacyRepository
         let cache = UsageCache(defaults: defaults)
         let apiClient = UsageAPIClient(session: .shared, mapper: UsageMapper())
         let alertEvaluator = AlertEvaluator(defaults: defaults)

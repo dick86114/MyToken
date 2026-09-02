@@ -79,7 +79,7 @@ struct SettingsView: View {
         var title: String {
             switch self {
             case .accounts:
-                return "账户"
+                return "供应商与凭证"
             case .display:
                 return "显示与刷新"
             case .system:
@@ -133,6 +133,7 @@ struct SettingsView: View {
     @State private var highThreshold: Int
     @State private var thresholdError: String?
     @State private var operationError: String?
+    @State private var revealedConfiguration: KeyConfiguration?
 
     init(
         store: UsageStore,
@@ -246,6 +247,16 @@ struct SettingsView: View {
         } message: {
             Text(operationError ?? "发生未知错误")
         }
+        .sheet(item: $revealedConfiguration) { configuration in
+            if let secret = readKey(configuration.id) {
+                CredentialRevealView(
+                    title: "显示 \(configuration.displayName) 的凭证",
+                    secret: secret
+                )
+            } else {
+                ContentUnavailableView("无法读取凭证", systemImage: "key.slash")
+            }
+        }
     }
 }
 
@@ -266,9 +277,9 @@ private extension SettingsView {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("账户")
+                    Text("供应商与凭证")
                         .font(.title2.weight(.semibold))
-                    Text("拖动列表可调整顺序；菜单栏最多显示 4 个凭证")
+                    Text("按供应商管理独立凭证；菜单栏可选择 1～4 个指标")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -296,10 +307,10 @@ private extension SettingsView {
                 ContentUnavailableView(
                     "尚未配置 Key",
                     systemImage: "key.slash",
-                    description: Text("添加 plan Key 后即可查看订阅用量")
+                    description: Text("添加供应商凭证后即可查看用量")
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .accessibilityLabel("尚未配置 Key，请添加 plan Key")
+                .accessibilityLabel("尚未配置供应商凭证，请点击添加")
             } else {
                 List {
                     ForEach(settingsProviderGroups, id: \.id) { group in
@@ -341,12 +352,12 @@ private extension SettingsView {
                         .foregroundStyle(.secondary)
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("\(configuration.displayName)，\(KeyDisplayMask.masked(suffix: configuration.keySuffix))")
+                .accessibilityLabel("\(configuration.displayName)，\(configuration.providerID == .routin ? KeyDisplayMask.masked(suffix: configuration.keySuffix) : (ProviderRegistry.builtInDescriptors.first(where: { $0.id == configuration.providerID })?.displayName ?? configuration.providerID.rawValue))")
 
                 Spacer()
 
                 Toggle(
-                    "在菜单栏显示",
+                    "启用凭证",
                     isOn: Binding(
                         get: { configuration.isEnabled },
                         set: { setEnabled(configuration, enabled: $0) }
@@ -364,10 +375,18 @@ private extension SettingsView {
                         set: { setMenuBarSelection(configuration.id, selected: $0) }
                     )
                 )
-                .labelsHidden()
                 .controlSize(.small)
                 .help(settings.selectedCredentialIDs.contains(configuration.id) ? "从菜单栏指标中移除" : "添加到菜单栏指标（最多 4 个）")
                 .accessibilityLabel(settings.selectedCredentialIDs.contains(configuration.id) ? "移除菜单栏指标" : "添加菜单栏指标")
+
+                Button {
+                    revealedConfiguration = configuration
+                } label: {
+                    Image(systemName: "eye")
+                }
+                .buttonStyle(.borderless)
+                .help("显示并复制凭证")
+                .accessibilityLabel("显示并复制 \(configuration.displayName) 的凭证")
 
                 Button {
                     editor = .edit(configuration)

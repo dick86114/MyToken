@@ -17,7 +17,7 @@
 - 同一供应商下的多个凭证完全独立，不跨凭证求和。
 - 菜单栏最多选择并显示 4 个凭证的指标单元，默认最多 2 个。
 - 没有明确上限的余额不得伪装成百分比用量。
-- 新增供应商从第一天起只使用 Keychain；旧 Routin 明文密钥必须迁移。
+- 所有供应商秘密材料使用应用本地存储；对上一轮测试版本遗留 Keychain 项仅做一次性回迁。
 - 所有请求日志不得包含密钥、Authorization、原始响应和账户敏感字段。
 - 每个任务完成后运行针对性测试，并创建一个小提交。
 
@@ -27,7 +27,7 @@
 - Create `RoutinUsage/Providers/UsageProvider.swift`: 适配器协议、统一错误和注册表。
 - Create `RoutinUsage/Providers/*UsageProvider.swift`: 各供应商适配器。
 - Modify `RoutinUsage/Models/KeyConfiguration.swift`: 演进为通用凭证配置并保留解码迁移。
-- Modify `RoutinUsage/Security/LocalKeyStore.swift`: 增加 Keychain 实现和旧值迁移。
+- Modify `RoutinUsage/Security/LocalKeyStore.swift`: 保持应用本地存储，并提供遗留 Keychain 回迁工具。
 - Modify `RoutinUsage/Models/UsageSnapshot.swift`: 改为通用指标数组并兼容旧 Routin 缓存。
 - Modify `RoutinUsage/Usage/UsageStore.swift`: 依赖 ProviderRegistry，按凭证调度刷新和告警。
 - Modify `RoutinUsage/Persistence/UsageCache.swift`: 增加 schemaVersion 和 providerID。
@@ -55,14 +55,14 @@
 - [ ] **Step 1: Write failing tests**
   - 验证四个首期供应商 descriptor 的 ID、简称、凭证类型和能力集合。
   - 验证凭证配置编码/解码保留 UUID、供应商、名称、排序、启用状态。
-  - 验证旧 `planKey.<UUID>` 可迁移到 Keychain，并在成功后删除旧 UserDefaults 值。
+  - 验证遗留 Keychain 项可回迁到 UserDefaults，并在成功后删除旧 Keychain 值。
   - 验证迁移失败时旧值仍保留。
 - [ ] **Step 2: Run tests to verify failure**
   - Run: `xcodegen generate && xcodebuild test -project RoutinUsage.xcodeproj -scheme RoutinUsage -only-testing:RoutinUsageTests/ProviderModelsTests -only-testing:RoutinUsageTests/KeychainMigrationTests`
   - Expected: 新测试因类型和迁移入口不存在而失败。
-- [ ] **Step 3: Implement minimal models and Keychain store**
+- [ ] **Step 3: Implement minimal models and local credential store**
   - 使用 `Security.SecItemAdd/SecItemCopyMatching/SecItemUpdate/SecItemDelete`。
-  - Keychain service 固定为 `ai.routin.usage-monitor.credentials`，account 使用凭证 UUID。
+  - 本地凭证键使用 `planKey.<UUID>` 兼容格式；仅迁移遗留 Keychain 项时使用原 service。
   - 旧 `KeyConfiguration` 解码时默认 `providerID = routin`、`credentialKind = bearerAPIKey`。
 - [ ] **Step 4: Run focused tests**
   - Expected: ProviderModelsTests 和 KeychainMigrationTests 全部通过。
@@ -236,7 +236,7 @@
   - Run: `xcodegen generate && xcodebuild test -project RoutinUsage.xcodeproj -scheme RoutinUsage -only-testing:RoutinUsageTests/CredentialEditorValidationTests -only-testing:RoutinUsageTests/SettingsProviderGroupingTests`
 - [ ] **Step 3: Implement grouped settings model**
   - 以 providerID 分组，sortOrder 在供应商内部计算。
-  - 编辑表单先 validate，再写 Keychain 和配置。
+  - 编辑表单先 validate，再写应用本地存储和配置。
 - [ ] **Step 4: Preserve Routin-only controls**
   - 仅 Routin 凭证显示签到和 Codex 分组检测入口。
 - [ ] **Step 5: Run tests and commit**
@@ -311,7 +311,7 @@
 - Test: `RoutinUsageTests/RefreshSchedulerTests.swift`
 
 **Interfaces:**
-- `AppEnvironment.live()` 创建 descriptors、providers、registry、Keychain store 和迁移器。
+- `AppEnvironment.live()` 创建 descriptors、providers、registry、本地凭证存储和一次性遗留迁移器。
 - `AlertEvaluator` 接受 progress 百分比、balance 金额和 status 三种阈值输入。
 
 - [ ] **Step 1: Write failing integration tests**
@@ -340,7 +340,7 @@
 - [ ] **Step 1: Add migration regression tests**
   - 覆盖旧 Routin 配置、旧快照、旧 selectedKeyID、旧明文 key 和重复启动。
 - [ ] **Step 2: Update user documentation**
-  - 说明供应商分组、1～4 个菜单栏选择、DeepSeek 余额语义、Keychain 存储和失败降级。
+  - 说明供应商分组、1～4 个菜单栏选择、DeepSeek 余额语义、本地凭证存储和失败降级。
   - 移除“只支持 plan Key”的表述，保留 Routin 专属能力说明。
 - [ ] **Step 3: Verify project resources**
   - 在 `project.yml` 测试资源同步脚本中加入新 Swift 文件和 fixture 目录。
