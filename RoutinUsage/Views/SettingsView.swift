@@ -40,6 +40,8 @@ private struct KeyRowDropDelegate: DropDelegate {
 @MainActor
 struct SettingsView: View {
     typealias UpdateValidatedKey = @MainActor (UUID, String, String) async throws -> KeyEditorSaveResult
+    typealias AddValidatedCredential = @MainActor (ValidatedCredentialInput) async throws -> KeyEditorSaveResult
+    typealias UpdateValidatedCredential = @MainActor (UUID, ValidatedCredentialInput) async throws -> KeyEditorSaveResult
     typealias MoveKey = @MainActor (IndexSet, Int) -> Void
     typealias SetKeyEnabled = @MainActor (UUID, Bool) throws -> Void
     typealias CheckForUpdates = @MainActor () async -> Void
@@ -102,6 +104,8 @@ struct SettingsView: View {
 
     private let loginItemManager: any LoginItemManaging
     private let updateValidatedKey: UpdateValidatedKey
+    private let addValidatedCredential: AddValidatedCredential
+    private let updateValidatedCredential: UpdateValidatedCredential
     private let moveKey: MoveKey
     private let setKeyEnabled: SetKeyEnabled
     private let updateStatus: AppUpdateStatus
@@ -135,6 +139,8 @@ struct SettingsView: View {
         settings: AppSettings,
         loginItemManager: any LoginItemManaging,
         updateValidatedKey: @escaping UpdateValidatedKey,
+        addValidatedCredential: @escaping AddValidatedCredential = { _ in .saved },
+        updateValidatedCredential: @escaping UpdateValidatedCredential = { _, _ in .saved },
         moveKey: @escaping MoveKey,
         setKeyEnabled: @escaping SetKeyEnabled = { _, _ in },
         updateStatus: AppUpdateStatus = .idle,
@@ -154,6 +160,8 @@ struct SettingsView: View {
         self.settings = settings
         self.loginItemManager = loginItemManager
         self.updateValidatedKey = updateValidatedKey
+        self.addValidatedCredential = addValidatedCredential
+        self.updateValidatedCredential = updateValidatedCredential
         self.moveKey = moveKey
         self.setKeyEnabled = setKeyEnabled
         self.updateStatus = updateStatus
@@ -852,14 +860,16 @@ private extension SettingsView {
     private func editorView(for presentation: EditorPresentation) -> some View {
         switch presentation {
         case .add:
-            KeyEditorView(save: addKey)
+            CredentialEditorView(save: addValidatedCredential)
         case let .edit(configuration):
-            KeyEditorView(
+            CredentialEditorView(
                 title: "编辑 Key",
+                initialProviderID: configuration.providerID,
                 initialName: configuration.displayName,
-                initialSecret: readKey(configuration.id) ?? ""
-            ) { name, secret in
-                try await updateValidatedKey(configuration.id, name, secret)
+                initialSecret: readKey(configuration.id) ?? "",
+                initialMetadata: configuration.metadata
+            ) { input in
+                try await updateValidatedCredential(configuration.id, input)
             }
         }
     }

@@ -47,6 +47,8 @@ struct RoutinUsageApp: App {
                         secret: secret
                     )
                 },
+                addValidatedCredential: environment.addValidatedCredential,
+                updateValidatedCredential: environment.updateValidatedCredential,
                 moveKey: environment.moveKey(fromOffsets:toOffset:),
                 setKeyEnabled: environment.setKeyEnabled(_:enabled:),
                 updateStatus: environment.updateStatus,

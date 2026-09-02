@@ -61,6 +61,7 @@ final class AppEnvironment {
     let loginItemManager: any LoginItemManaging
     let routinCheckIn: RoutinCheckInService
     let codexGroupDetection: CodexGroupDetectionService
+    let providerRegistry: ProviderRegistry?
     let routinWebSession: RoutinWebSession?
     var showsOnboarding = false
     private(set) var updateStatus: AppUpdateStatus = .idle
@@ -100,7 +101,8 @@ final class AppEnvironment {
         logWriter: any AppLogWriting = NoopAppLogWriter(),
         routinCheckIn: RoutinCheckInService? = nil,
         codexGroupDetection: CodexGroupDetectionService? = nil,
-        routinWebSession: RoutinWebSession? = nil
+        routinWebSession: RoutinWebSession? = nil,
+        providerRegistry: ProviderRegistry? = nil
     ) {
         self.settings = settings
         self.store = store
@@ -117,6 +119,7 @@ final class AppEnvironment {
             ?? UpdateCheckScheduler(interval: 3_600)
         self.notificationTaskYield = notificationTaskYield
         self.routinWebSession = routinWebSession
+        self.providerRegistry = providerRegistry
         self.routinCheckIn = routinCheckIn ?? RoutinCheckInService(session: UnavailableRoutinWebSession())
         self.codexGroupDetection = codexGroupDetection ?? CodexGroupDetectionService(
             webSession: UnavailableRoutinGroupDetectionWebSession(),
@@ -194,6 +197,7 @@ final class AppEnvironment {
             routinCheckIn: routinCheckIn,
             codexGroupDetection: codexGroupDetection,
             routinWebSession: routinWebSession
+            ,providerRegistry: providerRegistry
         )
     }
 
@@ -396,6 +400,59 @@ final class AppEnvironment {
             }
         } catch {
             throw UsageStoreError.persistence
+        }
+        await store.applyValidatedSnapshot(snapshot, for: id, validatedAt: validationTime)
+        return snapshot == nil ? .savedWithoutSubscription : .saved
+    }
+
+    func addValidatedCredential(_ input: ValidatedCredentialInput) async throws -> KeyEditorSaveResult {
+        guard let provider = providerRegistry?.provider(for: input.providerID) else {
+            throw UsageStoreError.invalidResponse
+        }
+        let validationTime = Date()
+        let credential = ProviderCredential(
+            providerID: input.providerID,
+            kind: input.credentialKind,
+            secret: input.secret,
+            metadata: input.metadata
+        )
+        let snapshot = try await provider.validate(credential, now: validationTime)
+        let configuration = try keyRepository.add(
+            name: input.name,
+            secret: input.secret,
+            providerID: input.providerID,
+            credentialKind: input.credentialKind,
+            metadata: input.metadata
+        )
+        store.reloadConfigurations()
+        await store.applyValidatedSnapshot(snapshot, for: configuration.id, validatedAt: validationTime)
+        return snapshot == nil ? .savedWithoutSubscription : .saved
+    }
+
+    func updateValidatedCredential(id: UUID, input: ValidatedCredentialInput) async throws -> KeyEditorSaveResult {
+        guard let provider = providerRegistry?.provider(for: input.providerID) else {
+            throw UsageStoreError.invalidResponse
+        }
+        let validationTime = Date()
+        let credential = ProviderCredential(
+            credentialID: id,
+            providerID: input.providerID,
+            kind: input.credentialKind,
+            secret: input.secret,
+            metadata: input.metadata
+        )
+        let snapshot = try await provider.validate(credential, now: validationTime)
+        let previousSecret = try keyRepository.read(id: id)
+        _ = try keyRepository.update(
+            id: id,
+            name: input.name,
+            secret: input.secret,
+            providerID: input.providerID,
+            credentialKind: input.credentialKind,
+            metadata: input.metadata
+        )
+        if input.providerID == .routin, previousSecret != input.secret {
+            codexGroupDetection.clearRecord(for: id)
         }
         await store.applyValidatedSnapshot(snapshot, for: id, validatedAt: validationTime)
         return snapshot == nil ? .savedWithoutSubscription : .saved
