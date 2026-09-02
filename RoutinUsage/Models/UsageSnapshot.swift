@@ -21,6 +21,61 @@ enum DisplayDimension: String, Codable, Equatable, Sendable {
     case weekly
 }
 
+enum NormalizedUsageMetricPresentation: String, Codable, Equatable, Sendable {
+    case progress
+    case balance
+    case status
+    case value
+}
+
+enum UsageMetricUnit: String, Codable, Equatable, Sendable {
+    case token
+    case currency
+    case request
+    case boolean
+    case text
+}
+
+struct NormalizedUsageMetric: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let label: String
+    let used: Decimal?
+    let limit: Decimal?
+    let remaining: Decimal?
+    let value: Decimal?
+    let unit: UsageMetricUnit
+    let windowStart: Date?
+    let windowEnd: Date?
+    let presentation: NormalizedUsageMetricPresentation
+    let currencyCode: String?
+
+    init(
+        id: String,
+        label: String,
+        used: Decimal? = nil,
+        limit: Decimal? = nil,
+        remaining: Decimal? = nil,
+        value: Decimal? = nil,
+        unit: UsageMetricUnit,
+        windowStart: Date? = nil,
+        windowEnd: Date? = nil,
+        presentation: NormalizedUsageMetricPresentation,
+        currencyCode: String? = nil
+    ) {
+        self.id = id
+        self.label = label
+        self.used = used
+        self.limit = limit
+        self.remaining = remaining
+        self.value = value
+        self.unit = unit
+        self.windowStart = windowStart
+        self.windowEnd = windowEnd
+        self.presentation = presentation
+        self.currencyCode = currencyCode
+    }
+}
+
 struct UsageMetric: Codable, Equatable, Sendable {
     let used: Decimal
     let limit: Decimal
@@ -36,6 +91,8 @@ struct UsageGroupMultiplier: Codable, Equatable, Sendable {
 }
 
 struct UsageSnapshot: Codable, Equatable, Sendable {
+    let providerID: ProviderID?
+    let credentialID: UUID?
     let subscriptionId: String?
     let planId: String?
     let planName: String
@@ -52,6 +109,53 @@ struct UsageSnapshot: Codable, Equatable, Sendable {
     let status: Int?
     let subscriptionStartAt: Date?
     let subscriptionEndAt: Date?
+    let metrics: [NormalizedUsageMetric]
+
+    var normalizedMetrics: [NormalizedUsageMetric] {
+        if !metrics.isEmpty {
+            return metrics
+        }
+
+        var result: [NormalizedUsageMetric] = []
+        if let fiveHour {
+            result.append(NormalizedUsageMetric(
+                id: "fiveHour",
+                label: "5 小时",
+                used: fiveHour.used,
+                limit: fiveHour.limit,
+                remaining: fiveHour.remaining,
+                unit: fiveHour.unit == .token ? .token : .currency,
+                windowEnd: fiveHour.windowEnd,
+                presentation: .progress,
+                currencyCode: fiveHour.unit == .usd ? "USD" : nil
+            ))
+        }
+        if let weekly {
+            result.append(NormalizedUsageMetric(
+                id: "weekly",
+                label: "周",
+                used: weekly.used,
+                limit: weekly.limit,
+                remaining: weekly.remaining,
+                unit: weekly.unit == .token ? .token : .currency,
+                windowEnd: weekly.windowEnd,
+                presentation: .progress,
+                currencyCode: weekly.unit == .usd ? "USD" : nil
+            ))
+        }
+        if let token {
+            result.append(NormalizedUsageMetric(
+                id: "token",
+                label: "Token",
+                used: token.used,
+                limit: token.limit,
+                remaining: token.remaining,
+                unit: .token,
+                presentation: .progress
+            ))
+        }
+        return result
+    }
 
     init(
         planName: String,
@@ -67,8 +171,13 @@ struct UsageSnapshot: Codable, Equatable, Sendable {
         groupMultipliers: [UsageGroupMultiplier] = [],
         status: Int? = nil,
         subscriptionStartAt: Date? = nil,
-        subscriptionEndAt: Date? = nil
+        subscriptionEndAt: Date? = nil,
+        providerID: ProviderID? = nil,
+        credentialID: UUID? = nil,
+        metrics: [NormalizedUsageMetric] = []
     ) {
+        self.providerID = providerID
+        self.credentialID = credentialID
         self.subscriptionId = subscriptionId
         self.planId = planId
         self.planName = planName
@@ -83,9 +192,12 @@ struct UsageSnapshot: Codable, Equatable, Sendable {
         self.status = status
         self.subscriptionStartAt = subscriptionStartAt
         self.subscriptionEndAt = subscriptionEndAt
+        self.metrics = metrics
     }
 
     private enum CodingKeys: String, CodingKey {
+        case providerID
+        case credentialID
         case planName
         case subscriptionId
         case planId
@@ -100,10 +212,13 @@ struct UsageSnapshot: Codable, Equatable, Sendable {
         case status
         case subscriptionStartAt
         case subscriptionEndAt
+        case metrics
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        providerID = try container.decodeIfPresent(ProviderID.self, forKey: .providerID)
+        credentialID = try container.decodeIfPresent(UUID.self, forKey: .credentialID)
         planName = try container.decode(String.self, forKey: .planName)
         subscriptionId = try container.decodeIfPresent(String.self, forKey: .subscriptionId)
         planId = try container.decodeIfPresent(String.self, forKey: .planId)
@@ -118,5 +233,6 @@ struct UsageSnapshot: Codable, Equatable, Sendable {
         status = try container.decodeIfPresent(Int.self, forKey: .status)
         subscriptionStartAt = try container.decodeIfPresent(Date.self, forKey: .subscriptionStartAt)
         subscriptionEndAt = try container.decodeIfPresent(Date.self, forKey: .subscriptionEndAt)
+        metrics = try container.decodeIfPresent([NormalizedUsageMetric].self, forKey: .metrics) ?? []
     }
 }

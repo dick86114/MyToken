@@ -110,6 +110,21 @@ final class UsageCacheTests: XCTestCase {
         XCTAssertNil(snapshot.subscriptionEndAt)
     }
 
+    func test保存新缓存时写入版本化容器() throws {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let keyID = UUID()
+
+        try context.cache.save(makeSnapshot(planName: "新缓存", fetchedAt: Date()), for: keyID)
+
+        let persistedData = try XCTUnwrap(context.defaults.data(forKey: "usageSnapshots"))
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: persistedData) as? [String: Any]
+        )
+        XCTAssertEqual(object["schemaVersion"] as? Int, UsageCache.currentSchemaVersion)
+        XCTAssertNotNil(object["snapshots"])
+    }
+
     private func makeContext() -> UsageCacheTestContext {
         let suiteName = "ai.routin.usage-monitor.cache-tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

@@ -7,6 +7,7 @@ protocol UsageCaching: Sendable {
 }
 
 final class UsageCache: UsageCaching, @unchecked Sendable {
+    static let currentSchemaVersion = 2
     private let defaults: UserDefaults
     private let storageKey: String
 
@@ -22,7 +23,11 @@ final class UsageCache: UsageCaching, @unchecked Sendable {
     func save(_ snapshot: UsageSnapshot, for keyID: UUID) throws {
         var values = try snapshots()
         values[keyID] = snapshot
-        defaults.set(try JSONEncoder().encode(values), forKey: storageKey)
+        let envelope = UsageCacheEnvelope(
+            schemaVersion: Self.currentSchemaVersion,
+            snapshots: values
+        )
+        defaults.set(try JSONEncoder().encode(envelope), forKey: storageKey)
     }
 
     func delete(for keyID: UUID) throws {
@@ -40,12 +45,21 @@ final class UsageCache: UsageCaching, @unchecked Sendable {
             return [:]
         }
         do {
+            if let envelope = try? JSONDecoder().decode(UsageCacheEnvelope.self, from: data) {
+                return envelope.snapshots
+            }
+            // 兼容 v1 直接保存字典的缓存格式。
             return try JSONDecoder().decode([UUID: UsageSnapshot].self, from: data)
         } catch {
             defaults.removeObject(forKey: storageKey)
             return [:]
         }
     }
+}
+
+private struct UsageCacheEnvelope: Codable {
+    let schemaVersion: Int
+    let snapshots: [UUID: UsageSnapshot]
 }
 
 enum UsageFreshness {
