@@ -12,20 +12,14 @@ struct MenuBarIndicatorModel: Equatable, Sendable {
         dimension: DisplayDimension
     ) -> Self {
         if let metric = state.snapshot?.metrics.first(where: { $0.presentation == .progress }),
-           let used = metric.used,
-           let limit = metric.limit,
-           limit > 0 {
-            let percent = NSDecimalNumber(decimal: used)
-                .dividing(by: NSDecimalNumber(decimal: limit))
-                .multiplying(by: 100)
-                .doubleValue
+           let percent = metric.displayedPercent {
             return Self(
                 shortCode: descriptor.shortCode,
                 percent: percent,
                 healthState: metric.healthState == .unknown
                     ? MenuBarUsageRisk.healthState(for: percent)
                     : metric.healthState,
-                accessibilityLabel: "\(descriptor.displayName)，\(state.configuration.displayName)，已使用 \(Int(percent.rounded()))%"
+                accessibilityLabel: "\(descriptor.displayName)，\(state.configuration.displayName)，\(metric.displaysRemainingPercent ? "剩余" : "已使用") \(Int(percent.rounded()))%"
             )
         }
 

@@ -117,11 +117,16 @@ struct GLMUsageProvider: UsageProvider {
                   let percentage = object["percentage"]?.numberValue()
             else { return nil }
             let type = object["type"]?.stringValue() ?? "quota"
+            let unit = object["unit"]?.stringValue()?.lowercased() ?? ""
+            let number = object["number"]?.numberValue().map { NSDecimalNumber(decimal: $0).intValue }
             let label: String
             if type == "TOKENS_LIMIT" {
-                label = "Token 配额（5 小时）"
+                let isWeekly = unit.contains("week") || unit.contains("weekly") || number == 7 || number == 6
+                label = isWeekly ? "Token 剩余额度（每周）" : "Token 剩余额度（5 小时）"
             } else if type == "TIME_LIMIT" {
-                label = "MCP 配额（1 个月）"
+                label = "MCP 剩余额度（1 个月）"
+            } else if type == "CREDIT_LIMIT" {
+                label = "工具调用剩余额度"
             } else {
                 label = type
             }
@@ -146,6 +151,21 @@ struct GLMUsageProvider: UsageProvider {
         let values: [GLMJSONValue]
         switch value {
         case let .object(object):
+            if let percentage = Self.nestedObject(object)?["percentage"]?.numberValue() {
+                let name = ["name", "type", "tool", "toolName", "model", "modelName"]
+                    .compactMap { Self.nestedObject(object)?[$0]?.stringValue() }
+                    .first ?? label
+                return [NormalizedUsageMetric(
+                    id: "\(prefix)-summary",
+                    label: "\(name) 剩余",
+                    used: percentage,
+                    limit: 100,
+                    remaining: 100 - percentage,
+                    unit: .request,
+                    presentation: .progress,
+                    healthState: percentage >= 80 ? .critical : (percentage >= 50 ? .warning : .normal)
+                )]
+            }
             if case let .object(data)? = object["data"], case let .array(items)? = data["items"] {
                 values = items
             } else if case let .array(items)? = object["data"] {
@@ -166,6 +186,20 @@ struct GLMUsageProvider: UsageProvider {
             let name = ["model", "modelName", "tool", "toolName", "name", "id"]
                 .compactMap { object[$0]?.stringValue() }
                 .first ?? "\(label) \(index + 1)"
+
+            if let percentage = object["percentage"]?.numberValue() {
+                return NormalizedUsageMetric(
+                    id: "\(prefix)-\(index)",
+                    label: "\(name) 剩余",
+                    used: percentage,
+                    limit: 100,
+                    remaining: 100 - percentage,
+                    unit: .request,
+                    presentation: .progress,
+                    healthState: percentage >= 80 ? .critical : (percentage >= 50 ? .warning : .normal)
+                )
+            }
+
             let amount = ["tokens", "tokenCount", "count", "usage", "value", "currentUsage"]
                 .compactMap { object[$0]?.numberValue() }
                 .first
@@ -179,6 +213,11 @@ struct GLMUsageProvider: UsageProvider {
                 healthState: .normal
             )
         }
+    }
+
+    private static func nestedObject(_ object: [String: GLMJSONValue]) -> [String: GLMJSONValue]? {
+        if case let .object(data)? = object["data"] { return data }
+        return object
     }
 
     private static func windowStart(from date: Date) -> Date {

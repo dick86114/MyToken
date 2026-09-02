@@ -647,11 +647,7 @@ private extension SettingsView {
     func normalizedUsageDetailItem(_ metric: NormalizedUsageMetric) -> some View {
         switch metric.presentation {
         case .progress:
-            let used = metric.used ?? 0
-            let limit = metric.limit ?? 0
-            let percent = limit > 0
-                ? NSDecimalNumber(decimal: used).dividing(by: NSDecimalNumber(decimal: limit)).doubleValue * 100
-                : 0
+            let percent = metric.displayedPercent ?? 0
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(metric.label).foregroundStyle(.tertiary)
@@ -702,11 +698,10 @@ private extension SettingsView {
         case .status:
             value = metric.healthState == .unavailable ? "不可用" : "可用"
         case .progress:
-            let used = metric.used ?? 0
-            let limit = metric.limit ?? 0
-            if limit > 0 {
-                let percent = NSDecimalNumber(decimal: used).dividing(by: NSDecimalNumber(decimal: limit)).multiplying(by: 100).intValue
-                value = "已使用 \(percent)%，剩余 \(decimalText(metric.remaining))"
+            if let percent = metric.displayedPercent {
+                value = metric.displaysRemainingPercent
+                    ? "剩余 \(Int(percent.rounded()))%"
+                    : "已使用 \(Int(percent.rounded()))%，剩余 \(decimalText(metric.remaining))"
             } else {
                 value = "—"
             }

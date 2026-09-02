@@ -55,4 +55,33 @@ final class GLMUsageProviderTests: XCTestCase {
             XCTAssertEqual(error as? UsageProviderError, .unauthorized)
         }
     }
+
+    func test配额百分比按官网语义显示剩余值() async throws {
+        let stub = URLProtocolStub.makeSession { request in
+            let path = request.url?.path ?? ""
+            let body = path.contains("quota/limit")
+                ? #"{"data":{"limits":[{"type":"TIME_LIMIT","percentage":26},{"type":"TOKENS_LIMIT","percentage":1,"unit":"week","number":7}]}}"#
+                : #"{"data":{"items":[]}}"#
+            let response = try XCTUnwrap(HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            return (response, Data(body.utf8))
+        }
+        let provider = GLMUsageProvider(session: stub.session, baseURL: URL(string: "https://glm.test")!)
+        let credential = ProviderCredential(providerID: .glm, kind: .apiKey, secret: "glm-token")
+
+        let fetched = try await provider.fetchUsage(credential, now: .now)
+        let snapshot = try XCTUnwrap(fetched)
+        let mcp = try XCTUnwrap(snapshot.metrics.first(where: { $0.label.contains("MCP") }))
+        let weekly = try XCTUnwrap(snapshot.metrics.first(where: { $0.label.contains("每周") }))
+
+        XCTAssertEqual(mcp.used, 26)
+        XCTAssertEqual(mcp.remaining, 74)
+        XCTAssertEqual(try XCTUnwrap(mcp.displayedPercent), 74, accuracy: 0.001)
+        XCTAssertTrue(mcp.label.contains("剩余额度"))
+        XCTAssertTrue(weekly.label.contains("每周"))
+    }
 }

@@ -75,6 +75,19 @@ struct NormalizedUsageMetric: Codable, Equatable, Sendable, Identifiable {
     let currencyCode: String?
     let healthState: UsageMetricHealthState
 
+    var displayedPercent: Double? {
+        guard let limit, limit > 0 else { return nil }
+        let amount = label.contains("剩余") ? (remaining ?? 0) : (used ?? 0)
+        return NSDecimalNumber(decimal: amount)
+            .dividing(by: NSDecimalNumber(decimal: limit))
+            .multiplying(by: 100)
+            .doubleValue
+    }
+
+    var displaysRemainingPercent: Bool {
+        label.contains("剩余")
+    }
+
     init(
         id: String,
         label: String,

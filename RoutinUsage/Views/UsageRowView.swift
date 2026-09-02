@@ -381,11 +381,7 @@ private extension UsageRowView {
     func normalizedMetricContent(_ metric: NormalizedUsageMetric, now: Date) -> some View {
         switch metric.presentation {
         case .progress:
-            let used = metric.used ?? 0
-            let limit = metric.limit ?? 0
-            let percent = limit > 0
-                ? NSDecimalNumber(decimal: used).dividing(by: NSDecimalNumber(decimal: limit)).doubleValue * 100
-                : 0
+            let percent = metric.displayedPercent ?? 0
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(metric.label)
@@ -590,12 +586,8 @@ private extension UsageRowView {
                 if metric.presentation == .balance {
                     return "余额 \(decimalText(metric.value)) \(metric.currencyCode ?? "")"
                 }
-                if let used = metric.used, let limit = metric.limit, limit > 0 {
-                    let percent = NSDecimalNumber(decimal: used)
-                        .dividing(by: NSDecimalNumber(decimal: limit))
-                        .multiplying(by: 100)
-                        .intValue
-                    return "\(metric.label) 已使用 \(percent)%"
+                if let percent = metric.displayedPercent {
+                    return "\(metric.label) \(metric.displaysRemainingPercent ? "剩余" : "已使用") \(Int(percent.rounded()))%"
                 }
                 return metric.label
             }.joined(separator: "，")
