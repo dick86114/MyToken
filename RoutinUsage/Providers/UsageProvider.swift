@@ -32,7 +32,7 @@ struct ProviderRegistry: Sendable {
             id: .routin,
             displayName: "Routin",
             shortCode: "ROU",
-            iconName: "routin",
+            iconName: "circle.hexagongrid",
             capabilities: [.quotaWindow, .tokenUsage, .resetTime, .planDetection],
             credentialSchemas: [
                 .bearerAPIKey: [CredentialField(id: "secret", label: "plan Key", isSecret: true)]
@@ -42,7 +42,7 @@ struct ProviderRegistry: Sendable {
             id: .deepseek,
             displayName: "DeepSeek",
             shortCode: "DS",
-            iconName: "deepseek",
+            iconName: "d.circle",
             capabilities: [.balance],
             credentialSchemas: [
                 .apiKey: [CredentialField(id: "secret", label: "API Key", isSecret: true)]
@@ -52,7 +52,7 @@ struct ProviderRegistry: Sendable {
             id: .glm,
             displayName: "GLM",
             shortCode: "GLM",
-            iconName: "glm",
+            iconName: "g.circle",
             capabilities: [.quotaWindow, .tokenUsage, .modelBreakdown, .toolBreakdown, .resetTime],
             credentialSchemas: [
                 .apiKey: [CredentialField(id: "secret", label: "API Key", isSecret: true)]
@@ -62,7 +62,7 @@ struct ProviderRegistry: Sendable {
             id: .volcengine,
             displayName: "火山方舟",
             shortCode: "VOL",
-            iconName: "volcengine",
+            iconName: "cloud",
             capabilities: [.quotaWindow, .tokenUsage, .resetTime, .planDetection],
             credentialSchemas: [
                 .accessKeyPair: [
