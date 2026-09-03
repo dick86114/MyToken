@@ -36,11 +36,15 @@ jobs:
           sed -i '' "s/MARKETING_VERSION: \"[^\"]*\"/MARKETING_VERSION: \"${{ inputs.version }}\"/" project.yml
       - name: 构建 DMG
         run: scripts/build-dmg.sh
+      - name: 生成旧版自动更新兼容副本
+        run: cp build/dist/MyToken.dmg build/dist/MyRoutin.dmg
       - name: 创建 GitHub Release 并上传 DMG
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ inputs.version }}
-          name: MyRoutin v${{ inputs.version }}
+          name: MyToken v${{ inputs.version }}
           body: ${{ inputs.release_notes }}
           generate_release_notes: false
-          files: build/dist/MyRoutin.dmg
+          files: |
+            build/dist/MyToken.dmg
+            build/dist/MyRoutin.dmg

@@ -1,6 +1,6 @@
-# MyRoutin
+# MyToken
 
-MyRoutin 是一个 macOS 菜单栏用量监控工具，用于在本地查看多个大模型供应商的用量、余额、剩余额度和重置时间。
+MyToken 是一个 macOS 菜单栏用量监控工具，用于在本地查看多个大模型供应商的用量、余额、剩余额度和重置时间。
 
 ## 功能
 
@@ -27,10 +27,10 @@ brew install xcodegen
 
 ## 安装使用
 
-1. 下载 `MyRoutin.dmg`，或从 GitHub Release 下载正式版本。
-2. 打开 DMG，将 `MyRoutin` 拖入“应用程序”文件夹。
+1. 下载 `MyToken.dmg`，或从 GitHub Release 下载正式版本。
+2. 打开 DMG，将 `MyToken` 拖入“应用程序”文件夹。
 3. 启动应用，在设置中选择供应商并手动添加 API Key 或 Access Key/SecretAccessKey。
-4. 点击菜单栏中的 MyRoutin 图标查看用量。
+4. 点击菜单栏中的 MyToken 图标查看用量。
 
 首次运行的未签名版本可能会被 macOS Gatekeeper 拦截。请前往“系统设置 → 隐私与安全性”，选择“仍要打开”，然后确认启动应用。
 
@@ -60,7 +60,7 @@ Routin 每日签到使用内置网页承载 Routin 官方登录和签到流程�
 
 日志文件位于：
 
-    ~/Library/Logs/MyRoutin/app.log
+    ~/Library/Logs/MyToken/app.log
 
 ## 本地开发
 
@@ -89,7 +89,7 @@ xcodebuild test -project RoutinUsage.xcodeproj -scheme RoutinUsage
 scripts/build-dmg.sh
 ```
 
-产物位于 `build/dist/MyRoutin.dmg`。构建脚本会先校验 Xcode 26 和 macOS 26 SDK。
+产物位于 `build/dist/MyToken.dmg`。构建脚本会先校验 Xcode 26 和 macOS 26 SDK。
 
 ## CI 与发布
 

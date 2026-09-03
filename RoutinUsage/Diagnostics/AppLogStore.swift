@@ -67,7 +67,7 @@ actor AppLogStore: AppLogWriting {
             ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library")
         return library
             .appendingPathComponent("Logs", isDirectory: true)
-            .appendingPathComponent("MyRoutin", isDirectory: true)
+            .appendingPathComponent("MyToken", isDirectory: true)
             .appendingPathComponent("app.log")
     }
 

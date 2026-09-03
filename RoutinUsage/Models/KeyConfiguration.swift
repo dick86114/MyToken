@@ -41,6 +41,13 @@ struct KeyConfiguration: Codable, Equatable, Identifiable, Sendable {
         case metadata
     }
 
+    var websiteURL: URL? {
+        guard let rawValue = metadata["websiteURL"], !rawValue.isEmpty else {
+            return nil
+        }
+        return URL(string: rawValue)
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)

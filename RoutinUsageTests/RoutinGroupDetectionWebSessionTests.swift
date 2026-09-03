@@ -49,7 +49,7 @@ final class RoutinGroupDetectionWebSessionTests: XCTestCase {
         let rows = """
         [
           {"userAgent":"Codex Desktop","groupName":"Codex"},
-          {"userAgent":"C MyRoutin-Group-Probe/00000000-0000-0000-0000-000000000123 Client","groupName":"Codex Pro"}
+          {"userAgent":"C MyToken-Group-Probe/00000000-0000-0000-0000-000000000123 Client","groupName":"Codex Pro"}
         ]
         """
 

@@ -25,7 +25,7 @@ struct OnboardingView: View {
                 .accessibilityHidden(true)
 
             VStack(spacing: 8) {
-                Text("欢迎使用 MyRoutin")
+                Text("欢迎使用 MyToken")
                     .font(.title.weight(.semibold))
                 Text("添加第一个 plan Key，即可在菜单栏查看 5 小时、周或 Token 资源包用量。")
                     .multilineTextAlignment(.center)

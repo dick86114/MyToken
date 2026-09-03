@@ -136,8 +136,9 @@ final class StatusBarController: NSObject {
             )
             button.imagePosition = .imageOnly
             button.imageScaling = .scaleProportionallyDown
-            button.setAccessibilityLabel(selectedIndicators.map(\.accessibilityLabel).joined(separator: "；"))
-            button.toolTip = selectedIndicators.map(\.accessibilityLabel).joined(separator: "；")
+            let hoverSummary = MenuBarIndicatorModel.hoverSummary(for: selectedIndicators)
+            button.setAccessibilityLabel(hoverSummary)
+            button.toolTip = hoverSummary
             return
         }
         let state: KeyUsageState? = nil
@@ -279,7 +280,7 @@ final class StatusBarController: NSObject {
         menu.addItem(.separator())
 
         let quitItem = NSMenuItem(
-            title: "退出 MyRoutin",
+            title: "退出 MyToken",
             action: #selector(quitApplication),
             keyEquivalent: "q"
         )

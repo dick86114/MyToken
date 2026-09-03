@@ -25,6 +25,6 @@ jobs:
       - name: 上传 DMG 构建产物
         uses: actions/upload-artifact@v4
         with:
-          name: MyRoutin-dmg
-          path: build/dist/MyRoutin.dmg
+          name: MyToken-dmg
+          path: build/dist/MyToken.dmg
           if-no-files-found: error

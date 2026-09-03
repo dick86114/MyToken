@@ -6,6 +6,10 @@ struct MenuBarIndicatorModel: Equatable, Sendable {
     let healthState: UsageMetricHealthState
     let accessibilityLabel: String
 
+    static func hoverSummary(for indicators: [MenuBarIndicatorModel]) -> String {
+        indicators.map(\.accessibilityLabel).joined(separator: "\n")
+    }
+
     static func make(
         state: KeyUsageState,
         descriptor: ProviderDescriptor,

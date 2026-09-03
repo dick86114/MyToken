@@ -78,7 +78,7 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
             timeoutInterval: 30
         )
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("MyRoutin/\(currentVersion)", forHTTPHeaderField: "User-Agent")
+        request.setValue("MyToken/\(currentVersion)", forHTTPHeaderField: "User-Agent")
         let data: Data
         let response: URLResponse
         do {
@@ -153,7 +153,7 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
             timeoutInterval: 30
         )
         request.setValue("application/atom+xml", forHTTPHeaderField: "Accept")
-        request.setValue("MyRoutin/\(currentVersion)", forHTTPHeaderField: "User-Agent")
+        request.setValue("MyToken/\(currentVersion)", forHTTPHeaderField: "User-Agent")
 
         let data: Data
         let response: URLResponse
@@ -192,7 +192,7 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
         }
 
         let tag = release.version.hasPrefix("v") ? release.version : "v\(release.version)"
-        guard let downloadURL = URL(string: "https://github.com/\(Self.repository)/releases/download/\(tag)/MyRoutin.dmg"),
+        guard let downloadURL = URL(string: "https://github.com/\(Self.repository)/releases/download/\(tag)/MyToken.dmg"),
               let releaseURL = URL(string: release.releaseURL) else {
             await logWriter.log(level: .error, event: "update_check_atom_url_invalid", details: "version=\(version)")
             throw UpdateServiceError.invalidResponse
@@ -262,7 +262,7 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
                 )
                 throw UpdateServiceError.downloadFailed
             }
-            let url = FileManager.default.temporaryDirectory.appendingPathComponent("MyRoutin-\(update.version).dmg")
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("MyToken-\(update.version).dmg")
             try data.write(to: url, options: .atomic)
             await logWriter.log(
                 level: .info,
@@ -391,7 +391,7 @@ private final class AtomReleaseParser: NSObject, XMLParserDelegate {
 enum UpdateInstaller {
     static func install(
         dmgURL: URL,
-        appName: String = "MyRoutin",
+        appName: String = "MyToken",
         version: String,
         logWriter: any AppLogWriting = AppLogStore.shared
     ) throws {
@@ -433,7 +433,7 @@ enum UpdateInstaller {
                 // 新版本已复制完成但系统拒绝自动启动时，保留旧进程并给出可操作提示。
                 let alert = NSAlert()
                 alert.messageText = "更新已安装"
-                alert.informativeText = "新版本已安装到“应用程序”文件夹，请手动重新打开 MyRoutin。"
+                alert.informativeText = "新版本已安装到“应用程序”文件夹，请手动重新打开 MyToken。"
                 alert.alertStyle = .warning
                 alert.addButton(withTitle: "好")
                 NSApp.activate(ignoringOtherApps: true)

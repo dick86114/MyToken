@@ -5,6 +5,7 @@ enum ProviderID: String, Codable, CaseIterable, Identifiable, Sendable {
     case deepseek
     case glm
     case volcengine
+    case newAPI
 
     var id: String { rawValue }
 }

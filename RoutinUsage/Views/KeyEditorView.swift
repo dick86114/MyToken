@@ -166,6 +166,8 @@ final class KeyEditorModel {
             return "请输入 Key 名称"
         case .invalidSecret:
             return "Key 必须以 plan- 开头"
+        case .invalidURL:
+            return "官网链接无效"
         case .invalidKey:
             return "Key 无效"
         case .network:

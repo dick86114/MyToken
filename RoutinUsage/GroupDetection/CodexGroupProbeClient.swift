@@ -14,7 +14,7 @@ struct CodexGroupProbeRequestMarker: Equatable, Sendable {
     }
 
     var userAgent: String {
-        "MyRoutin-Group-Probe/\(id.uuidString)"
+        "MyToken-Group-Probe/\(id.uuidString)"
     }
 }
 

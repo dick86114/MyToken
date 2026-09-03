@@ -6,7 +6,7 @@ final class GitHubUpdateServiceTests: XCTestCase {
     func test发现较新Release并选择DMG资源() async throws {
         let stub = URLProtocolStub.makeSession { request in
             let response = try XCTUnwrap(HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil))
-            return (response, Data(#"{"tag_name":"v1.2.0","html_url":"https://github.com/dick86114/MyRoutin/releases/tag/v1.2.0","body":"修复问题","assets":[{"name":"MyRoutin.dmg","browser_download_url":"https://example.com/MyRoutin.dmg"}]}"#.utf8))
+            return (response, Data(#"{"tag_name":"v1.2.0","html_url":"https://github.com/dick86114/MyRoutin/releases/tag/v1.2.0","body":"修复问题","assets":[{"name":"MyToken.dmg","browser_download_url":"https://example.com/MyToken.dmg"}]}"#.utf8))
         }
         let logger = UpdateLogWriter()
         let service = GitHubUpdateService(
@@ -19,7 +19,7 @@ final class GitHubUpdateServiceTests: XCTestCase {
 
         XCTAssertEqual(stub.registration.lastRequest?.url, GitHubUpdateService.releasesURL)
         XCTAssertEqual(update?.version, "1.2.0")
-        XCTAssertEqual(update?.downloadURL.absoluteString, "https://example.com/MyRoutin.dmg")
+        XCTAssertEqual(update?.downloadURL.absoluteString, "https://example.com/MyToken.dmg")
         let events = await logger.events
         XCTAssertTrue(events.contains { $0 == "update_check_succeeded" })
     }
@@ -27,7 +27,7 @@ final class GitHubUpdateServiceTests: XCTestCase {
     func test相同或更旧Release不提示更新() async throws {
         let stub = URLProtocolStub.makeSession { request in
             let response = try XCTUnwrap(HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil))
-            return (response, Data(#"{"tag_name":"v1.2.0","html_url":"https://github.com/dick86114/MyRoutin/releases/tag/v1.2.0","assets":[{"name":"MyRoutin.dmg","browser_download_url":"https://example.com/MyRoutin.dmg"}]}"#.utf8))
+            return (response, Data(#"{"tag_name":"v1.2.0","html_url":"https://github.com/dick86114/MyRoutin/releases/tag/v1.2.0","assets":[{"name":"MyToken.dmg","browser_download_url":"https://example.com/MyToken.dmg"}]}"#.utf8))
         }
         let service = GitHubUpdateService(session: stub.session, currentVersion: "1.2.0")
 
@@ -42,7 +42,7 @@ final class GitHubUpdateServiceTests: XCTestCase {
           <entry>
             <id>tag:github.com,2008:Repository/1/v1.3.0</id>
             <link rel="alternate" href="https://github.com/dick86114/MyRoutin/releases/tag/v1.3.0" />
-            <title>MyRoutin v1.3.0</title>
+            <title>MyToken v1.3.0</title>
             <content type="html">修复 API 限流检查</content>
           </entry>
         </feed>
@@ -68,7 +68,7 @@ final class GitHubUpdateServiceTests: XCTestCase {
         XCTAssertEqual(update?.version, "1.3.0")
         XCTAssertEqual(
             update?.downloadURL.absoluteString,
-            "https://github.com/dick86114/MyRoutin/releases/download/v1.3.0/MyRoutin.dmg"
+            "https://github.com/dick86114/MyRoutin/releases/download/v1.3.0/MyToken.dmg"
         )
     }
 
@@ -89,7 +89,7 @@ final class GitHubUpdateServiceTests: XCTestCase {
         let update = AppUpdate(
             version: "1.1.0",
             releaseURL: URL(string: "https://example.com/release")!,
-            downloadURL: URL(string: "https://example.com/MyRoutin.dmg")!,
+            downloadURL: URL(string: "https://example.com/MyToken.dmg")!,
             notes: ""
         )
         let progress = DownloadProgressCapture()

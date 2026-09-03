@@ -27,6 +27,8 @@ enum UsageMetricGridPolicy {
             return UsageMetricGridLayout(metrics: metrics, columns: 2)
         case .routin:
             return UsageMetricGridLayout(metrics: metrics, columns: 2)
+        case .newAPI:
+            return UsageMetricGridLayout(metrics: metrics, columns: 2)
         }
     }
 }
@@ -195,7 +197,15 @@ private struct NormalizedUsageMetricCell: View {
     }
 
     private var valueCell: some View {
-        let suffix = metric.unit == .request ? " 次" : ""
+        let suffix: String
+        switch metric.unit {
+        case .request:
+            suffix = " 次"
+        case .currency:
+            suffix = " \(metric.currencyCode ?? "元")"
+        case .token, .boolean, .text:
+            suffix = ""
+        }
 
         return VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {

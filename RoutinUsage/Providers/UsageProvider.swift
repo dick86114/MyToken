@@ -93,6 +93,20 @@ struct ProviderRegistry: Sendable {
                     CredentialField(id: "region", label: "区域", isSecret: false, isRequired: false, placeholder: "cn-beijing")
                 ]
             ]
+        ),
+        ProviderDescriptor(
+            id: .newAPI,
+            displayName: "New API",
+            shortCode: "NEW",
+            iconName: "server.rack",
+            capabilities: [.balance, .tokenUsage],
+            credentialSchemas: [
+                .bearerAPIKey: [
+                    CredentialField(id: "baseURL", label: "New API 地址", isSecret: false),
+                    CredentialField(id: "userID", label: "用户 ID", isSecret: false),
+                    CredentialField(id: "secret", label: "用户访问令牌", isSecret: true)
+                ]
+            ]
         )
     ]
 }

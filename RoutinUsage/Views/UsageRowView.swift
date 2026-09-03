@@ -18,6 +18,14 @@ struct UsageRowView: View {
             }
             .padding(.vertical, 10)
             .padding(.horizontal, 8)
+            .background {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(ProviderTheme.background(for: state.configuration.providerID))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(ProviderTheme.borderColor(for: state.configuration.providerID))
+            }
             .opacity(isSubscriptionExpired(now: timeline.date) ? 0.45 : 1)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(accessibilityLabel(now: timeline.date))
@@ -68,7 +76,7 @@ enum UsageRowAccessibility {
         ) {
             details.append(expiryText)
         }
-        if snapshot.kind == .periodic {
+        if snapshot.kind == .periodic, state.configuration.providerID != .newAPI {
             details.append("5 小时剩余 \(remainingDuration(for: snapshot.fiveHour, now: now))")
             details.append("周剩余 \(remainingDuration(for: snapshot.weekly, now: now))")
         }
@@ -213,7 +221,7 @@ private extension UsageRowView {
                     .foregroundStyle(normalizedMetricColor(metric.healthState))
             }
         case .balance:
-            Text("余额 \(decimalText(metric.value)) 元")
+            Text("余额 \(decimalText(metric.value)) \(metric.currencyCode ?? "元")")
                 .font(.caption.weight(.semibold))
                 .monospacedDigit()
                 .foregroundStyle(normalizedMetricColor(metric.healthState))
@@ -427,25 +435,50 @@ private extension UsageRowView {
     }
 
     @ViewBuilder
+    var providerNameLabel: some View {
+        let providerName = ProviderRegistry.builtInDescriptors
+            .first(where: { $0.id == state.configuration.providerID })?
+            .displayName ?? state.configuration.providerID.rawValue
+
+        if let websiteURL = state.configuration.websiteURL {
+            Link(providerName, destination: websiteURL)
+                .help("打开 \(providerName) 官网")
+                .accessibilityLabel("打开 \(providerName) 官网")
+        } else {
+            Text(providerName)
+        }
+    }
+
+    @ViewBuilder
     func subscriptionDescription(now: Date) -> some View {
         if let snapshot = state.snapshot {
-            let description = subscriptionDescriptionText(for: snapshot)
+            let planSuffix = snapshot.planName.isEmpty ? "" : " · \(snapshot.planName)"
 
             if let expiryText = UsageFormatter.subscriptionExpiryText(
                 until: snapshot.subscriptionEndAt,
                 now: now
             ) {
                 HStack(spacing: 4) {
-                    Text(description)
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 2) {
+                        providerNameLabel
+                        if !planSuffix.isEmpty {
+                            Text(planSuffix)
+                        }
+                    }
+                    .foregroundStyle(.secondary)
                     Text(expiryText)
                         .foregroundStyle(.red)
                 }
                 .font(.caption)
             } else {
-                Text(description)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 2) {
+                    providerNameLabel
+                    if !planSuffix.isEmpty {
+                        Text(planSuffix)
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
         } else {
             Text("等待用量数据")

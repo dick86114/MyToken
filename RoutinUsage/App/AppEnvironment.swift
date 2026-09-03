@@ -169,7 +169,8 @@ final class AppEnvironment {
             RoutinUsageProvider(client: apiClient),
             DeepSeekUsageProvider(session: .shared),
             GLMUsageProvider(session: .shared),
-            VolcenginePlanUsageProvider(session: .shared)
+            VolcenginePlanUsageProvider(session: .shared),
+            NewAPIUsageProvider(session: .shared)
         ])
         routinWebSession.onLoginCompleted = {
             Task { @MainActor in
@@ -364,7 +365,7 @@ final class AppEnvironment {
 
         let alert = NSAlert()
         alert.messageText = "更新完成"
-        alert.informativeText = "MyRoutin 已更新到 \(version)，应用已重新启动。"
+        alert.informativeText = "MyToken 已更新到 \(version)，应用已重新启动。"
         alert.alertStyle = .informational
         alert.addButton(withTitle: "好")
         NSApp.activate(ignoringOtherApps: true)

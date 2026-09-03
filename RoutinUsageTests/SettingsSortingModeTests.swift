@@ -49,10 +49,29 @@ final class SettingsSortingModeTests: XCTestCase {
         let rowStart = try XCTUnwrap(source.range(of: "func menuBarIndicatorRow"))
         let availableStart = try XCTUnwrap(source.range(of: "func availableMenuBarIndicatorRow"))
         let row = String(source[rowStart.lowerBound..<availableStart.lowerBound])
+        let availableStart2 = try XCTUnwrap(source.range(of: "func availableMenuBarIndicatorRow"))
+        let providerStart = try XCTUnwrap(source.range(of: "func providerIdentity"))
+        let availableRow = String(source[availableStart2.lowerBound..<providerStart.lowerBound])
 
         XCTAssertTrue(delegate.contains("move(draggedID, targetID)"))
         XCTAssertFalse(delegate.contains("self.draggedID = targetID"))
-        XCTAssertTrue(row.contains(".onDrag {"))
+        XCTAssertFalse(row.contains(".onDrag {"))
         XCTAssertTrue(row.contains("scaleEffect(draggingIndicatorID == configuration.id ? 1.02 : 1)"))
+        XCTAssertTrue(source.contains(".contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))"))
+        XCTAssertTrue(source.contains("indicatorDragProvider("))
+        XCTAssertTrue(availableRow.contains("scaleEffect(draggingIndicatorID == configuration.id ? 1.02 : 1)"))
+    }
+
+    func test可添加指标使用独立的菜单栏排序交互() throws {
+        let source = try TestSourceReader.read([
+            "RoutinUsage",
+            "Views",
+            "SettingsView.swift"
+        ])
+
+        XCTAssertTrue(source.contains("@State private var isReorderingAvailableIndicators = false"))
+        XCTAssertTrue(source.contains("toggleAvailableIndicatorReordering()"))
+        XCTAssertTrue(source.contains("isActive: isReorderingAvailableIndicators && availableMenuBarConfigurations.count > 1"))
+        XCTAssertFalse(source.contains("toggleAvailableIndicatorReordering() {\n        isReorderingAvailableIndicators.toggle()\n    }\n\n    func toggleMenuBarReordering()"))
     }
 }

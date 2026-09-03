@@ -3,7 +3,7 @@ import XCTest
 
 final class ProjectBootstrapTests: XCTestCase {
     func test应用标识稳定() {
-        XCTAssertEqual(RoutinUsageApp.applicationName, "MyRoutin")
+        XCTAssertEqual(RoutinUsageApp.applicationName, "MyToken")
     }
 
     func test正式应用使用新的状态栏身份并保留旧偏好迁移() throws {
@@ -16,24 +16,28 @@ final class ProjectBootstrapTests: XCTestCase {
 
     func test应用提供版本号与官网和GitHub地址() throws {
         XCTAssertFalse(RoutinUsageApp.currentVersion.isEmpty)
-        XCTAssertEqual(RoutinUsageApp.websiteURL.absoluteString, "https://routin.ai")
+        XCTAssertEqual(RoutinUsageApp.websiteURL.absoluteString, "https://mytoken.idickies.cc")
         XCTAssertEqual(
             RoutinUsageApp.githubURL.absoluteString,
             "https://github.com/dick86114/MyRoutin"
         )
+        XCTAssertEqual(
+            RoutinUsageApp.releasesURL.absoluteString,
+            "https://github.com/dick86114/MyRoutin/releases"
+        )
     }
 
-    func test菜单栏弹窗左侧版本号可点击并链接到GitHub() throws {
+    func test菜单栏弹窗左侧版本号可点击并链接到Releases() throws {
         let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
         let app = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
 
         XCTAssertTrue(app.contains("nonisolated static var currentVersion"))
         XCTAssertTrue(app.contains("nonisolated static let githubURL"))
-        XCTAssertTrue(popover.contains("Link(destination: RoutinUsageApp.githubURL)"))
+        XCTAssertTrue(app.contains("nonisolated static let releasesURL"))
+        XCTAssertTrue(popover.contains("Link(destination: RoutinUsageApp.releasesURL)"))
         XCTAssertTrue(popover.contains("RoutinUsageApp.currentVersion"))
-        XCTAssertTrue(popover.contains("打开 GitHub 项目"))
-        XCTAssertTrue(popover.contains(".underline()"))
-        XCTAssertFalse(popover.contains("arrow.up.right.square"))
+        XCTAssertTrue(popover.contains("打开 Releases 页面"))
+        XCTAssertFalse(popover.contains(".underline()"))
     }
 
     func test菜单栏弹窗顶部使用左版本中彩色透明Logo右刷新布局() throws {
@@ -44,18 +48,18 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(popover.contains("Link(destination: RoutinUsageApp.websiteURL)"))
         XCTAssertTrue(popover.contains("Image(nsImage: NSImage(named: \"PopoverColorBrandLogo\")"))
         XCTAssertTrue(popover.contains("frame(width: 28, height: 28)"))
-        XCTAssertTrue(popover.contains("打开 Routin 官网"))
+        XCTAssertTrue(popover.contains("打开 MyToken 官网"))
         XCTAssertTrue(popover.contains(".overlay(alignment: .center)"))
         XCTAssertTrue(popover.contains("Image(systemName: \"arrow.clockwise\")"))
         XCTAssertFalse(popover.contains("Picker(\"用量周期\""))
     }
 
-    func test应用图标使用已归档的Routin品牌原图生成完整尺寸集() throws {
+    func test应用图标使用已归档的MyToken品牌原图生成完整尺寸集() throws {
         let projectRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
         let brandLogo = projectRoot
-            .appendingPathComponent("docs/brand-assets/routin-brand-logo.png")
+            .appendingPathComponent("docs/brand-assets/mytoken-brand-logo.png")
         let appIconDirectory = projectRoot
             .appendingPathComponent("RoutinUsage/Assets.xcassets/AppIcon.appiconset")
         let expectedIconNames = [
@@ -241,10 +245,11 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(settings.contains("UserDefaults"))
     }
 
-    func test首次引导使用Routin品牌图并聚焦添加首个Key() throws {
+    func test首次引导使用MyToken品牌图并聚焦添加首个Key() throws {
         let onboarding = try sourceText(at: "RoutinUsage/Views/OnboardingView.swift")
 
         XCTAssertTrue(onboarding.contains("PopoverColorBrandLogo"))
+        XCTAssertTrue(onboarding.contains("欢迎使用 MyToken"))
         XCTAssertFalse(onboarding.contains("chart.bar.xaxis"))
         XCTAssertTrue(onboarding.contains("添加第一个 Key"))
     }
@@ -410,10 +415,12 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(projectSpec.contains("SWIFT_VERSION: \"5.0\""))
     }
 
-    func test发布工作流使用MyRoutin作为版本展示名称() throws {
+    func test发布工作流使用MyToken作为版本展示名称() throws {
         let releaseWorkflow = try sourceText(at: ".github/workflows/release.yml")
 
-        XCTAssertTrue(releaseWorkflow.contains("name: MyRoutin v${{ inputs.version }}"))
+        XCTAssertTrue(releaseWorkflow.contains("name: MyToken v${{ inputs.version }}"))
+        XCTAssertTrue(releaseWorkflow.contains("build/dist/MyToken.dmg"))
+        XCTAssertTrue(releaseWorkflow.contains("build/dist/MyRoutin.dmg"))
         XCTAssertFalse(releaseWorkflow.contains("Routin Usage"))
     }
 

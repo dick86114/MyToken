@@ -72,3 +72,28 @@ struct UsageMetricProgressBar: View {
         .accessibilityHidden(true)
     }
 }
+
+enum ProviderTheme {
+    static func accentColor(for providerID: ProviderID) -> Color {
+        switch providerID {
+        case .routin:
+            return .blue
+        case .deepseek:
+            return .indigo
+        case .glm:
+            return .green
+        case .volcengine:
+            return .orange
+        case .newAPI:
+            return .purple
+        }
+    }
+
+    static func background(for providerID: ProviderID) -> Color {
+        accentColor(for: providerID).opacity(0.10)
+    }
+
+    static func borderColor(for providerID: ProviderID) -> Color {
+        accentColor(for: providerID).opacity(0.18)
+    }
+}

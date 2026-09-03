@@ -19,7 +19,7 @@ targets:
     sources: [RoutinUsage]
     settings:
       base:
-        PRODUCT_NAME: "MyRoutin"
+        PRODUCT_NAME: "MyToken"
         PRODUCT_MODULE_NAME: RoutinUsage
   RoutinUsageTests:
     type: bundle.unit-test
@@ -58,7 +58,7 @@ targets:
           cp "$PROJECT_DIR/.github/workflows/release.yml" "$resource_dir/release.yml"
     settings:
       base:
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/MyRoutin.app/Contents/MacOS/MyRoutin"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/MyToken.app/Contents/MacOS/MyToken"
         BUNDLE_LOADER: "$(TEST_HOST)"
     dependencies:
       - target: RoutinUsage

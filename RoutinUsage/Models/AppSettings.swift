@@ -1,6 +1,25 @@
 import Foundation
 import Observation
 
+enum CredentialDisplayOrder {
+    static func popoverIDs(
+        selected: [UUID],
+        available: [UUID],
+        visible: [UUID]
+    ) -> [UUID] {
+        let selectedVisible: [UUID] = selected.reduce(into: []) { result, id in
+            if visible.contains(id) {
+                result.append(id)
+            }
+        }
+        let availableVisible = available.filter {
+            visible.contains($0) && !selectedVisible.contains($0)
+        }
+        let ordered = selectedVisible + availableVisible
+        return ordered + visible.filter { !ordered.contains($0) }
+    }
+}
+
 @Observable
 final class AppSettings {
     static let allowedRefreshMinutes = [1, 5, 15, 30]
@@ -59,6 +78,15 @@ final class AppSettings {
         }
     }
 
+    var availableCredentialIDs: [UUID] {
+        didSet {
+            defaults.set(
+                availableCredentialIDs.uniqued().map(\.uuidString),
+                forKey: Keys.availableCredentialIDs
+            )
+        }
+    }
+
     func moveSelectedCredential(fromOffsets source: IndexSet, toOffset destination: Int) {
         let validSource = source.filter { selectedCredentialIDs.indices.contains($0) }
         guard !validSource.isEmpty, (0...selectedCredentialIDs.count).contains(destination) else {
@@ -75,10 +103,20 @@ final class AppSettings {
         selectedCredentialIDs = reordered
     }
 
-    static func orderedPopoverCredentialIDs(selected: [UUID], visible: [UUID]) -> [UUID] {
-        let visibleSet = Set(visible)
-        let selectedVisible = selected.filter { visibleSet.contains($0) }
-        return selectedVisible + visible.filter { !selectedVisible.contains($0) }
+    func moveAvailableCredential(fromOffsets source: IndexSet, toOffset destination: Int) {
+        let validSource = source.filter { availableCredentialIDs.indices.contains($0) }
+        guard !validSource.isEmpty, (0...availableCredentialIDs.count).contains(destination) else {
+            return
+        }
+
+        var reordered = availableCredentialIDs
+        let moving = validSource.map { reordered[$0] }
+        for index in validSource.reversed() {
+            reordered.remove(at: index)
+        }
+        let removedBeforeDestination = validSource.filter { $0 < destination }.count
+        reordered.insert(contentsOf: moving, at: destination - removedBeforeDestination)
+        availableCredentialIDs = reordered
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -118,6 +156,9 @@ final class AppSettings {
 
         let storedSelection = defaults.stringArray(forKey: Keys.selectedCredentialIDs) ?? []
         selectedCredentialIDs = Self.normalizedSelection(storedSelection.compactMap(UUID.init(uuidString:)))
+
+        let storedAvailable = defaults.stringArray(forKey: Keys.availableCredentialIDs) ?? []
+        availableCredentialIDs = storedAvailable.compactMap(UUID.init(uuidString:))
     }
 }
 
@@ -131,6 +172,7 @@ private extension AppSettings {
         static let highThreshold = "notificationHighThreshold"
         static let launchAtLogin = "launchAtLogin"
         static let selectedCredentialIDs = "selectedCredentialIDs"
+        static let availableCredentialIDs = "availableCredentialIDs"
     }
 
     static func normalizedSelection(_ ids: [UUID]) -> [UUID] {

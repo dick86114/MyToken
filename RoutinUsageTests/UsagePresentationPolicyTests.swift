@@ -33,6 +33,7 @@ final class UsagePresentationPolicyTests: XCTestCase {
         XCTAssertEqual(UsageMetricGridPolicy.layout(providerID: .volcengine, metrics: metrics).columns, 2)
         XCTAssertEqual(UsageMetricGridPolicy.layout(providerID: .deepseek, metrics: metrics).columns, 2)
         XCTAssertEqual(UsageMetricGridPolicy.layout(providerID: .routin, metrics: metrics).columns, 2)
+        XCTAssertEqual(UsageMetricGridPolicy.layout(providerID: .newAPI, metrics: metrics).columns, 2)
     }
 
     func test设置页和弹窗按供应商使用统一栅格并隐藏GLMZCode指标() throws {

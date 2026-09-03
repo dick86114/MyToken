@@ -92,14 +92,31 @@ struct UsagePopoverView: View {
 private extension UsagePopoverView {
     var toolbar: some View {
         HStack(spacing: 10) {
-            Link(destination: RoutinUsageApp.githubURL) {
-                Text("v\(RoutinUsageApp.currentVersion)")
-                    .underline()
+            Link(destination: RoutinUsageApp.releasesURL) {
+                HStack(spacing: 4) {
+                    Image(systemName: "tag")
+                        .imageScale(.small)
+                    Text("v\(RoutinUsageApp.currentVersion)")
+                        .monospacedDigit()
+                    Image(systemName: "arrow.up.right.square")
+                        .imageScale(.small)
+                }
+                .font(.caption.weight(.medium))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background {
+                    Capsule()
+                        .fill(Color.primary.opacity(0.055))
+                }
+                .overlay {
+                    Capsule()
+                        .strokeBorder(Color.primary.opacity(0.12))
+                }
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .help("打开 GitHub 项目")
-            .accessibilityLabel("当前版本 v\(RoutinUsageApp.currentVersion)，打开 GitHub 项目")
+            .help("打开 Releases 页面")
+            .accessibilityLabel("当前版本 v\(RoutinUsageApp.currentVersion)，打开 Releases 页面")
 
             Spacer()
             Button {
@@ -150,8 +167,8 @@ private extension UsagePopoverView {
                     .shadow(color: .black.opacity(0.22), radius: 1.5, y: 1)
             }
             .buttonStyle(.plain)
-            .help("打开 Routin 官网")
-            .accessibilityLabel("打开 Routin 官网")
+            .help("打开 MyToken 官网")
+            .accessibilityLabel("打开 MyToken 官网")
         }
     }
 
@@ -195,8 +212,9 @@ private extension UsagePopoverView {
     }
 
     var popoverKeyIDs: [UUID] {
-        AppSettings.orderedPopoverCredentialIDs(
+        CredentialDisplayOrder.popoverIDs(
             selected: settings.selectedCredentialIDs,
+            available: settings.availableCredentialIDs,
             visible: store.visibleKeyIDs
         )
     }
@@ -310,8 +328,8 @@ private extension UsagePopoverView {
                 }
                 .liquidGlassButton()
                 .keyboardShortcut("q")
-                .help("退出 MyRoutin")
-                .accessibilityLabel("退出 MyRoutin")
+                .help("退出 MyToken")
+                .accessibilityLabel("退出 MyToken")
             }
         }
     }

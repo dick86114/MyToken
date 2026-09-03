@@ -28,7 +28,7 @@ enum IssueReporter {
         let footer = """
         ```
 
-        > 日志由 MyRoutin 自动脱敏，提交前请再次确认内容。
+        > 日志由 MyToken 自动脱敏，提交前请再次确认内容。
         """
         let availableLogCharacters = max(0, maxBodyCharacters - header.count - footer.count)
         let logs = String(context.logs.suffix(min(maxLogCharacters, availableLogCharacters)))
@@ -39,7 +39,7 @@ enum IssueReporter {
             resolvingAgainstBaseURL: false
         )
         components?.queryItems = [
-            URLQueryItem(name: "title", value: "MyRoutin 问题反馈"),
+            URLQueryItem(name: "title", value: "MyToken 问题反馈"),
             URLQueryItem(name: "body", value: body)
         ]
         return components?.url

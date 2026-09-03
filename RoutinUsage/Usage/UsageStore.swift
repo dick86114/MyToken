@@ -13,11 +13,35 @@ enum UsageDisplayError: Equatable, Sendable {
 enum UsageStoreError: Error, Equatable, Sendable {
     case invalidName
     case invalidSecret
+    case invalidURL
     case invalidKey
     case network
     case invalidResponse
     case server(statusCode: Int)
     case persistence
+}
+
+extension UsageStoreError: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case .invalidName:
+            return "请输入凭证名称"
+        case .invalidSecret:
+            return "凭证内容无效"
+        case .invalidURL:
+            return "官网链接无效"
+        case .invalidKey:
+            return "凭证无效"
+        case .network:
+            return "网络连接失败，请检查网络后重试"
+        case .invalidResponse:
+            return "供应商返回的数据无法识别"
+        case .server(let statusCode):
+            return "服务暂时不可用（HTTP \(statusCode)）"
+        case .persistence:
+            return "保存失败，请稍后重试"
+        }
+    }
 }
 
 struct KeyUsageState: Equatable, Sendable {
