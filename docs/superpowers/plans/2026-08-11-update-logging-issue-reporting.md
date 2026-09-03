@@ -37,7 +37,7 @@
 - [ ] **Step 2: 运行定向测试确认失败**：
   `xcodebuild -project RoutinUsage.xcodeproj -scheme RoutinUsage -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO -only-testing:RoutinUsageTests/AppLogStoreTests -only-testing:RoutinUsageTests/IssueReporterTests test`
 - [ ] **Step 3: 实现 `AppLogStore`**：使用 JSONL 或可读文本追加日志；写入前替换 `plan-` 凭据、敏感查询参数和超长详情；超过 128 KiB 时只保留末尾内容；文件失败时通过 `Logger` 记录但不抛出业务错误。
-- [ ] **Step 4: 实现 `IssueReporter`**：使用 `URLComponents` 构造 `https://github.com/dick86114/MyRoutin/issues/new`，正文包含版本、系统版本、架构、更新状态和最多 6000 字符日志。
+- [ ] **Step 4: 实现 `IssueReporter`**：使用 `URLComponents` 构造 `https://github.com/dick86114/MyToken/issues/new`，正文包含版本、系统版本、架构、更新状态和最多 6000 字符日志。
 - [ ] **Step 5: 运行定向测试确认通过**。
 - [ ] **Step 6: 提交组件**：`git add RoutinUsage/Diagnostics RoutinUsageTests/AppLogStoreTests.swift RoutinUsageTests/IssueReporterTests.swift && git commit -m "feat: 增加脱敏日志与 Issue 报告组件"`。
 

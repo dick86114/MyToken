@@ -26,8 +26,8 @@ struct RoutinUsageApp: App {
     @MainActor private static var retainedStatusBarController: StatusBarController?
     nonisolated static let applicationName = "MyToken"
     nonisolated static let websiteURL = URL(string: "https://mytoken.idickies.cc")!
-    nonisolated static let githubURL = URL(string: "https://github.com/dick86114/MyRoutin")!
-    nonisolated static let releasesURL = URL(string: "https://github.com/dick86114/MyRoutin/releases")!
+    nonisolated static let githubURL = URL(string: "https://github.com/dick86114/MyToken")!
+    nonisolated static let releasesURL = URL(string: "https://github.com/dick86114/MyToken/releases")!
 
     nonisolated static var currentVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"

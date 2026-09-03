@@ -10,7 +10,7 @@ struct IssueReportContext: Sendable {
 }
 
 enum IssueReporter {
-    static let issuesURL = URL(string: "https://github.com/dick86114/MyRoutin/issues/new")!
+    static let issuesURL = URL(string: "https://github.com/dick86114/MyToken/issues/new")!
     static let maxLogCharacters = 6000
     static let maxBodyCharacters = 9000
 

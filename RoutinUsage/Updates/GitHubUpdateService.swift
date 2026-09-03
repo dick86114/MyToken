@@ -48,7 +48,7 @@ struct NoUpdateService: UpdateChecking {
 }
 
 struct GitHubUpdateService: UpdateChecking, Sendable {
-    static let repository = "dick86114/MyRoutin"
+    static let repository = "dick86114/MyToken"
     static let releasesURL = URL(string: "https://api.github.com/repos/\(repository)/releases/latest")!
     static let releasesAtomURL = URL(string: "https://github.com/\(repository)/releases.atom")!
 

@@ -18,7 +18,7 @@ final class IssueReporterTests: XCTestCase {
         let title = try XCTUnwrap(query.first(where: { $0.name == "title" })?.value)
         let body = try XCTUnwrap(query.first(where: { $0.name == "body" })?.value)
 
-        XCTAssertEqual(components.path, "/dick86114/MyRoutin/issues/new")
+        XCTAssertEqual(components.path, "/dick86114/MyToken/issues/new")
         XCTAssertTrue(title.contains("MyToken"))
         XCTAssertTrue(body.contains("2.1.0"))
         XCTAssertTrue(body.contains("macOS 15.6"))

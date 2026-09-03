@@ -19,11 +19,11 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertEqual(RoutinUsageApp.websiteURL.absoluteString, "https://mytoken.idickies.cc")
         XCTAssertEqual(
             RoutinUsageApp.githubURL.absoluteString,
-            "https://github.com/dick86114/MyRoutin"
+            "https://github.com/dick86114/MyToken"
         )
         XCTAssertEqual(
             RoutinUsageApp.releasesURL.absoluteString,
-            "https://github.com/dick86114/MyRoutin/releases"
+            "https://github.com/dick86114/MyToken/releases"
         )
     }
 
