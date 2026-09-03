@@ -59,6 +59,28 @@ final class AppSettings {
         }
     }
 
+    func moveSelectedCredential(fromOffsets source: IndexSet, toOffset destination: Int) {
+        let validSource = source.filter { selectedCredentialIDs.indices.contains($0) }
+        guard !validSource.isEmpty, (0...selectedCredentialIDs.count).contains(destination) else {
+            return
+        }
+
+        var reordered = selectedCredentialIDs
+        let moving = validSource.map { reordered[$0] }
+        for index in validSource.reversed() {
+            reordered.remove(at: index)
+        }
+        let removedBeforeDestination = validSource.filter { $0 < destination }.count
+        reordered.insert(contentsOf: moving, at: destination - removedBeforeDestination)
+        selectedCredentialIDs = reordered
+    }
+
+    static func orderedPopoverCredentialIDs(selected: [UUID], visible: [UUID]) -> [UUID] {
+        let visibleSet = Set(visible)
+        let selectedVisible = selected.filter { visibleSet.contains($0) }
+        return selectedVisible + visible.filter { !selectedVisible.contains($0) }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
@@ -112,7 +134,7 @@ private extension AppSettings {
     }
 
     static func normalizedSelection(_ ids: [UUID]) -> [UUID] {
-        Array(ids.uniqued().prefix(4))
+        Array(ids.uniqued().prefix(5))
     }
 }
 

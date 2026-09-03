@@ -724,33 +724,6 @@ final class AppLifecycleTests: XCTestCase {
         XCTAssertEqual(checkCount, 1)
     }
 
-    func test切换Key时有缓存不请求而无数据只刷新所选Key() async throws {
-        let context = try makeContext()
-        defer { context.cleanUp() }
-        let cachedKey = try context.repository.add(
-            name: "有缓存",
-            secret: "plan-cached-0001"
-        )
-        let emptyKey = try context.repository.add(
-            name: "无缓存",
-            secret: "plan-empty-0002"
-        )
-        try context.cache.save(makeSnapshot(planName: "缓存"), for: cachedKey.id)
-        await context.fetcher.setResponse(.success(makeSnapshot(planName: "新数据")), for: "plan-empty-0002")
-        let environment = context.makeEnvironment()
-
-        environment.store.selectKey(cachedKey.id)
-        await environment.selectedKeyDidChange(to: cachedKey.id)
-        environment.store.selectKey(emptyKey.id)
-        await environment.selectedKeyDidChange(to: emptyKey.id)
-
-        let cachedRequestCount = await context.fetcher.requestCount(for: "plan-cached-0001")
-        let emptyRequestCount = await context.fetcher.requestCount(for: "plan-empty-0002")
-        XCTAssertEqual(cachedRequestCount, 0)
-        XCTAssertEqual(emptyRequestCount, 1)
-        XCTAssertEqual(environment.store.state(for: emptyKey.id)?.snapshot?.planName, "新数据")
-    }
-
     func test切换显示周期立即重新计算菜单栏且不发请求() async throws {
         let context = try makeContext()
         defer { context.cleanUp() }

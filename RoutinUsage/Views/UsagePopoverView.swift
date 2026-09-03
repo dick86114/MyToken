@@ -47,20 +47,22 @@ struct UsagePopoverView: View {
 
             Divider()
 
-            usageListHeader
+            ScrollView(.vertical, showsIndicators: true) {
+                VStack(spacing: 0) {
+                    usageListHeader
 
-            usageList
-                .padding(.vertical, 4)
+                    usageList
+                        .padding(.vertical, 4)
 
-            Divider()
+                    Divider()
 
-            footer
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
+                    footer
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                }
+            }
         }
-        // 让窗口按内容自然撑开，避免固定高度造成不必要的竖向滚动条。
-        .frame(width: 440)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: 440, height: maxPopoverHeight)
         .liquidGlassWindowBackground()
         .confirmationDialog(
             "获取 Codex 当前分组？",
@@ -116,7 +118,7 @@ private extension UsagePopoverView {
             .help("刷新全部 Key")
             .accessibilityLabel(store.isRefreshing ? "正在刷新全部 Key" : "刷新全部 Key")
 
-            if isSelectedRoutin {
+            if hasRoutinAccount {
                 Button {
                     openWindow(id: "routin-check-in")
                     Task { await startRoutinCheckIn() }
@@ -171,35 +173,19 @@ private extension UsagePopoverView {
             .accessibilityElement(children: .combine)
             .accessibilityLabel("空配置，尚未配置 Key")
         } else {
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(providerGroups, id: \.id) { group in
-                    VStack(alignment: .leading, spacing: 5) {
-                        HStack(spacing: 6) {
-                            Image(systemName: group.iconName)
-                                .foregroundStyle(.secondary)
-                            Text(group.displayName)
-                                .font(.caption.weight(.semibold))
-                            Text("\(group.ids.count)")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                        VStack(spacing: 0) {
-                            ForEach(group.ids, id: \.self) { id in
-                                if let state = store.state(for: id) {
-                                    UsageRowView(
-                                        store: store,
-                                        state: state,
-                                        detectionState: codexGroupDetection.state(for: id),
-                                        detectionRecord: codexGroupDetection.record(for: id),
-                                        isAnotherDetectionActive: codexGroupDetection.activeKeyID != nil
-                                            && codexGroupDetection.activeKeyID != id,
-                                        requestDetection: { pendingDetectionKeyID = id }
-                                    )
-                                    if id != group.ids.last {
-                                        Divider()
-                                    }
-                                }
-                            }
+            VStack(spacing: 0) {
+                ForEach(popoverKeyIDs, id: \.self) { id in
+                    if let state = store.state(for: id) {
+                        UsageRowView(
+                            state: state,
+                            detectionState: codexGroupDetection.state(for: id),
+                            detectionRecord: codexGroupDetection.record(for: id),
+                            isAnotherDetectionActive: codexGroupDetection.activeKeyID != nil
+                                && codexGroupDetection.activeKeyID != id,
+                            requestDetection: { pendingDetectionKeyID = id }
+                        )
+                        if id != popoverKeyIDs.last {
+                            Divider()
                         }
                     }
                 }
@@ -208,29 +194,23 @@ private extension UsagePopoverView {
         }
     }
 
-    struct ProviderGroup: Identifiable {
-        let id: ProviderID
-        let displayName: String
-        let iconName: String
-        let ids: [UUID]
+    var popoverKeyIDs: [UUID] {
+        AppSettings.orderedPopoverCredentialIDs(
+            selected: settings.selectedCredentialIDs,
+            visible: store.visibleKeyIDs
+        )
     }
 
-    var providerGroups: [ProviderGroup] {
-        var groups: [ProviderID: [UUID]] = [:]
-        for id in store.visibleKeyIDs {
-            guard let state = store.state(for: id) else { continue }
-            groups[state.configuration.providerID, default: []].append(id)
-        }
-        return ProviderID.allCases.compactMap { id in
-            guard let ids = groups[id], !ids.isEmpty,
-                  let descriptor = ProviderRegistry.builtInDescriptors.first(where: { $0.id == id })
-            else { return nil }
-            return ProviderGroup(id: id, displayName: descriptor.displayName, iconName: descriptor.iconName, ids: ids)
-        }
+    var maxPopoverHeight: CGFloat {
+        let visibleFrame = NSScreen.main?.visibleFrame
+        let visibleHeight = visibleFrame?.height ?? 800
+        return visibleHeight * 0.9
     }
 
-    var isSelectedRoutin: Bool {
-        store.selectedKeyID.flatMap(store.state(for:))?.configuration.providerID == .routin
+    var hasRoutinAccount: Bool {
+        store.visibleKeyIDs.contains {
+            store.state(for: $0)?.configuration.providerID == .routin
+        }
     }
 
     var usageListHeader: some View {
@@ -245,22 +225,12 @@ private extension UsagePopoverView {
 
             Spacer(minLength: 8)
 
-            if let selectedState = store.selectedKeyID.flatMap(store.state(for:)) {
-                Label("当前账户 · \(selectedState.configuration.displayName)", systemImage: "checkmark.circle.fill")
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(Color.accentColor)
-                    .lineLimit(1)
-            }
         }
         .padding(.horizontal, 16)
         .padding(.top, 10)
         .padding(.bottom, 4)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            store.selectedKeyID.flatMap(store.state(for:)).map {
-                "账户用量，共 \(store.visibleKeyIDs.count) 个 Key，当前账户 \($0.configuration.displayName)"
-            } ?? "账户用量，共 \(store.visibleKeyIDs.count) 个 Key"
-        )
+        .accessibilityLabel("账户用量，共 \(store.visibleKeyIDs.count) 个 Key")
     }
 
     var footer: some View {
@@ -319,6 +289,7 @@ private extension UsagePopoverView {
 
             HStack(spacing: 10) {
                 Button {
+                    NSApp.setActivationPolicy(.regular)
                     openWindow(id: "settings")
                 } label: {
                     Image(systemName: "gearshape")

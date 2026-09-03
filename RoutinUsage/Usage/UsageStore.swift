@@ -34,7 +34,6 @@ struct KeyUsageState: Equatable, Sendable {
 final class UsageStore {
     private(set) var states: [UUID: KeyUsageState] = [:]
     private(set) var orderedKeyIDs: [UUID] = []
-    private(set) var selectedKeyID: UUID?
     private(set) var isRefreshing = false
 
     var visibleKeyIDs: [UUID] {
@@ -56,8 +55,6 @@ final class UsageStore {
     @ObservationIgnored private var refreshingKeyIDs: Set<UUID> = []
     @ObservationIgnored private var refreshGenerationByKeyID: [UUID: UUID] = [:]
     @ObservationIgnored private var invalidKeyFingerprintsByKeyID: [UUID: CredentialFingerprint] = [:]
-
-    private static let selectedKeyStorageKey = "selectedKeyID"
 
     init(
         keyRepository: KeyRepository,
@@ -171,14 +168,6 @@ final class UsageStore {
         }
     }
 
-    func selectKey(_ id: UUID) {
-        guard states[id]?.configuration.isEnabled == true else {
-            return
-        }
-        selectedKeyID = id
-        persistSelection()
-    }
-
     func setKeyEnabled(_ id: UUID, enabled: Bool) throws {
         do {
             _ = try keyRepository.setEnabled(id: id, enabled: enabled)
@@ -186,13 +175,6 @@ final class UsageStore {
             throw Self.storeError(from: error)
         }
         synchronizeConfigurations()
-        if !enabled, selectedKeyID == id {
-            selectedKeyID = visibleKeyIDs.first
-            persistSelection()
-        } else if enabled, selectedKeyID == nil {
-            selectedKeyID = id
-            persistSelection()
-        }
     }
 
     func addValidatedKey(name: String, secret: String) async throws {
@@ -240,11 +222,6 @@ final class UsageStore {
             isStale: false,
             error: result == nil ? .noSubscription : nil
         )
-        if selectedKeyID == nil {
-            selectedKeyID = configuration.id
-            persistSelection()
-        }
-
         if let result {
             try? cache.save(result, for: configuration.id)
             let refreshGeneration = UUID()
@@ -280,10 +257,6 @@ final class UsageStore {
         states.removeValue(forKey: id)
         orderedKeyIDs.removeAll { $0 == id }
         isRefreshing = !refreshingKeyIDs.isEmpty
-        if selectedKeyID == id {
-            selectedKeyID = orderedKeyIDs.first
-            persistSelection()
-        }
         if cacheDeletionFailed {
             throw UsageStoreError.persistence
         }
@@ -313,13 +286,6 @@ final class UsageStore {
                 )
             )
         })
-
-        let storedID = defaults.string(forKey: Self.selectedKeyStorageKey)
-            .flatMap(UUID.init(uuidString:))
-        selectedKeyID = storedID.flatMap { id in
-            states[id]?.configuration.isEnabled == true ? id : nil
-        } ?? orderedKeyIDs.first(where: { states[$0]?.configuration.isEnabled == true })
-        persistSelection()
     }
 
     private func synchronizeConfigurations() {
@@ -351,11 +317,6 @@ final class UsageStore {
                     error: nil
                 )
             }
-        }
-
-        if selectedKeyID.flatMap({ states[$0] })?.configuration.isEnabled != true {
-            selectedKeyID = orderedKeyIDs.first(where: { states[$0]?.configuration.isEnabled == true })
-            persistSelection()
         }
     }
 
@@ -605,14 +566,6 @@ final class UsageStore {
                     return await self.shouldDeliverNotification(work)
                 }
             )
-        }
-    }
-
-    private func persistSelection() {
-        if let selectedKeyID {
-            defaults.set(selectedKeyID.uuidString, forKey: Self.selectedKeyStorageKey)
-        } else {
-            defaults.removeObject(forKey: Self.selectedKeyStorageKey)
         }
     }
 

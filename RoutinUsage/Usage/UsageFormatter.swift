@@ -78,7 +78,15 @@ enum UsageFormatter {
         now: Date = .now,
         timeZone: TimeZone = .current
     ) -> String {
-        guard let windowEnd = metric.windowEnd else {
+        resetTime(metric.windowEnd, now: now, timeZone: timeZone)
+    }
+
+    static func resetTime(
+        _ windowEnd: Date?,
+        now: Date = .now,
+        timeZone: TimeZone = .current
+    ) -> String {
+        guard let windowEnd else {
             return "--"
         }
         var calendar = Calendar(identifier: .gregorian)

@@ -2,6 +2,19 @@ import AppKit
 import SwiftUI
 
 final class RoutinUsageAppDelegate: NSObject, NSApplicationDelegate {
+    static var didFinishLaunchingHandler: (() -> Void)?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            guard !RoutinUsageApp.isRunningUnitTests else {
+                return
+            }
+            SettingsWindowActivationPolicy.refresh()
+            Self.didFinishLaunchingHandler?()
+        }
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return false
     }
@@ -10,6 +23,7 @@ final class RoutinUsageAppDelegate: NSObject, NSApplicationDelegate {
 @main
 @MainActor
 struct RoutinUsageApp: App {
+    @MainActor private static var retainedStatusBarController: StatusBarController?
     nonisolated static let applicationName = "MyRoutin"
     nonisolated static let websiteURL = URL(string: "https://routin.ai")!
     nonisolated static let githubURL = URL(string: "https://github.com/dick86114/MyRoutin")!
@@ -22,16 +36,26 @@ struct RoutinUsageApp: App {
     @State private var environment: AppEnvironment
     @State private var statusBarController: StatusBarController?
 
-    private static var isRunningUnitTests: Bool {
+    static var isRunningUnitTests: Bool {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
 
     init() {
         let environment = AppEnvironment.live()
         _environment = State(initialValue: environment)
-        _statusBarController = State(
-            initialValue: Self.isRunningUnitTests ? nil : StatusBarController(environment: environment)
-        )
+        _statusBarController = State(initialValue: nil)
+
+        guard !Self.isRunningUnitTests else {
+            return
+        }
+        RoutinUsageAppDelegate.didFinishLaunchingHandler = { [environment] in
+            Self.installStatusBarController(environment: environment)
+        }
+    }
+
+    @MainActor
+    private static func installStatusBarController(environment: AppEnvironment) {
+        retainedStatusBarController = StatusBarController(environment: environment)
     }
 
     var body: some Scene {
@@ -49,7 +73,6 @@ struct RoutinUsageApp: App {
                 },
                 addValidatedCredential: environment.addValidatedCredential,
                 updateValidatedCredential: environment.updateValidatedCredential,
-                moveKey: environment.moveKey(fromOffsets:toOffset:),
                 setKeyEnabled: environment.setKeyEnabled(_:enabled:),
                 updateStatus: environment.updateStatus,
                 checkForUpdates: environment.checkForUpdates,

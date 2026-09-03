@@ -30,20 +30,20 @@ struct GLMUsageProvider: UsageProvider {
             url: root.appendingPathComponent("/api/monitor/usage/model-usage").appending(query: query),
             credential: credential
         )
-        async let tool = request(
-            url: root.appendingPathComponent("/api/monitor/usage/tool-usage").appending(query: query),
-            credential: credential
-        )
         async let quota = request(
             url: root.appendingPathComponent("/api/monitor/usage/quota/limit"),
             credential: credential
         )
 
-        let (modelValue, toolValue, quotaValue) = try await (model, tool, quota)
-        var metrics: [NormalizedUsageMetric] = []
-        metrics.append(contentsOf: Self.quotaMetrics(from: quotaValue))
-        metrics.append(contentsOf: Self.breakdownMetrics(from: modelValue, prefix: "model", label: "模型"))
-        metrics.append(contentsOf: Self.breakdownMetrics(from: toolValue, prefix: "tool", label: "工具"))
+        let (modelValue, quotaValue) = try await (model, quota)
+        let quotaMetrics = Self.quotaMetrics(from: quotaValue)
+        var metrics = quotaMetrics.filter { $0.id != "zcode-mcp" }
+        if let modelCallMetric = Self.modelCallMetric(from: modelValue) {
+            metrics.append(modelCallMetric)
+        }
+        if let zcodeMCPMetric = quotaMetrics.first(where: { $0.id == "zcode-mcp" }) {
+            metrics.append(zcodeMCPMetric)
+        }
         guard !metrics.isEmpty else {
             throw UsageProviderError.invalidResponse
         }
@@ -112,112 +112,104 @@ struct GLMUsageProvider: UsageProvider {
             limits = []
         }
 
-        return limits.enumerated().compactMap { index, item in
+        var fiveHour: NormalizedUsageMetric?
+        var weekly: NormalizedUsageMetric?
+        var zcodeMCP: NormalizedUsageMetric?
+
+        for item in limits {
             guard case let .object(object) = item,
                   let percentage = object["percentage"]?.numberValue()
-            else { return nil }
+            else { continue }
             let type = object["type"]?.stringValue() ?? "quota"
-            let unit = object["unit"]?.stringValue()?.lowercased() ?? ""
+            let unit = object["unit"]?.numberValue().map { NSDecimalNumber(decimal: $0).intValue }
             let number = object["number"]?.numberValue().map { NSDecimalNumber(decimal: $0).intValue }
-            let label: String
-            if type == "TOKENS_LIMIT" {
-                let isWeekly = unit.contains("week") || unit.contains("weekly") || number == 7 || number == 6
-                label = isWeekly ? "Token 剩余额度（每周）" : "Token 剩余额度（5 小时）"
-            } else if type == "TIME_LIMIT" {
-                label = "MCP 剩余额度（1 个月）"
-            } else if type == "CREDIT_LIMIT" {
-                label = "工具调用剩余额度"
-            } else {
-                label = type
-            }
-            return NormalizedUsageMetric(
-                id: "quota-\(index)-\(type)",
-                label: label,
-                used: percentage,
-                limit: 100,
-                remaining: 100 - percentage,
-                unit: .token,
-                presentation: .progress,
-                healthState: percentage >= 80 ? .critical : (percentage >= 50 ? .warning : .normal)
-            )
-        }
-    }
+            let windowEnd = Self.date(fromMilliseconds: object["nextResetTime"]?.numberValue())
 
-    private static func breakdownMetrics(
-        from value: GLMJSONValue,
-        prefix: String,
-        label: String
-    ) -> [NormalizedUsageMetric] {
-        let values: [GLMJSONValue]
-        switch value {
-        case let .object(object):
-            if let percentage = Self.nestedObject(object)?["percentage"]?.numberValue() {
-                let name = ["name", "type", "tool", "toolName", "model", "modelName"]
-                    .compactMap { Self.nestedObject(object)?[$0]?.stringValue() }
-                    .first ?? label
-                return [NormalizedUsageMetric(
-                    id: "\(prefix)-summary",
-                    label: "\(name) 剩余",
-                    used: percentage,
-                    limit: 100,
-                    remaining: 100 - percentage,
-                    unit: .request,
-                    presentation: .progress,
-                    healthState: percentage >= 80 ? .critical : (percentage >= 50 ? .warning : .normal)
-                )]
-            }
-            if case let .object(data)? = object["data"], case let .array(items)? = data["items"] {
-                values = items
-            } else if case let .array(items)? = object["data"] {
-                values = items
-            } else if case let .array(items)? = object["items"] {
-                values = items
-            } else {
-                values = []
-            }
-        case let .array(items):
-            values = items
-        default:
-            values = []
-        }
-
-        return values.enumerated().compactMap { index, item in
-            guard case let .object(object) = item else { return nil }
-            let name = ["model", "modelName", "tool", "toolName", "name", "id"]
-                .compactMap { object[$0]?.stringValue() }
-                .first ?? "\(label) \(index + 1)"
-
-            if let percentage = object["percentage"]?.numberValue() {
-                return NormalizedUsageMetric(
-                    id: "\(prefix)-\(index)",
-                    label: "\(name) 剩余",
-                    used: percentage,
-                    limit: 100,
-                    remaining: 100 - percentage,
-                    unit: .request,
-                    presentation: .progress,
-                    healthState: percentage >= 80 ? .critical : (percentage >= 50 ? .warning : .normal)
+            switch (type, unit, number) {
+            case ("TOKENS_LIMIT", 3, 5):
+                fiveHour = Self.percentMetric(
+                    id: "five-hour",
+                    label: "5 小时用量",
+                    percentage: percentage,
+                    windowEnd: windowEnd
                 )
+            case ("TOKENS_LIMIT", 6, 1):
+                weekly = Self.percentMetric(
+                    id: "weekly",
+                    label: "每周用量",
+                    percentage: percentage,
+                    windowEnd: windowEnd
+                )
+            case ("TIME_LIMIT", _, _):
+                let limit = object["usage"]?.numberValue() ?? 100
+                let used = object["currentValue"]?.numberValue() ?? percentage
+                let remaining = object["remaining"]?.numberValue() ?? max(0, limit - used)
+                zcodeMCP = NormalizedUsageMetric(
+                    id: "zcode-mcp",
+                    label: "ZCode MCP 用量",
+                    used: used,
+                    limit: limit,
+                    remaining: remaining,
+                    unit: .request,
+                    windowEnd: windowEnd,
+                    presentation: .progress,
+                    healthState: Self.healthState(for: percentage)
+                )
+            default:
+                continue
             }
-
-            let amount = ["tokens", "tokenCount", "count", "usage", "value", "currentUsage"]
-                .compactMap { object[$0]?.numberValue() }
-                .first
-            guard let amount else { return nil }
-            return NormalizedUsageMetric(
-                id: "\(prefix)-\(index)",
-                label: "\(label)：\(name)",
-                value: amount,
-                unit: .request,
-                presentation: .value,
-                healthState: .normal
-            )
         }
+
+        return [fiveHour, weekly, zcodeMCP].compactMap { $0 }
     }
 
-    private static func nestedObject(_ object: [String: GLMJSONValue]) -> [String: GLMJSONValue]? {
-        if case let .object(data)? = object["data"] { return data }
-        return object
+    private static func modelCallMetric(from value: GLMJSONValue) -> NormalizedUsageMetric? {
+        guard case let .object(object) = value,
+              case let .object(data)? = object["data"],
+              case let .object(totalUsage)? = data["totalUsage"],
+              let count = totalUsage["totalModelCallCount"]?.numberValue()
+        else {
+            return nil
+        }
+        return NormalizedUsageMetric(
+            id: "model-calls",
+            label: "调用量",
+            value: count,
+            unit: .request,
+            presentation: .value,
+            healthState: .normal
+        )
+    }
+
+    private static func percentMetric(
+        id: String,
+        label: String,
+        percentage: Decimal,
+        windowEnd: Date?
+    ) -> NormalizedUsageMetric {
+        NormalizedUsageMetric(
+            id: id,
+            label: label,
+            used: percentage,
+            limit: 100,
+            remaining: max(0, 100 - percentage),
+            unit: .token,
+            windowEnd: windowEnd,
+            presentation: .progress,
+            healthState: healthState(for: percentage)
+        )
+    }
+
+    private static func healthState(for percentage: Decimal) -> UsageMetricHealthState {
+        let value = NSDecimalNumber(decimal: percentage).doubleValue
+        if value >= 80 { return .critical }
+        if value >= 50 { return .warning }
+        return .normal
+    }
+
+    private static func date(fromMilliseconds value: Decimal?) -> Date? {
+        guard let value else { return nil }
+        return Date(timeIntervalSince1970: NSDecimalNumber(decimal: value).doubleValue / 1_000)
     }
 
     private static func windowStart(from date: Date) -> Date {

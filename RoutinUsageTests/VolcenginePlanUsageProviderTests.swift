@@ -13,7 +13,7 @@ final class VolcenginePlanUsageProviderTests: XCTestCase {
                 httpVersion: nil,
                 headerFields: ["Content-Type": "application/json"]
             ))
-            let body = #"{"Result":{"PlanType":"Max","AFPFiveHour":{"Quota":"100","Used":"25","ResetTime":1893456000000,"SubscribeTime":1893452400000},"AFPDaily":{"Quota":"500","Used":"100","ResetTime":1893456000000,"SubscribeTime":1893369600000}}}"#
+            let body = #"{"Result":{"PlanType":"Max","AFPFiveHour":{"Quota":"10000","Used":"0","ResetTime":1893456000000},"AFPDaily":{"Quota":"50000","Used":"0"},"AFPWeekly":{"Quota":"35000","Used":"3252.2867","ResetTime":1893456000000},"AFPMonthly":{"Quota":"100000","Used":"41222.3834","ResetTime":1893456000000}}}"#
             return (response, Data(body.utf8))
         }
         let provider = VolcenginePlanUsageProvider(session: stub.session, endpoint: URL(string: "https://ark.test/")!)
@@ -30,9 +30,12 @@ final class VolcenginePlanUsageProviderTests: XCTestCase {
 
         XCTAssertEqual(snapshot.providerID, .volcengine)
         XCTAssertEqual(snapshot.planName, "Max Plan")
-        XCTAssertEqual(snapshot.metrics.count, 2)
-        XCTAssertEqual(snapshot.metrics.first?.used, 25)
-        XCTAssertEqual(snapshot.metrics.first?.limit, 100)
+        XCTAssertEqual(snapshot.metrics.map(\.id), ["fiveHour", "weekly", "monthly"])
+        XCTAssertEqual(snapshot.metrics.map(\.label), ["近 5 小时用量", "近一周用量", "近一月用量"])
+        XCTAssertEqual(snapshot.metrics[1].used, Decimal(string: "3252.2867"))
+        XCTAssertEqual(snapshot.metrics[1].limit, 35_000)
+        XCTAssertEqual(snapshot.metrics[2].used, Decimal(string: "41222.3834"))
+        XCTAssertEqual(snapshot.metrics[2].limit, 100_000)
         XCTAssertEqual(snapshot.metrics.first?.presentation, .progress)
     }
 

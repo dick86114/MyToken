@@ -91,12 +91,12 @@ final class UsageFormatterTests: XCTestCase {
         )
     }
     @MainActor
-    func test菜单栏独立竖条图像只承载彩色用量条() {
+    func test菜单栏独立竖条图像有效渲染() {
         let image = MenuBarVerticalUsageIcon.image(percent: 35)
 
         XCTAssertEqual(image.size.width, 7)
         XCTAssertEqual(image.size.height, 18)
-        XCTAssertFalse(image.isTemplate)
+        XCTAssertTrue(image.isTemplate)
     }
 
     @MainActor
@@ -105,73 +105,12 @@ final class UsageFormatterTests: XCTestCase {
 
         XCTAssertEqual(image.size.width, 18)
         XCTAssertEqual(image.size.height, 18)
-        XCTAssertFalse(image.isTemplate)
+        XCTAssertTrue(image.isTemplate)
         XCTAssertNotNil(NSImage(named: "MenuBarLogoOutline"))
         XCTAssertNotNil(NSImage(named: "MenuBarLogoMask"))
     }
 
     @MainActor
-    func test菜单栏Logo轮廓在浅色系统外观使用黑色() throws {
-        let appearance = try XCTUnwrap(NSAppearance(named: .aqua))
-        var darkPixelCount = 0
-
-        appearance.performAsCurrentDrawingAppearance {
-            let image = MenuBarLogoUsageIcon.image(percent: 0)
-            let representation = try? NSBitmapImageRep(
-                data: try XCTUnwrap(image.tiffRepresentation)
-            )
-            guard let representation else {
-                return
-            }
-            for x in 0..<representation.pixelsWide {
-                for y in 0..<representation.pixelsHigh {
-                    guard let color = representation.colorAt(x: x, y: y)?
-                        .usingColorSpace(.deviceRGB) else {
-                        continue
-                    }
-                    if color.redComponent < 0.3,
-                       color.greenComponent < 0.3,
-                       color.blueComponent < 0.3 {
-                        darkPixelCount += 1
-                    }
-                }
-            }
-        }
-
-        XCTAssertGreaterThan(darkPixelCount, 50)
-    }
-
-    @MainActor
-    func test菜单栏Logo进度图标在有用量时绘制彩色填充() throws {
-        func greenPixelCount(in image: NSImage) throws -> Int {
-            let representation = try XCTUnwrap(
-                NSBitmapImageRep(data: try XCTUnwrap(image.tiffRepresentation))
-            )
-
-            return (0..<representation.pixelsWide).reduce(into: 0) { count, x in
-                for y in 0..<representation.pixelsHigh {
-                    guard let color = representation.colorAt(x: x, y: y)?
-                        .usingColorSpace(.deviceRGB) else {
-                        continue
-                    }
-                    if color.greenComponent > color.redComponent * 1.2,
-                       color.greenComponent > color.blueComponent * 1.2 {
-                        count += 1
-                    }
-                }
-            }
-        }
-
-        let emptyGreenPixelCount = try greenPixelCount(
-            in: MenuBarLogoUsageIcon.image(percent: 0)
-        )
-        let progressGreenPixelCount = try greenPixelCount(
-            in: MenuBarLogoUsageIcon.image(percent: 35)
-        )
-
-        XCTAssertGreaterThan(progressGreenPixelCount, emptyGreenPixelCount)
-    }
-
     func test菜单栏把百分比四舍五入为整数() {
         let state = makeState(snapshot: makePeriodicSnapshot(fiveHourPercent: 67.5))
 
@@ -655,7 +594,7 @@ final class UsageFormatterTests: XCTestCase {
         )
     }
 
-    func test当前Key的可访问性标签和提示明确表达选中状态() throws {
+    func testKey的可访问性提示不再表达选中状态() throws {
         let state = makeState(snapshot: makePeriodicSnapshot(fiveHourPercent: 67.5))
         let metric = try XCTUnwrap(state.snapshot?.fiveHour)
 
@@ -664,32 +603,30 @@ final class UsageFormatterTests: XCTestCase {
                 state: state,
                 metric: metric,
                 dimension: .fiveHour,
-                isSelected: true
-            ),
-            "当前，主账号，已使用 68%，$6.80 / $10.00，5 小时剩余 —，周剩余 —"
-        )
-        XCTAssertEqual(
-            UsageRowAccessibility.hint(isSelected: true),
-            "已是菜单栏当前 Key"
-        )
-    }
-
-    func test非当前Key保留设为当前的可访问性提示() throws {
-        let state = makeState(snapshot: makePeriodicSnapshot(fiveHourPercent: 67.5))
-        let metric = try XCTUnwrap(state.snapshot?.fiveHour)
-
-        XCTAssertEqual(
-            UsageRowAccessibility.label(
-                state: state,
-                metric: metric,
-                dimension: .fiveHour,
-                isSelected: false
             ),
             "主账号，已使用 68%，$6.80 / $10.00，5 小时剩余 —，周剩余 —"
         )
         XCTAssertEqual(
-            UsageRowAccessibility.hint(isSelected: false),
-            "点击后设为菜单栏当前 Key"
+            UsageRowAccessibility.hint(),
+            ""
+        )
+    }
+
+    func test非当前Key不提供设为当前提示() throws {
+        let state = makeState(snapshot: makePeriodicSnapshot(fiveHourPercent: 67.5))
+        let metric = try XCTUnwrap(state.snapshot?.fiveHour)
+
+        XCTAssertEqual(
+            UsageRowAccessibility.label(
+                state: state,
+                metric: metric,
+                dimension: .fiveHour,
+            ),
+            "主账号，已使用 68%，$6.80 / $10.00，5 小时剩余 —，周剩余 —"
+        )
+        XCTAssertEqual(
+            UsageRowAccessibility.hint(),
+            ""
         )
     }
 
@@ -729,7 +666,6 @@ final class UsageFormatterTests: XCTestCase {
                 state: state,
                 metric: metric,
                 dimension: .fiveHour,
-                isSelected: false,
                 now: now
             ),
             "主账号，已使用 68%，$6.80 / $10.00，5 小时剩余 3小时 45分钟，周剩余 2天 15分钟，Codex ×1、Codex Pro ×2"
@@ -760,7 +696,6 @@ final class UsageFormatterTests: XCTestCase {
             state: state,
             metric: metric,
             dimension: .fiveHour,
-            isSelected: false
         )
 
         XCTAssertTrue(label.contains("Fast ×1.5"))

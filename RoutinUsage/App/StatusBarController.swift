@@ -14,7 +14,6 @@ final class StatusBarController: NSObject {
     private var refreshMinutes: Int
     private var notificationsEnabled: Bool
     private var thresholds: AlertThresholds
-    private var selectedKeyID: UUID?
     private var selectedCredentialIDs: [UUID]
     private var appearanceObservation: NSKeyValueObservation?
     private var popoverWindowResignObserver: NSObjectProtocol?
@@ -24,7 +23,6 @@ final class StatusBarController: NSObject {
         refreshMinutes = environment.settings.refreshMinutes
         notificationsEnabled = environment.settings.notificationsEnabled
         thresholds = environment.settings.thresholds
-        selectedKeyID = environment.store.selectedKeyID
         selectedCredentialIDs = environment.settings.selectedCredentialIDs
         super.init()
 
@@ -40,6 +38,7 @@ final class StatusBarController: NSObject {
             await self.environment.start()
             self.environment.presentUpdateCompletionNoticeIfNeeded()
         }
+
     }
 
     private func configurePopover() {
@@ -50,6 +49,8 @@ final class StatusBarController: NSObject {
     }
 
     private func configureStatusButton() {
+        statusItem.autosaveName = "ai.routin.myroutin"
+        statusItem.isVisible = true
         guard let button = statusItem.button else {
             return
         }
@@ -57,6 +58,7 @@ final class StatusBarController: NSObject {
         button.action = #selector(handleStatusButtonClick(_:))
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         button.imagePosition = .imageRight
+        button.imageScaling = .scaleProportionallyDown
     }
 
     private func observeStatusBarAppearance() {
@@ -76,7 +78,6 @@ final class StatusBarController: NSObject {
             _ = environment.settings.notificationsEnabled
             _ = environment.settings.thresholds
             _ = environment.settings.selectedCredentialIDs
-            _ = environment.store.selectedKeyID
             _ = environment.store.states
             _ = environment.updateStatus
             _ = environment.routinCheckIn.state
@@ -103,10 +104,6 @@ final class StatusBarController: NSObject {
             thresholds = settings.thresholds
             environment.thresholdsDidChange(to: thresholds)
         }
-        if selectedKeyID != environment.store.selectedKeyID {
-            selectedKeyID = environment.store.selectedKeyID
-            Task { await environment.selectedKeyDidChange(to: selectedKeyID) }
-        }
         if selectedCredentialIDs != settings.selectedCredentialIDs {
             selectedCredentialIDs = settings.selectedCredentialIDs
         }
@@ -117,7 +114,6 @@ final class StatusBarController: NSObject {
         guard let button = statusItem.button else {
             return
         }
-        let state = environment.store.selectedKeyID.flatMap(environment.store.state(for:))
         let selectedIndicators = environment.settings.selectedCredentialIDs.compactMap { id -> MenuBarIndicatorModel? in
             guard let state = environment.store.state(for: id),
                   let descriptor = ProviderRegistry.builtInDescriptors.first(where: { $0.id == state.configuration.providerID })
@@ -129,13 +125,22 @@ final class StatusBarController: NSObject {
             )
         }
         if !selectedIndicators.isEmpty {
+            let displayedCount = min(selectedIndicators.count, MenuBarMultiUsageIcon.maximumCount)
+            let imageWidth = MenuBarMultiUsageIcon.unitWidth * CGFloat(displayedCount)
+                + MenuBarMultiUsageIcon.gap * CGFloat(max(0, displayedCount - 1))
+            statusItem.length = imageWidth + 8
             button.title = ""
-            button.image = MenuBarMultiUsageIcon.image(indicators: selectedIndicators)
+            button.image = MenuBarMultiUsageIcon.image(
+                indicators: selectedIndicators,
+                appearance: button.effectiveAppearance
+            )
             button.imagePosition = .imageOnly
+            button.imageScaling = .scaleProportionallyDown
             button.setAccessibilityLabel(selectedIndicators.map(\.accessibilityLabel).joined(separator: "；"))
             button.toolTip = selectedIndicators.map(\.accessibilityLabel).joined(separator: "；")
             return
         }
+        let state: KeyUsageState? = nil
         let text = UsageFormatter.menuBarText(
             state: state,
             dimension: environment.settings.displayDimension,
@@ -203,15 +208,19 @@ final class StatusBarController: NSObject {
             popover.performClose(nil)
         } else {
             NSApp.activate(ignoringOtherApps: true)
+            let contentSize = popoverContentSize(for: button)
+            popover.contentSize = contentSize
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            configurePopoverWindow()
+            configurePopoverWindow(contentSize: contentSize)
         }
     }
 
-    private func configurePopoverWindow() {
+    private func configurePopoverWindow(contentSize: NSSize) {
         guard let window = popover.contentViewController?.view.window else {
             return
         }
+        window.contentViewController?.preferredContentSize = contentSize
+        window.setContentSize(contentSize)
         window.level = .statusBar
         window.makeKeyAndOrderFront(nil)
 
@@ -227,15 +236,18 @@ final class StatusBarController: NSObject {
         }
     }
 
+    private func popoverContentSize(for button: NSStatusBarButton) -> NSSize {
+        let screenHeight = button.window?.screen?.visibleFrame.height
+            ?? NSScreen.main?.visibleFrame.height
+            ?? 800
+        return NSSize(width: 440, height: screenHeight * 0.9)
+    }
+
     private func showContextMenu(from button: NSStatusBarButton) {
         popover.performClose(nil)
         let menu = NSMenu()
         menu.autoenablesItems = false
         menu.presentationStyle = .regular
-
-        let accountsItem = NSMenuItem(title: "切换账号", action: nil, keyEquivalent: "")
-        accountsItem.submenu = accountMenu()
-        menu.addItem(accountsItem)
 
         let settingsItem = NSMenuItem(
             title: "设置",
@@ -279,41 +291,6 @@ final class StatusBarController: NSObject {
         button.performClick(nil)
     }
 
-    private func accountMenu() -> NSMenu {
-        let menu = NSMenu()
-        let keyIDs = environment.store.visibleKeyIDs
-        guard !keyIDs.isEmpty else {
-            let emptyItem = NSMenuItem(title: "尚未配置账号", action: nil, keyEquivalent: "")
-            emptyItem.isEnabled = false
-            menu.addItem(emptyItem)
-            return menu
-        }
-
-        for id in keyIDs {
-            guard let state = environment.store.state(for: id) else {
-                continue
-            }
-            let item = NSMenuItem(
-                title: state.configuration.displayName,
-                action: #selector(selectAccount(_:)),
-                keyEquivalent: ""
-            )
-            item.target = self
-            item.representedObject = id.uuidString
-            item.state = environment.store.selectedKeyID == id ? .on : .off
-            menu.addItem(item)
-        }
-        return menu
-    }
-
-    @objc private func selectAccount(_ sender: NSMenuItem) {
-        guard let idText = sender.representedObject as? String,
-              let id = UUID(uuidString: idText) else {
-            return
-        }
-        environment.store.selectKey(id)
-    }
-
     @objc private func checkForUpdates() {
         Task { await environment.checkForUpdates() }
     }
@@ -330,6 +307,7 @@ final class StatusBarController: NSObject {
     }
 
     @objc private func openSettingsWindow() {
+        NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         NotificationCenter.default.post(name: Notification.Name.showSettingsWindow, object: nil)
     }

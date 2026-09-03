@@ -2,6 +2,52 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
+private struct MenuBarIndicatorCardDropDelegate: DropDelegate {
+    @Binding var draggedID: UUID?
+    let targetID: UUID
+    let orderedIDs: [UUID]
+    let move: (UUID, UUID) -> Void
+
+    func dropEntered(info: DropInfo) {
+        guard
+            let draggedID,
+            draggedID != targetID,
+            orderedIDs.contains(draggedID),
+            orderedIDs.contains(targetID)
+        else {
+            return
+        }
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+            move(draggedID, targetID)
+        }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggedID = nil
+        return true
+    }
+}
+
+private struct MenuBarIndicatorCardDragControl: View {
+    let id: UUID
+    let enabled: Bool
+    @Binding var draggedID: UUID?
+
+    var body: some View {
+        Image(systemName: "line.3.horizontal")
+            .font(.system(.body, weight: .medium))
+            .foregroundStyle(Color.secondary.opacity(enabled ? 1 : 0.35))
+            .frame(width: 28, height: 32)
+            .contentShape(Rectangle())
+            .help(enabled ? "拖动调整菜单栏与弹窗排序" : "点击排序后可拖动")
+            .accessibilityLabel("拖动排序")
+    }
+}
+
 enum KeyDisplayMask {
     static func masked(suffix: String) -> String {
         guard
@@ -14,47 +60,51 @@ enum KeyDisplayMask {
     }
 }
 
-private struct KeyRowDropDelegate: DropDelegate {
-    let targetID: UUID
-    let move: @MainActor (UUID) -> Void
-
-    func performDrop(info: DropInfo) -> Bool {
-        guard let provider = info.itemProviders(for: [UTType.text]).first else {
-            return false
-        }
-        provider.loadObject(ofClass: NSString.self) { object, _ in
-            guard
-                let value = object as? String,
-                let draggedID = UUID(uuidString: value)
-            else {
-                return
-            }
-            Task { @MainActor in
-                move(draggedID)
-            }
-        }
-        return true
+/// 设置窗口存在时临时显示 Dock 图标，关闭后恢复菜单栏应用形态。
+private struct SettingsDockIconAnchor: NSViewRepresentable {
+    func makeNSView(context: Context) -> SettingsDockIconView {
+        SettingsDockIconView()
     }
+
+    func updateNSView(_ nsView: SettingsDockIconView, context: Context) {}
 }
 
-private struct CredentialSortInteraction: ViewModifier {
-    let enabled: Bool
-    let targetID: UUID
-    let move: @MainActor (UUID, UUID) -> Void
+private final class SettingsDockIconView: NSView {
+    private weak var observedWindow: NSWindow?
+    private var closeObserver: NSObjectProtocol?
 
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if enabled {
-            content.onDrop(
-                of: [UTType.text],
-                delegate: KeyRowDropDelegate(targetID: targetID) { draggedID in
-                    move(draggedID, targetID)
-                }
-            )
-        } else {
-            content
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        closeObserver.map(NotificationCenter.default.removeObserver)
+        closeObserver = nil
+        if let observedWindow {
+            SettingsWindowActivationPolicy.unregister(observedWindow)
+            self.observedWindow = nil
+        }
+
+        guard let window else {
+            if let observedWindow {
+                SettingsWindowActivationPolicy.unregister(observedWindow)
+                self.observedWindow = nil
+            }
+            return
+        }
+        SettingsWindowActivationPolicy.register(window)
+        observedWindow = window
+        closeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: window,
+            queue: .main
+        ) { notification in
+            guard let window = notification.object as? NSWindow else {
+                return
+            }
+            MainActor.assumeIsolated {
+                SettingsWindowActivationPolicy.unregister(window)
+            }
         }
     }
+
 }
 
 @MainActor
@@ -62,7 +112,6 @@ struct SettingsView: View {
     typealias UpdateValidatedKey = @MainActor (UUID, String, String) async throws -> KeyEditorSaveResult
     typealias AddValidatedCredential = @MainActor (ValidatedCredentialInput) async throws -> KeyEditorSaveResult
     typealias UpdateValidatedCredential = @MainActor (UUID, ValidatedCredentialInput) async throws -> KeyEditorSaveResult
-    typealias MoveKey = @MainActor (IndexSet, Int) -> Void
     typealias SetKeyEnabled = @MainActor (UUID, Bool) throws -> Void
     typealias CheckForUpdates = @MainActor () async -> Void
     typealias InstallAvailableUpdate = @MainActor () async -> Void
@@ -103,7 +152,7 @@ struct SettingsView: View {
             case .display:
                 return "显示与刷新"
             case .system:
-                return "通知与系统"
+                return "系统与更新"
             }
         }
 
@@ -114,7 +163,7 @@ struct SettingsView: View {
             case .display:
                 return "rectangle.3.group"
             case .system:
-                return "bell.badge"
+                return "gearshape"
             }
         }
     }
@@ -126,7 +175,6 @@ struct SettingsView: View {
     private let updateValidatedKey: UpdateValidatedKey
     private let addValidatedCredential: AddValidatedCredential
     private let updateValidatedCredential: UpdateValidatedCredential
-    private let moveKey: MoveKey
     private let setKeyEnabled: SetKeyEnabled
     private let updateStatus: AppUpdateStatus
     private let checkForUpdates: CheckForUpdates
@@ -146,14 +194,11 @@ struct SettingsView: View {
     @State private var editor: EditorPresentation?
     @State private var pendingDeletion: KeyConfiguration?
     @State private var selectedSection: SettingsSection? = .accounts
-    @State private var isReordering = false
+    @State private var isReorderingMenuBarIndicators = false
+    @State private var draggingIndicatorID: UUID?
     @State private var expandedKeyID: UUID?
     @State private var orderedKeyIDs: [UUID]
-    @State private var lowThreshold: Int
-    @State private var highThreshold: Int
-    @State private var thresholdError: String?
     @State private var operationError: String?
-    @State private var revealedConfiguration: KeyConfiguration?
 
     init(
         store: UsageStore,
@@ -162,7 +207,6 @@ struct SettingsView: View {
         updateValidatedKey: @escaping UpdateValidatedKey,
         addValidatedCredential: @escaping AddValidatedCredential = { _ in .saved },
         updateValidatedCredential: @escaping UpdateValidatedCredential = { _, _ in .saved },
-        moveKey: @escaping MoveKey,
         setKeyEnabled: @escaping SetKeyEnabled = { _, _ in },
         updateStatus: AppUpdateStatus = .idle,
         checkForUpdates: @escaping CheckForUpdates = {},
@@ -183,7 +227,6 @@ struct SettingsView: View {
         self.updateValidatedKey = updateValidatedKey
         self.addValidatedCredential = addValidatedCredential
         self.updateValidatedCredential = updateValidatedCredential
-        self.moveKey = moveKey
         self.setKeyEnabled = setKeyEnabled
         self.updateStatus = updateStatus
         self.checkForUpdates = checkForUpdates
@@ -198,8 +241,6 @@ struct SettingsView: View {
         self.codexGroupDetectionRecord = codexGroupDetectionRecord
         self.clearCodexGroupDetection = clearCodexGroupDetection
         _orderedKeyIDs = State(initialValue: store.orderedKeyIDs)
-        _lowThreshold = State(initialValue: settings.thresholds.low)
-        _highThreshold = State(initialValue: settings.thresholds.high)
     }
 
     var body: some View {
@@ -220,20 +261,16 @@ struct SettingsView: View {
         .frame(minWidth: 760, idealWidth: 860, minHeight: 520, idealHeight: 620)
         .liquidGlassWindowBackground()
         .background(WindowFramePersistence())
+        .background(SettingsDockIconAnchor())
         .onChange(of: store.orderedKeyIDs) { _, ids in
             orderedKeyIDs = ids
         }
         .onAppear {
-            // 应用以 LSUIElement 菜单栏模式启动。打开独立设置窗口时切换为普通应用，
-            // 让程序坞显示图标并允许用户在多个窗口间切换；窗口关闭后恢复菜单栏模式。
-            NSApp.setActivationPolicy(.regular)
-            NSApp.activate(ignoringOtherApps: true)
             LoginItemSettingSynchronizer.synchronize(
                 settings: settings,
                 manager: loginItemManager
             )
         }
-        .onDisappear { NSApp.setActivationPolicy(.accessory) }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             LoginItemSettingSynchronizer.synchronize(
                 settings: settings,
@@ -267,16 +304,6 @@ struct SettingsView: View {
         } message: {
             Text(operationError ?? "发生未知错误")
         }
-        .sheet(item: $revealedConfiguration) { configuration in
-            if let secret = readKey(configuration.id) {
-                CredentialRevealView(
-                    title: "显示 \(configuration.displayName) 的凭证",
-                    secret: secret
-                )
-            } else {
-                ContentUnavailableView("无法读取凭证", systemImage: "key.slash")
-            }
-        }
     }
 }
 
@@ -299,21 +326,11 @@ private extension SettingsView {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("供应商与凭证")
                         .font(.title2.weight(.semibold))
-                    Text("按供应商管理独立凭证；菜单栏可选择 1～4 个指标")
+                    Text("按供应商管理独立凭证；菜单栏指标请在“显示与刷新”中管理")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button {
-                    isReordering.toggle()
-                } label: {
-                    Label(
-                        isReordering ? "完成" : "排序",
-                        systemImage: isReordering ? "checkmark" : "arrow.up.arrow.down"
-                    )
-                }
-                .liquidGlassButton()
-                .accessibilityLabel(isReordering ? "完成排序" : "调整 Key 排序")
                 Button {
                     editor = .add
                 } label: {
@@ -352,7 +369,7 @@ private extension SettingsView {
                     }
                 }
                 .listStyle(.plain)
-                .accessibilityLabel("Key 列表，可拖动排序")
+                .accessibilityLabel("Key 列表")
                 .scrollContentBackground(.hidden)
             }
         }
@@ -362,25 +379,6 @@ private extension SettingsView {
     func keyRow(_ configuration: KeyConfiguration) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 10) {
-                if isReordering {
-                    Image(systemName: "line.3.horizontal")
-                        .foregroundStyle(.secondary)
-                        .frame(width: 22, height: 28)
-                        .contentShape(Rectangle())
-                        .onDrag {
-                            NSItemProvider(object: configuration.id.uuidString as NSString)
-                        }
-                        .onHover { isHovered in
-                            if isHovered {
-                                NSCursor.openHand.push()
-                            } else {
-                                NSCursor.pop()
-                            }
-                        }
-                        .help("拖动以调整排序")
-                        .accessibilityLabel("拖动 (configuration.displayName) 调整排序")
-                }
-
                 VStack(alignment: .leading, spacing: 3) {
                     Text(configuration.displayName)
                         .font(.headline)
@@ -422,17 +420,8 @@ private extension SettingsView {
                 .toggleStyle(.button)
                 .controlSize(.small)
                 .tint(settings.selectedCredentialIDs.contains(configuration.id) ? .accentColor : .secondary)
-                .help(settings.selectedCredentialIDs.contains(configuration.id) ? "点击从菜单栏移除" : "点击添加到菜单栏（最多 4 个）")
+                .help(settings.selectedCredentialIDs.contains(configuration.id) ? "点击从菜单栏移除" : "点击添加到菜单栏（最多 5 个）")
                 .accessibilityLabel(settings.selectedCredentialIDs.contains(configuration.id) ? "从菜单栏移除" : "添加到菜单栏")
-
-                Button {
-                    revealedConfiguration = configuration
-                } label: {
-                    Image(systemName: "eye")
-                }
-                .buttonStyle(.borderless)
-                .help("显示并复制凭证")
-                .accessibilityLabel("显示并复制 \(configuration.displayName) 的凭证")
 
                 Button {
                     editor = .edit(configuration)
@@ -467,34 +456,12 @@ private extension SettingsView {
         .padding(.horizontal, 8)
         .opacity(configuration.isEnabled ? 1 : 0.55)
         .contentShape(Rectangle())
-        .onHover { isHovered in
-            if isHovered {
-                if !isReordering {
-                    NSCursor.pointingHand.push()
-                }
-            } else {
-                NSCursor.pop()
-            }
-        }
-        .modifier(CredentialSortInteraction(
-            enabled: isReordering,
-            targetID: configuration.id,
-            move: { draggedID, targetID in
-                move(draggedID: draggedID, before: targetID)
-            }
-        ))
         .onTapGesture {
-            if !isReordering {
-                expandedKeyID = configuration.id
-            }
+            expandedKeyID = expandedKeyID == configuration.id ? nil : configuration.id
         }
         .listRowSeparator(.visible)
         .listRowSeparatorTint(Color.secondary.opacity(0.28))
-        .listRowBackground(
-            store.selectedKeyID == configuration.id
-                ? Color.accentColor.opacity(0.10)
-                : Color.clear
-        )
+        .listRowBackground(Color.clear)
     }
 
     @ViewBuilder
@@ -502,9 +469,10 @@ private extension SettingsView {
         if let snapshot = state.snapshot {
             VStack(alignment: .leading, spacing: 10) {
                 if !snapshot.metrics.isEmpty {
-                    ForEach(snapshot.normalizedMetrics.prefix(3)) { metric in
-                        normalizedUsageDetailItem(metric)
-                    }
+                    normalizedUsageOverview(
+                        snapshot: snapshot,
+                        providerID: state.configuration.providerID
+                    )
                 } else if snapshot.kind == .periodic {
                     HStack(alignment: .top, spacing: 16) {
                         if let metric = snapshot.fiveHour {
@@ -645,6 +613,20 @@ private extension SettingsView {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private func normalizedUsageOverview(
+        snapshot: UsageSnapshot,
+        providerID: ProviderID
+    ) -> some View {
+        let layout = UsageMetricGridPolicy.layout(
+            providerID: providerID,
+            metrics: snapshot.normalizedMetrics
+        )
+        return NormalizedUsageMetricGrid(
+            metrics: layout.metrics,
+            columns: layout.columns
+        )
+    }
+
     func usageDetailItem(_ title: String, _ metric: UsageMetric) -> some View {
         let percentText = UsageFormatter.percentText(metric) ?? "—"
 
@@ -682,53 +664,6 @@ private extension SettingsView {
         .accessibilityLabel(
             "\(title)，已使用 \(percentText)，\(UsageFormatter.amount(metric))，剩余 \(UsageFormatter.remaining(metric))"
         )
-    }
-
-    @ViewBuilder
-    func normalizedUsageDetailItem(_ metric: NormalizedUsageMetric) -> some View {
-        switch metric.presentation {
-        case .progress:
-            let percent = metric.displayedPercent ?? 0
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(metric.label).foregroundStyle(.tertiary)
-                    Spacer()
-                    Text("\(Int(percent.rounded()))%")
-                        .font(.system(.headline, design: .rounded, weight: .semibold))
-                        .foregroundStyle(normalizedMetricColor(metric.healthState))
-                        .monospacedDigit()
-                }
-                ProgressView(value: min(max(percent, 0), 100), total: 100)
-                    .tint(normalizedMetricColor(metric.healthState))
-                if let remaining = metric.remaining {
-                    Text("剩余 \(decimalText(remaining))")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-            }
-        case .balance:
-            HStack {
-                Text(metric.label).foregroundStyle(.tertiary)
-                Spacer()
-                Text("\(decimalText(metric.value)) 元")
-                    .foregroundStyle(normalizedMetricColor(metric.healthState))
-                    .monospacedDigit()
-            }
-        case .status:
-            HStack {
-                Text(metric.label).foregroundStyle(.tertiary)
-                Spacer()
-                Text(metric.healthState == .unavailable ? "不可用" : "可用")
-                    .foregroundStyle(normalizedMetricColor(metric.healthState))
-            }
-        case .value:
-            HStack {
-                Text(metric.label).foregroundStyle(.tertiary)
-                Spacer()
-                Text(decimalText(metric.value)).monospacedDigit()
-            }
-        }
     }
 
     func normalizedDetailValue(_ metric: NormalizedUsageMetric) -> some View {
@@ -798,38 +733,62 @@ private extension SettingsView {
             settingsPageHeader("显示与刷新", subtitle: "选择菜单栏指标并控制后台刷新频率")
 
             Form {
-                Section("菜单栏指标（\(settings.selectedCredentialIDs.count)/4）") {
-                    ForEach(orderedKeyIDs, id: \.self) { id in
-                        if let configuration = store.state(for: id)?.configuration, configuration.isEnabled {
-                            Toggle(configuration.displayName, isOn: Binding(
-                                get: { settings.selectedCredentialIDs.contains(id) },
-                                set: { setMenuBarSelection(id, selected: $0) }
-                            ))
-                            .disabled(!settings.selectedCredentialIDs.contains(id) && settings.selectedCredentialIDs.count >= 4)
+                Section {
+                    if selectedMenuBarConfigurations.isEmpty {
+                        Text("尚未选择菜单栏指标")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(selectedMenuBarConfigurations) { configuration in
+                            menuBarIndicatorRow(configuration)
+                                .background {
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .fill(Color.primary.opacity(0.04))
+                                }
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .stroke(Color.secondary.opacity(0.14), lineWidth: 1)
+                                }
+                                .padding(.vertical, 3)
+                                .onDrop(
+                                    of: [UTType.text],
+                                    delegate: MenuBarIndicatorCardDropDelegate(
+                                        draggedID: $draggingIndicatorID,
+                                        targetID: configuration.id,
+                                        orderedIDs: selectedMenuBarConfigurations.map(\.id),
+                                        move: { draggedID, targetID in
+                                            moveMenuBarIndicator(draggedID: draggedID, before: targetID)
+                                        }
+                                    )
+                                )
                         }
                     }
-                    if orderedKeyIDs.isEmpty {
-                        Text("尚未添加凭证")
-                            .foregroundStyle(.secondary)
+                } header: {
+                    HStack {
+                        Text("菜单栏指标（\(selectedMenuBarConfigurations.count)/5）")
+                        Spacer()
+                        Button {
+                            toggleMenuBarReordering()
+                        } label: {
+                            Label(
+                                isReorderingMenuBarIndicators ? "完成" : "排序",
+                                systemImage: isReorderingMenuBarIndicators ? "checkmark" : "arrow.up.arrow.down"
+                            )
+                        }
+                        .buttonStyle(.borderless)
+                        .disabled(selectedMenuBarConfigurations.count < 2)
+                        .accessibilityLabel(isReorderingMenuBarIndicators ? "完成菜单栏指标排序" : "调整菜单栏指标排序")
                     }
                 }
 
-                Section("兼容选项") {
-                    Picker("当前 Key", selection: selectedKeyBinding) {
-                        ForEach(orderedKeyIDs, id: \.self) { id in
-                            if let configuration = store.state(for: id)?.configuration {
-                                Text(configuration.displayName).tag(Optional(id))
-                            }
+                Section("可添加的指标") {
+                    if availableMenuBarConfigurations.isEmpty {
+                        Text(orderedKeyIDs.isEmpty ? "尚未添加凭证" : "没有可添加的已启用凭证")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(availableMenuBarConfigurations) { configuration in
+                            availableMenuBarIndicatorRow(configuration)
                         }
                     }
-                    .disabled(orderedKeyIDs.isEmpty)
-                    .accessibilityLabel("菜单栏当前 Key")
-                    Picker("显示样式", selection: $settings.menuBarStyle) {
-                        ForEach(MenuBarStyle.allCases, id: \.rawValue) { style in
-                            Text(style.title).tag(style)
-                        }
-                    }
-                    .accessibilityLabel("菜单栏显示样式")
                 }
 
                 Section("自动刷新") {
@@ -851,31 +810,9 @@ private extension SettingsView {
 
     var notificationsAndSystem: some View {
         VStack(alignment: .leading, spacing: 16) {
-            settingsPageHeader("通知与系统", subtitle: "管理额度预警、登录启动、签到与软件更新")
+            settingsPageHeader("系统与更新", subtitle: "管理登录启动、签到与软件更新")
 
             Form {
-                Section("额度通知") {
-                    Toggle("启用额度通知", isOn: $settings.notificationsEnabled)
-                        .accessibilityLabel("启用额度通知")
-
-                    Stepper("低阈值：\(lowThreshold)%", value: $lowThreshold, in: 1...100)
-                        .disabled(!settings.notificationsEnabled)
-                        .accessibilityLabel("低通知阈值，\(lowThreshold)%")
-                        .onChange(of: lowThreshold) { _, _ in applyThresholds() }
-
-                    Stepper("高阈值：\(highThreshold)%", value: $highThreshold, in: 1...100)
-                        .disabled(!settings.notificationsEnabled)
-                        .accessibilityLabel("高通知阈值，\(highThreshold)%")
-                        .onChange(of: highThreshold) { _, _ in applyThresholds() }
-
-                    if let thresholdError {
-                        Text(thresholdError)
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                            .accessibilityLabel("阈值错误，\(thresholdError)")
-                    }
-                }
-
                 Section("系统") {
                     Toggle("登录时启动", isOn: launchAtLoginBinding)
                         .accessibilityLabel("登录时启动")
@@ -900,17 +837,6 @@ private extension SettingsView {
             .formStyle(.grouped)
         }
         .padding(24)
-    }
-
-    var selectedKeyBinding: Binding<UUID?> {
-        Binding(
-            get: { store.selectedKeyID },
-            set: { id in
-                if let id {
-                    store.selectKey(id)
-                }
-            }
-        )
     }
 
     var launchAtLoginBinding: Binding<Bool> {
@@ -1071,20 +997,6 @@ private extension SettingsView {
             : .saved
     }
 
-    func move(fromOffsets: IndexSet, toOffset: Int) {
-        let validOffsets = fromOffsets.filter { orderedKeyIDs.indices.contains($0) }
-        guard !validOffsets.isEmpty, (0...orderedKeyIDs.count).contains(toOffset) else {
-            return
-        }
-        let moving = validOffsets.map { orderedKeyIDs[$0] }
-        for index in validOffsets.reversed() {
-            orderedKeyIDs.remove(at: index)
-        }
-        let removedBeforeDestination = validOffsets.filter { $0 < toOffset }.count
-        orderedKeyIDs.insert(contentsOf: moving, at: toOffset - removedBeforeDestination)
-        moveKey(IndexSet(validOffsets), toOffset)
-    }
-
     struct SettingsProviderGroup: Identifiable {
         let id: ProviderID
         let displayName: String
@@ -1109,20 +1021,133 @@ private extension SettingsView {
         }
     }
 
-    func move(draggedID: UUID, before targetID: UUID) {
+    var selectedMenuBarConfigurations: [KeyConfiguration] {
+        settings.selectedCredentialIDs.compactMap { id in
+            guard let configuration = store.state(for: id)?.configuration, configuration.isEnabled else {
+                return nil
+            }
+            return configuration
+        }
+    }
+
+    var availableMenuBarConfigurations: [KeyConfiguration] {
+        orderedKeyIDs.compactMap { id in
+            guard let configuration = store.state(for: id)?.configuration,
+                  configuration.isEnabled,
+                  !settings.selectedCredentialIDs.contains(id)
+            else {
+                return nil
+            }
+            return configuration
+        }
+    }
+
+    func menuBarIndicatorRow(_ configuration: KeyConfiguration) -> some View {
+        HStack(spacing: 10) {
+            if isReorderingMenuBarIndicators {
+                MenuBarIndicatorCardDragControl(
+                    id: configuration.id,
+                    enabled: selectedMenuBarConfigurations.count > 1,
+                    draggedID: $draggingIndicatorID
+                )
+            }
+
+            providerIdentity(for: configuration)
+            Spacer(minLength: 12)
+            if !isReorderingMenuBarIndicators {
+                Button {
+                    setMenuBarSelection(configuration.id, selected: false)
+                } label: {
+                    Image(systemName: "minus.circle")
+                }
+                .buttonStyle(.borderless)
+                .help("从菜单栏移除")
+                .accessibilityLabel("从菜单栏移除 \(configuration.displayName)")
+            }
+        }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 10)
+            .opacity(draggingIndicatorID == configuration.id ? 0.78 : 1)
+            .scaleEffect(draggingIndicatorID == configuration.id ? 1.02 : 1)
+            .shadow(color: .black.opacity(draggingIndicatorID == configuration.id ? 0.18 : 0),
+                radius: draggingIndicatorID == configuration.id ? 10 : 0,
+                y: draggingIndicatorID == configuration.id ? 4 : 0
+            )
+            .animation(.spring(response: 0.32, dampingFraction: 0.82), value: draggingIndicatorID)
+            .onDrag {
+                guard isReorderingMenuBarIndicators, selectedMenuBarConfigurations.count > 1 else {
+                    return NSItemProvider()
+                }
+                draggingIndicatorID = configuration.id
+                let provider = NSItemProvider(object: configuration.id.uuidString as NSString)
+                provider.suggestedName = configuration.displayName
+                return provider
+            }
+    }
+
+    func availableMenuBarIndicatorRow(_ configuration: KeyConfiguration) -> some View {
+        HStack(spacing: 10) {
+            providerIdentity(for: configuration)
+            Spacer(minLength: 12)
+            Button {
+                setMenuBarSelection(configuration.id, selected: true)
+            } label: {
+                Image(systemName: "plus.circle")
+            }
+            .buttonStyle(.borderless)
+            .disabled(settings.selectedCredentialIDs.count >= 5)
+            .help("添加到菜单栏")
+            .accessibilityLabel("将 \(configuration.displayName) 添加到菜单栏")
+        }
+    }
+
+    func providerIdentity(for configuration: KeyConfiguration) -> some View {
+        let descriptor = ProviderRegistry.builtInDescriptors.first(where: { $0.id == configuration.providerID })
+        return VStack(alignment: .leading, spacing: 2) {
+            Text(configuration.displayName)
+                .font(.body.weight(.medium))
+            HStack(spacing: 5) {
+                Image(systemName: descriptor?.iconName ?? "key")
+                Text(descriptor?.displayName ?? configuration.providerID.rawValue)
+                if configuration.providerID == .routin {
+                    Text(KeyDisplayMask.masked(suffix: configuration.keySuffix))
+                        .font(.system(.caption2, design: .monospaced))
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("别名 \(configuration.displayName)，供应商 \(descriptor?.displayName ?? configuration.providerID.rawValue)")
+    }
+
+    func toggleMenuBarReordering() {
+        isReorderingMenuBarIndicators.toggle()
+    }
+
+    func moveMenuBarIndicator(draggedID: UUID, before targetID: UUID) {
         guard
             draggedID != targetID,
-            let sourceIndex = orderedKeyIDs.firstIndex(of: draggedID),
-            let targetIndex = orderedKeyIDs.firstIndex(of: targetID)
+            let sourceIndex = settings.selectedCredentialIDs.firstIndex(of: draggedID),
+            let targetIndex = settings.selectedCredentialIDs.firstIndex(of: targetID)
         else {
             return
         }
-        move(fromOffsets: IndexSet(integer: sourceIndex), toOffset: targetIndex)
+        let destination = targetIndex > sourceIndex ? targetIndex + 1 : targetIndex
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+            settings.moveSelectedCredential(
+                fromOffsets: IndexSet(integer: sourceIndex),
+                toOffset: destination
+            )
+        }
     }
 
     func setEnabled(_ configuration: KeyConfiguration, enabled: Bool) {
         do {
             try setKeyEnabled(configuration.id, enabled)
+            if !enabled {
+                setMenuBarSelection(configuration.id, selected: false)
+            }
         } catch {
             operationError = "无法更新 Key 显示状态，请稍后重试"
         }
@@ -1131,7 +1156,7 @@ private extension SettingsView {
     func setMenuBarSelection(_ id: UUID, selected: Bool) {
         var ids = settings.selectedCredentialIDs
         if selected {
-            guard !ids.contains(id), ids.count < 4 else { return }
+            guard !ids.contains(id), ids.count < 5 else { return }
             ids.append(id)
         } else {
             ids.removeAll { $0 == id }
@@ -1152,13 +1177,4 @@ private extension SettingsView {
         }
     }
 
-    func applyThresholds() {
-        do {
-            try KeyEditorValidation.validateThresholds(low: lowThreshold, high: highThreshold)
-            settings.thresholds = AlertThresholds(low: lowThreshold, high: highThreshold)
-            thresholdError = nil
-        } catch {
-            thresholdError = error.localizedDescription
-        }
-    }
 }

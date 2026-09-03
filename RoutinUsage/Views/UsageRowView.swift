@@ -2,7 +2,6 @@ import SwiftUI
 
 @MainActor
 struct UsageRowView: View {
-    let store: UsageStore
     let state: KeyUsageState
     let detectionState: CodexGroupDetectionState
     let detectionRecord: CodexGroupDetectionRecord?
@@ -12,39 +11,17 @@ struct UsageRowView: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { timeline in
             HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-                        .font(.system(size: 12, weight: .semibold))
-                        .padding(.top, 4)
-                        .accessibilityHidden(true)
-
                     VStack(alignment: .leading, spacing: 7) {
                         headerView(now: timeline.date)
                         content(now: timeline.date)
                     }
             }
-            .contentShape(Rectangle())
             .padding(.vertical, 10)
             .padding(.horizontal, 8)
             .opacity(isSubscriptionExpired(now: timeline.date) ? 0.45 : 1)
-            .background {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.accentColor.opacity(0.10))
-                }
-            }
-            .overlay {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Color.accentColor.opacity(0.18), lineWidth: 1)
-                }
-            }
             .accessibilityElement(children: .combine)
             .accessibilityLabel(accessibilityLabel(now: timeline.date))
             .accessibilityHint(accessibilityHint)
-            .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : [.isButton])
-            .accessibilityAction { store.selectKey(state.configuration.id) }
-            .onTapGesture { store.selectKey(state.configuration.id) }
         }
     }
 }
@@ -54,11 +31,9 @@ enum UsageRowAccessibility {
         state: KeyUsageState,
         metric: UsageMetric?,
         dimension: DisplayDimension,
-        isSelected: Bool,
         now: Date = .now
     ) -> String {
-        let currentPrefix = isSelected ? "当前，" : ""
-        let prefix = "\(currentPrefix)\(state.configuration.displayName)，"
+        let prefix = "\(state.configuration.displayName)，"
         let summary: String
         if state.isRefreshing || (state.error != nil && metric != nil) {
             summary = prefix + UsageFormatter.statusText(state: state, dimension: dimension)
@@ -103,8 +78,8 @@ enum UsageRowAccessibility {
         return ([summary] + details).joined(separator: "，")
     }
 
-    static func hint(isSelected: Bool) -> String {
-        isSelected ? "已是菜单栏当前 Key" : "点击后设为菜单栏当前 Key"
+    static func hint() -> String {
+        ""
     }
 
     private static func remainingDuration(for metric: UsageMetric?, now: Date) -> String {
@@ -113,11 +88,19 @@ enum UsageRowAccessibility {
     }
 }
 
-private extension UsageRowView {
-    var isSelected: Bool {
-        store.selectedKeyID == state.configuration.id
+enum UsageRowPresentation {
+    static func subscriptionDescription(providerID: ProviderID, planName: String) -> String {
+        let providerName = ProviderRegistry.builtInDescriptors
+            .first(where: { $0.id == providerID })?
+            .displayName ?? providerID.rawValue
+        guard !planName.isEmpty else {
+            return providerName
+        }
+        return "\(providerName) · \(planName)"
     }
+}
 
+private extension UsageRowView {
     func headerView(now: Date) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .top, spacing: 8) {
@@ -126,11 +109,6 @@ private extension UsageRowView {
                         Text(state.configuration.displayName)
                             .font(.headline)
                             .lineLimit(1)
-                        if isSelected {
-                            Text("当前账户")
-                                .font(.caption2.weight(.medium))
-                                .foregroundStyle(Color.accentColor)
-                        }
                     }
                     subscriptionDescription(now: now)
                 }
@@ -267,7 +245,7 @@ private extension UsageRowView {
         if let snapshot = state.snapshot {
             VStack(alignment: .leading, spacing: 7) {
                 if !snapshot.metrics.isEmpty {
-                    normalizedMetricsContent(snapshot: snapshot, now: now)
+                    normalizedMetricsContent(snapshot: snapshot)
                 } else {
                     switch snapshot.kind {
                     case .periodic:
@@ -368,61 +346,15 @@ private extension UsageRowView {
         }
     }
 
-    @ViewBuilder
-    func normalizedMetricsContent(snapshot: UsageSnapshot, now: Date) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(snapshot.normalizedMetrics) { metric in
-                normalizedMetricContent(metric, now: now)
-            }
-        }
-    }
-
-    @ViewBuilder
-    func normalizedMetricContent(_ metric: NormalizedUsageMetric, now: Date) -> some View {
-        switch metric.presentation {
-        case .progress:
-            let percent = metric.displayedPercent ?? 0
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(metric.label)
-                    Spacer()
-                    Text("\(Int(percent.rounded()))%")
-                        .monospacedDigit()
-                        .foregroundStyle(normalizedMetricColor(metric.healthState))
-                }
-                UsageMetricProgressBar(percent: percent)
-                if let remaining = metric.remaining {
-                    Text("剩余 \(decimalText(remaining))")
-                }
-                if let windowEnd = metric.windowEnd {
-                    Text("重置 \(UsageFormatter.remainingDurationText(until: windowEnd, now: now))")
-                }
-            }
-        case .balance:
-            HStack {
-                Text(metric.label)
-                Spacer()
-                Text("余额 \(decimalText(metric.value)) \(metric.currencyCode ?? "")")
-                    .foregroundStyle(normalizedMetricColor(metric.healthState))
-                    .monospacedDigit()
-            }
-        case .status:
-            HStack(spacing: 5) {
-                Circle()
-                    .fill(normalizedMetricColor(metric.healthState))
-                    .frame(width: 7, height: 7)
-                Text(metric.label)
-                Spacer()
-                Text(metric.healthState == .unavailable ? "不可用" : "可用")
-            }
-        case .value:
-            HStack {
-                Text(metric.label)
-                Spacer()
-                Text(decimalText(metric.value))
-                    .monospacedDigit()
-            }
-        }
+    func normalizedMetricsContent(snapshot: UsageSnapshot) -> some View {
+        let layout = UsageMetricGridPolicy.layout(
+            providerID: state.configuration.providerID,
+            metrics: snapshot.normalizedMetrics
+        )
+        return NormalizedUsageMetricGrid(
+            metrics: layout.metrics,
+            columns: layout.columns
+        )
     }
 
     @ViewBuilder
@@ -521,15 +453,10 @@ private extension UsageRowView {
     }
 
     func subscriptionDescriptionText(for snapshot: UsageSnapshot) -> String {
-        if !snapshot.planName.isEmpty, !snapshot.metrics.isEmpty {
-            return snapshot.planName
-        }
-        switch snapshot.kind {
-        case .periodic:
-            return "\(snapshot.planName) · 5 小时与周"
-        case .tokenPack:
-            return "\(snapshot.planName) · Token 资源包"
-        }
+        UsageRowPresentation.subscriptionDescription(
+            providerID: state.configuration.providerID,
+            planName: snapshot.planName
+        )
     }
 
     var currentGroupMultiplier: UsageGroupMultiplier? {
@@ -591,18 +518,17 @@ private extension UsageRowView {
                 }
                 return metric.label
             }.joined(separator: "，")
-            return "\(isSelected ? "当前，" : "")\(state.configuration.displayName)，\(metricText)"
+            return "\(state.configuration.displayName)，\(metricText)"
         }
         return UsageRowAccessibility.label(
             state: state,
             metric: validMetric(state.snapshot?.fiveHour) ?? validMetric(state.snapshot?.token),
             dimension: .fiveHour,
-            isSelected: isSelected,
             now: now
         )
     }
 
     var accessibilityHint: String {
-        UsageRowAccessibility.hint(isSelected: isSelected)
+        UsageRowAccessibility.hint()
     }
 }

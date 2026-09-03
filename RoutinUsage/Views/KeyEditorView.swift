@@ -1,6 +1,16 @@
 import Observation
 import SwiftUI
 
+enum CredentialVisibility {
+    static func canToggle(secret: String) -> Bool {
+        !secret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    static func iconName(isVisible: Bool) -> String {
+        isVisible ? "eye" : "eye.slash"
+    }
+}
+
 struct ValidatedKeyInput: Equatable, Sendable {
     let name: String
     let secret: String
@@ -205,8 +215,20 @@ struct KeyEditorView: View {
         @Bindable var model = model
 
         VStack(alignment: .leading, spacing: 20) {
-            Text(title)
-                .font(.title3.weight(.semibold))
+            HStack {
+                Text(title)
+                    .font(.title3.weight(.semibold))
+                Spacer()
+                Button {
+                    model.cancelSaving()
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                }
+                .buttonStyle(.borderless)
+                .help("关闭")
+                .accessibilityLabel("关闭")
+            }
 
             Form {
                 TextField("名称", text: $model.name)
@@ -230,9 +252,12 @@ struct KeyEditorView: View {
                     Button {
                         isSecretVisible.toggle()
                     } label: {
-                        Image(systemName: isSecretVisible ? "eye" : "eye.slash")
+                        Image(systemName: CredentialVisibility.iconName(isVisible: isSecretVisible))
                     }
                     .buttonStyle(.borderless)
+                    .foregroundStyle(CredentialVisibility.canToggle(secret: model.secret) ? .primary : .tertiary)
+                    .disabled(!CredentialVisibility.canToggle(secret: model.secret))
+                    .help(isSecretVisible ? "隐藏 plan Key" : "显示 plan Key")
                     .accessibilityLabel(isSecretVisible ? "隐藏 plan Key" : "显示 plan Key")
                 }
             }
@@ -274,6 +299,11 @@ struct KeyEditorView: View {
         .frame(width: 440)
         .onAppear { focusedField = .name }
         .onDisappear { model.cancelSaving() }
+        .onChange(of: model.secret) { _, secret in
+            if !CredentialVisibility.canToggle(secret: secret) {
+                isSecretVisible = false
+            }
+        }
         .onChange(of: model.saveResult) { _, result in
             guard result == .saved else {
                 return

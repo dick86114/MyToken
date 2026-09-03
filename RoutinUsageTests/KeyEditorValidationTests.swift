@@ -140,6 +140,12 @@ final class KeyEditorValidationTests: XCTestCase {
         }
     }
 
+    func test密钥可见性按钮空值不可操作且有值默认闭眼() {
+        XCTAssertFalse(CredentialVisibility.canToggle(secret: "  \n"))
+        XCTAssertEqual(CredentialVisibility.iconName(isVisible: false), "eye.slash")
+        XCTAssertEqual(CredentialVisibility.iconName(isVisible: true), "eye")
+    }
+
     private func waitUntil(_ condition: @MainActor () -> Bool) async -> Bool {
         for _ in 0..<1_000 {
             if condition() {

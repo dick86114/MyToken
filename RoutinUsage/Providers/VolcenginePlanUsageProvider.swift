@@ -80,10 +80,9 @@ struct VolcenginePlanUsageProvider: UsageProvider {
             let payload = try JSONDecoder().decode(VolcengineUsageResponse.self, from: data)
             guard let result = payload.result else { throw UsageProviderError.invalidResponse }
             let windows: [(String, String, VolcengineUsageWindow?)] = [
-                ("fiveHour", "5 小时 AFP", result.afpFiveHour),
-                ("daily", "近 1 天 AFP", result.afpDaily),
-                ("weekly", "周 AFP", result.afpWeekly),
-                ("monthly", "月 AFP", result.afpMonthly)
+                ("fiveHour", "近 5 小时用量", result.afpFiveHour),
+                ("weekly", "近一周用量", result.afpWeekly),
+                ("monthly", "近一月用量", result.afpMonthly)
             ]
             var metrics = windows.compactMap { id, label, window -> NormalizedUsageMetric? in
                 guard let window, window.quota > 0 else { return nil }

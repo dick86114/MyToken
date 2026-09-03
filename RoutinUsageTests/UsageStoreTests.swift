@@ -83,7 +83,7 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertEqual(activeRequestCount, 2)
     }
 
-    func test禁用Key不显示不刷新并将当前Key回退到启用Key() async throws {
+    func test禁用Key不显示不刷新() async throws {
         let context = try makeContext()
         defer { context.cleanUp() }
         let disabledKey = try context.addKey(name: "禁用", secret: "plan-disabled-0001")
@@ -100,7 +100,6 @@ final class UsageStoreTests: XCTestCase {
         let disabledRequestCount = await fetcher.requestCount(for: "plan-disabled-0001")
         let enabledRequestCount = await fetcher.requestCount(for: "plan-enabled-0002")
         XCTAssertEqual(store.visibleKeyIDs, [enabledKey.id])
-        XCTAssertEqual(store.selectedKeyID, enabledKey.id)
         XCTAssertEqual(disabledRequestCount, 0)
         XCTAssertEqual(enabledRequestCount, 1)
     }
@@ -510,19 +509,6 @@ final class UsageStoreTests: XCTestCase {
             ).map(\.level),
             [.high]
         )
-    }
-
-    func test选择Key会持久化并在重建后恢复() throws {
-        let context = try makeContext()
-        defer { context.cleanUp() }
-        _ = try context.addKey(name: "一", secret: "plan-key-0001")
-        let second = try context.addKey(name: "二", secret: "plan-key-0002")
-        let store = context.makeStore()
-
-        store.selectKey(second.id)
-
-        XCTAssertEqual(store.selectedKeyID, second.id)
-        XCTAssertEqual(context.makeStore().selectedKeyID, second.id)
     }
 
     func test删除Key同步清除配置密钥缓存和通知状态() async throws {

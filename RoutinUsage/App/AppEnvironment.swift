@@ -130,6 +130,7 @@ final class AppEnvironment {
     }
 
     static func live() -> AppEnvironment {
+        UserDefaultsMigration.migrateLegacyBundlePreferences()
         let defaults = UserDefaults.standard
         let logWriter = AppLogStore.shared
         let settings = AppSettings(defaults: defaults)
@@ -279,17 +280,6 @@ final class AppEnvironment {
 
     func thresholdsDidChange(to _: AlertThresholds) {
         synchronizeStoreSettings()
-    }
-
-    func selectedKeyDidChange(to keyID: UUID?) async {
-        guard
-            let keyID,
-            let state = store.state(for: keyID),
-            state.snapshot == nil
-        else {
-            return
-        }
-        await store.refresh(keyID: keyID)
     }
 
     func dismissOnboarding() {

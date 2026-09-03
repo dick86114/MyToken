@@ -103,47 +103,88 @@ enum MenuBarUsageRisk: Equatable {
 }
 
 enum MenuBarMultiUsageIcon {
-    static let unitWidth: CGFloat = 20
+    static let maximumCount = 5
+    static let unitWidth: CGFloat = 17
     static let gap: CGFloat = 3
     static let size = NSSize(width: unitWidth, height: 18)
 
-    static func image(indicators: [MenuBarIndicatorModel]) -> NSImage {
-        let count = max(1, min(indicators.count, 4))
+    static func image(
+        indicators: [MenuBarIndicatorModel],
+        appearance: NSAppearance? = nil
+    ) -> NSImage {
+        let count = max(1, min(indicators.count, maximumCount))
         let image = NSImage(size: NSSize(width: unitWidth * CGFloat(count) + gap * CGFloat(count - 1), height: size.height))
         image.lockFocus()
         defer { image.unlockFocus() }
-        for (index, indicator) in indicators.prefix(4).enumerated() {
+        let labelColor = foregroundColor(for: appearance ?? NSApp?.effectiveAppearance)
+        for (index, indicator) in indicators.prefix(maximumCount).enumerated() {
             let x = CGFloat(index) * (unitWidth + gap)
-            draw(indicator: indicator, in: NSRect(x: x, y: 0, width: unitWidth, height: size.height))
+            draw(
+                indicator: indicator,
+                in: NSRect(x: x, y: 0, width: unitWidth, height: size.height),
+                foregroundColor: labelColor
+            )
         }
+        // 模板图会丢弃颜色；这里保留风险色，同时手动根据菜单栏深浅绘制文字。
         image.isTemplate = false
         return image
     }
 
-    private static func draw(indicator: MenuBarIndicatorModel, in rect: NSRect) {
+    static func codeFont(for characterCount: Int) -> NSFont {
+        let size: CGFloat = characterCount >= 3 ? 4.7 : 6
+        return NSFont.monospacedSystemFont(ofSize: size, weight: .bold)
+    }
+
+    static func codeSlotHeight(for characterCount: Int) -> CGFloat {
+        (size.height - 4) / CGFloat(max(1, characterCount))
+    }
+
+    static func codeBaselineY(
+        characterCount: Int,
+        index: Int,
+        font: NSFont
+    ) -> CGFloat {
+        let slotHeight = codeSlotHeight(for: characterCount)
+        let slotBottom = size.height - 2 - slotHeight * CGFloat(index + 1)
+        return slotBottom + (slotHeight - font.capHeight) / 2
+    }
+
+    private static func draw(
+        indicator: MenuBarIndicatorModel,
+        in rect: NSRect,
+        foregroundColor: NSColor
+    ) {
         let text = indicator.shortCode
         let characters = Array(text.prefix(3))
-        let font = NSFont.systemFont(ofSize: characters.count == 3 ? 6 : 7, weight: .bold)
+        let font = codeFont(for: characters.count)
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
-            .foregroundColor: NSColor.labelColor,
+            .foregroundColor: foregroundColor,
             .paragraphStyle: paragraph
         ]
-        let textRect = NSRect(x: rect.minX, y: rect.minY + 1, width: 8, height: rect.height - 2)
+        let textWidth: CGFloat = 9
+
         characters.enumerated().forEach { index, character in
-            NSString(string: String(character)).draw(
-                in: NSRect(x: textRect.minX, y: textRect.maxY - CGFloat(index + 1) * 5.5, width: textRect.width, height: 6),
-                withAttributes: attributes
+            let character = String(character)
+            let characterSize = NSString(string: character).size(withAttributes: attributes)
+            let baselineY = codeBaselineY(
+                characterCount: characters.count,
+                index: index,
+                font: font
             )
+            let origin = NSPoint(
+                x: rect.minX + (textWidth - characterSize.width) / 2,
+                y: baselineY
+            )
+            NSString(string: character).draw(at: origin, withAttributes: attributes)
         }
 
-        let trackRect = NSRect(x: rect.minX + 10, y: 1, width: 8, height: rect.height - 2)
-        let track = NSBezierPath(roundedRect: trackRect, xRadius: 4, yRadius: 4)
-        NSColor.secondaryLabelColor.withAlphaComponent(0.35).setStroke()
-        track.lineWidth = 1.2
-        track.stroke()
+        let trackRect = NSRect(x: rect.minX + 12, y: 2, width: 3, height: rect.height - 4)
+        let track = NSBezierPath(roundedRect: trackRect, xRadius: 1.5, yRadius: 1.5)
+        foregroundColor.withAlphaComponent(0.28).setFill()
+        track.fill()
 
         let color: NSColor
         switch indicator.healthState {
@@ -166,13 +207,13 @@ enum MenuBarMultiUsageIcon {
         NSBezierPath(rect: NSRect(x: trackRect.minX, y: trackRect.minY, width: trackRect.width, height: fillHeight + 1)).fill()
         NSGraphicsContext.restoreGraphicsState()
     }
-}
 
-enum MenuBarLogoAppearance {
-    static func outlineColor(for appearance: NSAppearance) -> NSColor {
-        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-            ? .white
-            : .black
+    private static func foregroundColor(for appearance: NSAppearance?) -> NSColor {
+        guard let appearance,
+              appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua else {
+            return .black
+        }
+        return .white
     }
 }
 
@@ -188,7 +229,7 @@ enum MenuBarVerticalUsageIcon {
             percent: percent,
             in: NSRect(origin: .zero, size: size)
         )
-        image.isTemplate = false
+        image.isTemplate = true
         return image
     }
 
@@ -258,7 +299,7 @@ enum MenuBarLogoUsageIcon {
             appearance: appearance ?? NSApp?.effectiveAppearance
                 ?? NSAppearance(named: .aqua)!
         )
-        image.isTemplate = false
+        image.isTemplate = true
         return image
     }
 
@@ -291,18 +332,16 @@ enum MenuBarLogoUsageIcon {
             NSGraphicsContext.restoreGraphicsState()
         }
 
-        let tintedOutline = NSImage(size: rect.size)
-        tintedOutline.lockFocus()
-        MenuBarLogoAppearance.outlineColor(for: appearance).setFill()
-        NSBezierPath(rect: NSRect(origin: .zero, size: rect.size)).fill()
+        let outlineMask = NSImage(size: rect.size)
+        outlineMask.lockFocus()
         outline.draw(
             in: NSRect(origin: .zero, size: rect.size),
             from: .zero,
-            operation: .destinationIn,
+            operation: .sourceOver,
             fraction: 1
         )
-        tintedOutline.unlockFocus()
-        tintedOutline.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
+        outlineMask.unlockFocus()
+        outlineMask.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
     }
 
     private static func clampedPercent(_ percent: Double) -> Double {

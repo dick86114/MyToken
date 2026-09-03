@@ -125,7 +125,18 @@ struct CredentialEditorView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text(title).font(.title3.weight(.semibold))
+            HStack {
+                Text(title).font(.title3.weight(.semibold))
+                Spacer()
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                }
+                .buttonStyle(.borderless)
+                .help("关闭")
+                .accessibilityLabel("关闭")
+            }
             Form {
                 Picker("供应商", selection: $providerID) {
                     ForEach(ProviderID.allCases) { id in
@@ -154,11 +165,11 @@ struct CredentialEditorView: View {
                         Button {
                             isSecretVisible.toggle()
                         } label: {
-                            Image(systemName: isSecretVisible ? "eye.slash" : "eye")
+                            Image(systemName: CredentialVisibility.iconName(isVisible: isSecretVisible))
                         }
                         .buttonStyle(.borderless)
-                        .foregroundStyle(canRevealSecretAccessKey ? .primary : .tertiary)
-                        .disabled(!canRevealSecretAccessKey)
+                        .foregroundStyle(CredentialVisibility.canToggle(secret: secretAccessKey) ? .primary : .tertiary)
+                        .disabled(!CredentialVisibility.canToggle(secret: secretAccessKey))
                         .help(isSecretVisible ? "隐藏 SecretAccessKey" : "显示 SecretAccessKey")
                         .accessibilityLabel(isSecretVisible ? "隐藏 SecretAccessKey" : "显示 SecretAccessKey")
                     }
@@ -175,11 +186,11 @@ struct CredentialEditorView: View {
                         Button {
                             isSecretVisible.toggle()
                         } label: {
-                            Image(systemName: isSecretVisible ? "eye.slash" : "eye")
+                            Image(systemName: CredentialVisibility.iconName(isVisible: isSecretVisible))
                         }
                         .buttonStyle(.borderless)
-                        .foregroundStyle(canRevealAPIKey ? .primary : .tertiary)
-                        .disabled(!canRevealAPIKey)
+                        .foregroundStyle(CredentialVisibility.canToggle(secret: apiKey) ? .primary : .tertiary)
+                        .disabled(!CredentialVisibility.canToggle(secret: apiKey))
                         .help(isSecretVisible ? "隐藏凭证" : "显示凭证")
                         .accessibilityLabel(isSecretVisible ? "隐藏凭证" : "显示凭证")
                     }
@@ -219,14 +230,19 @@ struct CredentialEditorView: View {
         }
         .padding(28)
         .frame(width: 680)
-    }
-
-    private var canRevealAPIKey: Bool {
-        !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private var canRevealSecretAccessKey: Bool {
-        !secretAccessKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        .onChange(of: providerID) { _, _ in
+            isSecretVisible = false
+        }
+        .onChange(of: apiKey) { _, secret in
+            if !CredentialVisibility.canToggle(secret: secret) {
+                isSecretVisible = false
+            }
+        }
+        .onChange(of: secretAccessKey) { _, secret in
+            if !CredentialVisibility.canToggle(secret: secret) {
+                isSecretVisible = false
+            }
+        }
     }
 
     private func submit() async {

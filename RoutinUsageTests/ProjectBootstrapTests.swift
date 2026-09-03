@@ -6,6 +6,14 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertEqual(RoutinUsageApp.applicationName, "MyRoutin")
     }
 
+    func test正式应用使用新的状态栏身份并保留旧偏好迁移() throws {
+        let project = try sourceText(at: "project.yml")
+        let environment = try sourceText(at: "RoutinUsage/App/AppEnvironment.swift")
+
+        XCTAssertTrue(project.contains("PRODUCT_BUNDLE_IDENTIFIER: ai.routin.myroutin"))
+        XCTAssertTrue(environment.contains("UserDefaultsMigration.migrateLegacyBundlePreferences()"))
+    }
+
     func test应用提供版本号与官网和GitHub地址() throws {
         XCTAssertFalse(RoutinUsageApp.currentVersion.isEmpty)
         XCTAssertEqual(RoutinUsageApp.websiteURL.absoluteString, "https://routin.ai")
@@ -102,6 +110,22 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(source.contains("MenuBarExtra"))
     }
 
+    func test设置页展示全部通用用量指标() throws {
+        let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+
+        XCTAssertTrue(settings.contains("ForEach(snapshot.normalizedMetrics)"))
+        XCTAssertFalse(settings.contains("ForEach(snapshot.normalizedMetrics.prefix(3))"))
+    }
+
+    func test状态栏控制器在应用启动后延迟创建() throws {
+        let source = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
+
+        XCTAssertTrue(source.contains("applicationDidFinishLaunching"))
+        XCTAssertTrue(source.contains("NSApp.setActivationPolicy(.accessory)"))
+        XCTAssertTrue(source.contains("asyncAfter"))
+        XCTAssertTrue(source.contains("Self.installStatusBarController(environment: environment)"))
+    }
+
     func test关闭最后一个设置窗口后应用仍驻留菜单栏() throws {
         let source = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
 
@@ -110,14 +134,15 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(source.contains("return false"))
     }
 
-    func test菜单栏标签提供右键账号与应用操作菜单() throws {
+    func test菜单栏标签提供应用操作菜单但不提供账号选择() throws {
         let statusBarController = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
 
         XCTAssertTrue(statusBarController.contains("button.sendAction(on: [.leftMouseUp, .rightMouseUp])"))
         XCTAssertTrue(statusBarController.contains("button.imagePosition = .imageRight"))
         XCTAssertTrue(statusBarController.contains("NSApp.currentEvent?.type == .rightMouseUp"))
-        XCTAssertTrue(statusBarController.contains("切换账号"))
-        XCTAssertTrue(statusBarController.contains("environment.store.selectKey(id)"))
+        XCTAssertFalse(statusBarController.contains("切换账号"))
+        XCTAssertFalse(statusBarController.contains("environment.store.selectKey(id)"))
+        XCTAssertFalse(statusBarController.contains("selectedKeyID"))
         XCTAssertTrue(statusBarController.contains("设置"))
         XCTAssertTrue(statusBarController.contains("Notification.Name.showSettingsWindow"))
         XCTAssertTrue(statusBarController.contains("检查更新"))
@@ -168,15 +193,17 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(usageRowView.contains("UsageMetricPresentation.color(for: metric.percent)"))
     }
 
-    func test菜单栏弹窗以账户概览突出当前Key() throws {
+    func test菜单栏弹窗不再提供Key选中交互() throws {
         let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
         let row = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
 
         XCTAssertTrue(popover.contains("usageListHeader"))
         XCTAssertTrue(popover.contains("账户用量"))
-        XCTAssertTrue(popover.contains("当前账户"))
-        XCTAssertTrue(row.contains("当前账户"))
-        XCTAssertTrue(row.contains("RoundedRectangle(cornerRadius: 10"))
+        XCTAssertFalse(popover.contains("当前账户"))
+        XCTAssertFalse(popover.contains("isSelectedRoutin"))
+        XCTAssertFalse(row.contains("store.selectedKeyID"))
+        XCTAssertFalse(row.contains("store.selectKey"))
+        XCTAssertFalse(row.contains("当前账户"))
     }
 
     func test设置使用独立可缩放窗口场景而不是系统固定设置场景() throws {
@@ -205,7 +232,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(settings.contains("@State private var revealedKeyIDs"))
         XCTAssertTrue(keyEditor.contains("@State private var isSecretVisible"))
         XCTAssertTrue(keyEditor.contains("TextField(\"plan-…\""))
-        XCTAssertTrue(keyEditor.contains("Image(systemName: isSecretVisible ? \"eye\" : \"eye.slash\")"))
+        XCTAssertTrue(keyEditor.contains("CredentialVisibility.iconName(isVisible: isSecretVisible)"))
     }
 
     func test设置页查看状态不从UserDefaults读取() throws {
@@ -226,8 +253,6 @@ final class ProjectBootstrapTests: XCTestCase {
         let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
         let statusBarController = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
 
-        XCTAssertTrue(settings.contains("Picker(\"显示样式\", selection: $settings.menuBarStyle)"))
-        XCTAssertTrue(settings.contains("MenuBarStyle.allCases"))
         XCTAssertTrue(statusBarController.contains("style: environment.settings.menuBarStyle"))
         XCTAssertTrue(statusBarController.contains("MenuBarVerticalUsage.metric"))
         XCTAssertTrue(statusBarController.contains("button.imagePosition = .imageRight"))
@@ -251,7 +276,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(settings.contains("UsageFormatter.fullDateTime(metric.windowEnd)"))
     }
 
-    func test点击Key时仅展开当前账户详情并保留关联操作按钮() throws {
+    func test点击Key可展开或收起当前账户详情并保留关联操作按钮() throws {
         let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
 
         XCTAssertTrue(settings.contains("detailSection(\"套餐状态\""))
@@ -260,7 +285,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(settings.contains("func detailValue("))
         XCTAssertTrue(settings.contains("@State private var expandedKeyID: UUID?"))
         XCTAssertTrue(settings.contains("if expandedKeyID == configuration.id"))
-        XCTAssertTrue(settings.contains("expandedKeyID = configuration.id"))
+        XCTAssertTrue(settings.contains("expandedKeyID = expandedKeyID == configuration.id ? nil : configuration.id"))
         let unlinkStart = try XCTUnwrap(settings.range(of: "Button(\"解除关联\", role: .destructive)"))
         let unlinkEnd = try XCTUnwrap(settings[unlinkStart.lowerBound...].range(of: ".accessibilityLabel("))
         let unlinkButton = settings[unlinkStart.lowerBound..<unlinkEnd.lowerBound]
@@ -429,6 +454,7 @@ final class ProjectBootstrapTests: XCTestCase {
         let app = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
 
         XCTAssertTrue(app.contains("XCTestConfigurationFilePath"))
+        XCTAssertTrue(app.contains("guard !RoutinUsageApp.isRunningUnitTests"))
         XCTAssertTrue(app.contains("@State private var statusBarController: StatusBarController?"))
     }
 
@@ -460,8 +486,9 @@ final class ProjectBootstrapTests: XCTestCase {
     func test设置页点击Key只展开详情不切换菜单栏当前Key() throws {
         let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
 
-        XCTAssertTrue(settings.contains("expandedKeyID = configuration.id"))
+        XCTAssertTrue(settings.contains("expandedKeyID == configuration.id ? nil : configuration.id"))
         XCTAssertFalse(settings.contains("store.selectKey(configuration.id)"))
+        XCTAssertFalse(settings.contains("store.selectedKeyID == configuration.id"))
     }
 
     func test设置页提供Key启用开关() throws {
@@ -474,30 +501,40 @@ final class ProjectBootstrapTests: XCTestCase {
 
     func test菜单栏弹窗只使用启用Key() throws {
         let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
-        let statusBar = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
-
-        XCTAssertTrue(popover.contains("store.visibleKeyIDs"))
-        XCTAssertTrue(statusBar.contains("environment.store.visibleKeyIDs"))
-    }
-
-    func test设置页提供排序模式并把拖动顺序交给持久化逻辑() throws {
         let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
 
-        XCTAssertTrue(settings.contains("isReordering"))
-        XCTAssertTrue(settings.contains(".onMove(perform: move)"))
+        XCTAssertTrue(popover.contains("store.visibleKeyIDs"))
+        XCTAssertTrue(settings.contains("settings.selectedCredentialIDs"))
+    }
+
+    func test设置页仅为菜单栏指标提供排序模式() throws {
+        let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
+
+        XCTAssertTrue(settings.contains("isReorderingMenuBarIndicators"))
+        XCTAssertFalse(settings.contains("private struct CredentialSortInteraction"))
+        XCTAssertTrue(settings.contains("MenuBarIndicatorCardDropDelegate"))
+        XCTAssertTrue(settings.contains("MenuBarIndicatorCardDragControl"))
+        XCTAssertTrue(settings.contains("draggingIndicatorID"))
         XCTAssertTrue(settings.contains(".onDrag"))
-        XCTAssertTrue(settings.contains(".onDrop"))
+        XCTAssertTrue(settings.contains("withAnimation(.spring(response: 0.32, dampingFraction: 0.82)"))
+        XCTAssertTrue(settings.contains("scaleEffect(draggingIndicatorID == configuration.id ? 1.02 : 1)"))
+        XCTAssertTrue(settings.contains("DropDelegate"))
+        XCTAssertTrue(settings.contains("func moveMenuBarIndicator(draggedID:"))
+        XCTAssertFalse(settings.contains(".onMove(perform: settings.moveSelectedCredential)"))
+        XCTAssertFalse(settings.contains("chevron.up"))
+        XCTAssertFalse(settings.contains("chevron.down"))
         XCTAssertTrue(settings.contains("arrow.up.arrow.down"))
     }
 
-    func testKey行移除复选框使用手型光标并显示分隔() throws {
+    func testKey行移除排序手柄和凭证查看按钮并显示分隔() throws {
         let settings = try sourceText(at: "RoutinUsage/Views/SettingsView.swift")
         let rowStart = try XCTUnwrap(settings.range(of: "func keyRow"))
         let overviewStart = try XCTUnwrap(settings.range(of: "func keyUsageOverview"))
         let row = settings[rowStart.lowerBound..<overviewStart.lowerBound]
 
         XCTAssertFalse(row.contains("checkmark.circle"))
-        XCTAssertTrue(row.contains("NSCursor.pointingHand"))
+        XCTAssertFalse(row.contains("line.3.horizontal"))
+        XCTAssertFalse(row.contains("Image(systemName: \"eye\")"))
         XCTAssertTrue(row.contains("listRowSeparator(.visible"))
     }
 
@@ -621,7 +658,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(row.contains("location.magnifyingglass"))
         XCTAssertTrue(row.contains("Color.green"))
         XCTAssertTrue(row.contains("Codex 分组检测"))
-        XCTAssertTrue(row.contains(".isButton"))
+        XCTAssertFalse(row.contains(".isButton"))
         XCTAssertTrue(settings.contains("已关联账号"))
         XCTAssertTrue(settings.contains("解除关联"))
         XCTAssertTrue(environment.contains("previousSecret != input.secret"))
