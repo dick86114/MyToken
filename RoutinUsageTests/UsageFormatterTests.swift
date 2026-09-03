@@ -482,6 +482,85 @@ final class UsageFormatterTests: XCTestCase {
         )
     }
 
+    func test通用指标临近重置按Routin阈值变绿() {
+        let now = Date(timeIntervalSince1970: 1_786_320_000)
+
+        func normalizedMetric(id: String, label: String, remainingInterval: TimeInterval) -> NormalizedUsageMetric {
+            NormalizedUsageMetric(
+                id: id,
+                label: label,
+                used: 1,
+                limit: 100,
+                remaining: 99,
+                unit: .request,
+                windowEnd: now.addingTimeInterval(remainingInterval),
+                presentation: .progress,
+                healthState: .normal
+            )
+        }
+
+        XCTAssertTrue(
+            UsageFormatter.shouldHighlightRemainingDuration(
+                for: normalizedMetric(
+                    id: "five-hour",
+                    label: "5 小时用量",
+                    remainingInterval: 59 * 60
+                ),
+                now: now
+            )
+        )
+        XCTAssertFalse(
+            UsageFormatter.shouldHighlightRemainingDuration(
+                for: normalizedMetric(
+                    id: "five-hour",
+                    label: "5 小时用量",
+                    remainingInterval: 60 * 60
+                ),
+                now: now
+            )
+        )
+        XCTAssertTrue(
+            UsageFormatter.shouldHighlightRemainingDuration(
+                for: normalizedMetric(
+                    id: "fiveHour",
+                    label: "近 5 小时用量",
+                    remainingInterval: 30 * 60
+                ),
+                now: now
+            )
+        )
+        XCTAssertTrue(
+            UsageFormatter.shouldHighlightRemainingDuration(
+                for: normalizedMetric(
+                    id: "weekly",
+                    label: "近一周用量",
+                    remainingInterval: 23 * 60 * 60
+                ),
+                now: now
+            )
+        )
+        XCTAssertFalse(
+            UsageFormatter.shouldHighlightRemainingDuration(
+                for: normalizedMetric(
+                    id: "weekly",
+                    label: "近一周用量",
+                    remainingInterval: 24 * 60 * 60
+                ),
+                now: now
+            )
+        )
+        XCTAssertFalse(
+            UsageFormatter.shouldHighlightRemainingDuration(
+                for: normalizedMetric(
+                    id: "monthly",
+                    label: "近一月用量",
+                    remainingInterval: 30 * 60
+                ),
+                now: now
+            )
+        )
+    }
+
     func test订阅日期使用紧凑本地格式() {
         let 时区 = TimeZone(secondsFromGMT: 8 * 60 * 60)!
 

@@ -245,7 +245,7 @@ private extension UsageRowView {
         if let snapshot = state.snapshot {
             VStack(alignment: .leading, spacing: 7) {
                 if !snapshot.metrics.isEmpty {
-                    normalizedMetricsContent(snapshot: snapshot)
+                    normalizedMetricsContent(snapshot: snapshot, now: now)
                 } else {
                     switch snapshot.kind {
                     case .periodic:
@@ -346,14 +346,16 @@ private extension UsageRowView {
         }
     }
 
-    func normalizedMetricsContent(snapshot: UsageSnapshot) -> some View {
+    func normalizedMetricsContent(snapshot: UsageSnapshot, now: Date) -> some View {
         let layout = UsageMetricGridPolicy.layout(
             providerID: state.configuration.providerID,
             metrics: snapshot.normalizedMetrics
         )
         return NormalizedUsageMetricGrid(
             metrics: layout.metrics,
-            columns: layout.columns
+            columns: layout.columns,
+            resetTimeStyle: .relativeDuration,
+            now: now
         )
     }
 

@@ -144,6 +144,43 @@ enum UsageFormatter {
         }
     }
 
+    /// 通用指标没有显式维度，这里按供应商约定 ID 和中文标签识别周期。
+    static func normalizedDimension(for metric: NormalizedUsageMetric) -> UsageDimension? {
+        let identifier = metric.id
+            .lowercased()
+            .replacingOccurrences(of: "-", with: "")
+            .replacingOccurrences(of: "_", with: "")
+
+        if identifier == "fivehour" || metric.label.contains("5 小时") || metric.label.contains("5小时") {
+            return .fiveHour
+        }
+        if identifier == "weekly" || metric.label.contains("周") {
+            return .weekly
+        }
+        return nil
+    }
+
+    static func shouldHighlightRemainingDuration(
+        for metric: NormalizedUsageMetric,
+        now: Date
+    ) -> Bool {
+        guard let dimension = normalizedDimension(for: metric) else {
+            return false
+        }
+        guard let end = metric.windowEnd, end > now else {
+            return false
+        }
+
+        switch dimension {
+        case .fiveHour:
+            return end.timeIntervalSince(now) < 60 * 60
+        case .weekly:
+            return end.timeIntervalSince(now) < 24 * 60 * 60
+        case .token, .balance:
+            return false
+        }
+    }
+
     /// 在用量行中使用紧凑的本地订阅日期时间。
     static func subscriptionDateText(
         _ date: Date?,

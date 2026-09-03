@@ -1,11 +1,25 @@
 import XCTest
 
+enum TestSourceReader {
+    static func read(_ pathComponents: [String]) throws -> String {
+        var url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+
+        for pathComponent in pathComponents {
+            url.appendPathComponent(pathComponent)
+        }
+        return try String(contentsOf: url, encoding: .utf8)
+    }
+}
+
 final class SettingsSortingModeTests: XCTestCase {
     func test排序仅在显示与刷新页的菜单栏指标中启用() throws {
-        let source = try String(
-            contentsOfFile: "REDACTED_PROJECT_ROOT/RoutinUsage/Views/SettingsView.swift",
-            encoding: .utf8
-        )
+        let source = try TestSourceReader.read([
+            "RoutinUsage",
+            "Views",
+            "SettingsView.swift"
+        ])
 
         XCTAssertTrue(source.contains("MenuBarIndicatorCardDropDelegate"))
         XCTAssertTrue(source.contains("MenuBarIndicatorCardDragControl"))
@@ -24,10 +38,11 @@ final class SettingsSortingModeTests: XCTestCase {
     }
 
     func test卡片拖拽保持原始拖拽ID并避免目标卡片闪烁() throws {
-        let source = try String(
-            contentsOfFile: "REDACTED_PROJECT_ROOT/RoutinUsage/Views/SettingsView.swift",
-            encoding: .utf8
-        )
+        let source = try TestSourceReader.read([
+            "RoutinUsage",
+            "Views",
+            "SettingsView.swift"
+        ])
         let delegateStart = try XCTUnwrap(source.range(of: "struct MenuBarIndicatorCardDropDelegate"))
         let delegateEnd = try XCTUnwrap(source.range(of: "struct MenuBarIndicatorCardDragControl"))
         let delegate = String(source[delegateStart.lowerBound..<delegateEnd.lowerBound])

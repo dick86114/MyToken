@@ -60,6 +60,7 @@ final class MenuBarCodeLayoutTests: XCTestCase {
             }
         }
 
-        XCTAssertGreaterThanOrEqual(labelPixels.count, 8)
+        let pixelScale = max(1, bitmap.pixelsWide / Int(MenuBarMultiUsageIcon.unitWidth))
+        XCTAssertGreaterThanOrEqual(labelPixels.count, 4 * pixelScale)
     }
 }
