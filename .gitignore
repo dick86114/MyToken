@@ -7,3 +7,6 @@ build/
 RoutinUsage.xcodeproj/
 *.xcuserstate
 xcuserdata/
+
+# Local-only website copy assets
+docs/MyToken-官网内容与图片素材说明.md
