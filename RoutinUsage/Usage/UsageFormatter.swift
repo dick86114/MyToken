@@ -66,6 +66,12 @@ enum UsageFormatter {
         formatted(metric.remaining, unit: metric.unit)
     }
 
+    /// 用于额度、调用量等统一指标的紧凑展示，避免弹窗里出现过长数字。
+    static func compactMetricValue(_ value: Decimal?) -> String {
+        guard let value else { return "—" }
+        return compactMetricValue(value)
+    }
+
     static func fullAmount(_ metric: UsageMetric) -> String {
         guard metric.unit == .token else {
             return amount(metric)
@@ -164,21 +170,11 @@ enum UsageFormatter {
         for metric: NormalizedUsageMetric,
         now: Date
     ) -> Bool {
-        guard let dimension = normalizedDimension(for: metric) else {
-            return false
-        }
         guard let end = metric.windowEnd, end > now else {
             return false
         }
 
-        switch dimension {
-        case .fiveHour:
-            return end.timeIntervalSince(now) < 60 * 60
-        case .weekly:
-            return end.timeIntervalSince(now) < 24 * 60 * 60
-        case .token, .balance:
-            return false
-        }
+        return end.timeIntervalSince(now) < 60 * 60
     }
 
     /// 在用量行中使用紧凑的本地订阅日期时间。
@@ -328,6 +324,34 @@ enum UsageFormatter {
         }
         return state.snapshot == nil ? "等待首次刷新" : "用量数据可用"
     }
+
+    /// New API 站点可能把内部 quota 换算为 CNY/USD 等展示单位；这里统一保留两位小数。
+    static func currencyText(_ value: Decimal?, symbol: String) -> String {
+        guard let value else { return "—" }
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.numberStyle = .decimal
+        formatter.usesGroupingSeparator = false
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        let text = formatter.string(from: NSDecimalNumber(decimal: value))
+            ?? NSDecimalNumber(decimal: value).stringValue
+        return symbol + text
+    }
+
+    /// Token 消耗需要保留完整数值，避免 compact 格式让用户无法核对后台总量。
+    static func exactTokenText(_ value: Decimal?) -> String {
+        guard let value else { return "—" }
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.numberStyle = .decimal
+        formatter.usesGroupingSeparator = true
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 0
+        let text = formatter.string(from: NSDecimalNumber(decimal: value))
+            ?? NSDecimalNumber(decimal: value).stringValue
+        return text
+    }
 }
 
 private extension UsageFormatter {
@@ -366,6 +390,10 @@ private extension UsageFormatter {
         }
         let text = String(format: "%.1f", locale: stableLocale, scaled)
         return text.replacingOccurrences(of: ".0", with: "") + suffix
+    }
+
+    static func compactMetricValue(_ value: Decimal) -> String {
+        compactToken(value)
     }
 
     static func fullToken(_ value: Decimal) -> String {

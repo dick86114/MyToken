@@ -6,6 +6,21 @@ struct AppUpdate: Equatable, Sendable {
     let releaseURL: URL
     let downloadURL: URL
     let notes: String
+    let publishedAt: Date?
+
+    init(
+        version: String,
+        releaseURL: URL,
+        downloadURL: URL,
+        notes: String,
+        publishedAt: Date? = nil
+    ) {
+        self.version = version
+        self.releaseURL = releaseURL
+        self.downloadURL = downloadURL
+        self.notes = notes
+        self.publishedAt = publishedAt
+    }
 }
 
 enum UpdateCompletionNotice {
@@ -142,7 +157,13 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
             throw UpdateServiceError.invalidResponse
         }
         await logWriter.log(level: .info, event: "update_check_succeeded", details: "version=\(version)")
-        return AppUpdate(version: version, releaseURL: releaseURL, downloadURL: downloadURL, notes: release.body ?? "")
+        return AppUpdate(
+            version: version,
+            releaseURL: releaseURL,
+            downloadURL: downloadURL,
+            notes: release.body ?? "",
+            publishedAt: Self.parseISO8601(release.publishedAt)
+        )
     }
 
     private func checkForUpdateFromAtom() async throws -> AppUpdate? {
@@ -206,7 +227,8 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
             version: version,
             releaseURL: releaseURL,
             downloadURL: downloadURL,
-            notes: release.notes
+            notes: release.notes,
+            publishedAt: release.publishedAt
         )
     }
 
@@ -294,8 +316,15 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
         let tagName: String
         let htmlURL: String
         let body: String?
+        let publishedAt: String?
         let assets: [AssetDTO]
-        enum CodingKeys: String, CodingKey { case tagName = "tag_name", htmlURL = "html_url", body, assets }
+        enum CodingKeys: String, CodingKey {
+            case tagName = "tag_name"
+            case htmlURL = "html_url"
+            case body
+            case publishedAt = "published_at"
+            case assets
+        }
     }
     private struct AssetDTO: Decodable {
         let name: String
@@ -314,12 +343,24 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
         }
         return .orderedSame
     }
+
+    private static func parseISO8601(_ value: String?) -> Date? {
+        guard let value else { return nil }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: value) {
+            return date
+        }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: value)
+    }
 }
 
 private struct AtomRelease {
     let version: String
     let releaseURL: String
     let notes: String
+    let publishedAt: Date?
 }
 
 private final class AtomReleaseParser: NSObject, XMLParserDelegate {
@@ -327,13 +368,24 @@ private final class AtomReleaseParser: NSObject, XMLParserDelegate {
     private var inEntry = false
     private var version: String?
     private var releaseURL: String?
+    private var publishedText: String?
     private var notes = ""
+    private var stoppedAfterFirstEntry = false
 
     func parse(data: Data) -> AtomRelease? {
         let parser = XMLParser(data: data)
         parser.delegate = self
-        guard parser.parse(), let version, let releaseURL else { return nil }
-        return AtomRelease(version: version, releaseURL: releaseURL, notes: notes)
+        // Atom Feed 按最新版本排序。解析完第一条后停止，避免旧版本字段覆盖新版本。
+        _ = parser.parse()
+        guard stoppedAfterFirstEntry, let version, let releaseURL else { return nil }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return AtomRelease(
+            version: version,
+            releaseURL: releaseURL,
+            notes: notes,
+            publishedAt: publishedText.flatMap(formatter.date(from:))
+        )
     }
 
     func parser(
@@ -378,8 +430,14 @@ private final class AtomReleaseParser: NSObject, XMLParserDelegate {
             }
         case "content":
             notes = text
+        case "published", "updated":
+            if publishedText == nil {
+                publishedText = text
+            }
         case "entry":
             inEntry = false
+            stoppedAfterFirstEntry = true
+            parser.abortParsing()
         default:
             break
         }

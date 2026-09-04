@@ -638,14 +638,22 @@ private extension SettingsView {
         snapshot: UsageSnapshot,
         providerID: ProviderID
     ) -> some View {
-        let layout = UsageMetricGridPolicy.layout(
-            providerID: providerID,
-            metrics: snapshot.normalizedMetrics
-        )
-        return NormalizedUsageMetricGrid(
-            metrics: layout.metrics,
-            columns: layout.columns
-        )
+        Group {
+            if providerID == .glm {
+                GLMUsageMetricsView(metrics: snapshot.normalizedMetrics, now: .now)
+            } else if providerID == .newAPI {
+                NewAPIUsageMetricsView(metrics: snapshot.normalizedMetrics, now: .now)
+            } else {
+                let layout = UsageMetricGridPolicy.layout(
+                    providerID: providerID,
+                    metrics: snapshot.normalizedMetrics
+                )
+                NormalizedUsageMetricGrid(
+                    metrics: layout.metrics,
+                    columns: layout.columns
+                )
+            }
+        }
     }
 
     func usageDetailItem(_ title: String, _ metric: UsageMetric) -> some View {

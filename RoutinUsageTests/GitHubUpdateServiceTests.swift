@@ -6,7 +6,7 @@ final class GitHubUpdateServiceTests: XCTestCase {
     func test发现较新Release并选择DMG资源() async throws {
         let stub = URLProtocolStub.makeSession { request in
             let response = try XCTUnwrap(HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil))
-            return (response, Data(#"{"tag_name":"v1.2.0","html_url":"https://github.com/dick86114/MyToken/releases/tag/v1.2.0","body":"修复问题","assets":[{"name":"MyToken.dmg","browser_download_url":"https://example.com/MyToken.dmg"}]}"#.utf8))
+            return (response, Data(#"{"tag_name":"v1.2.0","html_url":"https://github.com/dick86114/MyToken/releases/tag/v1.2.0","published_at":"2026-09-03T12:30:00Z","body":"修复问题","assets":[{"name":"MyToken.dmg","browser_download_url":"https://example.com/MyToken.dmg"}]}"#.utf8))
         }
         let logger = UpdateLogWriter()
         let service = GitHubUpdateService(
@@ -20,6 +20,10 @@ final class GitHubUpdateServiceTests: XCTestCase {
         XCTAssertEqual(stub.registration.lastRequest?.url, GitHubUpdateService.releasesURL)
         XCTAssertEqual(update?.version, "1.2.0")
         XCTAssertEqual(update?.downloadURL.absoluteString, "https://example.com/MyToken.dmg")
+        XCTAssertEqual(
+            update?.publishedAt,
+            Date(timeIntervalSince1970: 1_788_438_600)
+        )
         let events = await logger.events
         XCTAssertTrue(events.contains { $0 == "update_check_succeeded" })
     }
@@ -40,10 +44,18 @@ final class GitHubUpdateServiceTests: XCTestCase {
         <?xml version="1.0" encoding="UTF-8"?>
         <feed xmlns="http://www.w3.org/2005/Atom">
           <entry>
-            <id>tag:github.com,2008:Repository/1/v1.3.0</id>
-            <link rel="alternate" href="https://github.com/dick86114/MyToken/releases/tag/v1.3.0" />
-            <title>MyToken v1.3.0</title>
-            <content type="html">修复 API 限流检查</content>
+            <id>tag:github.com,2008:Repository/1/v5.0.0</id>
+            <updated>2026-09-03T13:38:39Z</updated>
+            <link rel="alternate" href="https://github.com/dick86114/MyToken/releases/tag/v5.0.0" />
+            <title>MyToken v5.0.0</title>
+            <content type="html">&lt;p&gt;更换品牌名&lt;/p&gt;</content>
+          </entry>
+          <entry>
+            <id>tag:github.com,2008:Repository/1/v3.0.0</id>
+            <updated>2026-08-12T05:38:50Z</updated>
+            <link rel="alternate" href="https://github.com/dick86114/MyToken/releases/tag/v3.0.0" />
+            <title>MyToken v3.0.0</title>
+            <content type="html">&lt;ol&gt;&lt;li&gt;旧版本日志&lt;/li&gt;&lt;/ol&gt;</content>
           </entry>
         </feed>
         """
@@ -65,11 +77,17 @@ final class GitHubUpdateServiceTests: XCTestCase {
 
         let update = try await service.checkForUpdate()
 
-        XCTAssertEqual(update?.version, "1.3.0")
+        XCTAssertEqual(update?.version, "5.0.0")
+        XCTAssertEqual(
+            update?.publishedAt,
+            Date(timeIntervalSince1970: 1_788_442_719)
+        )
         XCTAssertEqual(
             update?.downloadURL.absoluteString,
-            "https://github.com/dick86114/MyToken/releases/download/v1.3.0/MyToken.dmg"
+            "https://github.com/dick86114/MyToken/releases/download/v5.0.0/MyToken.dmg"
         )
+        XCTAssertEqual(update?.notes, "<p>更换品牌名</p>")
+        XCTAssertFalse(update?.notes.contains("旧版本日志") == true)
     }
 
     func test下载更新逐步报告百分比并保存完整文件() async throws {

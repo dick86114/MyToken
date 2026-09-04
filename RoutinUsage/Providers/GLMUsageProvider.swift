@@ -146,13 +146,14 @@ struct GLMUsageProvider: UsageProvider {
                 let remaining = object["remaining"]?.numberValue() ?? max(0, limit - used)
                 zcodeMCP = NormalizedUsageMetric(
                     id: "zcode-mcp",
-                    label: "ZCode MCP 用量",
+                    label: "MCP 调用量",
                     used: used,
                     limit: limit,
                     remaining: remaining,
+                    value: used,
                     unit: .request,
                     windowEnd: windowEnd,
-                    presentation: .progress,
+                    presentation: .value,
                     healthState: Self.healthState(for: percentage)
                 )
             default:
@@ -173,7 +174,7 @@ struct GLMUsageProvider: UsageProvider {
         }
         return NormalizedUsageMetric(
             id: "model-calls",
-            label: "调用量",
+            label: "模型调用量",
             value: count,
             unit: .request,
             presentation: .value,

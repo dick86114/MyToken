@@ -34,7 +34,9 @@ final class GLMUsageProviderTests: XCTestCase {
         XCTAssertEqual(snapshot.metrics.first?.used, 42)
         XCTAssertEqual(snapshot.metrics[1].label, "每周用量")
         XCTAssertEqual(snapshot.metrics[2].value, 22)
-        XCTAssertEqual(snapshot.metrics[3].label, "ZCode MCP 用量")
+        XCTAssertEqual(snapshot.metrics[3].label, "MCP 调用量")
+        XCTAssertEqual(snapshot.metrics[3].presentation, .value)
+        XCTAssertEqual(snapshot.metrics[3].value, 461)
         XCTAssertEqual(snapshot.metrics[3].used, 461)
         XCTAssertEqual(snapshot.metrics[3].limit, 1_000)
     }

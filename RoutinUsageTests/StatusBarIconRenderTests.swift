@@ -61,8 +61,7 @@ final class StatusBarIconRenderTests: XCTestCase {
         }
 
         let image = MenuBarMultiUsageIcon.image(indicators: indicators)
-        let expectedWidth = MenuBarMultiUsageIcon.unitWidth * 5
-            + MenuBarMultiUsageIcon.gap * 4
+        let expectedWidth = MenuBarMultiUsageIcon.imageWidth(for: 5)
 
         XCTAssertFalse(image.isTemplate)
         XCTAssertEqual(image.size.width, expectedWidth)

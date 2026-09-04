@@ -47,10 +47,16 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(app.contains("nonisolated static let websiteURL"))
         XCTAssertTrue(popover.contains("Link(destination: RoutinUsageApp.websiteURL)"))
         XCTAssertTrue(popover.contains("Image(nsImage: NSImage(named: \"PopoverColorBrandLogo\")"))
-        XCTAssertTrue(popover.contains("frame(width: 28, height: 28)"))
+        XCTAssertTrue(popover.contains("frame(width: 32, height: 32)"))
+        XCTAssertTrue(popover.contains("strokeBorder("))
+        XCTAssertTrue(popover.contains(".shadow(color: .white.opacity(0.16)"))
+        XCTAssertTrue(popover.contains("repeatForever"))
         XCTAssertTrue(popover.contains("打开 MyToken 官网"))
         XCTAssertTrue(popover.contains(".overlay(alignment: .center)"))
-        XCTAssertTrue(popover.contains("Image(systemName: \"arrow.clockwise\")"))
+        XCTAssertTrue(popover.contains("Image(systemName: store.isRefreshing ? \"arrow.triangle.2.circlepath\" : \"arrow.clockwise\")"))
+        XCTAssertTrue(popover.contains("刷新全部 Key"))
+        XCTAssertFalse(popover.contains("if hasRoutinAccount"))
+        XCTAssertFalse(popover.contains("checkInHelpText"))
         XCTAssertFalse(popover.contains("Picker(\"用量周期\""))
     }
 
@@ -340,12 +346,20 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(settings.contains("func glassSection"))
     }
 
-    func test弹窗简化为单层窗口玻璃并保留玻璃按钮() throws {
+    func test弹窗简化为单层窗口玻璃并保留固定底栏() throws {
         let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
         let row = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
         let onboarding = try sourceText(at: "RoutinUsage/Views/OnboardingView.swift")
 
-        XCTAssertTrue(popover.contains(".liquidGlassButton()"))
+        XCTAssertTrue(popover.contains("ScrollView(.vertical, showsIndicators: false)"))
+        XCTAssertTrue(popover.contains("ThinVerticalScrollIndicator"))
+        XCTAssertTrue(popover.contains("账户用量"))
+        XCTAssertTrue(popover.contains("WrappingFilterChips"))
+        XCTAssertTrue(popover.contains("visibleProviderIDs"))
+        XCTAssertTrue(popover.contains("updateReleaseOverlay"))
+        XCTAssertTrue(popover.contains("UpdateReleaseDetailView"))
+        XCTAssertTrue(popover.contains("var bottomBar: some View"))
+        XCTAssertFalse(popover.contains(".liquidGlassButton()"))
         XCTAssertTrue(popover.contains(".liquidGlassWindowBackground()"))
         XCTAssertFalse(popover.contains(".liquidGlassSurface(cornerRadius:"))
         XCTAssertFalse(popover.contains(".liquidGlassControlSurface()"))
@@ -420,7 +434,7 @@ final class ProjectBootstrapTests: XCTestCase {
 
         XCTAssertTrue(releaseWorkflow.contains("name: MyToken v${{ inputs.version }}"))
         XCTAssertTrue(releaseWorkflow.contains("build/dist/MyToken.dmg"))
-        XCTAssertTrue(releaseWorkflow.contains("build/dist/MyRoutin.dmg"))
+        XCTAssertFalse(releaseWorkflow.contains("MyRoutin.dmg"))
         XCTAssertFalse(releaseWorkflow.contains("Routin Usage"))
     }
 
@@ -641,13 +655,14 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(settings.contains("Button(\"提交问题\")"))
     }
 
-    func test菜单栏弹窗会以绿色实心图标标记今天已签到() throws {
+    func test菜单栏弹窗顶部不提供签到入口但保留签到状态() throws {
         let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
 
-        XCTAssertTrue(popover.contains("checkInState == .alreadyCheckedIn"))
-        XCTAssertTrue(popover.contains("checkmark.circle.fill"))
-        XCTAssertTrue(popover.contains("Color.green"))
-        XCTAssertTrue(popover.contains("今天已签到"))
+        XCTAssertFalse(popover.contains("openWindow(id: \"routin-check-in\")\n                    Task { await startRoutinCheckIn() }"))
+        XCTAssertFalse(popover.contains("if hasRoutinAccount"))
+        XCTAssertFalse(popover.contains("checkInHelpText"))
+        XCTAssertTrue(popover.contains("checkInState.statusText"))
+        XCTAssertTrue(popover.contains("Routin 签到："))
     }
 
     func testCodex当前分组检测已接入菜单栏设置和Key生命周期() throws {

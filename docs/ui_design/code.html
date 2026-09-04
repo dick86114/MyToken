@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: 'class', theme: { extend: { colors: { 'on-tertiary': '#1000a9', 'primary-fixed-dim': '#abc7ff', 'background': '#0f131c', 'status-success': '#10B981', 'text-muted': '#94A3B8', 'error': '#ffb4ab', 'on-surface-variant': '#c1c6d7', 'surface-hover': 'rgba(255, 255, 255, 0.05)', 'inverse-on-surface': '#2c3039', 'surface-bright': '#353942', 'surface': '#0f131c', 'surface-variant': '#31353e', 'secondary-fixed-dim': '#7bd0ff', 'surface-tint': '#abc7ff', 'on-secondary-fixed-variant': '#004c69', 'tag-rou': '#38BDF8', 'tertiary': '#c0c1ff', 'surface-container-high': '#262a33', 'status-danger': '#EF4444', 'text-primary': '#F8FAFC', 'tag-ds': '#60A5FA', 'on-secondary': '#00354a', 'on-secondary-fixed': '#001e2c', 'primary': '#abc7ff', 'on-background': '#dfe2ee', 'error-container': '#93000a', 'secondary-container': '#00a6e0', 'inverse-surface': '#dfe2ee', 'tertiary-fixed': '#e1e0ff', 'surface-container-lowest': '#0a0e16', 'secondary-fixed': '#c4e7ff', 'primary-container': '#438fff', 'surface-container-highest': '#31353e', 'inverse-primary': '#005cbb', 'on-tertiary-fixed-variant': '#2f2ebe', 'text-subtle': '#64748B', 'surface-popover': 'rgba(15, 23, 42, 0.88)', 'on-surface': '#dfe2ee', 'on-primary-fixed-variant': '#00458f', 'primary-fixed': '#d7e3ff', 'on-error': '#690005', 'tag-glm': '#A78BFA', 'on-error-container': '#ffdad6', 'secondary': '#7bd0ff', 'tag-vol': '#FB923C', 'status-warning': '#F59E0B', 'border-hairline': 'rgba(255, 255, 255, 0.08)', 'on-secondary-container': '#00374d', 'on-primary-container': '#002959', 'on-primary': '#002f65', 'surface-container': '#1c2028', 'surface-dim': '#0f131c', 'tag-new': '#34D399', 'on-tertiary-container': '#0d0096', 'surface-container-low': '#181c24', 'border-highlight': 'rgba(56, 189, 248, 0.3)', 'surface-card': 'rgba(18, 26, 43, 0.75)', 'outline-variant': '#414754', 'on-primary-fixed': '#001b3f', 'on-tertiary-fixed': '#07006c', 'tertiary-fixed-dim': '#c0c1ff', 'outline': '#8b91a0', 'tertiary-container': '#8083ff' }, borderRadius: { 'DEFAULT': '0.25rem', 'lg': '0.5rem', 'xl': '0.75rem', 'full': '9999px' }, spacing: { 'space-sm': '0.75rem', 'popover-width': '440px', 'space-xl': '2rem', 'space-xs': '0.5rem', 'space-4xl': '6rem', 'space-3xl': '4rem', 'space-2xs': '0.25rem', 'space-lg': '1.5rem', 'space-md': '1rem', 'container-max': '1200px', 'space-2xl': '3rem' }, fontFamily: { 'label-metric': ['jetbrainsMono'], 'headline-hero-mobile': ['inter'], 'body-base': ['inter'], 'headline-section': ['inter'], 'label-code': ['jetbrainsMono'], 'headline-hero': ['inter'], 'headline-section-mobile': ['inter'], 'title-card': ['inter'], 'body-large': ['inter'], 'body-small': ['inter'], 'label-badge': ['jetbrainsMono'] }, fontSize: { 'label-metric': ['14px', { lineHeight: '20px', fontWeight: '500' }], 'headline-hero-mobile': ['36px', { lineHeight: '44px', letterSpacing: '-0.02em', fontWeight: '700' }], 'body-base': ['15px', { lineHeight: '22px', fontWeight: '400' }], 'headline-section': ['36px', { lineHeight: '44px', letterSpacing: '-0.02em', fontWeight: '600' }], 'label-code': ['12px', { lineHeight: '16px', letterSpacing: '0.02em', fontWeight: '500' }], 'headline-hero': ['56px', { lineHeight: '64px', letterSpacing: '-0.025em', fontWeight: '700' }], 'headline-section-mobile': ['26px', { lineHeight: '34px', letterSpacing: '-0.015em', fontWeight: '600' }], 'title-card': ['20px', { lineHeight: '28px', letterSpacing: '-0.01em', fontWeight: '600' }], 'body-large': ['18px', { lineHeight: '28px', fontWeight: '400' }], 'body-small': ['13px', { lineHeight: '18px', fontWeight: '400' }], 'label-badge': ['11px', { lineHeight: '14px', letterSpacing: '0.04em', fontWeight: '600' }] } } } };</script></head><body class="bg-background font-body-base text-on-surface antialiased selection:bg-primary-container selection:text-on-primary-container min-h-screen relative"><div class="fixed inset-0 pointer-events-none bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(0,128,255,0.08),rgba(15,19,28,0))] z-0"></div><header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.4)]"><div class="h-16 max-w-container-max mx-auto px-space-lg flex items-center justify-between gap-space-md"><div class="flex items-center gap-space-sm shrink-0"><img alt="icon_1024x1024.png" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1Uv-CUtYuqaveXaahSlwI0B2pCzVrXCPW_1CPut6oRZHRWoKhNSOYwQpgW5p6WiPNPj6yaT7kIDVVNEdpKOXtOpDjD8hSIgLxFBxuo4NYaHOyur2uD1Oh3iv__ogGe1oIr5Mnk-3ogCpvBrYInhYAHEkDTetUCWfr06CZVVIQGraq4c4d598INyT-1cENEwO2QGhkaorS-aqKiiwcvZ5iivVxmRteHO82tWZom_tK-rvjei3wIgLd8qHQY-cI5vxE6k0I6jpG3NBeU"/><a class="flex items-center gap-space-xs group" data-path="features" href="#"><span class="font-title-card text-title-card text-text-primary tracking-tight">MyToken</span><span class="px-space-xs py-space-2xs rounded-md bg-surface-container-high text-on-surface-variant font-label-badge text-label-badge">macOS 14+</span></a></div><nav class="hidden lg:flex items-center gap-space-xs px-space-xs py-space-2xs rounded-xl bg-surface-container-lowest/60 backdrop-blur-md" data-active-classes="bg-surface-container-high text-primary font-body-base rounded-lg"><a aria-current="page" class="px-space-sm py-space-2xs transition-colors bg-surface-container-high text-primary font-body-base rounded-lg" data-path="features" href="#">核心功能</a><a class="px-space-sm py-space-2xs text-on-surface-variant hover:text-on-surface font-body-small text-body-small transition-colors" data-path="providers" href="#">供应商矩阵</a><a class="px-space-sm py-space-2xs text-on-surface-variant hover:text-on-surface font-body-small text-body-small transition-colors" data-path="privacy" href="#">安全与隐私</a><a class="px-space-sm py-space-2xs text-on-surface-variant hover:text-on-surface font-body-small text-body-small transition-colors" data-path="install" href="#">安装使用</a><a class="px-space-sm py-space-2xs text-on-surface-variant hover:text-on-surface font-body-small text-body-small transition-colors" data-path="faq" href="#">常见问题</a></nav><div class="flex items-center gap-space-sm shrink-0"><a class="hidden sm:flex items-center gap-space-xs px-space-sm py-space-2xs rounded-lg bg-surface-container-high hover:bg-surface-bright text-on-surface font-label-code text-label-code transition-colors" href="https://github.com/dick86114/MyRoutin" rel="noopener noreferrer" target="_blank"><span class="material-symbols-outlined text-[16px]">terminal</span><span>GitHub</span><span class="px-1.5 py-0.5 rounded-full bg-surface-container-highest text-secondary text-[11px] flex items-center gap-1"><span class="material-symbols-outlined text-[12px] text-status-warning">star</span>Star</span></a><a class="inline-flex items-center gap-space-xs px-space-md py-space-2xs rounded-xl bg-primary-container hover:bg-secondary-container text-on-primary-container font-body-small text-body-small font-semibold shadow-[0_0_20px_0_rgba(67,143,255,0.3)] transition-all" href="https://github.com/dick86114/MyRoutin/releases" rel="noopener noreferrer" target="_blank"><span class="material-symbols-outlined text-[18px]">download</span><span>下载 MyToken.dmg</span></a><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="relative z-10 w-full pt-16 bg-surface min-h-screen"><div class="flex flex-col w-full">
+<!-- SECTION 1: HERO SECTION -->
+<section class="relative w-full overflow-hidden py-space-3xl lg:py-space-4xl flex flex-col items-center">
+<div class="max-w-container-max mx-auto px-space-lg w-full flex flex-col items-center text-center relative z-10">
+<!-- Top Badge -->
+<div class="inline-flex items-center gap-space-xs px-space-sm py-space-2xs rounded-full bg-surface-container-high text-secondary font-label-badge text-label-badge mb-space-lg shadow-sm">
+<span class="w-2 h-2 rounded-full bg-status-success animate-pulse"></span>
+<span>macOS 14+ 菜单栏原生级体验 · 本地运行无云端中转</span>
+</div>
+<!-- Main Headline -->
+<h1 class="font-headline-hero text-headline-hero text-text-primary tracking-tight max-w-4xl mx-auto mb-space-md">
+        在菜单栏看清每个 <span class="text-transparent bg-clip-text bg-gradient-to-r from-primary via-secondary to-tertiary">AI 账户的额度</span>
+</h1>
+<!-- Subheadline -->
+<p class="font-body-large text-body-large text-on-surface-variant max-w-3xl mx-auto mb-space-xl">
+        MyToken 是本地运行的 macOS 菜单栏用量监控工具。一次配置 Routin、DeepSeek、GLM、火山方舟或 New API 凭证，即可分别查看 5 小时额度、周额度、Token 资源包、余额、调用次数、重置时间和账户状态。
+      </p>
+<!-- Primary & Secondary CTAs -->
+<div class="flex flex-wrap items-center justify-center gap-space-md mb-space-2xl">
+<a class="group relative inline-flex items-center gap-space-sm px-space-xl py-space-sm rounded-xl bg-primary-container hover:bg-secondary-container text-on-primary-container font-body-base text-body-base font-semibold shadow-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]" href="https://github.com/dick86114/MyRoutin/releases" rel="noopener noreferrer" target="_blank">
+<span class="material-symbols-outlined text-[20px]">download</span>
+<span>下载 MyToken.dmg</span>
+<span class="px-space-2xs py-0.5 rounded bg-on-primary-container/20 text-on-primary-container font-label-badge text-label-badge">v1.0.0</span>
+<span class="text-on-primary-container/80 font-label-code text-label-code">macOS 14+</span>
+</a>
+<a class="inline-flex items-center gap-space-xs px-space-lg py-space-sm rounded-xl bg-surface-container-high hover:bg-surface-bright text-text-primary font-body-base text-body-base font-medium shadow-md transition-colors duration-200" href="https://github.com/dick86114/MyRoutin" rel="noopener noreferrer" target="_blank">
+<span class="material-symbols-outlined text-[18px]">terminal</span>
+<span>GitHub 仓库</span>
+<span class="material-symbols-outlined text-[14px] text-text-subtle">north_east</span>
+</a>
+</div>
+<!-- Trust Badges -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-space-md w-full max-w-3xl mb-space-3xl">
+<div class="flex items-center justify-center gap-space-xs p-space-sm rounded-lg bg-surface-container-low shadow-sm">
+<span class="material-symbols-outlined text-status-success text-[18px]">cloud_off</span>
+<span class="font-label-metric text-label-metric text-on-surface">无自有云端账号</span>
+</div>
+<div class="flex items-center justify-center gap-space-xs p-space-sm rounded-lg bg-surface-container-low shadow-sm">
+<span class="material-symbols-outlined text-tag-rou text-[18px]">view_column</span>
+<span class="font-label-metric text-label-metric text-on-surface">最多 5 个菜单栏指标</span>
+</div>
+<div class="flex items-center justify-center gap-space-xs p-space-sm rounded-lg bg-surface-container-low shadow-sm">
+<span class="material-symbols-outlined text-secondary text-[18px]">lock</span>
+<span class="font-label-metric text-label-metric text-on-surface">凭据仅保留在本机</span>
+</div>
+<div class="flex items-center justify-center gap-space-xs p-space-sm rounded-lg bg-surface-container-low shadow-sm">
+<span class="material-symbols-outlined text-tertiary text-[18px]">history</span>
+<span class="font-label-metric text-label-metric text-on-surface">实时/定时智能快照</span>
+</div>
+</div>
+<!-- Interactive Hero Mockup (macOS Sequoia Menu Bar & Popover) -->
+<div class="w-full max-w-4xl relative flex flex-col items-center">
+<!-- Ambient radial glow behind popover -->
+<div class="absolute inset-0 bg-primary-container/10 blur-3xl -z-10 rounded-full"></div>
+<!-- macOS Menu Bar Simulator -->
+<div class="w-full h-9 rounded-t-xl bg-surface-container-lowest/90 backdrop-blur-2xl flex items-center justify-between px-space-md shadow-lg select-none">
+<!-- Left System Menu Items -->
+<div class="flex items-center gap-space-sm text-text-muted">
+<span class="material-symbols-outlined text-[15px] text-text-primary">desktop_mac</span>
+<span class="font-body-small text-body-small font-semibold text-text-primary">MyToken</span>
+<span class="font-body-small text-body-small hover:text-text-primary cursor-default hidden sm:inline">文件</span>
+<span class="font-body-small text-body-small hover:text-text-primary cursor-default hidden sm:inline">偏好设置</span>
+<span class="font-body-small text-body-small hover:text-text-primary cursor-default hidden sm:inline">窗口</span>
+<span class="font-body-small text-body-small hover:text-text-primary cursor-default hidden sm:inline">帮助</span>
+</div>
+<!-- Right Status Indicator Chips -->
+<div class="flex items-center gap-1.5 sm:gap-2">
+<!-- Chip 1: ROU -->
+<div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-container-high hover:bg-surface-bright transition-colors cursor-pointer">
+<span class="w-1.5 h-1.5 rounded-full bg-tag-rou"></span>
+<span class="font-label-badge text-label-badge text-tag-rou">ROU</span>
+<span class="font-label-code text-label-code text-text-primary">42%</span>
+</div>
+<!-- Chip 2: DS -->
+<div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-container-high hover:bg-surface-bright transition-colors cursor-pointer">
+<span class="w-1.5 h-1.5 rounded-full bg-tag-ds"></span>
+<span class="font-label-badge text-label-badge text-tag-ds">DS</span>
+<span class="font-label-code text-label-code text-status-success">¥12.36</span>
+</div>
+<!-- Chip 3: GLM -->
+<div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-container-high hover:bg-surface-bright transition-colors cursor-pointer">
+<span class="w-1.5 h-1.5 rounded-full bg-tag-glm"></span>
+<span class="font-label-badge text-label-badge text-tag-glm">GLM</span>
+<span class="font-label-code text-label-code text-status-warning">35%</span>
+</div>
+<!-- Chip 4: VOL -->
+<div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-container-high hover:bg-surface-bright transition-colors cursor-pointer hidden md:flex">
+<span class="w-1.5 h-1.5 rounded-full bg-tag-vol"></span>
+<span class="font-label-badge text-label-badge text-tag-vol">VOL</span>
+<span class="font-label-code text-label-code text-text-primary">18%</span>
+</div>
+<!-- Chip 5: NEW -->
+<div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-container-high hover:bg-surface-bright transition-colors cursor-pointer hidden md:flex">
+<span class="w-1.5 h-1.5 rounded-full bg-tag-new"></span>
+<span class="font-label-badge text-label-badge text-tag-new">NEW</span>
+<span class="font-label-code text-label-code text-text-primary">86.2</span>
+</div>
+<span class="material-symbols-outlined text-[14px] text-text-muted ml-1">wifi</span>
+<span class="font-label-code text-label-code text-text-muted hidden sm:inline">10:42</span>
+</div>
+</div>
+<!-- Menu Bar Popover Anchor Notch -->
+<div class="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[8px] border-b-surface-popover self-end mr-12 sm:mr-32 -mt-[1px] z-20"></div>
+<!-- Native Popover Simulation Window (440px target spec) -->
+<div class="w-full max-w-[480px] bg-surface-popover backdrop-blur-2xl rounded-2xl shadow-2xl p-space-md text-left flex flex-col gap-space-sm z-10 -mt-1">
+<!-- Popover Header -->
+<div class="flex items-center justify-between pb-space-xs">
+<div class="flex items-center gap-space-xs">
+<span class="w-2 h-2 rounded-full bg-status-success"></span>
+<span class="font-title-card text-title-card text-text-primary">账户用量 · 5 个 Key</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="px-space-xs py-0.5 rounded bg-surface-container text-text-muted font-label-badge text-label-badge">全本地解析</span>
+<button class="p-1 rounded hover:bg-surface-container-high text-text-subtle hover:text-text-primary transition-colors" title="快速设置">
+<span class="material-symbols-outlined text-[16px]">settings</span>
+</button>
+</div>
+</div>
+<!-- Cards Stack inside Popover -->
+<div class="flex flex-col gap-space-xs">
+<!-- Card 1: Routin -->
+<div class="p-space-sm rounded-xl bg-surface-container-low/80 hover:bg-surface-container transition-all">
+<div class="flex items-center justify-between mb-1">
+<div class="flex items-center gap-space-xs">
+<span class="px-1.5 py-0.5 rounded bg-tag-rou/10 text-tag-rou font-label-badge text-label-badge">ROU</span>
+<span class="font-body-small text-body-small font-semibold text-text-primary">Routin 生产环境</span>
+<span class="text-text-subtle font-label-code text-label-code">plan-***a91e</span>
+</div>
+<span class="px-1.5 py-0.5 rounded bg-surface-container-high text-tag-rou font-label-code text-label-code">Group B · 1.0x</span>
+</div>
+<div class="grid grid-cols-2 gap-space-sm mt-2">
+<div class="flex flex-col">
+<div class="flex justify-between items-center text-text-muted font-label-code text-label-code mb-1">
+<span>5 小时额度</span>
+<span class="text-text-primary font-semibold">42%</span>
+</div>
+<div class="w-full h-1.5 rounded-full bg-surface-container-highest overflow-hidden">
+<div class="h-full bg-tag-rou rounded-full" style="width: 42%;"></div>
+</div>
+</div>
+<div class="flex flex-col">
+<div class="flex justify-between items-center text-text-muted font-label-code text-label-code mb-1">
+<span>周周期额度</span>
+<span class="text-text-primary font-semibold">21%</span>
+</div>
+<div class="w-full h-1.5 rounded-full bg-surface-container-highest overflow-hidden">
+<div class="h-full bg-tag-rou/70 rounded-full" style="width: 21%;"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Card 2: DeepSeek -->
+<div class="p-space-sm rounded-xl bg-surface-container-low/80 hover:bg-surface-container transition-all">
+<div class="flex items-center justify-between mb-1.5">
+<div class="flex items-center gap-space-xs">
+<span class="px-1.5 py-0.5 rounded bg-tag-ds/10 text-tag-ds font-label-badge text-label-badge">DS</span>
+<span class="font-body-small text-body-small font-semibold text-text-primary">DeepSeek 主账户</span>
+<span class="text-text-subtle font-label-code text-label-code">sk-***90f2</span>
+</div>
+<span class="px-1.5 py-0.5 rounded bg-status-success/15 text-status-success font-label-code text-label-code">可用 / 正常</span>
+</div>
+<div class="flex items-baseline justify-between mt-1">
+<div>
+<span class="font-headline-section-mobile text-headline-section-mobile font-semibold text-text-primary">¥12.36</span>
+<span class="font-body-small text-body-small text-text-muted ml-1">总余额</span>
+</div>
+<div class="flex items-center gap-space-sm text-text-subtle font-label-code text-label-code">
+<span>赠金: ¥5.00</span>
+<span>充值: ¥7.36</span>
+</div>
+</div>
+</div>
+<!-- Card 3: GLM -->
+<div class="p-space-sm rounded-xl bg-surface-container-low/80 hover:bg-surface-container transition-all">
+<div class="flex items-center justify-between mb-1">
+<div class="flex items-center gap-space-xs">
+<span class="px-1.5 py-0.5 rounded bg-tag-glm/10 text-tag-glm font-label-badge text-label-badge">GLM</span>
+<span class="font-body-small text-body-small font-semibold text-text-primary">智谱 Coding Plan</span>
+<span class="text-text-subtle font-label-code text-label-code">4b7***81</span>
+</div>
+<span class="text-status-warning font-label-code text-label-code">1,204 次调用</span>
+</div>
+<div class="grid grid-cols-2 gap-space-sm mt-2">
+<div class="flex flex-col">
+<div class="flex justify-between items-center text-text-muted font-label-code text-label-code mb-1">
+<span>近5小时</span>
+<span class="text-status-warning font-semibold">35%</span>
+</div>
+<div class="w-full h-1.5 rounded-full bg-surface-container-highest overflow-hidden">
+<div class="h-full bg-status-warning rounded-full" style="width: 35%;"></div>
+</div>
+</div>
+<div class="flex flex-col">
+<div class="flex justify-between items-center text-text-muted font-label-code text-label-code mb-1">
+<span>每周配额</span>
+<span class="text-text-primary font-semibold">12%</span>
+</div>
+<div class="w-full h-1.5 rounded-full bg-surface-container-highest overflow-hidden">
+<div class="h-full bg-tag-glm rounded-full" style="width: 12%;"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Card 4: 火山方舟 -->
+<div class="p-space-sm rounded-xl bg-surface-container-low/80 hover:bg-surface-container transition-all">
+<div class="flex items-center justify-between mb-1">
+<div class="flex items-center gap-space-xs">
+<span class="px-1.5 py-0.5 rounded bg-tag-vol/10 text-tag-vol font-label-badge text-label-badge">VOL</span>
+<span class="font-body-small text-body-small font-semibold text-text-primary">火山方舟 Coding Plan</span>
+</div>
+<span class="text-text-muted font-label-code text-label-code">重置 03:14:22</span>
+</div>
+<div class="grid grid-cols-2 gap-space-sm mt-2">
+<div class="flex flex-col">
+<div class="flex justify-between items-center text-text-muted font-label-code text-label-code mb-1">
+<span>5小时周期</span>
+<span class="text-tag-vol font-semibold">18%</span>
+</div>
+<div class="w-full h-1.5 rounded-full bg-surface-container-highest overflow-hidden">
+<div class="h-full bg-tag-vol rounded-full" style="width: 18%;"></div>
+</div>
+</div>
+<div class="flex flex-col">
+<div class="flex justify-between items-center text-text-muted font-label-code text-label-code mb-1">
+<span>近一周用量</span>
+<span class="text-text-primary font-semibold">36%</span>
+</div>
+<div class="w-full h-1.5 rounded-full bg-surface-container-highest overflow-hidden">
+<div class="h-full bg-tag-vol/70 rounded-full" style="width: 36%;"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Card 5: New API -->
+<div class="p-space-sm rounded-xl bg-surface-container-low/80 hover:bg-surface-container transition-all">
+<div class="flex items-center justify-between mb-1">
+<div class="flex items-center gap-space-xs">
+<span class="px-1.5 py-0.5 rounded bg-tag-new/10 text-tag-new font-label-badge text-label-badge">NEW</span>
+<span class="font-body-small text-body-small font-semibold text-text-primary">自建 New API 聚合</span>
+</div>
+<span class="text-tag-new font-label-code text-label-code">今日: $2.10</span>
+</div>
+<div class="flex items-baseline justify-between mt-1">
+<div>
+<span class="font-title-card text-title-card font-semibold text-text-primary">$86.20</span>
+<span class="font-body-small text-body-small text-text-muted ml-1">剩余额度</span>
+</div>
+<span class="text-text-subtle font-label-code text-label-code">累计 2,310 次请求</span>
+</div>
+</div>
+</div>
+<!-- Popover Bottom Footer Bar -->
+<div class="flex items-center justify-between pt-space-xs text-text-subtle font-label-code text-label-code">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-[14px]">schedule</span>
+<span>最后刷新 10:42:18</span>
+</div>
+<button class="flex items-center gap-1 text-primary hover:text-text-primary transition-colors">
+<span class="material-symbols-outlined text-[14px]">sync</span>
+<span>手动刷新</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 2: CORE CAPABILITIES -->
+<section class="w-full py-space-3xl lg:py-space-4xl relative" id="features">
+<div class="max-w-container-max mx-auto px-space-lg">
+<!-- Section Header -->
+<div class="flex flex-col mb-space-2xl max-w-2xl">
+<span class="font-label-badge text-label-badge text-primary uppercase tracking-widest mb-space-xs">Native Capabilities</span>
+<h2 class="font-headline-section text-headline-section text-text-primary tracking-tight">
+          为严肃工程而生的核心能力
+        </h2>
+<p class="font-body-large text-body-large text-on-surface-variant mt-space-xs">
+          摒弃虚浮假数据与复杂云同步，将轻巧、即时、透明的 macOS 原生用量掌控感带给每一位开发者。
+        </p>
+</div>
+<!-- 4 Bento Grid Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-lg">
+<!-- Card 1 -->
+<div class="p-space-xl rounded-2xl bg-surface-container-low hover:bg-surface-container transition-all duration-300 shadow-md flex flex-col justify-between group">
+<div>
+<div class="w-12 h-12 rounded-xl bg-tag-rou/10 text-tag-rou flex items-center justify-center mb-space-lg group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-[24px]">desktop_windows</span>
+</div>
+<h3 class="font-title-card text-title-card text-text-primary mb-space-xs">
+              5 个独立菜单栏指标
+            </h3>
+<p class="font-body-base text-body-base text-on-surface-variant mb-space-lg">
+              内置短码短标识：<span class="text-tag-rou font-label-code">ROU</span>、<span class="text-tag-ds font-label-code">DS</span>、<span class="text-tag-glm font-label-code">GLM</span>、<span class="text-tag-vol font-label-code">VOL</span>、<span class="text-tag-new font-label-code">NEW</span>。进度条真实映射各供应商的有上限额度，余额健康状态精确显示，绝不伪造百分比。
+            </p>
+</div>
+<!-- Micro Visual Asset -->
+<div class="p-space-sm rounded-xl bg-surface-container-lowest flex items-center justify-around gap-space-xs">
+<span class="px-2 py-1 rounded bg-surface-container font-label-badge text-label-badge text-tag-rou">ROU 42%</span>
+<span class="px-2 py-1 rounded bg-surface-container font-label-badge text-label-badge text-status-success">DS ¥12.3</span>
+<span class="px-2 py-1 rounded bg-surface-container font-label-badge text-label-badge text-tag-glm">GLM 35%</span>
+<span class="px-2 py-1 rounded bg-surface-container font-label-badge text-label-badge text-tag-vol">VOL 18%</span>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="p-space-xl rounded-2xl bg-surface-container-low hover:bg-surface-container transition-all duration-300 shadow-md flex flex-col justify-between group">
+<div>
+<div class="w-12 h-12 rounded-xl bg-primary-container/20 text-primary flex items-center justify-center mb-space-lg group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-[24px]">vpn_key</span>
+</div>
+<h3 class="font-title-card text-title-card text-text-primary mb-space-xs">
+              多供应商与凭证隔离
+            </h3>
+<p class="font-body-base text-body-base text-on-surface-variant mb-space-lg">
+              支持在同一供应商下添加多套独立 Key（例如主账户、测试 Key、临时协作密钥），按供应商分类清晰管理，数据互不合并覆盖，本机维护独立加密缓存沙盒。
+            </p>
+</div>
+<!-- Micro Visual Asset -->
+<div class="p-space-sm rounded-xl bg-surface-container-lowest flex flex-col gap-1.5">
+<div class="flex items-center justify-between text-label-code font-label-code">
+<span class="text-text-muted">Prod Key:</span>
+<span class="text-text-primary">sk-prod-9a*** (可用)</span>
+<span class="text-status-success">● 独立</span>
+</div>
+<div class="flex items-center justify-between text-label-code font-label-code">
+<span class="text-text-muted">Test Key:</span>
+<span class="text-text-primary">sk-test-4b*** (隔离)</span>
+<span class="text-status-success">● 独立</span>
+</div>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="p-space-xl rounded-2xl bg-surface-container-low hover:bg-surface-container transition-all duration-300 shadow-md flex flex-col justify-between group">
+<div>
+<div class="w-12 h-12 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center mb-space-lg group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-[24px]">autorenew</span>
+</div>
+<h3 class="font-title-card text-title-card text-text-primary mb-space-xs">
+              智能刷新与缓存健康
+            </h3>
+<p class="font-body-base text-body-base text-on-surface-variant mb-space-lg">
+              灵活设定 1/5/15/30 分钟全局静默刷新。当遇到网络抖动、被限流或供应商短暂不可用时，界面清晰标记“缓存已过期”或最近一次成功快照，绝无假数据骚扰。
+            </p>
+</div>
+<!-- Micro Visual Asset -->
+<div class="p-space-sm rounded-xl bg-surface-container-lowest flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-[16px] text-text-subtle">cached</span>
+<span class="font-label-code text-label-code text-text-muted">快照健康度: 100% 真实返回</span>
+</div>
+<span class="font-label-badge text-label-badge px-2 py-0.5 rounded bg-surface-container text-secondary">15 min 定时</span>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="p-space-xl rounded-2xl bg-surface-container-low hover:bg-surface-container transition-all duration-300 shadow-md flex flex-col justify-between group">
+<div>
+<div class="w-12 h-12 rounded-xl bg-status-warning/10 text-status-warning flex items-center justify-center mb-space-lg group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-[24px]">notifications_active</span>
+</div>
+<h3 class="font-title-card text-title-card text-text-primary mb-space-xs">
+              原生通知与用量预警
+            </h3>
+<p class="font-body-base text-body-base text-on-surface-variant mb-space-lg">
+              额度消耗达到 80%、95% 或低于自定义余额阈值时，自动触发 macOS 系统级通知横幅与原生声音提醒。发出的系统通知内容绝不包含任何敏感密钥材料。
+            </p>
+</div>
+<!-- Micro Visual Asset -->
+<div class="p-space-sm rounded-xl bg-surface-container-lowest flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-status-warning text-[18px]">warning</span>
+<div class="flex flex-col">
+<span class="font-body-small text-body-small font-medium text-text-primary">DeepSeek 余额已低于预警阈值 ¥5.00</span>
+<span class="font-label-code text-label-code text-text-subtle">系统通知 · 敏感 Key 已自动隐匿</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 3: PROVIDER MATRIX -->
+<section class="w-full py-space-3xl lg:py-space-4xl bg-surface-container-lowest" id="providers">
+<div class="max-w-container-max mx-auto px-space-lg">
+<!-- Section Header -->
+<div class="flex flex-col mb-space-2xl max-w-2xl">
+<span class="font-label-badge text-label-badge text-tag-rou uppercase tracking-widest mb-space-xs">Provider Matrix</span>
+<h2 class="font-headline-section text-headline-section text-text-primary tracking-tight">
+          内置五大供应商矩阵与深度适配
+        </h2>
+<p class="font-body-large text-body-large text-on-surface-variant mt-space-xs">
+          针对主流 AI 基础模型服务与中转协议定制解析规则，不仅查额度，更深入识别套餐与分组状态。
+        </p>
+</div>
+<!-- Capability Matrix Table -->
+<div class="w-full overflow-x-auto rounded-2xl shadow-lg bg-surface-container-low">
+<table class="w-full text-left min-w-[760px]">
+<thead>
+<tr class="bg-surface-container-high/80 text-text-muted font-label-badge text-label-badge tracking-wider uppercase">
+<th class="py-space-md px-space-lg">供应商 (Provider)</th>
+<th class="py-space-md px-space-lg">凭证类型 (Credential)</th>
+<th class="py-space-md px-space-lg">监控维度 (Metrics Tracked)</th>
+<th class="py-space-md px-space-lg">专属能力与亮点 (Exclusive Features)</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-hairline font-body-base text-body-base">
+<!-- Row 1: Routin -->
+<tr class="hover:bg-surface-container transition-colors">
+<td class="py-space-md px-space-lg">
+<div class="flex items-center gap-space-xs">
+<span class="px-2 py-0.5 rounded bg-tag-rou/10 text-tag-rou font-label-badge text-label-badge">ROU</span>
+<span class="font-semibold text-text-primary">Routin</span>
+</div>
+</td>
+<td class="py-space-md px-space-lg font-label-code text-label-code text-text-muted">
+                plan-*** Key
+              </td>
+<td class="py-space-md px-space-lg text-on-surface-variant">
+                5小时额度、周额度、Token 资源包、订阅周期、分组倍率
+              </td>
+<td class="py-space-md px-space-lg">
+<span class="text-tag-rou font-medium">应用内官方网页免存密码登录</span>、每日签到抽奖、真实低额 Codex 当前分组检测
+              </td>
+</tr>
+<!-- Row 2: DeepSeek -->
+<tr class="hover:bg-surface-container transition-colors">
+<td class="py-space-md px-space-lg">
+<div class="flex items-center gap-space-xs">
+<span class="px-2 py-0.5 rounded bg-tag-ds/10 text-tag-ds font-label-badge text-label-badge">DS</span>
+<span class="font-semibold text-text-primary">DeepSeek</span>
+</div>
+</td>
+<td class="py-space-md px-space-lg font-label-code text-label-code text-text-muted">
+                API Key (Bearer)
+              </td>
+<td class="py-space-md px-space-lg text-on-surface-variant">
+                总余额、赠金余额、充值余额、账户可用状态
+              </td>
+<td class="py-space-md px-space-lg">
+                余额类真实健康度评估、支持低余额自定义独立预警阈值
+              </td>
+</tr>
+<!-- Row 3: GLM -->
+<tr class="hover:bg-surface-container transition-colors">
+<td class="py-space-md px-space-lg">
+<div class="flex items-center gap-space-xs">
+<span class="px-2 py-0.5 rounded bg-tag-glm/10 text-tag-glm font-label-badge text-label-badge">GLM</span>
+<span class="font-semibold text-text-primary">智谱 GLM</span>
+</div>
+</td>
+<td class="py-space-md px-space-lg font-label-code text-label-code text-text-muted">
+                API Key
+              </td>
+<td class="py-space-md px-space-lg text-on-surface-variant">
+                5小时用量、每周用量、调用次数统计
+              </td>
+<td class="py-space-md px-space-lg">
+                Coding Plan 专项周期追踪，精准窗口重置倒计时
+              </td>
+</tr>
+<!-- Row 4: 火山方舟 -->
+<tr class="hover:bg-surface-container transition-colors">
+<td class="py-space-md px-space-lg">
+<div class="flex items-center gap-space-xs">
+<span class="px-2 py-0.5 rounded bg-tag-vol/10 text-tag-vol font-label-badge text-label-badge">VOL</span>
+<span class="font-semibold text-text-primary">火山方舟</span>
+</div>
+</td>
+<td class="py-space-md px-space-lg font-label-code text-label-code text-text-muted">
+                AK / SK / Region
+              </td>
+<td class="py-space-md px-space-lg text-on-surface-variant">
+                个人 Agent Plan / Coding Plan 用量、剩余量、重置时间
+              </td>
+<td class="py-space-md px-space-lg">
+                自动换算近5小时与近一周周期用量，多 Region 智能容灾
+              </td>
+</tr>
+<!-- Row 5: New API -->
+<tr class="hover:bg-surface-container transition-colors">
+<td class="py-space-md px-space-lg">
+<div class="flex items-center gap-space-xs">
+<span class="px-2 py-0.5 rounded bg-tag-new/10 text-tag-new font-label-badge text-label-badge">NEW</span>
+<span class="font-semibold text-text-primary">New API</span>
+</div>
+</td>
+<td class="py-space-md px-space-lg font-label-code text-label-code text-text-muted">
+                URL + 数字ID + 访问令牌
+              </td>
+<td class="py-space-md px-space-lg text-on-surface-variant">
+                剩余额度、总额度、已用、今日消费、近7/30天趋势
+              </td>
+<td class="py-space-md px-space-lg">
+                广泛兼容自建与第三方 One API / New API 镜像，所属分组倍率明示
+              </td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<!-- SECTION 4: SECURITY & LOCAL PRIVACY ARCHITECTURE -->
+<section class="w-full py-space-3xl lg:py-space-4xl" id="privacy">
+<div class="max-w-container-max mx-auto px-space-lg">
+<!-- Section Header -->
+<div class="flex flex-col mb-space-2xl max-w-2xl">
+<span class="font-label-badge text-label-badge text-status-success uppercase tracking-widest mb-space-xs">Local First Architecture</span>
+<h2 class="font-headline-section text-headline-section text-text-primary tracking-tight">
+          安全、隐私与本地直连架构
+        </h2>
+<p class="font-body-large text-body-large text-on-surface-variant mt-space-xs">
+          没有自有云端账号，也没有任何中间收集服务器。您的 API Key 与用量数据永远留在您的 Mac 上。
+        </p>
+</div>
+<!-- Trust Architecture Diagram Card -->
+<div class="p-space-xl lg:p-space-2xl rounded-3xl bg-surface-container-low shadow-xl flex flex-col gap-space-2xl mb-space-xl">
+<!-- Network Flow Graphic -->
+<div class="w-full flex flex-col md:flex-row items-center justify-between gap-space-lg p-space-lg rounded-2xl bg-surface-container-lowest">
+<!-- Box: Local Mac -->
+<div class="flex flex-col items-center p-space-md rounded-xl bg-surface-container-high w-full md:w-56 text-center shadow-sm">
+<span class="material-symbols-outlined text-secondary text-[32px] mb-space-xs">laptop_mac</span>
+<span class="font-body-small text-body-small font-semibold text-text-primary">本机 macOS 容器</span>
+<span class="font-label-code text-label-code text-text-subtle mt-1">Keychain / 本地沙盒存储</span>
+</div>
+<!-- Flow Arrows -->
+<div class="flex flex-col items-center gap-space-xs text-center">
+<div class="flex items-center gap-space-xs text-status-success font-label-code text-label-code">
+<span>直接 HTTPS 签名请求</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</div>
+<div class="px-space-xs py-0.5 rounded-full bg-status-danger/10 text-status-danger font-label-badge text-label-badge flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">block</span>
+<span>零云端中转服务器 (Zero Cloud Relay)</span>
+</div>
+</div>
+<!-- Box: Providers -->
+<div class="flex flex-col items-center p-space-md rounded-xl bg-surface-container-high w-full md:w-56 text-center shadow-sm">
+<span class="material-symbols-outlined text-tag-rou text-[32px] mb-space-xs">dns</span>
+<span class="font-body-small text-body-small font-semibold text-text-primary">官方供应商 API</span>
+<span class="font-label-code text-label-code text-text-subtle mt-1">Direct Provider Endpoints</span>
+</div>
+</div>
+<!-- 4 Security Points Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+<div class="flex flex-col gap-space-xs p-space-md rounded-xl bg-surface-container">
+<span class="material-symbols-outlined text-status-success text-[24px]">key</span>
+<h4 class="font-title-card text-body-large font-semibold text-text-primary">本地密态存储</h4>
+<p class="font-body-small text-body-small text-on-surface-variant">凭据均保存在本地 macOS Keychain / App 沙盒中，不上传至任何非官方地址。</p>
+</div>
+<div class="flex flex-col gap-space-xs p-space-md rounded-xl bg-surface-container">
+<span class="material-symbols-outlined text-secondary text-[24px]">password</span>
+<h4 class="font-title-card text-body-large font-semibold text-text-primary">零账号侵入</h4>
+<p class="font-body-small text-body-small text-on-surface-variant">绝不收集登录密码、双重验证码、明文 Cookie 或账户邮箱原文。</p>
+</div>
+<div class="flex flex-col gap-space-xs p-space-md rounded-xl bg-surface-container">
+<span class="material-symbols-outlined text-tertiary text-[24px]">visibility_off</span>
+<h4 class="font-title-card text-body-large font-semibold text-text-primary">日志强制脱敏</h4>
+<p class="font-body-small text-body-small text-on-surface-variant">诊断日志中的密钥均自动脱敏处理（如 plan-&lt;redacted&gt;），在手动导出或提交前清晰可见。</p>
+</div>
+<div class="flex flex-col gap-space-xs p-space-md rounded-xl bg-surface-container">
+<span class="material-symbols-outlined text-error text-[24px]">delete_forever</span>
+<h4 class="font-title-card text-body-large font-semibold text-text-primary">一键彻底清理</h4>
+<p class="font-body-small text-body-small text-on-surface-variant">设置内提供“清除所有数据”功能，可在卸载或更换设备时彻底抹除本机留存材料。</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 5: STEP-BY-STEP QUICK START & GATEKEEPER GUIDE -->
+<section class="w-full py-space-3xl lg:py-space-4xl bg-surface-container-lowest" id="install">
+<div class="max-w-container-max mx-auto px-space-lg">
+<!-- Section Header -->
+<div class="flex flex-col mb-space-2xl max-w-2xl">
+<span class="font-label-badge text-label-badge text-primary uppercase tracking-widest mb-space-xs">Installation</span>
+<h2 class="font-headline-section text-headline-section text-text-primary tracking-tight">
+          极速安装与 macOS 首次配置
+        </h2>
+<p class="font-body-large text-body-large text-on-surface-variant mt-space-xs">
+          只需简单三步，把 AI 账户额度面板常驻到 macOS 菜单栏。
+        </p>
+</div>
+<!-- 3 Step Cards -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-space-lg mb-space-2xl">
+<!-- Step 1 -->
+<div class="p-space-lg rounded-2xl bg-surface-container-low shadow-md flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between mb-space-md">
+<span class="px-space-xs py-0.5 rounded bg-primary-container text-on-primary-container font-label-badge text-label-badge font-bold">STEP 01</span>
+<span class="material-symbols-outlined text-text-subtle text-[20px]">downloading</span>
+</div>
+<h3 class="font-title-card text-title-card text-text-primary mb-space-xs">下载 DMG 安装包</h3>
+<p class="font-body-base text-body-base text-on-surface-variant mb-space-md">
+              从官方 GitHub Releases 获取最新的 <span class="font-label-code text-label-code text-primary">MyToken.dmg</span> 安装镜像。
+            </p>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container-lowest text-text-subtle font-label-code text-label-code flex items-center justify-between">
+<span>通用架构 (Universal)</span>
+<span class="text-status-success">Apple &amp; Intel</span>
+</div>
+</div>
+<!-- Step 2 -->
+<div class="p-space-lg rounded-2xl bg-surface-container-low shadow-md flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between mb-space-md">
+<span class="px-space-xs py-0.5 rounded bg-primary-container text-on-primary-container font-label-badge text-label-badge font-bold">STEP 02</span>
+<span class="material-symbols-outlined text-text-subtle text-[20px]">drive_file_move</span>
+</div>
+<h3 class="font-title-card text-title-card text-text-primary mb-space-xs">拖拽至 Applications</h3>
+<p class="font-body-base text-body-base text-on-surface-variant mb-space-md">
+              双击打开 DMG 文件，将 MyToken 图标顺畅拖动至右侧的“应用程序”快捷文件夹内。
+            </p>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container-lowest text-text-subtle font-label-code text-label-code flex items-center justify-between">
+<span>/Applications</span>
+<span class="text-primary">无需额外依赖</span>
+</div>
+</div>
+<!-- Step 3 -->
+<div class="p-space-lg rounded-2xl bg-surface-container-low shadow-md flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between mb-space-md">
+<span class="px-space-xs py-0.5 rounded bg-primary-container text-on-primary-container font-label-badge text-label-badge font-bold">STEP 03</span>
+<span class="material-symbols-outlined text-text-subtle text-[20px]">tune</span>
+</div>
+<h3 class="font-title-card text-title-card text-text-primary mb-space-xs">配置凭据即刻使用</h3>
+<p class="font-body-base text-body-base text-on-surface-variant mb-space-md">
+              点击顶部菜单栏图标打开设置，选择对应供应商填写 Key 并点击“验证并保存”，实时指标立即点亮。
+            </p>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container-lowest text-text-subtle font-label-code text-label-code flex items-center justify-between">
+<span>即时生效</span>
+<span class="text-status-success">毫秒级同步</span>
+</div>
+</div>
+</div>
+<!-- macOS Gatekeeper Guide Banner -->
+<div class="p-space-xl rounded-2xl bg-surface-container-low flex flex-col md:flex-row items-start md:items-center gap-space-lg shadow-md">
+<div class="w-12 h-12 rounded-xl bg-status-warning/15 text-status-warning flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[28px]">shield_with_heart</span>
+</div>
+<div class="flex flex-col gap-1 grow">
+<h4 class="font-title-card text-body-large font-semibold text-text-primary">macOS 首次运行拦截提示（Gatekeeper 引导）</h4>
+<p class="font-body-base text-body-base text-on-surface-variant">
+            若因未购买昂贵的苹果官方开发者证书导致系统提示“无法验证开发者”或“已被阻止”，请前往：<br class="hidden sm:inline"/>
+<span class="text-primary font-semibold">系统设置 → 隐私与安全性 → 安全性区域</span>，找到拦截记录并点击 <span class="font-semibold text-text-primary">「仍要打开」</span> 即可永久正常运行。
+          </p>
+</div>
+<a class="shrink-0 px-space-md py-space-xs rounded-lg bg-surface-container-high hover:bg-surface-bright text-text-primary font-body-small text-body-small font-medium transition-colors" href="https://github.com/dick86114/MyRoutin#macos-gatekeeper-guide" rel="noopener noreferrer" target="_blank">
+          查看图文教程
+        </a>
+</div>
+</div>
+</section>
+<!-- SECTION 6: FAQ -->
+<section class="w-full py-space-3xl lg:py-space-4xl" id="faq">
+<div class="max-w-container-max mx-auto px-space-lg">
+<!-- Section Header -->
+<div class="flex flex-col mb-space-2xl max-w-2xl">
+<span class="font-label-badge text-label-badge text-secondary uppercase tracking-widest mb-space-xs">Questions &amp; Answers</span>
+<h2 class="font-headline-section text-headline-section text-text-primary tracking-tight">
+          常见问题解答
+        </h2>
+<p class="font-body-large text-body-large text-on-surface-variant mt-space-xs">
+          有关架构安全、多 Key 机制与用量计算的真实解答。
+        </p>
+</div>
+<!-- Accordion Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+<!-- Q1 -->
+<div class="p-space-lg rounded-2xl bg-surface-container-low shadow-sm flex flex-col gap-space-xs">
+<div class="flex items-center gap-space-xs text-primary">
+<span class="material-symbols-outlined text-[20px]">help_outline</span>
+<h3 class="font-title-card text-body-large font-semibold text-text-primary">MyToken 是云服务还是本地应用？</h3>
+</div>
+<p class="font-body-base text-body-base text-on-surface-variant">
+            MyToken 是一款 100% 纯本地运行的 macOS 原生菜单栏应用。它没有任何自有后端服务器、云端中转集群或统一用户账号系统。网络请求全部由您的 Mac 本机直接向供应商官方 API 发起。
+          </p>
+</div>
+<!-- Q2 -->
+<div class="p-space-lg rounded-2xl bg-surface-container-low shadow-sm flex flex-col gap-space-xs">
+<div class="flex items-center gap-space-xs text-primary">
+<span class="material-symbols-outlined text-[20px]">help_outline</span>
+<h3 class="font-title-card text-body-large font-semibold text-text-primary">同一个供应商添加多个 Key 会合并计算额度吗？</h3>
+</div>
+<p class="font-body-base text-body-base text-on-surface-variant">
+            绝不会。每个凭据拥有完全独立的配置卡片、独立查询任务与独立缓存沙盒。您可以在菜单栏或弹窗中分别查看工作号与个人号的额度，杜绝数据混淆。
+          </p>
+</div>
+<!-- Q3 -->
+<div class="p-space-lg rounded-2xl bg-surface-container-low shadow-sm flex flex-col gap-space-xs">
+<div class="flex items-center gap-space-xs text-primary">
+<span class="material-symbols-outlined text-[20px]">help_outline</span>
+<h3 class="font-title-card text-body-large font-semibold text-text-primary">为什么 DeepSeek 等接口不显示百分比进度条？</h3>
+</div>
+<p class="font-body-base text-body-base text-on-surface-variant">
+            因为 DeepSeek 采用按量计费的现金余额模型（无固定配额上限）。MyToken 遵循诚实透明的设计哲学，直接展示总余额、赠金与充值金明细，绝不通过捏造虚假的 100% 上限来绘制欺骗性进度条。
+          </p>
+</div>
+<!-- Q4 -->
+<div class="p-space-lg rounded-2xl bg-surface-container-low shadow-sm flex flex-col gap-space-xs">
+<div class="flex items-center gap-space-xs text-primary">
+<span class="material-symbols-outlined text-[20px]">help_outline</span>
+<h3 class="font-title-card text-body-large font-semibold text-text-primary">Routin 签到与 Codex 检测会消耗我的额度吗？</h3>
+</div>
+<p class="font-body-base text-body-base text-on-surface-variant">
+            完全不会。Routin 签到功能复用官方开放的抽奖端点，Codex 分组检测则通过极低载荷的元数据请求完成，不会产生实际的模型 Token 生成计费，请放心使用。
+          </p>
+</div>
+<!-- Q5 -->
+<div class="p-space-lg rounded-2xl bg-surface-container-low shadow-sm flex flex-col gap-space-xs md:col-span-2">
+<div class="flex items-center gap-space-xs text-primary">
+<span class="material-symbols-outlined text-[20px]">help_outline</span>
+<h3 class="font-title-card text-body-large font-semibold text-text-primary">卸载应用后会自动清除我的 API Key 吗？如何彻底清理？</h3>
+</div>
+<p class="font-body-base text-body-base text-on-surface-variant">
+            macOS 将应用拖入废纸篓时默认保留沙盒偏好设置与 Keychain 项。如果您打算彻底注销，请在卸载前打开 MyToken 设置面板，点击底部的「重置并清除所有数据」，即可在秒级内完全抹除本地存储的全部凭据。
+          </p>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 7: FINAL CTA DOWNLOAD BANNER -->
+<section class="w-full py-space-3xl lg:py-space-4xl relative">
+<div class="max-w-container-max mx-auto px-space-lg">
+<div class="relative overflow-hidden rounded-3xl bg-surface-container-low p-space-2xl lg:p-space-3xl shadow-2xl flex flex-col items-center text-center">
+<!-- App Icon -->
+<div class="w-20 h-20 mb-space-lg relative flex items-center justify-center">
+<img alt="MyToken Icon" class="w-full h-full object-contain rounded-2xl shadow-xl" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVvEpGb7ZCaF8YP12kY6nFFnoIV8SxCPytaKH3ygrbY6hnoqzCNnFuTnHRltlDaTY3xI156MHZsxNBZMb06kngPvt4hjvrpqu-du0QCnIuGwiBznfWJsBnixqWGXlbjYR0-pxKYDjJO174bH-L-0HA7bKmRU_DETLM5jwi-xS3hWVXwKrIscKD6jfrXatGjMGgCiD7q_AwibXqBtbcUk1odYpFKLU2jSq3CN8hhudaTFRzDWm5_1xg8tYz5_boht7D7bY"/>
+</div>
+<h2 class="font-headline-section text-headline-section text-text-primary tracking-tight max-w-2xl mb-space-xs">
+          告别逐个登录控制台，在菜单栏掌控所有大模型资产
+        </h2>
+<p class="font-body-large text-body-large text-on-surface-variant max-w-xl mb-space-2xl">
+          专为重度 AI 开发者打造，本地密态安全，毫秒级响应。立即下载开启原生体验。
+        </p>
+<!-- CTA Buttons -->
+<div class="flex flex-wrap items-center justify-center gap-space-md">
+<a class="group inline-flex items-center gap-space-sm px-space-xl py-space-md rounded-xl bg-primary-container hover:bg-secondary-container text-on-primary-container font-body-base text-body-base font-semibold shadow-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]" href="https://github.com/dick86114/MyRoutin/releases" rel="noopener noreferrer" target="_blank">
+<span class="material-symbols-outlined text-[22px]">download</span>
+<span>立即下载 MyToken.dmg</span>
+<span class="px-space-2xs py-0.5 rounded bg-on-primary-container/20 text-on-primary-container font-label-badge text-label-badge">v1.0.0</span>
+</a>
+<a class="inline-flex items-center gap-space-xs px-space-lg py-space-md rounded-xl bg-surface-container-high hover:bg-surface-bright text-text-primary font-body-base text-body-base font-medium shadow-md transition-colors duration-200" href="https://github.com/dick86114/MyRoutin" rel="noopener noreferrer" target="_blank">
+<span class="material-symbols-outlined text-[20px] text-status-warning">star</span>
+<span>在 GitHub 上 Star</span>
+</a>
+</div>
+<div class="mt-space-xl flex flex-wrap items-center justify-center gap-space-md text-text-subtle font-label-code text-label-code">
+<span>支持 macOS 14.0+ (Sonoma / Sequoia)</span>
+<span>•</span>
+<span>Apple Silicon &amp; Intel 通用支持</span>
+<span>•</span>
+<span>开源透明</span>
+</div>
+</div>
+</div>
+</section>
+</div></main><footer class="relative z-10 w-full bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_-1px_12px_rgba(0,0,0,0.5)] py-space-2xl"><div class="max-w-container-max mx-auto px-space-lg flex flex-col gap-space-xl"><div class="flex flex-col md:flex-row md:items-start justify-between gap-space-xl"><div class="flex flex-col gap-space-sm max-w-md"><div class="flex items-center gap-space-sm"><img alt="icon_1024x1024.png" class="h-6 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1Uv-CUtYuqaveXaahSlwI0B2pCzVrXCPW_1CPut6oRZHRWoKhNSOYwQpgW5p6WiPNPj6yaT7kIDVVNEdpKOXtOpDjD8hSIgLxFBxuo4NYaHOyur2uD1Oh3iv__ogGe1oIr5Mnk-3ogCpvBrYInhYAHEkDTetUCWfr06CZVVIQGraq4c4d598INyT-1cENEwO2QGhkaorS-aqKiiwcvZ5iivVxmRteHO82tWZom_tK-rvjei3wIgLd8qHQY-cI5vxE6k0I6jpG3NBeU"/><span class="font-title-card text-title-card text-text-primary tracking-tight">MyToken</span></div><p class="font-body-base text-body-base text-on-surface-variant">MyToken · 本地运行的 macOS 菜单栏大模型用量与额度监控工具。</p><div class="flex items-center gap-space-xs text-text-subtle font-label-code text-label-code"><span class="material-symbols-outlined text-status-success text-[16px]">verified_user</span><span>凭证均仅保存在本机存储中，无自有云端账号同步，保护隐私与密钥安全。</span></div></div><div class="flex flex-col sm:flex-row gap-space-xl sm:gap-space-3xl"><div class="flex flex-col gap-space-xs"><span class="font-label-badge text-label-badge text-text-subtle tracking-wider uppercase">快捷入口</span><nav class="flex flex-col gap-space-xs" data-active-classes="text-primary font-semibold"><a class="font-body-small text-body-small text-on-surface-variant hover:text-on-surface transition-colors" href="https://github.com/dick86114/MyRoutin/releases" rel="noopener noreferrer" target="_blank">GitHub Release</a><a class="font-body-small text-body-small text-on-surface-variant hover:text-on-surface transition-colors" href="https://github.com/dick86114/MyRoutin/issues" rel="noopener noreferrer" target="_blank">问题反馈 (Issues)</a><a class="font-body-small text-body-small text-on-surface-variant hover:text-on-surface transition-colors" data-path="privacy" href="#">文档与安全说明</a></nav></div><div class="flex flex-col gap-space-xs"><span class="font-label-badge text-label-badge text-text-subtle tracking-wider uppercase">平台兼容</span><span class="font-body-small text-body-small text-on-surface-variant">v1.0.0 正式发布</span><span class="font-body-small text-body-small text-text-subtle">支持 macOS 14.0+</span><span class="font-body-small text-body-small text-text-subtle">Apple Silicon &amp; Intel Universal</span></div></div></div><div class="flex flex-col md:flex-row items-center justify-between gap-space-md pt-space-md"><p class="font-body-small text-body-small text-text-subtle text-center md:text-left">© 2025 MyToken. Made with precision for AI engineers and heavy users.</p><div class="flex items-center gap-space-md text-text-subtle font-label-code text-label-code"><span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-status-success"></span>Keychain AES-256</span><span>Zero Cloud Relay</span></div></div></div></footer></body></html>

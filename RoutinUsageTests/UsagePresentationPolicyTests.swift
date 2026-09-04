@@ -25,9 +25,11 @@ final class UsagePresentationPolicyTests: XCTestCase {
                 metrics: [
                     metric("five-hour"),
                     metric("weekly"),
-                    metric("model-calls")
+                    metric("model-calls"),
+                    metric("zcode-mcp")
                 ],
-                columns: 2
+                columns: 2,
+                showsAmountDetails: false
             )
         )
         XCTAssertEqual(UsageMetricGridPolicy.layout(providerID: .volcengine, metrics: metrics).columns, 2)
@@ -86,7 +88,10 @@ final class UsagePresentationPolicyTests: XCTestCase {
             source.contains("UsageFormatter.remainingDurationText(until: windowEnd, now: now)")
         )
         XCTAssertTrue(
-            source.contains("UsageFormatter.shouldHighlightRemainingDuration(\n                                    for: metric,\n                                    now: now\n                                ) ? Color.green : Color.secondary")
+            source.contains("UsageFormatter.shouldHighlightRemainingDuration(")
+        )
+        XCTAssertTrue(
+            source.contains("? Color.green : Color.secondary")
         )
     }
 

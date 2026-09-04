@@ -108,21 +108,29 @@ enum MenuBarUsageRisk: Equatable {
 
 enum MenuBarMultiUsageIcon {
     static let maximumCount = 5
-    static let unitWidth: CGFloat = 17
-    static let gap: CGFloat = 3
-    static let size = NSSize(width: unitWidth, height: 18)
+    static let unitWidth: CGFloat = 24
+    static let gap: CGFloat = 0
+    static let outerPadding: CGFloat = 3
+    static let size = NSSize(width: unitWidth, height: 26)
+
+    static func imageWidth(for count: Int) -> CGFloat {
+        let displayedCount = max(1, min(count, maximumCount))
+        return outerPadding * 2
+            + unitWidth * CGFloat(displayedCount)
+            + gap * CGFloat(max(0, displayedCount - 1))
+    }
 
     static func image(
         indicators: [MenuBarIndicatorModel],
         appearance: NSAppearance? = nil
     ) -> NSImage {
         let count = max(1, min(indicators.count, maximumCount))
-        let image = NSImage(size: NSSize(width: unitWidth * CGFloat(count) + gap * CGFloat(count - 1), height: size.height))
+        let image = NSImage(size: NSSize(width: imageWidth(for: count), height: size.height))
         image.lockFocus()
         defer { image.unlockFocus() }
         let labelColor = foregroundColor(for: appearance ?? NSApp?.effectiveAppearance)
         for (index, indicator) in indicators.prefix(maximumCount).enumerated() {
-            let x = CGFloat(index) * (unitWidth + gap)
+            let x = outerPadding + CGFloat(index) * (unitWidth + gap)
             draw(
                 indicator: indicator,
                 in: NSRect(x: x, y: 0, width: unitWidth, height: size.height),
@@ -135,12 +143,12 @@ enum MenuBarMultiUsageIcon {
     }
 
     static func codeFont(for characterCount: Int) -> NSFont {
-        let size: CGFloat = characterCount >= 3 ? 4.7 : 6
+        let size: CGFloat = characterCount >= 3 ? 8.4 : 9.5
         return NSFont.monospacedSystemFont(ofSize: size, weight: .bold)
     }
 
     static func codeSlotHeight(for characterCount: Int) -> CGFloat {
-        (size.height - 4) / CGFloat(max(1, characterCount))
+        8
     }
 
     static func codeBaselineY(
@@ -149,8 +157,11 @@ enum MenuBarMultiUsageIcon {
         font: NSFont
     ) -> CGFloat {
         let slotHeight = codeSlotHeight(for: characterCount)
-        let slotBottom = size.height - 2 - slotHeight * CGFloat(index + 1)
-        return slotBottom + (slotHeight - font.capHeight) / 2
+        let stackHeight = slotHeight * CGFloat(max(0, characterCount - 1)) + font.capHeight
+        let topBaseline = (size.height + stackHeight) / 2 - font.capHeight
+        // 大写短码按 capHeight 居中时，视觉重心仍会偏上；这里按实际渲染结果做光学校正。
+        let opticalAdjustment: CGFloat = characterCount >= 3 ? -2 : -3
+        return topBaseline - slotHeight * CGFloat(index) + opticalAdjustment
     }
 
     private static func draw(
@@ -161,14 +172,11 @@ enum MenuBarMultiUsageIcon {
         let text = indicator.shortCode
         let characters = Array(text.prefix(3))
         let font = codeFont(for: characters.count)
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = .center
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
-            .foregroundColor: foregroundColor,
-            .paragraphStyle: paragraph
+            .foregroundColor: foregroundColor
         ]
-        let textWidth: CGFloat = 9
+        let textCenter = rect.minX + 4.5
 
         characters.enumerated().forEach { index, character in
             let character = String(character)
@@ -179,14 +187,16 @@ enum MenuBarMultiUsageIcon {
                 font: font
             )
             let origin = NSPoint(
-                x: rect.minX + (textWidth - characterSize.width) / 2,
+                x: textCenter - characterSize.width / 2,
                 y: baselineY
             )
             NSString(string: character).draw(at: origin, withAttributes: attributes)
         }
 
-        let trackRect = NSRect(x: rect.minX + 12, y: 2, width: 3, height: rect.height - 4)
-        let track = NSBezierPath(roundedRect: trackRect, xRadius: 1.5, yRadius: 1.5)
+        let trackRect = NSRect(x: rect.minX + 9.5, y: 4, width: 7.5, height: rect.height - 8)
+        let track = NSBezierPath(roundedRect: trackRect, xRadius: 2.5, yRadius: 2.5)
+        track.lineWidth = 1
+        whiteStroke().setStroke()
         foregroundColor.withAlphaComponent(0.28).setFill()
         track.fill()
 
@@ -200,16 +210,29 @@ enum MenuBarMultiUsageIcon {
         }
         let fillHeight: CGFloat
         if let percent = indicator.percent {
-            fillHeight = (rect.height - 4) * CGFloat(min(max(percent, 0), 100)) / 100
+            fillHeight = (trackRect.height - track.lineWidth) * CGFloat(min(max(percent, 0), 100)) / 100
         } else {
             fillHeight = indicator.healthState == .unknown ? 0 : 3
         }
-        guard fillHeight > 0 else { return }
-        NSGraphicsContext.saveGraphicsState()
-        track.addClip()
-        color.setFill()
-        NSBezierPath(rect: NSRect(x: trackRect.minX, y: trackRect.minY, width: trackRect.width, height: fillHeight + 1)).fill()
-        NSGraphicsContext.restoreGraphicsState()
+        if fillHeight > 0 {
+            NSGraphicsContext.saveGraphicsState()
+            track.addClip()
+            color.setFill()
+            NSBezierPath(
+                rect: NSRect(
+                    x: trackRect.minX + track.lineWidth / 2,
+                    y: trackRect.minY + track.lineWidth / 2,
+                    width: trackRect.width - track.lineWidth,
+                    height: fillHeight
+                )
+            ).fill()
+            NSGraphicsContext.restoreGraphicsState()
+        }
+        track.stroke()
+    }
+
+    private static func whiteStroke() -> NSColor {
+        .white.withAlphaComponent(0.9)
     }
 
     private static func foregroundColor(for appearance: NSAppearance?) -> NSColor {

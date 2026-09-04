@@ -4,6 +4,32 @@ import XCTest
 @testable import RoutinUsage
 
 final class UsageFormatterTests: XCTestCase {
+    func test统一指标数值使用紧凑格式() {
+        XCTAssertEqual(UsageFormatter.compactMetricValue(120_000), "120K")
+        XCTAssertEqual(UsageFormatter.compactMetricValue(4_500), "4.5K")
+        XCTAssertEqual(UsageFormatter.compactMetricValue(42), "42")
+        XCTAssertEqual(UsageFormatter.compactMetricValue(nil), "—")
+    }
+
+    func testNewAPI货币单位保留两位小数() {
+        XCTAssertEqual(
+            UsageFormatter.currencyText(Decimal(string: "1000.602"), symbol: "¥"),
+            "¥1000.60"
+        )
+        XCTAssertEqual(
+            UsageFormatter.currencyText(Decimal(string: "43607.129"), symbol: "¥"),
+            "¥43607.13"
+        )
+    }
+
+    func testToken统计保留千分位完整数值() {
+        XCTAssertEqual(
+            UsageFormatter.exactTokenText(7_362_665),
+            "7,362,665"
+        )
+        XCTAssertEqual(UsageFormatter.exactTokenText(nil), "—")
+    }
+
     func test分组倍率分段仅精确匹配检测分组() {
         let segments = UsageFormatter.groupMultiplierSegments(
             [
@@ -482,7 +508,7 @@ final class UsageFormatterTests: XCTestCase {
         )
     }
 
-    func test通用指标临近重置按Routin阈值变绿() {
+    func test通用指标剩余不足一小时时变绿() {
         let now = Date(timeIntervalSince1970: 1_786_320_000)
 
         func normalizedMetric(id: String, label: String, remainingInterval: TimeInterval) -> NormalizedUsageMetric {
@@ -504,7 +530,7 @@ final class UsageFormatterTests: XCTestCase {
                 for: normalizedMetric(
                     id: "five-hour",
                     label: "5 小时用量",
-                    remainingInterval: 59 * 60
+                    remainingInterval: 59 * 60 - 1
                 ),
                 now: now
             )
@@ -529,27 +555,27 @@ final class UsageFormatterTests: XCTestCase {
                 now: now
             )
         )
+        XCTAssertFalse(
+            UsageFormatter.shouldHighlightRemainingDuration(
+                for: normalizedMetric(
+                    id: "weekly",
+                    label: "近一周用量",
+                    remainingInterval: 2 * 60 * 60
+                ),
+                now: now
+            )
+        )
+        XCTAssertFalse(
+            UsageFormatter.shouldHighlightRemainingDuration(
+                for: normalizedMetric(
+                    id: "weekly",
+                    label: "近一周用量",
+                    remainingInterval: 60 * 60
+                ),
+                now: now
+            )
+        )
         XCTAssertTrue(
-            UsageFormatter.shouldHighlightRemainingDuration(
-                for: normalizedMetric(
-                    id: "weekly",
-                    label: "近一周用量",
-                    remainingInterval: 23 * 60 * 60
-                ),
-                now: now
-            )
-        )
-        XCTAssertFalse(
-            UsageFormatter.shouldHighlightRemainingDuration(
-                for: normalizedMetric(
-                    id: "weekly",
-                    label: "近一周用量",
-                    remainingInterval: 24 * 60 * 60
-                ),
-                now: now
-            )
-        )
-        XCTAssertFalse(
             UsageFormatter.shouldHighlightRemainingDuration(
                 for: normalizedMetric(
                     id: "monthly",

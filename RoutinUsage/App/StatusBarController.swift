@@ -126,8 +126,7 @@ final class StatusBarController: NSObject {
         }
         if !selectedIndicators.isEmpty {
             let displayedCount = min(selectedIndicators.count, MenuBarMultiUsageIcon.maximumCount)
-            let imageWidth = MenuBarMultiUsageIcon.unitWidth * CGFloat(displayedCount)
-                + MenuBarMultiUsageIcon.gap * CGFloat(max(0, displayedCount - 1))
+            let imageWidth = MenuBarMultiUsageIcon.imageWidth(for: displayedCount)
             statusItem.length = imageWidth + 8
             button.title = ""
             button.image = MenuBarMultiUsageIcon.image(
@@ -208,22 +207,23 @@ final class StatusBarController: NSObject {
         if popover.isShown {
             popover.performClose(nil)
         } else {
-            NSApp.activate(ignoringOtherApps: true)
             let contentSize = popoverContentSize(for: button)
             popover.contentSize = contentSize
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            configurePopoverWindow(contentSize: contentSize)
+            configurePopoverWindow(contentSize: contentSize, anchoredTo: button)
         }
     }
 
-    private func configurePopoverWindow(contentSize: NSSize) {
+    private func configurePopoverWindow(contentSize: NSSize, anchoredTo button: NSStatusBarButton) {
         guard let window = popover.contentViewController?.view.window else {
             return
         }
         window.contentViewController?.preferredContentSize = contentSize
         window.setContentSize(contentSize)
         window.level = .statusBar
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         window.makeKeyAndOrderFront(nil)
+        positionPopoverWindow(window, anchoredTo: button)
 
         if let popoverWindowResignObserver {
             NotificationCenter.default.removeObserver(popoverWindowResignObserver)
@@ -237,11 +237,35 @@ final class StatusBarController: NSObject {
         }
     }
 
+    private func positionPopoverWindow(_ popoverWindow: NSWindow, anchoredTo button: NSStatusBarButton) {
+        let mouseLocation = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first { $0.frame.contains(mouseLocation) }
+            ?? button.window?.screen
+            ?? popoverWindow.screen
+            ?? NSScreen.main
+        guard let screen else { return }
+
+        let anchorRect = button.window?.convertToScreen(button.bounds) ?? .zero
+        let origin = PopoverWindowPlacement.origin(
+            popoverSize: popoverWindow.frame.size,
+            anchorRect: anchorRect,
+            visibleFrame: screen.visibleFrame
+        )
+        popoverWindow.setFrameOrigin(origin)
+    }
+
     private func popoverContentSize(for button: NSStatusBarButton) -> NSSize {
         let screenHeight = button.window?.screen?.visibleFrame.height
             ?? NSScreen.main?.visibleFrame.height
             ?? 800
-        return NSSize(width: 440, height: screenHeight * 0.9)
+        let maximumHeight = screenHeight * 0.9
+        let idealSize = popover.contentViewController?.view.fittingSize
+            ?? NSSize(width: 440, height: 0)
+
+        return NSSize(
+            width: idealSize.width == 0 ? 440 : idealSize.width,
+            height: min(max(idealSize.height, 1), maximumHeight)
+        )
     }
 
     private func showContextMenu(from button: NSStatusBarButton) {
@@ -315,6 +339,22 @@ final class StatusBarController: NSObject {
 
     @objc private func quitApplication() {
         NSApplication.shared.terminate(nil)
+    }
+}
+
+enum PopoverWindowPlacement {
+    /// NSPopover 在设置窗口跨屏后可能跟随主屏；这里根据被点击的状态按钮重新落位。
+    static func origin(
+        popoverSize: NSSize,
+        anchorRect: NSRect,
+        visibleFrame: NSRect
+    ) -> NSPoint {
+        let preferredX = anchorRect.midX - popoverSize.width / 2
+        let minimumX = visibleFrame.minX
+        let maximumX = max(minimumX, visibleFrame.maxX - popoverSize.width)
+        let x = min(max(preferredX, minimumX), maximumX)
+        let y = visibleFrame.maxY - popoverSize.height
+        return NSPoint(x: x, y: y)
     }
 }
 

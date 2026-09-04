@@ -6,16 +6,16 @@ final class MenuBarCodeLayoutTests: XCTestCase {
     func test短码字号和行距安全区内的安全边距() {
         XCTAssertEqual(
             MenuBarMultiUsageIcon.codeFont(for: 2).pointSize,
-            6,
+            9.5,
             accuracy: 0.01
         )
         XCTAssertEqual(
             MenuBarMultiUsageIcon.codeFont(for: 3).pointSize,
-            4.7,
+            8.4,
             accuracy: 0.01
         )
-        XCTAssertEqual(MenuBarMultiUsageIcon.codeSlotHeight(for: 2), 7, accuracy: 0.01)
-        XCTAssertEqual(MenuBarMultiUsageIcon.codeSlotHeight(for: 3), 14.0 / 3.0, accuracy: 0.01)
+        XCTAssertEqual(MenuBarMultiUsageIcon.codeSlotHeight(for: 2), 8, accuracy: 0.01)
+        XCTAssertEqual(MenuBarMultiUsageIcon.codeSlotHeight(for: 3), 8, accuracy: 0.01)
     }
 
     func test短码绘制基线保留在图标安全区内() {
@@ -30,8 +30,8 @@ final class MenuBarCodeLayoutTests: XCTestCase {
             )
             let glyphTop = baseline + font.capHeight
 
-            XCTAssertGreaterThanOrEqual(baseline, 2)
-            XCTAssertLessThanOrEqual(glyphTop, 16)
+            XCTAssertGreaterThanOrEqual(baseline, 0)
+            XCTAssertLessThanOrEqual(glyphTop, MenuBarMultiUsageIcon.size.height - 2)
         }
     }
 

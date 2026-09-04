@@ -111,16 +111,18 @@ enum UsageRowPresentation {
 private extension UsageRowView {
     func headerView(now: Date) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .top, spacing: 8) {
+            HStack(alignment: .center, spacing: 8) {
+                Text(state.configuration.displayName)
+                    .font(.largeTitle.weight(.semibold))
+                    .lineLimit(1)
+
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 5) {
-                        Text(state.configuration.displayName)
-                            .font(.headline)
-                            .lineLimit(1)
-                    }
                     subscriptionDescription(now: now)
+                    subscriptionPeriodDetails
                 }
+
                 Spacer(minLength: 8)
+
                 if validMetric(state.snapshot?.token) != nil || hasGroupMultipliers || state.snapshot?.metrics.isEmpty == false {
                     VStack(alignment: .trailing, spacing: 3) {
                         if let metric = validMetric(state.snapshot?.token),
@@ -131,7 +133,10 @@ private extension UsageRowView {
                                 .foregroundStyle(progressColor(for: metric))
                         }
 
-                        if let metric = state.snapshot?.normalizedMetrics.first {
+                        if let metric = state.snapshot?.normalizedMetrics.first,
+                           metric.presentation != .progress,
+                           state.configuration.providerID != .deepseek,
+                           state.configuration.providerID != .newAPI {
                             normalizedHeaderMetric(metric)
                         }
 
@@ -146,7 +151,6 @@ private extension UsageRowView {
                     }
                 }
             }
-            subscriptionPeriodDetails
         }
     }
 
@@ -181,7 +185,9 @@ private extension UsageRowView {
 
     @ViewBuilder
     var subscriptionPeriodDetails: some View {
-        if let snapshot = state.snapshot, snapshot.kind == .periodic {
+        if let snapshot = state.snapshot,
+           snapshot.kind == .periodic,
+           snapshot.subscriptionStartAt != nil || snapshot.subscriptionEndAt != nil {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("开始 " + UsageFormatter.subscriptionDateText(snapshot.subscriptionStartAt))
                     .fixedSize(horizontal: false, vertical: true)
@@ -355,15 +361,29 @@ private extension UsageRowView {
     }
 
     func normalizedMetricsContent(snapshot: UsageSnapshot, now: Date) -> some View {
+        if state.configuration.providerID == .glm {
+            return AnyView(
+                GLMUsageMetricsView(metrics: snapshot.normalizedMetrics, now: now)
+            )
+        }
+
+        if state.configuration.providerID == .newAPI {
+            return AnyView(
+                NewAPIUsageMetricsView(metrics: snapshot.normalizedMetrics, now: now)
+            )
+        }
+
         let layout = UsageMetricGridPolicy.layout(
             providerID: state.configuration.providerID,
             metrics: snapshot.normalizedMetrics
         )
-        return NormalizedUsageMetricGrid(
-            metrics: layout.metrics,
-            columns: layout.columns,
-            resetTimeStyle: .relativeDuration,
-            now: now
+        return AnyView(
+            NormalizedUsageMetricGrid(
+                metrics: layout.metrics,
+                columns: layout.columns,
+                resetTimeStyle: .relativeDuration,
+                now: now
+            )
         )
     }
 
@@ -477,8 +497,8 @@ private extension UsageRowView {
                         Text(planSuffix)
                     }
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.system(.body, weight: .semibold))
+                .foregroundStyle(.primary)
             }
         } else {
             Text("等待用量数据")
