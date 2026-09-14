@@ -216,6 +216,7 @@ fun MyTokenApp(
                         0 -> {
                             HomeScreen(
                                 state = homeState,
+                                layoutMode = layoutMode,
                                 onRefreshAll = homeViewModel::refreshAll,
                                 onRefreshCredential = { id ->
                                     homeState.groups.flatMap { it.cards }

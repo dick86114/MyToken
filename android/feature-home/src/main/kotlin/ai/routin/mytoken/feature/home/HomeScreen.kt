@@ -1,11 +1,19 @@
 package ai.routin.mytoken.feature.home
 
+import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
+import ai.routin.mytoken.core.ui.MyTokenLayoutMode
+import ai.routin.mytoken.core.ui.adaptiveGridColumns
+import ai.routin.mytoken.core.ui.maxColumns
+
 import ai.routin.mytoken.domain.model.ProviderId
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,9 +21,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
@@ -40,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import java.util.UUID
@@ -53,9 +63,9 @@ fun HomeScreen(
     onOpenCredential: (UUID) -> Unit,
     onImportFromMac: () -> Unit,
     onAddManually: () -> Unit,
+    layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
 ) {
     var selectedProvider by remember { mutableStateOf<ProviderId?>(null) }
-    val listState = rememberLazyListState()
     val allCards = remember(state.cards) {
         state.cards.filter { it.status != ai.routin.mytoken.domain.usage.RefreshStatus.Disabled }
     }
@@ -112,55 +122,122 @@ fun HomeScreen(
                     onAddManually = onAddManually,
                 )
 
-                else -> Column(modifier = Modifier.fillMaxSize()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        FilterChip(
-                            selected = selectedProvider == null,
-                            onClick = { selectedProvider = null },
-                            label = { Text(text = "全部") },
-                            colors = glassFilterChipColors(selected = selectedProvider == null),
-                            border = glassFilterChipBorder(selected = selectedProvider == null),
+                else -> MyTokenAdaptiveContent(
+                    maxWidth = 1440.dp,
+                    horizontalPadding = 16.dp,
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                        val columns = adaptiveGridColumns(
+                            availableWidth = maxWidth,
+                            maxColumns = layoutMode.maxColumns(1, 2, 3),
+                            minItemWidth = 260.dp,
+                            spacing = 12.dp,
                         )
-                        visibleProviders.forEach { provider ->
-                            FilterChip(
-                                selected = selectedProvider == provider,
-                                onClick = {
-                                    selectedProvider = if (selectedProvider == provider) null else provider
-                                },
-                                label = { Text(text = ProviderCatalog.displayName(provider)) },
-                                colors = glassFilterChipColors(selected = selectedProvider == provider),
-                                border = glassFilterChipBorder(selected = selectedProvider == provider),
+                        val metricColumns = if (columns == 1) 2 else 1
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            ProviderFilters(
+                                layoutMode = layoutMode,
+                                selectedProvider = selectedProvider,
+                                visibleProviders = visibleProviders,
+                                onSelect = { selectedProvider = it },
                             )
-                        }
-                    }
-
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 96.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        items(
-                            visibleCards,
-                            key = { it.credential.id },
-                            contentType = { "credential-usage-card" },
-                        ) { card ->
-                            CredentialUsageCard(
-                                card = card,
-                                onOpen = { onOpenCredential(card.credential.id) },
-                                onRetry = { onRefreshCredential(card.credential.id) },
-                            )
+                            LazyVerticalGrid(
+                                state = rememberLazyGridState(),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .testTag("home_grid_${columns}_columns"),
+                                columns = GridCells.Fixed(columns),
+                                contentPadding = PaddingValues(
+                                    top = 4.dp,
+                                    bottom = if (layoutMode == MyTokenLayoutMode.Compact) 96.dp else 24.dp,
+                                ),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                gridItems(
+                                    visibleCards,
+                                    key = { it.credential.id },
+                                    contentType = { "credential-usage-card" },
+                                ) { card ->
+                                    CredentialUsageCard(
+                                        card = card,
+                                        metricColumns = metricColumns,
+                                        onOpen = { onOpenCredential(card.credential.id) },
+                                        onRetry = { onRefreshCredential(card.credential.id) },
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ProviderFilters(
+    layoutMode: MyTokenLayoutMode,
+    selectedProvider: ProviderId?,
+    visibleProviders: List<ProviderId>,
+    onSelect: (ProviderId?) -> Unit,
+) {
+    if (layoutMode == MyTokenLayoutMode.Compact) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            ProviderFilterChips(
+                selectedProvider = selectedProvider,
+                visibleProviders = visibleProviders,
+                onSelect = onSelect,
+            )
+        }
+    } else {
+        FlowRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            ProviderFilterChips(
+                selectedProvider = selectedProvider,
+                visibleProviders = visibleProviders,
+                onSelect = onSelect,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProviderFilterChips(
+    selectedProvider: ProviderId?,
+    visibleProviders: List<ProviderId>,
+    onSelect: (ProviderId?) -> Unit,
+) {
+    FilterChip(
+        selected = selectedProvider == null,
+        onClick = { onSelect(null) },
+        label = { Text(text = "全部") },
+        colors = glassFilterChipColors(selected = selectedProvider == null),
+        border = glassFilterChipBorder(selected = selectedProvider == null),
+    )
+    visibleProviders.forEach { provider ->
+        FilterChip(
+            selected = selectedProvider == provider,
+            onClick = {
+                onSelect(if (selectedProvider == provider) null else provider)
+            },
+            label = { Text(text = ProviderCatalog.displayName(provider)) },
+            colors = glassFilterChipColors(selected = selectedProvider == provider),
+            border = glassFilterChipBorder(selected = selectedProvider == provider),
+        )
     }
 }
 
@@ -181,6 +258,7 @@ private fun EmptyState(
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
         )
+
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = "从 Mac 迁移，或手动添加一个 plan Key",
@@ -188,15 +266,15 @@ private fun EmptyState(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(24.dp))
-    GlassButton(
-        onClick = onImportFromMac,
-        tone = GlassButtonTone.Primary,
-        text = "从 Mac 导入",
-    )
-    Spacer(modifier = Modifier.height(8.dp))
-    GlassButton(
-        onClick = onAddManually,
-        text = "手动添加",
-    )
-}
+        GlassButton(
+            onClick = onImportFromMac,
+            tone = GlassButtonTone.Primary,
+            text = "从 Mac 导入",
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        GlassButton(
+            onClick = onAddManually,
+            text = "手动添加",
+        )
+    }
 }

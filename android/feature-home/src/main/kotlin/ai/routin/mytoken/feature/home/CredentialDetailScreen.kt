@@ -3,17 +3,20 @@ package ai.routin.mytoken.feature.home
 import ai.routin.mytoken.core.ui.SectionCard
 import ai.routin.mytoken.core.ui.GlassButton
 import ai.routin.mytoken.core.ui.GlassButtonTone
+import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.domain.model.CredentialKind
 import ai.routin.mytoken.domain.model.CredentialMetadataKey
 import ai.routin.mytoken.domain.model.UsageMetric
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -32,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -86,12 +90,17 @@ fun CredentialDetailScreen(
         },
         bottomBar = {
             if (card != null) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center,
                 ) {
+                    Row(
+                        modifier = Modifier
+                            .widthIn(max = 840.dp)
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
                     GlassButton(
                         onClick = onRefresh,
                         modifier = Modifier.weight(1f),
@@ -117,6 +126,7 @@ fun CredentialDetailScreen(
                         text = "删除",
                     )
                 }
+                }
             }
         },
     ) { padding ->
@@ -130,12 +140,17 @@ fun CredentialDetailScreen(
             return@Scaffold
         }
 
+        MyTokenAdaptiveContent(
+            maxWidth = 840.dp,
+            horizontalPadding = 16.dp,
+            modifier = Modifier.padding(padding).fillMaxSize(),
+        ) {
         Column(
             modifier = Modifier
-                .padding(padding)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(vertical = 16.dp)
+                .testTag("detail_content"),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -204,6 +219,7 @@ fun CredentialDetailScreen(
                 providerId = card.credential.providerId,
                 lowThresholdPercent = lowThresholdPercent,
             )
+        }
         }
     }
 }
