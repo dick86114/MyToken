@@ -274,12 +274,12 @@ private fun ValueCell(metric: UsageMetric, colors: StatusColors, modifier: Modif
 }
 
 @Composable
-internal fun GLMMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modifier) {
+internal fun GLMMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modifier, columns: Int = 2) {
     val colors = statusColors()
     val progress = metrics.filter { it.presentation == ai.routin.mytoken.domain.model.UsageMetricPresentation.Progress }
     val calls = metrics.filter { it.id == "model-calls" || it.id == "zcode-mcp" }
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        progress.chunked(2).forEach { row ->
+        progress.chunked(columns).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 row.forEach { metric ->
                     val percent = progressPercent(metric)
@@ -296,10 +296,10 @@ internal fun GLMMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modifie
                         }
                     }
                 }
-                repeat(2 - row.size) { Spacer(Modifier.weight(1f)) }
+                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
-        calls.chunked(2).forEach { row ->
+        calls.chunked(columns).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 row.forEach { metric ->
                     Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
@@ -307,21 +307,21 @@ internal fun GLMMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modifie
                         Text("${formatCompact(metric.value)} 次", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     }
                 }
-                repeat(2 - row.size) { Spacer(Modifier.weight(1f)) }
+                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
 }
 
 @Composable
-internal fun VolcengineMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modifier) {
+internal fun VolcengineMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modifier, columns: Int = 2) {
     val colors = statusColors()
-    val rowItems = metrics.take(2)
+    val rowItems = metrics.take(columns)
     val monthly = metrics.firstOrNull { it.id == "monthly" }
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             rowItems.forEach { ProgressCell(it, colors, Modifier.weight(1f)) }
-            repeat(2 - rowItems.size) { Spacer(Modifier.weight(1f)) }
+            repeat(columns - rowItems.size) { Spacer(Modifier.weight(1f)) }
         }
         monthly?.let {
             val percent = progressPercent(it)
@@ -348,7 +348,7 @@ internal fun VolcengineMetrics(metrics: List<UsageMetric>, modifier: Modifier = 
 }
 
 @Composable
-internal fun NewAPIMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modifier) {
+internal fun NewAPIMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modifier, columns: Int = 2) {
     val colors = statusColors()
     val quota = metrics.firstOrNull { it.id == "quota-progress" }
     val tokens = listOf("today-token", "one-day-token", "seven-day-token", "thirty-day-token").mapNotNull { id -> metrics.firstOrNull { it.id == id } }
@@ -379,10 +379,10 @@ internal fun NewAPIMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modi
                 Text("Token 消耗", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
                 Text("单位 Token", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            tokens.chunked(2).forEach { row ->
+            tokens.chunked(columns).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     row.forEach { item -> TokenCell(item, metrics.firstOrNull { cost -> cost.id == "${item.id}-cost" }, Modifier.weight(1f)) }
-                    repeat(2 - row.size) { Spacer(Modifier.weight(1f)) }
+                    repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
         }
@@ -422,7 +422,7 @@ private fun MetricText(text: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-internal fun CommandCodeMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modifier) {
+internal fun CommandCodeMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modifier, columns: Int = 2) {
     val byId = metrics.associateBy(UsageMetric::id)
     val colors = statusColors()
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {

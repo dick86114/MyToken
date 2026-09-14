@@ -3,6 +3,7 @@ package ai.routin.mytoken.feature.transfer
 import ai.routin.mytoken.core.ui.SectionCard
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +14,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import ai.routin.mytoken.core.ui.GlassButton
 import ai.routin.mytoken.core.ui.GlassButtonTone
+import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
+import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -22,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
@@ -30,12 +34,20 @@ fun TransferPreviewScreen(
     state: TransferUiState.PreviewReady,
     onConfirm: (ImportConflictMode) -> Unit,
     onCancel: () -> Unit,
+    layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
 ) {
-    Column(
+    MyTokenAdaptiveContent(
+        maxWidth = 960.dp,
+        horizontalPadding = 16.dp,
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(16.dp),
+    ) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("transfer_preview_content")
+            .padding(vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Text(
@@ -46,6 +58,7 @@ fun TransferPreviewScreen(
         )
 
         SectionCard(
+            modifier = Modifier.testTag("transfer_summary_pane"),
             title = "迁移摘要",
             supportingText = "导出时间：${state.exportedAt}",
         ) {
@@ -60,7 +73,7 @@ fun TransferPreviewScreen(
         }
 
         LazyColumn(
-            modifier = Modifier.fillMaxWidth().weight(1f),
+            modifier = Modifier.fillMaxWidth().weight(1f).testTag("transfer_list_pane"),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(state.items, key = { it.credentialId }) { item ->
@@ -111,6 +124,7 @@ fun TransferPreviewScreen(
             )
         }
     }
+    }
 }
 
 @Composable
@@ -143,12 +157,19 @@ private fun SummaryCell(
 fun TransferCompletedScreen(
     summary: ImportSummary,
     onDone: () -> Unit,
+    layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
 ) {
-    Column(
+    MyTokenAdaptiveContent(
+        maxWidth = 480.dp,
+        horizontalPadding = 24.dp,
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(24.dp),
+    ) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("transfer_completed_content"),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -169,5 +190,6 @@ fun TransferCompletedScreen(
             tone = GlassButtonTone.Primary,
             text = "完成",
         )
+    }
     }
 }

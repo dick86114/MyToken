@@ -4,8 +4,11 @@ import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.model.CredentialKind
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.core.ui.LiquidGlassSurface
+import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
+import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,11 +19,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -42,9 +51,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import android.view.HapticFeedbackConstants
 import android.view.View
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.text.font.FontWeight
@@ -53,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import java.util.UUID
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
+import sh.calvin.reorderable.rememberReorderableLazyGridState
 
 private fun kindLabel(kind: CredentialKind): String = when (kind) {
     CredentialKind.BearerApiKey -> "Bearer Token"
@@ -72,6 +84,7 @@ fun CredentialListScreen(
     onConfirmDelete: () -> Unit,
     onImportFromMac: () -> Unit,
     onAddManually: () -> Unit,
+    layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
 ) {
     Scaffold(
         topBar = {
@@ -100,6 +113,15 @@ fun CredentialListScreen(
                 onImportFromMac = onImportFromMac,
                 onAddManually = onAddManually,
             )
+        } else if (layoutMode == MyTokenLayoutMode.Expanded) {
+            ExpandedCredentialGrid(
+                state = state,
+                padding = padding,
+                onToggleEnabled = onToggleEnabled,
+                onMove = onMove,
+                onEditCredential = onEditCredential,
+                onRequestDelete = onRequestDelete,
+            )
         } else {
             val listState = rememberLazyListState()
             val hapticView = LocalView.current
@@ -117,7 +139,7 @@ fun CredentialListScreen(
                     state.items,
                     key = { _, item -> item.id },
                     contentType = { _, _ -> "credential-row" },
-                ) { _, credential ->
+                ) { index, credential ->
                     ReorderableItem(reorderableState, key = credential.id) { isDragging ->
                         val elevation by animateDpAsState(
                             targetValue = if (isDragging) 8.dp else 0.dp,
@@ -125,6 +147,7 @@ fun CredentialListScreen(
                         )
                         CredentialRow(
                             credential = credential,
+                            order = index + 1,
                             providerName = ProviderNames.displayName(credential.providerId),
                             elevation = elevation,
                             isDragging = isDragging,
@@ -163,8 +186,67 @@ fun CredentialListScreen(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
+private fun ExpandedCredentialGrid(
+    state: CredentialListUiState,
+    padding: PaddingValues,
+    onToggleEnabled: (Credential) -> Unit,
+    onMove: (Int, Int) -> Unit,
+    onEditCredential: (UUID) -> Unit,
+    onRequestDelete: (Credential) -> Unit,
+) {
+    val listState = rememberLazyGridState()
+    val hapticView = LocalView.current
+    val reorderableState = rememberReorderableLazyGridState(listState) { from, to ->
+        onMove(from.index, to.index)
+        hapticView.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+    }
+    MyTokenAdaptiveContent(
+        maxWidth = 960.dp,
+        horizontalPadding = 0.dp,
+        modifier = Modifier.padding(padding).fillMaxSize(),
+    ) {
+        LazyVerticalGrid(
+            state = listState,
+            columns = GridCells.Fixed(2),
+            modifier = Modifier.fillMaxSize().testTag("credential_grid"),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            gridItemsIndexed(state.items, key = { _, item -> item.id }) { index, credential ->
+                ReorderableItem(reorderableState, key = credential.id) { isDragging ->
+                    val elevation by animateDpAsState(
+                        targetValue = if (isDragging) 8.dp else 0.dp,
+                        label = "credentialGridDragElevation",
+                    )
+                    CredentialRow(
+                        credential = credential,
+                        order = index + 1,
+                        providerName = ProviderNames.displayName(credential.providerId),
+                        elevation = elevation,
+                        isDragging = isDragging,
+                        dragHandleModifier = Modifier.longPressDraggableHandle(
+                            onDragStarted = {
+                                hapticView.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                            },
+                            onDragStopped = {
+                                hapticView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                            },
+                        ),
+                        onToggleEnabled = { onToggleEnabled(credential) },
+                        onEdit = { onEditCredential(credential.id) },
+                        onRequestDelete = { onRequestDelete(credential) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun CredentialRow(
     credential: Credential,
+    order: Int,
     providerName: String,
     elevation: androidx.compose.ui.unit.Dp,
     isDragging: Boolean,
@@ -196,6 +278,21 @@ private fun CredentialRow(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = order.toString(),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Spacer(modifier = Modifier.width(6.dp))
             Icon(
                 imageVector = Icons.Filled.DragHandle,
                 contentDescription = "长按拖动排序",

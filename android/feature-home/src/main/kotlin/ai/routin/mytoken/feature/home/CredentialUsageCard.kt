@@ -51,6 +51,7 @@ internal fun statusLabel(card: CredentialCardUi): String? = when (card.status) {
 @Composable
 fun CredentialUsageCard(
     card: CredentialCardUi,
+    metricColumns: Int = 2,
     onOpen: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
@@ -108,11 +109,11 @@ fun CredentialUsageCard(
 
             val metrics = card.snapshot?.metrics.orEmpty()
             when (card.credential.providerId) {
-                ai.routin.mytoken.domain.model.ProviderId.Glm -> GLMMetrics(metrics)
-                ai.routin.mytoken.domain.model.ProviderId.NewAPI -> NewAPIMetrics(metrics)
-                ai.routin.mytoken.domain.model.ProviderId.Volcengine -> VolcengineMetrics(metrics)
-                ai.routin.mytoken.domain.model.ProviderId.CommandCode -> CommandCodeMetrics(metrics)
-                else -> UsageMetricGrid(metrics = metrics)
+                ai.routin.mytoken.domain.model.ProviderId.Glm -> GLMMetrics(metrics, columns = metricColumns)
+                ai.routin.mytoken.domain.model.ProviderId.NewAPI -> NewAPIMetrics(metrics, columns = metricColumns)
+                ai.routin.mytoken.domain.model.ProviderId.Volcengine -> VolcengineMetrics(metrics, columns = metricColumns)
+                ai.routin.mytoken.domain.model.ProviderId.CommandCode -> CommandCodeMetrics(metrics, columns = metricColumns)
+                else -> UsageMetricGrid(metrics = metrics, columns = metricColumns)
             }
 
             if (card.status == RefreshStatus.Loading) {
