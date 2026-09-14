@@ -371,6 +371,7 @@ fun MyTokenApp(
                     when (val state = transferState) {
                         is TransferUiState.Idle -> TransferScannerScreen(
                             isActive = true,
+                            layoutMode = layoutMode,
                             onQrCodeScanned = transferViewModel::onQrCodeScanned,
                             onCancel = { goBack() },
                         )
@@ -383,11 +384,13 @@ fun MyTokenApp(
                         }
                         is TransferUiState.PreviewReady -> TransferPreviewScreen(
                             state = state,
+                            layoutMode = layoutMode,
                             onConfirm = { mode: ImportConflictMode -> transferViewModel.confirmImport(mode) },
                             onCancel = transferViewModel::cancel,
                         )
                         is TransferUiState.Completed -> TransferCompletedScreen(
                             summary = state.summary,
+                            layoutMode = layoutMode,
                             onDone = { goBack() },
                         )
                         is TransferUiState.Failed -> Column(
