@@ -1,6 +1,7 @@
 package ai.routin.mytoken.feature.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -14,6 +15,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -33,6 +37,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.HorizontalDivider
 import ai.routin.mytoken.core.ui.SectionCard
+import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
+import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.GlassButton
 import ai.routin.mytoken.core.ui.GlassButtonTone
 import ai.routin.mytoken.core.ui.glassFilterChipBorder
@@ -73,6 +79,7 @@ fun SettingsScreen(
     onOpenInstallPermissionSettings: () -> Unit = {},
     onInstallDownloadedUpdate: () -> Unit = {},
     onMirrorBaseChange: (String) -> Unit = {},
+    layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
 ) {
     var showReleaseHistory by remember { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
@@ -97,13 +104,21 @@ fun SettingsScreen(
             )
         },
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier.padding(padding).fillMaxSize().testTag("settings_list"),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp),
+        val columns = if (layoutMode == MyTokenLayoutMode.Compact) 1 else 2
+        MyTokenAdaptiveContent(
+            maxWidth = 1200.dp,
+            horizontalPadding = 16.dp,
+            modifier = Modifier.padding(padding).fillMaxSize(),
+        ) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(columns),
+            modifier = Modifier.fillMaxSize().testTag("settings_list"),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 96.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item(key = "theme") {
-                SectionCard(title = "主题") {
+                SectionCard(title = "主题", modifier = Modifier.testTag("settings_theme_cell")) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ThemeChip("跟随系统", state.display.themeMode == AppThemeMode.SYSTEM) {
                             onThemeModeChange(AppThemeMode.SYSTEM)
@@ -118,14 +133,16 @@ fun SettingsScreen(
                 }
             }
             item(key = "refresh") {
-                RefreshSettingsSection(
-                    settings = state.refresh,
-                    onAutoRefreshChange = onAutoRefreshChange,
-                    onIntervalChange = onIntervalChange,
-                    onWifiOnlyChange = onWifiOnlyChange,
-                    onOpenAppRefreshChange = onOpenAppRefreshChange,
-                    onRetryOnFailureChange = onRetryOnFailureChange,
-                )
+                Box(modifier = Modifier.testTag("settings_refresh_cell")) {
+                    RefreshSettingsSection(
+                        settings = state.refresh,
+                        onAutoRefreshChange = onAutoRefreshChange,
+                        onIntervalChange = onIntervalChange,
+                        onWifiOnlyChange = onWifiOnlyChange,
+                        onOpenAppRefreshChange = onOpenAppRefreshChange,
+                        onRetryOnFailureChange = onRetryOnFailureChange,
+                    )
+                }
             }
             item(key = "notification") {
                 NotificationSettingsSection(
@@ -152,7 +169,11 @@ fun SettingsScreen(
                     )
                 }
             }
-            item(key = "about") {
+            item(
+                key = "about",
+                span = { GridItemSpan(maxLineSpan) },
+            ) {
+                Box(modifier = Modifier.testTag("settings_about_span")) {
                 SectionCard(title = "关于") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -219,7 +240,9 @@ fun SettingsScreen(
                         )
                     }
                 }
+                }
             }
+        }
         }
     }
 

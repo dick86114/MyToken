@@ -245,6 +245,7 @@ fun MyTokenApp(
                         else -> {
                             SettingsScreen(
                                 state = settingsState,
+                                layoutMode = layoutMode,
                                 appVersion = appVersion,
                                 updateState = updateState,
                                 releaseHistoryState = releaseHistoryState,
