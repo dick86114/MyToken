@@ -35,7 +35,7 @@ fun RefreshSettingsSection(
             onChange = onAutoRefreshChange,
         )
         Text(
-            text = "刷新频率",
+            text = "刷新频率（分钟）",
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(vertical = 4.dp),
         )
@@ -44,7 +44,7 @@ fun RefreshSettingsSection(
                 FilterChip(
                     selected = settings.refreshIntervalMinutes == minutes,
                     onClick = { onIntervalChange(minutes) },
-                    label = { Text(text = "${minutes}分钟") },
+                    label = { Text(text = minutes.toString()) },
                     colors = glassFilterChipColors(selected = settings.refreshIntervalMinutes == minutes),
                     border = glassFilterChipBorder(selected = settings.refreshIntervalMinutes == minutes),
                 )

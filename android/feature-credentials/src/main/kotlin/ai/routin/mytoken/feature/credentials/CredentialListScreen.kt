@@ -8,6 +8,7 @@ import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -27,6 +29,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -48,6 +51,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import android.view.HapticFeedbackConstants
 import android.view.View
 import androidx.compose.ui.platform.LocalView
@@ -135,7 +139,7 @@ fun CredentialListScreen(
                     state.items,
                     key = { _, item -> item.id },
                     contentType = { _, _ -> "credential-row" },
-                ) { _, credential ->
+                ) { index, credential ->
                     ReorderableItem(reorderableState, key = credential.id) { isDragging ->
                         val elevation by animateDpAsState(
                             targetValue = if (isDragging) 8.dp else 0.dp,
@@ -143,6 +147,7 @@ fun CredentialListScreen(
                         )
                         CredentialRow(
                             credential = credential,
+                            order = index + 1,
                             providerName = ProviderNames.displayName(credential.providerId),
                             elevation = elevation,
                             isDragging = isDragging,
@@ -208,7 +213,7 @@ private fun ExpandedCredentialGrid(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            gridItemsIndexed(state.items, key = { _, item -> item.id }) { _, credential ->
+            gridItemsIndexed(state.items, key = { _, item -> item.id }) { index, credential ->
                 ReorderableItem(reorderableState, key = credential.id) { isDragging ->
                     val elevation by animateDpAsState(
                         targetValue = if (isDragging) 8.dp else 0.dp,
@@ -216,6 +221,7 @@ private fun ExpandedCredentialGrid(
                     )
                     CredentialRow(
                         credential = credential,
+                        order = index + 1,
                         providerName = ProviderNames.displayName(credential.providerId),
                         elevation = elevation,
                         isDragging = isDragging,
@@ -240,6 +246,7 @@ private fun ExpandedCredentialGrid(
 @Composable
 private fun CredentialRow(
     credential: Credential,
+    order: Int,
     providerName: String,
     elevation: androidx.compose.ui.unit.Dp,
     isDragging: Boolean,
@@ -271,6 +278,21 @@ private fun CredentialRow(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = order.toString(),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Spacer(modifier = Modifier.width(6.dp))
             Icon(
                 imageVector = Icons.Filled.DragHandle,
                 contentDescription = "长按拖动排序",
