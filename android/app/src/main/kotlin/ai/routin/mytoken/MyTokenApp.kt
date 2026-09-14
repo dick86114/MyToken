@@ -231,6 +231,7 @@ fun MyTokenApp(
                         1 -> {
                             CredentialListScreen(
                                 state = listState,
+                                layoutMode = layoutMode,
                                 onToggleEnabled = credentialListViewModel::toggleEnabled,
                                 onMove = credentialListViewModel::move,
                                 onEditCredential = { id -> navigate(AppScreen.Editor(id)) },
@@ -342,6 +343,7 @@ fun MyTokenApp(
                     val editorState by editorViewModel.state.collectAsStateWithLifecycle()
                     CredentialEditorScreen(
                         state = editorState,
+                        layoutMode = layoutMode,
                         onBack = { goBack() },
                         onProviderChange = editorViewModel::setProviderId,
                         onNameChange = editorViewModel::setName,

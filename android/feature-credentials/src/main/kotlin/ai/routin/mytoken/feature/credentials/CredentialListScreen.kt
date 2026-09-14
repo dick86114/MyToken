@@ -4,6 +4,8 @@ import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.model.CredentialKind
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.core.ui.LiquidGlassSurface
+import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
+import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +20,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,6 +51,7 @@ import androidx.compose.ui.Modifier
 import android.view.HapticFeedbackConstants
 import android.view.View
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.text.font.FontWeight
@@ -53,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import java.util.UUID
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
+import sh.calvin.reorderable.rememberReorderableLazyGridState
 
 private fun kindLabel(kind: CredentialKind): String = when (kind) {
     CredentialKind.BearerApiKey -> "Bearer Token"
@@ -72,6 +80,7 @@ fun CredentialListScreen(
     onConfirmDelete: () -> Unit,
     onImportFromMac: () -> Unit,
     onAddManually: () -> Unit,
+    layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
 ) {
     Scaffold(
         topBar = {
@@ -99,6 +108,15 @@ fun CredentialListScreen(
                 modifier = Modifier.padding(padding),
                 onImportFromMac = onImportFromMac,
                 onAddManually = onAddManually,
+            )
+        } else if (layoutMode == MyTokenLayoutMode.Expanded) {
+            ExpandedCredentialGrid(
+                state = state,
+                padding = padding,
+                onToggleEnabled = onToggleEnabled,
+                onMove = onMove,
+                onEditCredential = onEditCredential,
+                onRequestDelete = onRequestDelete,
             )
         } else {
             val listState = rememberLazyListState()
@@ -162,6 +180,63 @@ fun CredentialListScreen(
 }
 
 @OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ExpandedCredentialGrid(
+    state: CredentialListUiState,
+    padding: PaddingValues,
+    onToggleEnabled: (Credential) -> Unit,
+    onMove: (Int, Int) -> Unit,
+    onEditCredential: (UUID) -> Unit,
+    onRequestDelete: (Credential) -> Unit,
+) {
+    val listState = rememberLazyGridState()
+    val hapticView = LocalView.current
+    val reorderableState = rememberReorderableLazyGridState(listState) { from, to ->
+        onMove(from.index, to.index)
+        hapticView.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+    }
+    MyTokenAdaptiveContent(
+        maxWidth = 960.dp,
+        horizontalPadding = 0.dp,
+        modifier = Modifier.padding(padding).fillMaxSize(),
+    ) {
+        LazyVerticalGrid(
+            state = listState,
+            columns = GridCells.Fixed(2),
+            modifier = Modifier.fillMaxSize().testTag("credential_grid"),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            gridItemsIndexed(state.items, key = { _, item -> item.id }) { _, credential ->
+                ReorderableItem(reorderableState, key = credential.id) { isDragging ->
+                    val elevation by animateDpAsState(
+                        targetValue = if (isDragging) 8.dp else 0.dp,
+                        label = "credentialGridDragElevation",
+                    )
+                    CredentialRow(
+                        credential = credential,
+                        providerName = ProviderNames.displayName(credential.providerId),
+                        elevation = elevation,
+                        isDragging = isDragging,
+                        dragHandleModifier = Modifier.longPressDraggableHandle(
+                            onDragStarted = {
+                                hapticView.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                            },
+                            onDragStopped = {
+                                hapticView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                            },
+                        ),
+                        onToggleEnabled = { onToggleEnabled(credential) },
+                        onEdit = { onEditCredential(credential.id) },
+                        onRequestDelete = { onRequestDelete(credential) },
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun CredentialRow(
     credential: Credential,
