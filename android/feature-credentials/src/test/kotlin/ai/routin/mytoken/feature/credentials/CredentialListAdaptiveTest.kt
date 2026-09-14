@@ -9,6 +9,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import java.util.UUID
 import org.junit.Rule
 import org.junit.Test
@@ -49,6 +50,8 @@ class CredentialListAdaptiveTest {
         }
 
         composeRule.onNodeWithTag("credential_grid").assertExists()
+        composeRule.onNodeWithText("1").assertExists()
+        composeRule.onNodeWithText("2").assertExists()
         composeRule.onAllNodesWithContentDescription("长按拖动排序").onFirst().assertExists()
     }
 

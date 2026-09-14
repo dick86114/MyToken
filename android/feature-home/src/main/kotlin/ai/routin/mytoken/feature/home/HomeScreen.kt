@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -135,38 +134,40 @@ fun HomeScreen(
                             spacing = 12.dp,
                         )
                         val metricColumns = if (columns == 1) 2 else 1
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            ProviderFilters(
-                                layoutMode = layoutMode,
-                                selectedProvider = selectedProvider,
-                                visibleProviders = visibleProviders,
-                                onSelect = { selectedProvider = it },
-                            )
-                            LazyVerticalGrid(
-                                state = rememberLazyGridState(),
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .testTag("home_grid_${columns}_columns"),
-                                columns = GridCells.Fixed(columns),
-                                contentPadding = PaddingValues(
-                                    top = 4.dp,
-                                    bottom = if (layoutMode == MyTokenLayoutMode.Compact) 96.dp else 24.dp,
-                                ),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                        LazyVerticalGrid(
+                            state = rememberLazyGridState(),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .testTag("home_grid_${columns}_columns"),
+                            columns = GridCells.Fixed(columns),
+                            contentPadding = PaddingValues(
+                                top = 4.dp,
+                                bottom = if (layoutMode == MyTokenLayoutMode.Compact) 96.dp else 24.dp,
+                            ),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            item(
+                                key = "provider_filters",
+                                span = { GridItemSpan(maxLineSpan) },
                             ) {
-                                gridItems(
-                                    visibleCards,
-                                    key = { it.credential.id },
-                                    contentType = { "credential-usage-card" },
-                                ) { card ->
-                                    CredentialUsageCard(
-                                        card = card,
-                                        metricColumns = metricColumns,
-                                        onOpen = { onOpenCredential(card.credential.id) },
-                                        onRetry = { onRefreshCredential(card.credential.id) },
-                                    )
-                                }
+                                ProviderFilters(
+                                    selectedProvider = selectedProvider,
+                                    visibleProviders = visibleProviders,
+                                    onSelect = { selectedProvider = it },
+                                )
+                            }
+                            gridItems(
+                                visibleCards,
+                                key = { it.credential.id },
+                                contentType = { "credential-usage-card" },
+                            ) { card ->
+                                CredentialUsageCard(
+                                    card = card,
+                                    metricColumns = metricColumns,
+                                    onOpen = { onOpenCredential(card.credential.id) },
+                                    onRetry = { onRefreshCredential(card.credential.id) },
+                                )
                             }
                         }
                     }
@@ -176,42 +177,24 @@ fun HomeScreen(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ProviderFilters(
-    layoutMode: MyTokenLayoutMode,
     selectedProvider: ProviderId?,
     visibleProviders: List<ProviderId>,
     onSelect: (ProviderId?) -> Unit,
 ) {
-    if (layoutMode == MyTokenLayoutMode.Compact) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            ProviderFilterChips(
-                selectedProvider = selectedProvider,
-                visibleProviders = visibleProviders,
-                onSelect = onSelect,
-            )
-        }
-    } else {
-        FlowRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            ProviderFilterChips(
-                selectedProvider = selectedProvider,
-                visibleProviders = visibleProviders,
-                onSelect = onSelect,
-            )
-        }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        ProviderFilterChips(
+            selectedProvider = selectedProvider,
+            visibleProviders = visibleProviders,
+            onSelect = onSelect,
+        )
     }
 }
 

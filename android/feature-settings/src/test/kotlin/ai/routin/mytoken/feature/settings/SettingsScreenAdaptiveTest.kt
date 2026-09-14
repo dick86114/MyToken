@@ -38,13 +38,14 @@ class SettingsScreenAdaptiveTest {
         }
 
         composeRule.onNodeWithTag("settings_theme_cell").assertExists()
+        composeRule.onNodeWithTag("settings_migration_cell").assertExists()
         composeRule.onNodeWithTag("settings_refresh_cell").assertExists()
         composeRule.onNodeWithTag("settings_about_span").assertExists()
 
         val themeTop = composeRule.onNodeWithTag("settings_theme_cell")
             .getUnclippedBoundsInRoot().top
-        val refreshTop = composeRule.onNodeWithTag("settings_refresh_cell")
+        val migrationTop = composeRule.onNodeWithTag("settings_migration_cell")
             .getUnclippedBoundsInRoot().top
-        assertEquals(themeTop, refreshTop)
+        assertEquals(themeTop, migrationTop)
     }
 }

@@ -2,6 +2,7 @@ package ai.routin.mytoken.feature.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -20,6 +21,11 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BrightnessAuto
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material3.Icon
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -44,6 +50,7 @@ import ai.routin.mytoken.core.ui.GlassButtonTone
 import ai.routin.mytoken.core.ui.glassFilterChipBorder
 import ai.routin.mytoken.core.ui.glassFilterChipColors
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
@@ -119,17 +126,27 @@ fun SettingsScreen(
         ) {
             item(key = "theme") {
                 SectionCard(title = "主题", modifier = Modifier.testTag("settings_theme_cell")) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ThemeChip("跟随系统", state.display.themeMode == AppThemeMode.SYSTEM) {
-                            onThemeModeChange(AppThemeMode.SYSTEM)
-                        }
-                        ThemeChip("浅色", state.display.themeMode == AppThemeMode.LIGHT) {
-                            onThemeModeChange(AppThemeMode.LIGHT)
-                        }
-                        ThemeChip("深色", state.display.themeMode == AppThemeMode.DARK) {
-                            onThemeModeChange(AppThemeMode.DARK)
-                        }
-                    }
+                    ThemeSelector(
+                        selected = state.display.themeMode,
+                        onSelect = onThemeModeChange,
+                    )
+                }
+            }
+            item(key = "migration") {
+                SectionCard(
+                    title = "数据迁移",
+                    modifier = Modifier.testTag("settings_migration_cell"),
+                ) {
+                    Text(
+                        text = "从 Mac 扫码迁移凭证，密钥端到端加密传输。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    GlassButton(
+                        onClick = onOpenTransfer,
+                        tone = GlassButtonTone.Primary,
+                        text = "从 Mac 导入",
+                    )
                 }
             }
             item(key = "refresh") {
@@ -154,20 +171,6 @@ fun SettingsScreen(
                     onLowThresholdChange = onLowThresholdChange,
                     onHighThresholdChange = onHighThresholdChange,
                 )
-            }
-            item(key = "migration") {
-                SectionCard(title = "数据迁移") {
-                    Text(
-                        text = "从 Mac 扫码迁移凭证，密钥端到端加密传输。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    GlassButton(
-                        onClick = onOpenTransfer,
-                        tone = GlassButtonTone.Primary,
-                        text = "从 Mac 导入",
-                    )
-                }
             }
             item(
                 key = "about",
@@ -505,6 +508,69 @@ private fun UpdateSection(
             text = "检测更新",
         )
     }
+}
+
+@Composable
+private fun ThemeSelector(
+    selected: AppThemeMode,
+    onSelect: (AppThemeMode) -> Unit,
+) {
+    BoxWithConstraints {
+        val availableWidth = this.maxWidth
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (availableWidth < 320.dp) {
+                ThemeIconChip(
+                    icon = Icons.Filled.BrightnessAuto,
+                    label = "跟随系统",
+                    selected = selected == AppThemeMode.SYSTEM,
+                    onClick = { onSelect(AppThemeMode.SYSTEM) },
+                )
+                ThemeIconChip(
+                    icon = Icons.Filled.LightMode,
+                    label = "浅色",
+                    selected = selected == AppThemeMode.LIGHT,
+                    onClick = { onSelect(AppThemeMode.LIGHT) },
+                )
+                ThemeIconChip(
+                    icon = Icons.Filled.DarkMode,
+                    label = "深色",
+                    selected = selected == AppThemeMode.DARK,
+                    onClick = { onSelect(AppThemeMode.DARK) },
+                )
+            } else {
+                ThemeChip("跟随系统", selected == AppThemeMode.SYSTEM) {
+                    onSelect(AppThemeMode.SYSTEM)
+                }
+                ThemeChip("浅色", selected == AppThemeMode.LIGHT) {
+                    onSelect(AppThemeMode.LIGHT)
+                }
+                ThemeChip("深色", selected == AppThemeMode.DARK) {
+                    onSelect(AppThemeMode.DARK)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemeIconChip(
+    icon: ImageVector,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+            )
+        },
+        colors = glassFilterChipColors(selected = selected),
+        border = glassFilterChipBorder(selected = selected),
+    )
 }
 
 @Composable
