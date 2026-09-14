@@ -22,7 +22,6 @@ import ai.routin.mytoken.feature.transfer.TransferViewModel
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
@@ -35,11 +34,11 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import ai.routin.mytoken.core.ui.GlassNavItem
-import ai.routin.mytoken.core.ui.LiquidGlassBottomBar
+import ai.routin.mytoken.core.ui.MyTokenNavigationScaffold
+import ai.routin.mytoken.core.ui.rememberMyTokenLayoutMode
 import ai.routin.mytoken.core.ui.WalletCardsIcon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -172,6 +171,22 @@ fun MyTokenApp(
         scope.launch { pagerState.animateScrollToPage(index) }
     }
 
+    val layoutMode = rememberMyTokenLayoutMode()
+    val isRootScreen = screen == AppScreen.Home ||
+        screen == AppScreen.Credentials ||
+        screen == AppScreen.Settings
+    val navigationItems = listOf(
+        GlassNavItem("首页", Icons.Filled.Home, "首页", selectedTab == 0) {
+            selectTab(0)
+        },
+        GlassNavItem("凭证", WalletCardsIcon, "凭证", selectedTab == 1) {
+            selectTab(1)
+        },
+        GlassNavItem("设置", Icons.Filled.Settings, "设置", selectedTab == 2) {
+            selectTab(2)
+        },
+    )
+
     LaunchedEffect(openCredentialId) {
         openCredentialId?.let { credentialId ->
             selectedTab = 0
@@ -182,25 +197,10 @@ fun MyTokenApp(
         }
     }
 
-    Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = {
-            if (screen is AppScreen.Home || screen is AppScreen.Credentials || screen is AppScreen.Settings) {
-                LiquidGlassBottomBar(
-                    items = listOf(
-                        GlassNavItem("首页", Icons.Filled.Home, "首页", selectedTab == 0) {
-                            selectTab(0)
-                        },
-                        GlassNavItem("凭证", WalletCardsIcon, "凭证", selectedTab == 1) {
-                            selectTab(1)
-                        },
-                        GlassNavItem("设置", Icons.Filled.Settings, "设置", selectedTab == 2) {
-                            selectTab(2)
-                        },
-                    )
-                )
-            }
-        },
+    MyTokenNavigationScaffold(
+        layoutMode = layoutMode,
+        showNavigation = isRootScreen,
+        items = navigationItems,
     ) { padding ->
         Box(modifier = Modifier
             .padding(PaddingValues(start = padding.calculateStartPadding(LayoutDirection.Ltr), top = padding.calculateTopPadding(), end = padding.calculateEndPadding(LayoutDirection.Ltr)))
