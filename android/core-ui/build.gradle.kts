@@ -30,5 +30,8 @@ dependencies {
     api(platform("androidx.compose:compose-bom:2024.09.03"))
     api("androidx.compose.ui:ui")
     api("androidx.compose.material3:material3")
+    api("androidx.compose.material3.adaptive:adaptive")
     api("androidx.compose.material:material-icons-extended")
+
+    testImplementation("junit:junit:4.13.2")
 }
