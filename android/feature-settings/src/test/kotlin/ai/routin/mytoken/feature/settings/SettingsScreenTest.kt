@@ -76,8 +76,8 @@ class SettingsScreenTest {
 
         composeRule.onNodeWithText("刷新").assertIsDisplayed()
         composeRule.onNodeWithText("自动刷新").assertIsDisplayed()
-        composeRule.onNodeWithText("5分钟").assertIsDisplayed()
-        composeRule.onNodeWithText("15分钟").assertIsDisplayed()
+        composeRule.onNodeWithText("5").assertIsDisplayed()
+        composeRule.onNodeWithText("15").assertIsDisplayed()
         composeRule.onNodeWithText("打开应用时刷新").assertIsDisplayed()
     }
 
@@ -85,14 +85,14 @@ class SettingsScreenTest {
     fun intervalChipsReflectCurrentSelection() {
         setContent()
 
-        composeRule.onNodeWithText("15分钟").assertIsSelected()
+        composeRule.onNodeWithText("15").assertIsSelected()
     }
 
     @Test
     fun intervalChipClickUpdatesSelection() {
         setContent()
 
-        composeRule.onNodeWithText("5分钟").performClick()
+        composeRule.onNodeWithText("5").performClick()
         composeRule.waitUntil(5_000) { refreshStore.state.value.refreshIntervalMinutes == 5 }
 
         assertEquals(5, refreshStore.state.value.refreshIntervalMinutes)
@@ -113,12 +113,7 @@ class SettingsScreenTest {
         var opened = 0
         setContent(onOpenTransfer = { opened++ })
 
-        // The 通知 section (Task 10) pushed 数据迁移 below the fold; scroll to it.
-        repeat(4) {
-            composeRule.onNodeWithTag("settings_list").performTouchInput { swipeUp() }
-            composeRule.waitForIdle()
-        }
-        composeRule.onNodeWithText("从 Mac 导入").assertIsDisplayed()
+        composeRule.onNodeWithText("从 Mac 导入").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("从 Mac 导入").performClick()
 
         assertEquals(1, opened)

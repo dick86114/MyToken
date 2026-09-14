@@ -1,6 +1,8 @@
 package ai.routin.mytoken.feature.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -14,8 +16,16 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BrightnessAuto
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material3.Icon
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -33,11 +43,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.HorizontalDivider
 import ai.routin.mytoken.core.ui.SectionCard
+import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
+import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.GlassButton
 import ai.routin.mytoken.core.ui.GlassButtonTone
 import ai.routin.mytoken.core.ui.glassFilterChipBorder
 import ai.routin.mytoken.core.ui.glassFilterChipColors
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
@@ -73,6 +86,7 @@ fun SettingsScreen(
     onOpenInstallPermissionSettings: () -> Unit = {},
     onInstallDownloadedUpdate: () -> Unit = {},
     onMirrorBaseChange: (String) -> Unit = {},
+    layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
 ) {
     var showReleaseHistory by remember { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
@@ -97,49 +111,32 @@ fun SettingsScreen(
             )
         },
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier.padding(padding).fillMaxSize().testTag("settings_list"),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp),
+        val columns = if (layoutMode == MyTokenLayoutMode.Compact) 1 else 2
+        MyTokenAdaptiveContent(
+            maxWidth = 1200.dp,
+            horizontalPadding = 16.dp,
+            modifier = Modifier.padding(padding).fillMaxSize(),
+        ) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(columns),
+            modifier = Modifier.fillMaxSize().testTag("settings_list"),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 96.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item(key = "theme") {
-                SectionCard(title = "主题") {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ThemeChip("跟随系统", state.display.themeMode == AppThemeMode.SYSTEM) {
-                            onThemeModeChange(AppThemeMode.SYSTEM)
-                        }
-                        ThemeChip("浅色", state.display.themeMode == AppThemeMode.LIGHT) {
-                            onThemeModeChange(AppThemeMode.LIGHT)
-                        }
-                        ThemeChip("深色", state.display.themeMode == AppThemeMode.DARK) {
-                            onThemeModeChange(AppThemeMode.DARK)
-                        }
-                    }
+                SectionCard(title = "主题", modifier = Modifier.testTag("settings_theme_cell")) {
+                    ThemeSelector(
+                        selected = state.display.themeMode,
+                        onSelect = onThemeModeChange,
+                    )
                 }
             }
-            item(key = "refresh") {
-                RefreshSettingsSection(
-                    settings = state.refresh,
-                    onAutoRefreshChange = onAutoRefreshChange,
-                    onIntervalChange = onIntervalChange,
-                    onWifiOnlyChange = onWifiOnlyChange,
-                    onOpenAppRefreshChange = onOpenAppRefreshChange,
-                    onRetryOnFailureChange = onRetryOnFailureChange,
-                )
-            }
-            item(key = "notification") {
-                NotificationSettingsSection(
-                    settings = state.notifications,
-                    permissionGranted = notificationPermissionGranted,
-                    onRequestPermission = onRequestNotificationPermission,
-                    onNotificationsEnabledChange = onNotificationsEnabledChange,
-                    onCredentialFailureAlertsChange = onCredentialFailureAlertsChange,
-                    onLowThresholdChange = onLowThresholdChange,
-                    onHighThresholdChange = onHighThresholdChange,
-                )
-            }
             item(key = "migration") {
-                SectionCard(title = "数据迁移") {
+                SectionCard(
+                    title = "数据迁移",
+                    modifier = Modifier.testTag("settings_migration_cell"),
+                ) {
                     Text(
                         text = "从 Mac 扫码迁移凭证，密钥端到端加密传输。",
                         style = MaterialTheme.typography.bodySmall,
@@ -152,7 +149,34 @@ fun SettingsScreen(
                     )
                 }
             }
-            item(key = "about") {
+            item(key = "refresh") {
+                Box(modifier = Modifier.testTag("settings_refresh_cell")) {
+                    RefreshSettingsSection(
+                        settings = state.refresh,
+                        onAutoRefreshChange = onAutoRefreshChange,
+                        onIntervalChange = onIntervalChange,
+                        onWifiOnlyChange = onWifiOnlyChange,
+                        onOpenAppRefreshChange = onOpenAppRefreshChange,
+                        onRetryOnFailureChange = onRetryOnFailureChange,
+                    )
+                }
+            }
+            item(key = "notification") {
+                NotificationSettingsSection(
+                    settings = state.notifications,
+                    permissionGranted = notificationPermissionGranted,
+                    onRequestPermission = onRequestNotificationPermission,
+                    onNotificationsEnabledChange = onNotificationsEnabledChange,
+                    onCredentialFailureAlertsChange = onCredentialFailureAlertsChange,
+                    onLowThresholdChange = onLowThresholdChange,
+                    onHighThresholdChange = onHighThresholdChange,
+                )
+            }
+            item(
+                key = "about",
+                span = { GridItemSpan(maxLineSpan) },
+            ) {
+                Box(modifier = Modifier.testTag("settings_about_span")) {
                 SectionCard(title = "关于") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -219,7 +243,9 @@ fun SettingsScreen(
                         )
                     }
                 }
+                }
             }
+        }
         }
     }
 
@@ -482,6 +508,69 @@ private fun UpdateSection(
             text = "检测更新",
         )
     }
+}
+
+@Composable
+private fun ThemeSelector(
+    selected: AppThemeMode,
+    onSelect: (AppThemeMode) -> Unit,
+) {
+    BoxWithConstraints {
+        val availableWidth = this.maxWidth
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (availableWidth < 320.dp) {
+                ThemeIconChip(
+                    icon = Icons.Filled.BrightnessAuto,
+                    label = "跟随系统",
+                    selected = selected == AppThemeMode.SYSTEM,
+                    onClick = { onSelect(AppThemeMode.SYSTEM) },
+                )
+                ThemeIconChip(
+                    icon = Icons.Filled.LightMode,
+                    label = "浅色",
+                    selected = selected == AppThemeMode.LIGHT,
+                    onClick = { onSelect(AppThemeMode.LIGHT) },
+                )
+                ThemeIconChip(
+                    icon = Icons.Filled.DarkMode,
+                    label = "深色",
+                    selected = selected == AppThemeMode.DARK,
+                    onClick = { onSelect(AppThemeMode.DARK) },
+                )
+            } else {
+                ThemeChip("跟随系统", selected == AppThemeMode.SYSTEM) {
+                    onSelect(AppThemeMode.SYSTEM)
+                }
+                ThemeChip("浅色", selected == AppThemeMode.LIGHT) {
+                    onSelect(AppThemeMode.LIGHT)
+                }
+                ThemeChip("深色", selected == AppThemeMode.DARK) {
+                    onSelect(AppThemeMode.DARK)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemeIconChip(
+    icon: ImageVector,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+            )
+        },
+        colors = glassFilterChipColors(selected = selected),
+        border = glassFilterChipBorder(selected = selected),
+    )
 }
 
 @Composable

@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import ai.routin.mytoken.core.ui.GlassButton
+import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
+import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
@@ -38,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -54,6 +57,7 @@ import java.util.concurrent.Executors
 @Composable
 fun TransferScannerScreen(
     isActive: Boolean,
+    layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
     onQrCodeScanned: (String) -> Unit,
     onCancel: () -> Unit
 ) {
@@ -94,7 +98,15 @@ fun TransferScannerScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Box(modifier = Modifier.fillMaxSize().weight(1f)) {
+        MyTokenAdaptiveContent(
+            maxWidth = 720.dp,
+            horizontalPadding = 0.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .testTag("transfer_camera_frame"),
+        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             if (hasCameraPermission && isActive) {
                 Box(
                     modifier = Modifier
@@ -129,6 +141,7 @@ fun TransferScannerScreen(
                     )
                 }
             }
+        }
         }
         GlassButton(onClick = onCancel, modifier = Modifier.fillMaxWidth(), text = "取消")
     }

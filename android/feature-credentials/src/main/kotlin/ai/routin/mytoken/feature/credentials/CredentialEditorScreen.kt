@@ -32,6 +32,8 @@ import ai.routin.mytoken.core.ui.GlassTextField
 import ai.routin.mytoken.core.ui.glassFilterChipBorder
 import ai.routin.mytoken.core.ui.glassFilterChipColors
 import ai.routin.mytoken.core.ui.LiquidGlassSurface
+import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
+import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -68,6 +70,7 @@ fun CredentialEditorScreen(
     onToggleSecretVisible: () -> Unit,
     onTestConnection: () -> Unit,
     onSave: () -> Unit,
+    layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
 ) {
     Scaffold(
         topBar = {
@@ -88,12 +91,17 @@ fun CredentialEditorScreen(
             Column(modifier = Modifier.padding(padding).fillMaxSize()) {}
             return@Scaffold
         }
+        MyTokenAdaptiveContent(
+            maxWidth = 720.dp,
+            horizontalPadding = 16.dp,
+            modifier = Modifier.padding(padding).fillMaxSize(),
+        ) {
         Column(
             modifier = Modifier
-                .padding(padding)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(vertical = 16.dp)
+                .testTag("editor_form"),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (state.isNew) {
@@ -254,6 +262,7 @@ fun CredentialEditorScreen(
                 tone = GlassButtonTone.Primary,
                 text = if (state.isSaving) "保存中…" else "保存",
             )
+        }
         }
     }
 }
