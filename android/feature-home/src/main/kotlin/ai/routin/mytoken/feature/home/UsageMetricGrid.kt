@@ -426,11 +426,6 @@ internal fun CommandCodeMetrics(metrics: List<UsageMetric>, modifier: Modifier =
     val byId = metrics.associateBy(UsageMetric::id)
     val colors = statusColors()
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text(
-            text = "额度单位：美元（USD）",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             CommandCodeProgressMetric(byId["five-hour"], "5 小时", colors, Modifier.weight(1f))
             CommandCodeProgressMetric(byId["weekly"], "周", colors, Modifier.weight(1f))
@@ -530,8 +525,11 @@ private fun CommandCodeRequestMetric(metric: UsageMetric?, modifier: Modifier = 
         )
         Text(
             text = "${formatCompact(metric.value)} 次",
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Clip,
         )
     }
 }
