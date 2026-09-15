@@ -8,16 +8,6 @@ class FakeRefreshSettingsStore(initial: RefreshSettings = RefreshSettings()) : R
     val state = MutableStateFlow(initial)
     override val settings: Flow<RefreshSettings> = state
 
-    override suspend fun setAutoRefreshEnabled(enabled: Boolean) =
-        state.update { it.copy(autoRefreshEnabled = enabled) }
-
-    override suspend fun setRefreshIntervalMinutes(minutes: Int) {
-        require(minutes in RefreshSettings.ALLOWED_REFRESH_INTERVAL_MINUTES)
-        state.update { it.copy(refreshIntervalMinutes = minutes) }
-    }
-
-    override suspend fun setWifiOnly(enabled: Boolean) = state.update { it.copy(wifiOnly = enabled) }
-
     override suspend fun setOpenAppRefresh(enabled: Boolean) =
         state.update { it.copy(openAppRefresh = enabled) }
 
@@ -53,20 +43,6 @@ class FakeNotificationSettingsStore(
 ) : NotificationSettingsStore {
     val state = MutableStateFlow(initial)
     override val settings: Flow<NotificationSettings> = state
-
-    override suspend fun setNotificationsEnabled(enabled: Boolean) =
-        state.update { it.copy(notificationsEnabled = enabled) }
-
-    override suspend fun setAlertThresholds(lowPercent: Int, highPercent: Int) {
-        require(
-            lowPercent in NotificationSettings.MIN_THRESHOLD_PERCENT..NotificationSettings.MAX_THRESHOLD_PERCENT &&
-                highPercent in NotificationSettings.MIN_THRESHOLD_PERCENT..NotificationSettings.MAX_THRESHOLD_PERCENT &&
-                lowPercent < highPercent,
-        )
-        state.update {
-            it.copy(lowThresholdPercent = lowPercent, highThresholdPercent = highPercent)
-        }
-    }
 
     override suspend fun setCredentialFailureAlertsEnabled(enabled: Boolean) =
         state.update { it.copy(credentialFailureAlertsEnabled = enabled) }

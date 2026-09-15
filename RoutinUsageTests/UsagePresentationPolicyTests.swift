@@ -113,8 +113,8 @@ final class UsagePresentationPolicyTests: XCTestCase {
         let lines = CommandCodeMetricLayoutPolicy.progressDetailLines(for: metric, now: now)
 
         XCTAssertEqual(lines.map(\.text), [
-            "已用 2.56 / 14.00",
-            "剩余 11.44",
+            "已用 $2.56 / $14.00",
+            "剩余 $11.44",
             "重置 \(UsageFormatter.resetTime(metric.windowEnd!, now: now))",
             "剩余 23分钟"
         ])
@@ -132,6 +132,7 @@ final class UsagePresentationPolicyTests: XCTestCase {
             encoding: .utf8
         )
 
+        XCTAssertTrue(source.contains("额度单位：美元（USD）"))
         XCTAssertTrue(source.contains("private var summaryMetricsCell: some View"))
         XCTAssertTrue(source.contains("requestCountCell(layout.requestCount)"))
         XCTAssertTrue(source.contains("valueCell(layout.purchasedRemaining, fallbackLabel: \"购买剩余\")"))
