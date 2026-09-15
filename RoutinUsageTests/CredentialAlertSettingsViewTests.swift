@@ -76,10 +76,11 @@ final class CredentialAlertSettingsViewTests: XCTestCase {
             encoding: .utf8
         )
 
-        XCTAssertTrue(source.contains("@Environment(\\.dismiss)"))
+        XCTAssertTrue(source.contains("let onClose: () -> Void"))
         XCTAssertTrue(source.contains("Image(systemName: \"xmark\")"))
         XCTAssertTrue(source.contains("Text(title).font(.title3.weight(.semibold))"))
         XCTAssertTrue(source.contains("Spacer()"))
+        XCTAssertTrue(source.contains("onClose()"))
         XCTAssertTrue(source.contains(".keyboardShortcut(.cancelAction)"))
         XCTAssertFalse(source.contains("Button(\"关闭\")"))
         XCTAssertTrue(source.contains("LazyVGrid("))

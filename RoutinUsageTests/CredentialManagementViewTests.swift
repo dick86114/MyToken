@@ -12,8 +12,34 @@ final class CredentialManagementViewTests: XCTestCase {
         XCTAssertTrue(source.contains("提醒设置"))
         XCTAssertTrue(source.contains("CredentialAlertSettingsView"))
         XCTAssertTrue(source.contains("CredentialAlertSettingsPresentation"))
-        XCTAssertTrue(source.contains(".sheet(item: $alertSettingsPresentation)"))
+        XCTAssertTrue(source.contains(".liquidGlassOverlay(item: $alertSettingsPresentation)"))
         XCTAssertTrue(source.contains("model: presentation.model"))
+    }
+
+    func test编辑添加和详情弹窗统一使用液态玻璃焦外关闭() throws {
+        let source = try TestSourceReader.read([
+            "RoutinUsage", "Views", "Settings", "CredentialManagementView.swift"
+        ])
+        let surface = try TestSourceReader.read([
+            "RoutinUsage", "Views", "LiquidGlassSurface.swift"
+        ])
+
+        XCTAssertTrue(source.contains(".liquidGlassOverlay(item: $editor)"))
+        XCTAssertTrue(source.contains(".liquidGlassOverlay(item: $detailsState)"))
+        XCTAssertFalse(source.contains(".sheet(item: $editor)"))
+        XCTAssertFalse(source.contains(".sheet(item: $alertSettingsPresentation)"))
+        XCTAssertTrue(surface.contains("LiquidGlassOverlay"))
+        XCTAssertTrue(surface.contains("onTapGesture(perform: onDismiss)"))
+        XCTAssertTrue(surface.contains("liquidGlassSurface(cornerRadius: 18)"))
+    }
+
+    func test凭证编辑器弹窗高度贴合内容() throws {
+        let source = try TestSourceReader.read([
+            "RoutinUsage", "Views", "CredentialEditorView.swift"
+        ])
+
+        XCTAssertTrue(source.contains(".frame(width: 680)"))
+        XCTAssertTrue(source.contains(".fixedSize(horizontal: false, vertical: true)"))
     }
 
     func test过滤状态供应商和搜索组合只保留匹配凭证() throws {
@@ -279,8 +305,7 @@ final class CredentialManagementViewTests: XCTestCase {
         XCTAssertTrue(source.contains("搜索别名或供应商"))
         XCTAssertTrue(source.contains("LazyVGrid"))
         XCTAssertTrue(source.contains("CredentialDetailsView"))
-        XCTAssertTrue(source.contains("detailsOverlay"))
-        XCTAssertTrue(source.contains("onTapGesture {"))
+        XCTAssertTrue(source.contains(".liquidGlassOverlay(item: $detailsState)"))
         XCTAssertTrue(source.contains("closeDetails()"))
         XCTAssertTrue(source.contains("CredentialDetailsView(state: state, onClose: closeDetails)"))
         XCTAssertTrue(source.contains(".frame(width: 640)"))

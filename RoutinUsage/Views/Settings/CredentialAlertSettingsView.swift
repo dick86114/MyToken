@@ -1,9 +1,9 @@
 import SwiftUI
 
 struct CredentialAlertSettingsView: View {
-    @Environment(\.dismiss) private var dismiss
     let title: String
     @Bindable var model: CredentialAlertSettingsModel
+    let onClose: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -47,7 +47,7 @@ struct CredentialAlertSettingsView: View {
             }
             Spacer()
             Button {
-                dismiss()
+                onClose()
             } label: {
                 Image(systemName: "xmark")
             }

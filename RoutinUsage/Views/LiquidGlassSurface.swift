@@ -37,6 +37,42 @@ private struct LiquidGlassWindowBackgroundModifier: ViewModifier {
     }
 }
 
+/// 以居中弹层承载编辑、提醒等临时操作，并支持点击焦外背景关闭。
+private struct LiquidGlassOverlay<OverlayContent: View>: View {
+    let onDismiss: () -> Void
+    @ViewBuilder let content: () -> OverlayContent
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.24)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture(perform: onDismiss)
+
+            content()
+                .liquidGlassSurface(cornerRadius: 18)
+                .padding(16)
+                .contentShape(Rectangle())
+                .onTapGesture {}
+        }
+    }
+}
+
+private struct LiquidGlassOverlayModifier<Item: Identifiable, OverlayContent: View>: ViewModifier {
+    @Binding var item: Item?
+    let content: (Item) -> OverlayContent
+
+    func body(content: Content) -> some View {
+        content.overlay {
+            if let item {
+                LiquidGlassOverlay(onDismiss: { self.item = nil }) {
+                    self.content(item)
+                }
+            }
+        }
+    }
+}
+
 extension View {
     func liquidGlassSurface(cornerRadius: CGFloat = 16) -> some View {
         modifier(LiquidGlassSurfaceModifier(cornerRadius: cornerRadius))
@@ -44,6 +80,13 @@ extension View {
 
     func liquidGlassWindowBackground() -> some View {
         modifier(LiquidGlassWindowBackgroundModifier())
+    }
+
+    func liquidGlassOverlay<Item: Identifiable, OverlayContent: View>(
+        item: Binding<Item?>,
+        @ViewBuilder content: @escaping (Item) -> OverlayContent
+    ) -> some View {
+        modifier(LiquidGlassOverlayModifier(item: item, content: content))
     }
 
     func liquidGlassControlSurface() -> some View {
