@@ -150,8 +150,8 @@ struct CredentialEditorView: View {
     let initialMetadata: [String: String]
     let save: @MainActor (ValidatedCredentialInput) async throws -> KeyEditorSaveResult
     let onSaved: @MainActor () -> Void
+    let onClose: () -> Void
 
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @State private var providerID: ProviderID
     @State private var name: String
@@ -175,7 +175,8 @@ struct CredentialEditorView: View {
         initialSecret: String = "",
         initialMetadata: [String: String] = [:],
         save: @escaping @MainActor (ValidatedCredentialInput) async throws -> KeyEditorSaveResult,
-        onSaved: @escaping @MainActor () -> Void = {}
+        onSaved: @escaping @MainActor () -> Void = {},
+        onClose: @escaping () -> Void = {}
     ) {
         self.title = title
         self.initialProviderID = initialProviderID
@@ -184,6 +185,7 @@ struct CredentialEditorView: View {
         self.initialMetadata = initialMetadata
         self.save = save
         self.onSaved = onSaved
+        self.onClose = onClose
         _providerID = State(initialValue: initialProviderID)
         _name = State(initialValue: initialName)
         _apiKey = State(initialValue: initialProviderID == .volcengine ? "" : initialSecret)
@@ -203,7 +205,7 @@ struct CredentialEditorView: View {
                 Text(title).font(.title3.weight(.semibold))
                 Spacer()
                 Button {
-                    dismiss()
+                    close()
                 } label: {
                     Image(systemName: "xmark")
                 }
@@ -336,7 +338,7 @@ struct CredentialEditorView: View {
             }
 
             HStack {
-                Button("取消") { dismiss() }
+                Button("取消") { close() }
                     .buttonStyle(.borderless)
                     .keyboardShortcut(.cancelAction)
                 Spacer()
@@ -354,6 +356,7 @@ struct CredentialEditorView: View {
         }
         .padding(28)
         .frame(width: 680)
+        .fixedSize(horizontal: false, vertical: true)
         .onChange(of: providerID) { _, _ in
             isSecretVisible = false
         }
@@ -390,7 +393,7 @@ struct CredentialEditorView: View {
             _ = try await save(input)
             isSaving = false
             onSaved()
-            dismiss()
+            close()
         } catch is CancellationError {
             isSaving = false
         } catch {
@@ -410,5 +413,9 @@ struct CredentialEditorView: View {
         }
         components?.path += "/profile"
         return components?.url
+    }
+
+    private func close() {
+        onClose()
     }
 }

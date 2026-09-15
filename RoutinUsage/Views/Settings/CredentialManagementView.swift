@@ -57,19 +57,10 @@ struct CredentialManagementView: View {
             }
             .padding(24)
         }
-        .sheet(item: $editor) { presentation in
-            credentialEditor(presentation)
-        }
         .sheet(isPresented: $showsTransferToAndroid) {
             TransferToAndroidView(environment: environment) {
                 showsTransferToAndroid = false
             }
-        }
-        .sheet(item: $alertSettingsPresentation) { presentation in
-            CredentialAlertSettingsView(
-                title: presentation.title,
-                model: presentation.model
-            )
         }
         .confirmationDialog(
             "确定删除这个凭证？",
@@ -95,8 +86,20 @@ struct CredentialManagementView: View {
         } message: {
             Text(model.operationNotice?.message ?? "发生未知错误")
         }
-        .overlay {
-            detailsOverlay
+        .liquidGlassOverlay(item: $editor) { presentation in
+            credentialEditor(presentation)
+        }
+        .liquidGlassOverlay(item: $alertSettingsPresentation) { presentation in
+            CredentialAlertSettingsView(
+                title: presentation.title,
+                model: presentation.model,
+                onClose: { alertSettingsPresentation = nil }
+            )
+        }
+        .liquidGlassOverlay(item: $detailsState) { state in
+            CredentialDetailsView(state: state, onClose: closeDetails)
+                .frame(width: 640)
+                .frame(minHeight: 500, maxHeight: 720)
         }
     }
 
@@ -236,28 +239,6 @@ struct CredentialManagementView: View {
         }
     }
 
-    @ViewBuilder
-    private var detailsOverlay: some View {
-        if let state = detailsState {
-            ZStack {
-                Color.black.opacity(0.24)
-                    .ignoresSafeArea()
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        closeDetails()
-                    }
-
-                CredentialDetailsView(state: state, onClose: closeDetails)
-                    .frame(width: 640)
-                    .frame(minHeight: 500, maxHeight: 720)
-                    .liquidGlassSurface(cornerRadius: 18)
-                    .padding(16)
-                    .contentShape(Rectangle())
-                    .onTapGesture {}
-            }
-        }
-    }
-
     private func closeDetails() {
         detailsState = nil
     }
@@ -338,7 +319,10 @@ struct CredentialManagementView: View {
     private func credentialEditor(_ presentation: EditorPresentation) -> some View {
         switch presentation {
         case .add:
-            CredentialEditorView(save: model.addValidatedCredential)
+            CredentialEditorView(
+                save: model.addValidatedCredential,
+                onClose: { editor = nil }
+            )
         case let .edit(configuration):
             CredentialEditorView(
                 title: "编辑凭证",
@@ -348,7 +332,7 @@ struct CredentialManagementView: View {
                 initialMetadata: configuration.metadata
             ) { input in
                 try await model.updateValidatedCredential(id: configuration.id, input: input)
-            }
+            } onSaved: {} onClose: { editor = nil }
         }
     }
 
