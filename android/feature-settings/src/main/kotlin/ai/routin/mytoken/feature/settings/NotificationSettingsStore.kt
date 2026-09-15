@@ -26,8 +26,6 @@ data class NotificationSettings(
 
 interface NotificationSettingsStore {
     val settings: Flow<NotificationSettings>
-    suspend fun setNotificationsEnabled(enabled: Boolean)
-    suspend fun setAlertThresholds(lowPercent: Int, highPercent: Int)
     suspend fun setCredentialFailureAlertsEnabled(enabled: Boolean)
 }
 
@@ -45,21 +43,6 @@ class AppPreferencesNotificationSettingsStore(
                 credentialFailureAlertsEnabled = prefs.credentialFailureAlertsEnabled,
             )
         }
-
-    override suspend fun setNotificationsEnabled(enabled: Boolean) {
-        preferencesRepository.setNotificationsEnabled(enabled)
-    }
-
-    override suspend fun setAlertThresholds(lowPercent: Int, highPercent: Int) {
-        require(
-            lowPercent in NotificationSettings.MIN_THRESHOLD_PERCENT..NotificationSettings.MAX_THRESHOLD_PERCENT &&
-                highPercent in NotificationSettings.MIN_THRESHOLD_PERCENT..NotificationSettings.MAX_THRESHOLD_PERCENT &&
-                lowPercent < highPercent,
-        ) {
-            "alert thresholds must satisfy 0 < low < high <= 99"
-        }
-        preferencesRepository.setAlertThresholds(lowPercent, highPercent)
-    }
 
     override suspend fun setCredentialFailureAlertsEnabled(enabled: Boolean) {
         preferencesRepository.setCredentialFailureAlertsEnabled(enabled)

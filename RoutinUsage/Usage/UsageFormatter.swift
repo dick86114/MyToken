@@ -376,6 +376,25 @@ enum UsageFormatter {
         return symbol + text
     }
 
+    /// 将接口返回的 ISO 货币代码统一映射为前置符号。
+    static func currencyText(_ value: Decimal?, currencyCode: String?) -> String {
+        currencyText(value, symbol: currencySymbol(for: currencyCode))
+    }
+
+    static func currencySymbol(for currencyCode: String?) -> String {
+        let normalized = currencyCode?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased()
+        switch normalized {
+        case "CNY", "RMB", "¥", "￥", "人民币": return "¥"
+        case "USD", "$", "US$": return "$"
+        case "EUR", "€": return "€"
+        default:
+            guard let currencyCode, !currencyCode.isEmpty else { return "元" }
+            return currencyCode
+        }
+    }
+
     /// Token 消耗需要保留完整数值，避免 compact 格式让用户无法核对后台总量。
     static func exactTokenText(_ value: Decimal?) -> String {
         numberText(value, grouping: true)

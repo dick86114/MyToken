@@ -33,6 +33,21 @@ final class UsageFormatterTests: XCTestCase {
         )
     }
 
+    func test货币代码使用前置符号且人民币映射为人民币符号() {
+        XCTAssertEqual(
+            UsageFormatter.currencyText(Decimal(string: "12.36"), currencyCode: "CNY"),
+            "¥12.36"
+        )
+        XCTAssertEqual(
+            UsageFormatter.currencyText(Decimal(string: "0"), currencyCode: "USD"),
+            "$0.00"
+        )
+        XCTAssertEqual(
+            UsageFormatter.currencyText(Decimal(string: "7.2"), currencyCode: "EUR"),
+            "€7.20"
+        )
+    }
+
     func testToken统计保留千分位完整数值() {
         XCTAssertEqual(
             UsageFormatter.exactTokenText(7_362_665),

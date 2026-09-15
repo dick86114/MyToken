@@ -12,18 +12,27 @@ import ai.routin.mytoken.domain.model.UsageMetricUnit
 import ai.routin.mytoken.domain.model.UsageSnapshot
 import ai.routin.mytoken.domain.usage.RefreshStatus
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -116,6 +125,7 @@ class HomeScreenTest {
     }
 
     @Test
+    @Config(qualifiers = "w360dp-h800dp")
     fun commandCodeCardUsesRequestedMetricLayout() {
         val command = credential("Command Code", ProviderId.CommandCode)
         fun metric(
@@ -142,10 +152,10 @@ class HomeScreenTest {
         val metrics = listOf(
             metric("five-hour", "5 小时", used = 2.45, limit = 14.0, remaining = 11.55),
             metric("weekly", "周", used = 2.45, limit = 35.0, remaining = 32.55),
-            metric("credit-progress", "月", used = 2.45, limit = 70.0, remaining = 67.55),
+            metric("credit-progress", "月", used = 24.11, limit = 70.0, remaining = 45.89),
             metric("purchased-remaining", "购买剩余", value = 0.0),
             metric("free-remaining", "赠送剩余", value = 0.0),
-            metric("request-count", "累计请求", value = 474.0, unit = UsageMetricUnit.Request),
+            metric("request-count", "累计请求", value = 9700.0, unit = UsageMetricUnit.Request),
         )
         val commandCodeCard = CredentialCardUi(
             credential = command,
@@ -172,7 +182,23 @@ class HomeScreenTest {
         listOf("5 小时", "周", "月", "累计请求", "购买剩余", "赠送剩余").forEach {
             composeRule.onNodeWithText(it).assertIsDisplayed()
         }
-        composeRule.onNodeWithText("\$67.55", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("额度单位：美元（USD）").assertDoesNotExist()
+        composeRule.onNodeWithText("已用 \$24.11").assertIsDisplayed()
+        composeRule.onNodeWithText("剩余 \$45.89").assertIsDisplayed()
+        composeRule.onAllNodesWithText("\$0.00", useUnmergedTree = true).assertCountEquals(2)
+        val requestTextResults = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        composeRule.onNodeWithText("9.7K 次", useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
+                action(requestTextResults)
+            }
+        assertEquals(1, requestTextResults.single().lineCount)
+        val request = composeRule.onNodeWithText("累计请求", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val purchased = composeRule.onNodeWithText("购买剩余", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val free = composeRule.onNodeWithText("赠送剩余", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertEquals(request.top, purchased.top)
+        assertEquals(purchased.top, free.top)
+        assertTrue(request.left < purchased.left)
+        assertTrue(purchased.left < free.left)
     }
 
     @Test
@@ -218,6 +244,34 @@ class HomeScreenTest {
         composeRule.onNodeWithText("备用").assertDoesNotExist()
         composeRule.onNodeWithText("2 个凭证").assertDoesNotExist()
         composeRule.onNodeWithText("1 个凭证").assertIsDisplayed()
+    }
+
+    @Test
+    fun pullRefreshIsOnlyAttachedWhenCredentialCardsExist() {
+        val credential = credential("首页")
+        var state by mutableStateOf(HomeUiState(isLoading = false))
+        composeRule.setContent {
+            MaterialTheme {
+                HomeScreen(
+                    state = state,
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                )
+            }
+        }
+        composeRule.onNodeWithTag("home_pull_refresh").assertDoesNotExist()
+
+        state = HomeUiState(
+            isLoading = false,
+            cards = listOf(card(credential, metrics = listOf(balance(20.0)))),
+            groups = listOf(group(ProviderId.Routin, listOf(card(credential, metrics = listOf(balance(20.0)))))),
+            credentialCount = 1,
+        )
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("home_pull_refresh").assertExists()
     }
 
     @Test

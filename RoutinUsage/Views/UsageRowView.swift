@@ -247,7 +247,7 @@ private extension UsageRowView {
                     .foregroundStyle(normalizedMetricColor(metric.healthState))
             }
         case .balance:
-            Text("余额 \(decimalText(metric.value)) \(metric.currencyCode ?? "元")")
+            Text("余额 \(UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode))")
                 .font(.caption.weight(.semibold))
                 .monospacedDigit()
                 .foregroundStyle(normalizedMetricColor(metric.healthState))
@@ -607,7 +607,7 @@ private extension UsageRowView {
         if let snapshot = state.snapshot, !snapshot.metrics.isEmpty {
             let metricText = snapshot.normalizedMetrics.map { metric in
                 if metric.presentation == .balance {
-                    return "余额 \(decimalText(metric.value)) \(metric.currencyCode ?? "")"
+                    return "余额 \(UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode))"
                 }
                 if let percent = metric.displayedPercent {
                     return "\(metric.label) \(metric.displaysRemainingPercent ? "剩余" : "已使用") \(UsageFormatter.displayPercentText(percent))"

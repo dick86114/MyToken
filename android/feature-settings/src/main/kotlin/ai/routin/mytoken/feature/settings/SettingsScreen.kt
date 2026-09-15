@@ -67,17 +67,11 @@ fun SettingsScreen(
     appVersion: String,
     updateState: AppUpdateUiState = AppUpdateUiState.Idle,
     releaseHistoryState: AppReleaseHistoryUiState = AppReleaseHistoryUiState.Idle,
-    onAutoRefreshChange: (Boolean) -> Unit,
-    onIntervalChange: (Int) -> Unit,
-    onWifiOnlyChange: (Boolean) -> Unit,
     onOpenAppRefreshChange: (Boolean) -> Unit,
     onRetryOnFailureChange: (Boolean) -> Unit,
     onThemeModeChange: (AppThemeMode) -> Unit,
     onOpenTransfer: () -> Unit,
-    onNotificationsEnabledChange: (Boolean) -> Unit = {},
     onCredentialFailureAlertsChange: (Boolean) -> Unit = {},
-    onLowThresholdChange: (Int) -> Unit = {},
-    onHighThresholdChange: (Int) -> Unit = {},
     notificationPermissionGranted: Boolean = true,
     onRequestNotificationPermission: () -> Unit = {},
     onCheckForUpdates: () -> Unit = {},
@@ -153,9 +147,6 @@ fun SettingsScreen(
                 Box(modifier = Modifier.testTag("settings_refresh_cell")) {
                     RefreshSettingsSection(
                         settings = state.refresh,
-                        onAutoRefreshChange = onAutoRefreshChange,
-                        onIntervalChange = onIntervalChange,
-                        onWifiOnlyChange = onWifiOnlyChange,
                         onOpenAppRefreshChange = onOpenAppRefreshChange,
                         onRetryOnFailureChange = onRetryOnFailureChange,
                     )
@@ -166,10 +157,7 @@ fun SettingsScreen(
                     settings = state.notifications,
                     permissionGranted = notificationPermissionGranted,
                     onRequestPermission = onRequestNotificationPermission,
-                    onNotificationsEnabledChange = onNotificationsEnabledChange,
                     onCredentialFailureAlertsChange = onCredentialFailureAlertsChange,
-                    onLowThresholdChange = onLowThresholdChange,
-                    onHighThresholdChange = onHighThresholdChange,
                 )
             }
             item(

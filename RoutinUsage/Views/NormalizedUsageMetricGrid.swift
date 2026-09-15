@@ -221,7 +221,7 @@ private struct NormalizedUsageMetricCell: View {
     private var balanceCell: some View {
         if isDeepSeekSummary {
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(decimalText(metric.value)) \(metric.currencyCode ?? "元")")
+                Text(UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode))
                     .font(.system(.title3, design: .rounded, weight: .semibold))
                     .foregroundStyle(healthColor)
                     .monospacedDigit()
@@ -233,7 +233,6 @@ private struct NormalizedUsageMetricCell: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("账户余额，\(decimalText(metric.value)) \(metric.currencyCode ?? "元")")
         } else {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -241,7 +240,7 @@ private struct NormalizedUsageMetricCell: View {
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                 Spacer(minLength: 4)
-                Text("\(decimalText(metric.value)) \(metric.currencyCode ?? "元")")
+                Text(UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode))
                     .font(.system(.headline, design: .rounded, weight: .semibold))
                     .foregroundStyle(healthColor)
                     .monospacedDigit()
@@ -253,7 +252,7 @@ private struct NormalizedUsageMetricCell: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
-            "\(metric.label)，\(decimalText(metric.value)) \(metric.currencyCode ?? "元")"
+            "\(metric.label)，\(UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode))"
         )
         }
     }
@@ -301,7 +300,7 @@ private struct NormalizedUsageMetricCell: View {
     private var valueCell: some View {
         if isDeepSeekSummary {
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(decimalText(metric.value))\(valueSuffix)")
+                Text(valueText)
                     .font(.system(.title3, design: .rounded, weight: .semibold))
                     .foregroundStyle(healthColor)
                     .monospacedDigit()
@@ -320,25 +319,25 @@ private struct NormalizedUsageMetricCell: View {
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                     Spacer(minLength: 4)
-                    Text("\(decimalText(metric.value))\(valueSuffix)")
+                    Text(valueText)
                         .font(.system(.headline, design: .rounded, weight: .semibold))
                         .monospacedDigit()
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(metric.label)，\(decimalText(metric.value))\(valueSuffix)")
+            .accessibilityLabel("\(metric.label)，\(valueText)")
         }
     }
 
-    private var valueSuffix: String {
+    private var valueText: String {
         switch metric.unit {
         case .request:
-            return " 次"
+            return "\(decimalText(metric.value)) 次"
         case .currency:
-            return " \(metric.currencyCode ?? "元")"
+            return UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode)
         case .token, .boolean, .text:
-            return ""
+            return decimalText(metric.value)
         }
     }
 

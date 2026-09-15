@@ -36,7 +36,6 @@ class SettingsViewModel(
         notificationStore.settings,
         updateStore.settings,
     ) { refresh, display, notifications, update ->
-        currentNotifications = notifications
         SettingsUiState(
             isLoading = false,
             refresh = refresh,
@@ -61,18 +60,6 @@ class SettingsViewModel(
 
     fun installDownloadedUpdate() = updateController.installDownloadedUpdate()
 
-    @Volatile
-    private var currentNotifications: NotificationSettings = NotificationSettings()
-
-    fun setAutoRefreshEnabled(enabled: Boolean) = launch { refreshStore.setAutoRefreshEnabled(enabled) }
-
-    fun setRefreshIntervalMinutes(minutes: Int) {
-        if (minutes !in RefreshSettings.ALLOWED_REFRESH_INTERVAL_MINUTES) return
-        launch { refreshStore.setRefreshIntervalMinutes(minutes) }
-    }
-
-    fun setWifiOnly(enabled: Boolean) = launch { refreshStore.setWifiOnly(enabled) }
-
     fun setOpenAppRefresh(enabled: Boolean) = launch { refreshStore.setOpenAppRefresh(enabled) }
 
     fun setRetryOnFailure(enabled: Boolean) = launch { refreshStore.setRetryOnFailure(enabled) }
@@ -92,28 +79,10 @@ class SettingsViewModel(
 
     fun setShowResetTime(enabled: Boolean) = launch { displayStore.setShowResetTime(enabled) }
 
-    fun setNotificationsEnabled(enabled: Boolean) =
-        launch { notificationStore.setNotificationsEnabled(enabled) }
-
     fun setCredentialFailureAlertsEnabled(enabled: Boolean) =
         launch { notificationStore.setCredentialFailureAlertsEnabled(enabled) }
 
     fun setUpdateMirrorBase(base: String) = launch { updateStore.setMirrorBase(base) }
-
-    fun setLowAlertThreshold(percent: Int) {
-        if (!isValidThreshold(percent)) return
-        if (percent >= currentNotifications.highThresholdPercent) return
-        launch { notificationStore.setAlertThresholds(percent, currentNotifications.highThresholdPercent) }
-    }
-
-    fun setHighAlertThreshold(percent: Int) {
-        if (!isValidThreshold(percent)) return
-        if (percent <= currentNotifications.lowThresholdPercent) return
-        launch { notificationStore.setAlertThresholds(currentNotifications.lowThresholdPercent, percent) }
-    }
-
-    private fun isValidThreshold(percent: Int) =
-        percent in NotificationSettings.MIN_THRESHOLD_PERCENT..NotificationSettings.MAX_THRESHOLD_PERCENT
 
     private fun launch(block: suspend () -> Unit) {
         viewModelScope.launch { block() }
