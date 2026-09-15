@@ -108,6 +108,7 @@ fun MyTokenApp(
                 repository = graph.credentialRepository,
                 refreshUseCase = graph.refreshUseCase,
                 credentialOrderIds = graph.credentialOrderStore.order,
+                refreshOnStart = false,
             )
     }
 
@@ -146,6 +147,12 @@ fun MyTokenApp(
     val settingsState by settingsViewModel.state.collectAsStateWithLifecycle()
     val updateState by settingsViewModel.updateState.collectAsStateWithLifecycle()
     val releaseHistoryState by settingsViewModel.releaseHistoryState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(settingsState.isLoading) {
+        if (!settingsState.isLoading && settingsState.refresh.openAppRefresh) {
+            homeViewModel.refreshAll(settingsState.refresh.retryOnFailure)
+        }
+    }
 
     val pagerState = rememberPagerState(initialPage = selectedTab, pageCount = { 3 })
     LaunchedEffect(pagerState) {
@@ -217,7 +224,9 @@ fun MyTokenApp(
                             HomeScreen(
                                 state = homeState,
                                 layoutMode = layoutMode,
-                                onRefreshAll = homeViewModel::refreshAll,
+                                onRefreshAll = {
+                                    homeViewModel.refreshAll(settingsState.refresh.retryOnFailure)
+                                },
                                 onRefreshCredential = { id ->
                                     homeState.groups.flatMap { it.cards }
                                         .firstOrNull { it.credential.id == id }
@@ -249,17 +258,11 @@ fun MyTokenApp(
                                 appVersion = appVersion,
                                 updateState = updateState,
                                 releaseHistoryState = releaseHistoryState,
-                                onAutoRefreshChange = settingsViewModel::setAutoRefreshEnabled,
-                                onIntervalChange = settingsViewModel::setRefreshIntervalMinutes,
-                                onWifiOnlyChange = settingsViewModel::setWifiOnly,
                                 onOpenAppRefreshChange = settingsViewModel::setOpenAppRefresh,
                                 onRetryOnFailureChange = settingsViewModel::setRetryOnFailure,
                                 onThemeModeChange = settingsViewModel::setThemeMode,
                                 onOpenTransfer = { navigate(AppScreen.Transfer) },
-                                onNotificationsEnabledChange = settingsViewModel::setNotificationsEnabled,
                                 onCredentialFailureAlertsChange = settingsViewModel::setCredentialFailureAlertsEnabled,
-                                onLowThresholdChange = settingsViewModel::setLowAlertThreshold,
-                                onHighThresholdChange = settingsViewModel::setHighAlertThreshold,
                                 notificationPermissionGranted = notificationPermissionGranted,
                                 onRequestNotificationPermission = onRequestNotificationPermission,
                                 onCheckForUpdates = settingsViewModel::checkForUpdates,

@@ -31,47 +31,18 @@ class NotificationSettingsSectionTest {
                     settings = NotificationSettings(),
                     permissionGranted = true,
                     onRequestPermission = {},
-                    onNotificationsEnabledChange = {},
                     onCredentialFailureAlertsChange = {},
-                    onLowThresholdChange = {},
-                    onHighThresholdChange = {},
                 )
             }
         }
 
         composeRule.onNodeWithText("通知").assertIsDisplayed()
-        composeRule.onNodeWithText("启用提醒").assertIsDisplayed()
-        composeRule.onNodeWithText("用量提醒低阈值").assertIsDisplayed()
-        composeRule.onNodeWithText("50%").assertIsDisplayed()
-        composeRule.onNodeWithText("用量提醒高阈值").assertIsDisplayed()
-        composeRule.onNodeWithText("80%").assertIsDisplayed()
+        composeRule.onNodeWithText("启用提醒").assertDoesNotExist()
+        composeRule.onNodeWithText("用量提醒低阈值").assertDoesNotExist()
+        composeRule.onNodeWithText("用量提醒高阈值").assertDoesNotExist()
         composeRule.onNodeWithText("凭证失效提醒").assertIsDisplayed()
         composeRule.onNodeWithText("系统通知权限：已允许").assertIsDisplayed()
         composeRule.onNodeWithText("去授权").assertDoesNotExist()
-    }
-
-    @Test
-    fun thresholdSteppersEmitChanges() {
-        var lowChange = 0
-        var highChange = 0
-        composeRule.setContent {
-            MaterialTheme {
-                NotificationSettingsSection(
-                    settings = NotificationSettings(),
-                    permissionGranted = true,
-                    onRequestPermission = {},
-                    onNotificationsEnabledChange = {},
-                    onCredentialFailureAlertsChange = {},
-                    onLowThresholdChange = { lowChange = it },
-                    onHighThresholdChange = { highChange = it },
-                )
-            }
-        }
-
-        composeRule.onNodeWithContentDescription("用量提醒低阈值 减少").performClick()
-        assertEquals(45, lowChange)
-        composeRule.onNodeWithContentDescription("用量提醒高阈值 增加").performClick()
-        assertEquals(85, highChange)
     }
 
     @Test
@@ -83,10 +54,7 @@ class NotificationSettingsSectionTest {
                     settings = NotificationSettings(),
                     permissionGranted = false,
                     onRequestPermission = { requested++ },
-                    onNotificationsEnabledChange = {},
                     onCredentialFailureAlertsChange = {},
-                    onLowThresholdChange = {},
-                    onHighThresholdChange = {},
                 )
             }
         }
@@ -98,7 +66,6 @@ class NotificationSettingsSectionTest {
 
     @Test
     fun togglesEmitChanges() {
-        var notificationsEnabled: Boolean? = null
         var failureAlerts: Boolean? = null
         composeRule.setContent {
             MaterialTheme {
@@ -106,17 +73,12 @@ class NotificationSettingsSectionTest {
                     settings = NotificationSettings(),
                     permissionGranted = true,
                     onRequestPermission = {},
-                    onNotificationsEnabledChange = { notificationsEnabled = it },
                     onCredentialFailureAlertsChange = { failureAlerts = it },
-                    onLowThresholdChange = {},
-                    onHighThresholdChange = {},
                 )
             }
         }
 
-        composeRule.onNodeWithContentDescription("启用提醒").performClick()
         composeRule.onNodeWithContentDescription("凭证失效提醒").performClick()
-        assertFalse(notificationsEnabled!!)
         assertFalse(failureAlerts!!)
     }
 }

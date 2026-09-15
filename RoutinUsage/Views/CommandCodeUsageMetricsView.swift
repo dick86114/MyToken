@@ -37,10 +37,10 @@ enum CommandCodeMetricLayoutPolicy {
     ) -> [ProgressDetailLine] {
         var lines = [
             ProgressDetailLine(
-                text: "已用 \(CommandCodeMetricFormatter.amount(metric.used)) / \(CommandCodeMetricFormatter.amount(metric.limit))"
+                text: "已用 \(CommandCodeMetricFormatter.currencyAmount(metric.used)) / \(CommandCodeMetricFormatter.currencyAmount(metric.limit))"
             ),
             ProgressDetailLine(
-                text: "剩余 \(CommandCodeMetricFormatter.amount(metric.remaining))"
+                text: "剩余 \(CommandCodeMetricFormatter.currencyAmount(metric.remaining))"
             )
         ]
         if let windowEnd = metric.windowEnd {
@@ -87,6 +87,11 @@ enum CommandCodeMetricFormatter {
         UsageFormatter.numberText(value)
     }
 
+    static func currencyAmount(_ value: Decimal?) -> String {
+        guard let value else { return "—" }
+        return "$\(amount(value))"
+    }
+
     private static func formatted(
         _ value: Decimal,
         minimumFractionDigits: Int,
@@ -114,6 +119,9 @@ struct CommandCodeUsageMetricsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            Text("额度单位：美元（USD）")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
             HStack(alignment: .top, spacing: 16) {
                 progressCell(layout.fiveHour, fallbackLabel: "5 小时")
                 progressCell(layout.weekly, fallbackLabel: "周")

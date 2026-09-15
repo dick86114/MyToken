@@ -2,7 +2,6 @@ package ai.routin.mytoken.feature.settings
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -58,9 +57,6 @@ class SettingsScreenTest {
                     ),
                     appVersion = "0.1.0",
                     releaseHistoryState = releaseHistoryState,
-                    onAutoRefreshChange = { refreshStore.state.value = refreshStore.state.value.copy(autoRefreshEnabled = it) },
-                    onIntervalChange = { refreshStore.state.value = refreshStore.state.value.copy(refreshIntervalMinutes = it) },
-                    onWifiOnlyChange = { refreshStore.state.value = refreshStore.state.value.copy(wifiOnly = it) },
                     onOpenAppRefreshChange = { refreshStore.state.value = refreshStore.state.value.copy(openAppRefresh = it) },
                     onRetryOnFailureChange = { refreshStore.state.value = refreshStore.state.value.copy(retryOnFailure = it) },
                     onThemeModeChange = { displayStore.state.value = displayStore.state.value.copy(themeMode = it) },
@@ -75,37 +71,21 @@ class SettingsScreenTest {
         setContent()
 
         composeRule.onNodeWithText("刷新").assertIsDisplayed()
-        composeRule.onNodeWithText("自动刷新").assertIsDisplayed()
-        composeRule.onNodeWithText("5").assertIsDisplayed()
-        composeRule.onNodeWithText("15").assertIsDisplayed()
+        composeRule.onNodeWithText("自动刷新").assertDoesNotExist()
+        composeRule.onNodeWithText("刷新频率（分钟）").assertDoesNotExist()
+        composeRule.onNodeWithText("仅 Wi-Fi 下刷新").assertDoesNotExist()
         composeRule.onNodeWithText("打开应用时刷新").assertIsDisplayed()
-    }
-
-    @Test
-    fun intervalChipsReflectCurrentSelection() {
-        setContent()
-
-        composeRule.onNodeWithText("15").assertIsSelected()
-    }
-
-    @Test
-    fun intervalChipClickUpdatesSelection() {
-        setContent()
-
-        composeRule.onNodeWithText("5").performClick()
-        composeRule.waitUntil(5_000) { refreshStore.state.value.refreshIntervalMinutes == 5 }
-
-        assertEquals(5, refreshStore.state.value.refreshIntervalMinutes)
+        composeRule.onNodeWithText("失败后自动重试").assertIsDisplayed()
     }
 
     @Test
     fun switchInteractionPersists() {
         setContent()
 
-        composeRule.onNodeWithContentDescription("自动刷新").performClick()
-        composeRule.waitUntil(5_000) { !refreshStore.state.value.autoRefreshEnabled }
+        composeRule.onNodeWithContentDescription("打开应用时刷新").performClick()
+        composeRule.waitUntil(5_000) { !refreshStore.state.value.openAppRefresh }
 
-        assertFalse(refreshStore.state.value.autoRefreshEnabled)
+        assertFalse(refreshStore.state.value.openAppRefresh)
     }
 
     @Test
