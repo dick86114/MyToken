@@ -132,12 +132,15 @@ final class UsagePresentationPolicyTests: XCTestCase {
             encoding: .utf8
         )
 
-        XCTAssertTrue(source.contains("额度单位：美元（USD）"))
+        XCTAssertFalse(source.contains("额度单位：美元（USD）"))
         XCTAssertTrue(source.contains("private var summaryMetricsCell: some View"))
         XCTAssertTrue(source.contains("requestCountCell(layout.requestCount)"))
         XCTAssertTrue(source.contains("valueCell(layout.purchasedRemaining, fallbackLabel: \"购买剩余\")"))
         XCTAssertTrue(source.contains("valueCell(layout.freeRemaining, fallbackLabel: \"赠送剩余\")"))
         XCTAssertTrue(source.contains("Text(metric.label.isEmpty ? \"累计请求\" : metric.label)"))
+        XCTAssertTrue(source.contains("UsageFormatter.currencyText(metric.used, currencyCode: metric.currencyCode)"))
+        XCTAssertTrue(source.contains("UsageFormatter.currencyText(metric.remaining, currencyCode: metric.currencyCode)"))
+        XCTAssertTrue(source.contains("UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode)"))
     }
 
     func testCommandCode金额四舍五入保留两位小数() {

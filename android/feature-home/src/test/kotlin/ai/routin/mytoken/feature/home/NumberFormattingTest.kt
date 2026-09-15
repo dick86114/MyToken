@@ -25,4 +25,11 @@ class NumberFormattingTest {
         assertEquals("67.56%", formatPercent(67.555))
         assertEquals("42%", formatPercent(42.0))
     }
+
+    @Test
+    fun currencyCodesUseLeadingSymbols() {
+        assertEquals("¥12.36", formatCurrency(BigDecimal("12.36"), "CNY"))
+        assertEquals("$0.00", formatCurrency(BigDecimal("0"), "USD"))
+        assertEquals("€7.20", formatCurrency(BigDecimal("7.2"), "EUR"))
+    }
 }

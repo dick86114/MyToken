@@ -119,9 +119,6 @@ struct CommandCodeUsageMetricsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("额度单位：美元（USD）")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
             HStack(alignment: .top, spacing: 16) {
                 progressCell(layout.fiveHour, fallbackLabel: "5 小时")
                 progressCell(layout.weekly, fallbackLabel: "周")
@@ -175,9 +172,9 @@ struct CommandCodeUsageMetricsView: View {
                 cellHeader(metric, fallbackLabel: "月")
                 UsageMetricProgressBar(percent: metric.displayedPercent ?? 0)
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text("已用 \(amountText(metric.used))")
+                    Text("已用 \(UsageFormatter.currencyText(metric.used, currencyCode: metric.currencyCode))")
                     Spacer(minLength: 12)
-                    Text("剩余 \(amountText(metric.remaining))")
+                    Text("剩余 \(UsageFormatter.currencyText(metric.remaining, currencyCode: metric.currencyCode))")
                 }
                 .font(.caption2)
                 .foregroundStyle(.secondary)
@@ -221,7 +218,7 @@ struct CommandCodeUsageMetricsView: View {
                 Text(metric.label.isEmpty ? fallbackLabel : metric.label)
                     .font(.caption)
                     .foregroundStyle(.tertiary)
-                Text("\(amountText(metric.value)) \(currencyText(metric))")
+                Text(UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode))
                     .font(.system(.headline, design: .rounded, weight: .semibold))
                     .foregroundStyle(color(metric.healthState))
                     .monospacedDigit()
@@ -229,7 +226,7 @@ struct CommandCodeUsageMetricsView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(
-                "\(metric.label)，\(amountText(metric.value)) \(currencyText(metric))"
+                "\(metric.label)，\(UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode))"
             )
         } else {
             placeholderCell(label: fallbackLabel)
@@ -274,10 +271,6 @@ struct CommandCodeUsageMetricsView: View {
 
     private func numberText(_ value: Decimal?) -> String {
         CommandCodeMetricFormatter.number(value)
-    }
-
-    private func currencyText(_ metric: NormalizedUsageMetric) -> String {
-        metric.currencyCode ?? "元"
     }
 
     private func color(_ state: UsageMetricHealthState) -> Color {
