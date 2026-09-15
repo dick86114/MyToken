@@ -100,28 +100,30 @@ fun HomeScreen(
             )
         },
     ) { padding ->
-        PullToRefreshBox(
-            isRefreshing = state.isRefreshingAll,
-            onRefresh = onRefreshAll,
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
-        ) {
-            when {
-                state.isLoading -> Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator()
-                }
+        val contentModifier = Modifier
+            .padding(padding)
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+        when {
+            state.isLoading -> Box(
+                modifier = contentModifier,
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator()
+            }
 
-                allCards.isEmpty() -> EmptyState(
-                    onImportFromMac = onImportFromMac,
-                    onAddManually = onAddManually,
-                )
+            allCards.isEmpty() -> EmptyState(
+                modifier = contentModifier,
+                onImportFromMac = onImportFromMac,
+                onAddManually = onAddManually,
+            )
 
-                else -> MyTokenAdaptiveContent(
+            else -> PullToRefreshBox(
+                isRefreshing = state.isRefreshingAll,
+                onRefresh = onRefreshAll,
+                modifier = contentModifier.testTag("home_pull_refresh"),
+            ) {
+                MyTokenAdaptiveContent(
                     maxWidth = 1440.dp,
                     horizontalPadding = 16.dp,
                     modifier = Modifier.fillMaxSize(),
@@ -226,11 +228,12 @@ private fun ProviderFilterChips(
 
 @Composable
 private fun EmptyState(
+    modifier: Modifier = Modifier,
     onImportFromMac: () -> Unit,
     onAddManually: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

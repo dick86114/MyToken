@@ -37,10 +37,10 @@ enum CommandCodeMetricLayoutPolicy {
     ) -> [ProgressDetailLine] {
         var lines = [
             ProgressDetailLine(
-                text: "已用 \(CommandCodeMetricFormatter.amount(metric.used)) / \(CommandCodeMetricFormatter.amount(metric.limit))"
+                text: "已用 \(CommandCodeMetricFormatter.currencyAmount(metric.used)) / \(CommandCodeMetricFormatter.currencyAmount(metric.limit))"
             ),
             ProgressDetailLine(
-                text: "剩余 \(CommandCodeMetricFormatter.amount(metric.remaining))"
+                text: "剩余 \(CommandCodeMetricFormatter.currencyAmount(metric.remaining))"
             )
         ]
         if let windowEnd = metric.windowEnd {
@@ -85,6 +85,11 @@ enum CommandCodeMetricFormatter {
 
     static func number(_ value: Decimal?) -> String {
         UsageFormatter.numberText(value)
+    }
+
+    static func currencyAmount(_ value: Decimal?) -> String {
+        guard let value else { return "—" }
+        return "$\(amount(value))"
     }
 
     private static func formatted(
@@ -167,9 +172,9 @@ struct CommandCodeUsageMetricsView: View {
                 cellHeader(metric, fallbackLabel: "月")
                 UsageMetricProgressBar(percent: metric.displayedPercent ?? 0)
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text("已用 \(amountText(metric.used))")
+                    Text("已用 \(UsageFormatter.currencyText(metric.used, currencyCode: metric.currencyCode))")
                     Spacer(minLength: 12)
-                    Text("剩余 \(amountText(metric.remaining))")
+                    Text("剩余 \(UsageFormatter.currencyText(metric.remaining, currencyCode: metric.currencyCode))")
                 }
                 .font(.caption2)
                 .foregroundStyle(.secondary)
@@ -213,7 +218,7 @@ struct CommandCodeUsageMetricsView: View {
                 Text(metric.label.isEmpty ? fallbackLabel : metric.label)
                     .font(.caption)
                     .foregroundStyle(.tertiary)
-                Text("\(amountText(metric.value)) \(currencyText(metric))")
+                Text(UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode))
                     .font(.system(.headline, design: .rounded, weight: .semibold))
                     .foregroundStyle(color(metric.healthState))
                     .monospacedDigit()
@@ -221,7 +226,7 @@ struct CommandCodeUsageMetricsView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(
-                "\(metric.label)，\(amountText(metric.value)) \(currencyText(metric))"
+                "\(metric.label)，\(UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode))"
             )
         } else {
             placeholderCell(label: fallbackLabel)
@@ -266,10 +271,6 @@ struct CommandCodeUsageMetricsView: View {
 
     private func numberText(_ value: Decimal?) -> String {
         CommandCodeMetricFormatter.number(value)
-    }
-
-    private func currencyText(_ metric: NormalizedUsageMetric) -> String {
-        metric.currencyCode ?? "元"
     }
 
     private func color(_ state: UsageMetricHealthState) -> Color {

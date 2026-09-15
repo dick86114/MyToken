@@ -97,6 +97,7 @@ class HomeViewModel(
     private val credentialOrderIds: Flow<List<String>> = emptyFlow(),
     private val clock: Clock = Clock.systemUTC(),
     refreshOnStart: Boolean = true,
+    private val retryOnFailure: Boolean = false,
     private val nowTickIntervalMillis: Long? = DEFAULT_NOW_TICK_MILLIS,
     // Ticking happens off the main dispatcher: an infinite delay loop on the
     // main looper keeps Robolectric/Compose idle detection from ever settling.
@@ -153,12 +154,11 @@ class HomeViewModel(
                 }
             }
         }
-        if (refreshOnStart) {
-            viewModelScope.launch {
-                // Show last-known data (Ready + stale) before the network round
-                // trips complete; the refreshes below keep the seeded snapshots.
-                refreshUseCase.restoreFromCache()
-                refreshAll()
+        viewModelScope.launch {
+            // Show last-known data (Ready + stale) before any network round trip.
+            refreshUseCase.restoreFromCache()
+            if (refreshOnStart) {
+                refreshAll(retryOnFailure)
             }
         }
     }
@@ -185,6 +185,10 @@ class HomeViewModel(
      *   is skipped, so no duplicate concurrent provider request is issued.
      */
     fun refreshAll() {
+        refreshAll(retryOnFailure)
+    }
+
+    fun refreshAll(retryOnFailure: Boolean) {
         if (!isRefreshingAll.compareAndSet(expect = false, update = true)) return
         viewModelScope.launch {
             try {
@@ -194,7 +198,7 @@ class HomeViewModel(
                         if (tryBeginRefresh(credential.id)) {
                             launch {
                                 try {
-                                    refreshUseCase.refresh(credential)
+                                    refreshWithRetry(credential, retryOnFailure)
                                 } finally {
                                     endRefresh(credential.id)
                                 }
@@ -235,11 +239,19 @@ class HomeViewModel(
         viewModelScope.launch {
             if (tryBeginRefresh(credential.id)) {
                 try {
-                    refreshUseCase.refresh(credential)
+                    refreshWithRetry(credential, retryOnFailure)
                 } finally {
                     endRefresh(credential.id)
                 }
             }
+        }
+    }
+
+    private suspend fun refreshWithRetry(credential: Credential, retryOnFailure: Boolean) {
+        refreshUseCase.refresh(credential)
+        if (retryOnFailure && refreshUseCase.states.value[credential.id]?.status == RefreshStatus.Failed) {
+            delay(FAILURE_RETRY_DELAY_MILLIS)
+            refreshUseCase.refresh(credential)
         }
     }
 
@@ -287,6 +299,7 @@ class HomeViewModel(
         now: Instant,
     ): CredentialCardUi {
         val snapshot = usageState?.snapshot
+        val status = if (!isEnabled) RefreshStatus.Disabled else usageState?.status ?: RefreshStatus.Loading
         // A failed refresh keeps the last successful snapshot; that data is stale regardless
         // of its fetch time because the authoritative refresh did not succeed.
         val freshness = if (usageState?.status == RefreshStatus.Failed && snapshot != null) {
@@ -296,7 +309,7 @@ class HomeViewModel(
         }
         return CredentialCardUi(
             credential = this,
-            status = usageState?.status ?: RefreshStatus.Loading,
+            status = status,
             snapshot = snapshot,
             isStale = usageState?.isStale ?: false,
             error = usageState?.error,
@@ -306,5 +319,6 @@ class HomeViewModel(
 
     private companion object {
         const val DEFAULT_NOW_TICK_MILLIS: Long = 30_000L
+        const val FAILURE_RETRY_DELAY_MILLIS: Long = 1_000L
     }
 }

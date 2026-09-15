@@ -2,12 +2,10 @@ package ai.routin.mytoken
 
 import ai.routin.mytoken.core.alerts.AlertStateStore
 import ai.routin.mytoken.core.alerts.AlertThresholds
-import ai.routin.mytoken.core.alerts.MetricAlert
 import ai.routin.mytoken.core.alerts.InvalidCredentialAlert
 import ai.routin.mytoken.core.alerts.MetricAlertEvaluator
 import ai.routin.mytoken.core.alerts.MetricAlertSettings
 import ai.routin.mytoken.core.notifications.NotificationChannels
-import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.repository.CredentialRepository
 import ai.routin.mytoken.domain.usage.CredentialUsageState
 import ai.routin.mytoken.feature.settings.NotificationSettingsStore
@@ -21,13 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 
 /**
- * Evaluates threshold / invalid-credential alerts after a refresh pass and posts
- * notifications on the [NotificationChannels] channels. All degradation paths are
- * silent: notifications disabled by the user (DataStore) or by the OS runtime
- * permission (Android 13+ POST_NOTIFICATIONS) simply skip posting.
- *
- * Notification content carries only alias, provider and redacted metric values —
- * never secrets, keys or raw request payloads.
+ * 当前只投递凭证失效提醒；系统权限关闭时静默跳过。通知内容不包含密钥。
  */
 class UsageAlertDispatcher(
     private val context: Context,
@@ -41,7 +33,6 @@ class UsageAlertDispatcher(
 
     suspend fun dispatchAfterRefresh() {
         val settings = notificationSettingsStore.settings.first()
-        if (!settings.notificationsEnabled) return
 
         val notifier = NotificationManagerCompat.from(context)
         if (!notifier.areNotificationsEnabled()) return
@@ -50,11 +41,7 @@ class UsageAlertDispatcher(
             .filter { it.isEnabled }
         if (credentials.isEmpty()) return
 
-        val alertSettings = MetricAlertSettings(
-            thresholds = runCatching {
-                AlertThresholds(settings.lowThresholdPercent, settings.highThresholdPercent)
-            }.getOrDefault(AlertThresholds.DEFAULT),
-        )
+        val alertSettings = MetricAlertSettings(thresholds = AlertThresholds.DEFAULT)
 
         var state = alertStateStore.load()
         credentials.forEach { credential ->
@@ -66,9 +53,6 @@ class UsageAlertDispatcher(
                 credentialFailureAlertsEnabled = settings.credentialFailureAlertsEnabled,
             )
             state = evaluation.state
-            evaluation.usageAlerts.forEach { alert ->
-                post(notifier, usageNotification(credential, alert), notificationId(credential.id, alert.metricId))
-            }
             evaluation.invalidCredentialAlerts.forEach { invalid ->
                 post(notifier, invalidNotification(invalid), notificationId(credential.id, INVALID_METRIC_KEY))
             }
@@ -81,13 +65,6 @@ class UsageAlertDispatcher(
         if (!notifier.areNotificationsEnabled()) return
         runCatching { notifier.notify(id, notification) }
     }
-
-    private fun usageNotification(credential: Credential, alert: MetricAlert) =
-        baseNotification()
-            .setContentTitle("MyToken 用量提醒")
-            .setContentText(alert.notificationBody())
-            .setChannelId(NotificationChannels.USAGE_ALERTS_ID)
-            .build()
 
     private fun invalidNotification(alert: InvalidCredentialAlert) =
         baseNotification()

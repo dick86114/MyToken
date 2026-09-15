@@ -68,6 +68,7 @@ class HomeViewModelTest {
 
     private fun viewModel(
         refreshOnStart: Boolean = false,
+        retryOnFailure: Boolean = false,
         credentialOrderIds: Flow<List<String>> = MutableStateFlow(emptyList()),
     ) = HomeViewModel(
         repository = repository,
@@ -75,6 +76,7 @@ class HomeViewModelTest {
         credentialOrderIds = credentialOrderIds,
         clock = clock,
         refreshOnStart = refreshOnStart,
+        retryOnFailure = retryOnFailure,
         nowTickIntervalMillis = null,
     )
 
@@ -284,6 +286,58 @@ class HomeViewModelTest {
 
         val card = vm.state.value.groups.single().cards.single()
         assertEquals(RefreshStatus.Disabled, card.status)
+    }
+
+    @Test
+    fun `credential disabled after refresh becomes disabled without another refresh`() = runTest {
+        val credential = credential("OFF-AFTER-REFRESH", ProviderId.Routin)
+        addCredential(credential)
+        providers[ProviderId.Routin] = FakeUsageProvider(
+            ProviderId.Routin,
+            Result.success(snapshot(credential.id, balanceMetric(20.0))),
+        )
+
+        val vm = viewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        vm.refreshAll()
+        advanceUntilIdle()
+        assertEquals(RefreshStatus.Ready, vm.state.value.groups.single().cards.single().status)
+
+        repository.credentials[credential.id] = credential.copy(isEnabled = false)
+        repository.emit()
+        advanceUntilIdle()
+
+        assertEquals(RefreshStatus.Disabled, vm.state.value.groups.single().cards.single().status)
+    }
+
+    @Test
+    fun `refresh retries once when enabled and failure can recover`() = runTest {
+        val credential = credential("RETRY", ProviderId.Routin)
+        addCredential(credential)
+        var attempts = 0
+        providers[ProviderId.Routin] = object : UsageProvider {
+            override val providerId = ProviderId.Routin
+
+            override suspend fun fetchUsage(
+                credential: Credential,
+                secret: CredentialSecret,
+            ): Result<UsageSnapshot> {
+                attempts += 1
+                return if (attempts == 1) {
+                    Result.failure(AppError.Network("临时失败"))
+                } else {
+                    Result.success(snapshot(credential.id, balanceMetric(10.0)))
+                }
+            }
+        }
+
+        val vm = viewModel(retryOnFailure = true)
+        backgroundScope.launch { vm.state.collect {} }
+        vm.refreshAll()
+        advanceUntilIdle()
+
+        assertEquals(2, attempts)
+        assertEquals(RefreshStatus.Ready, vm.state.value.groups.single().cards.single().status)
     }
 
     @Test

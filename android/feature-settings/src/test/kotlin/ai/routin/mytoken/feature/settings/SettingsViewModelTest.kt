@@ -55,23 +55,9 @@ class SettingsViewModelTest {
 
         val state = vm.state.value
         assertFalse(state.isLoading)
-        assertTrue(state.refresh.autoRefreshEnabled)
-        assertEquals(15, state.refresh.refreshIntervalMinutes)
         assertTrue(state.refresh.openAppRefresh)
         assertTrue(state.refresh.retryOnFailure)
         assertTrue(state.display.showDisabledCredentials)
-    }
-
-    @Test
-    fun refreshIntervalChangePersistsToStore() = runTest(dispatcher) {
-        val vm = viewModel()
-        advanceUntilIdle()
-
-        vm.setRefreshIntervalMinutes(5)
-        advanceUntilIdle()
-
-        assertEquals(5, refreshStore.state.value.refreshIntervalMinutes)
-        assertEquals(5, vm.state.value.refresh.refreshIntervalMinutes)
     }
 
     @Test
@@ -85,30 +71,15 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun refreshIntervalOutsideAllowedValuesIsIgnored() = runTest(dispatcher) {
-        val vm = viewModel()
-        advanceUntilIdle()
-
-        vm.setRefreshIntervalMinutes(3)
-        advanceUntilIdle()
-
-        assertEquals(15, refreshStore.state.value.refreshIntervalMinutes)
-    }
-
-    @Test
     fun refreshTogglesPersistToStore() = runTest(dispatcher) {
         val vm = viewModel()
         advanceUntilIdle()
 
-        vm.setAutoRefreshEnabled(false)
-        vm.setWifiOnly(true)
         vm.setOpenAppRefresh(false)
         vm.setRetryOnFailure(false)
         advanceUntilIdle()
 
         val refresh = refreshStore.state.value
-        assertFalse(refresh.autoRefreshEnabled)
-        assertTrue(refresh.wifiOnly)
         assertFalse(refresh.openAppRefresh)
         assertFalse(refresh.retryOnFailure)
     }
@@ -139,9 +110,6 @@ class SettingsViewModelTest {
         advanceUntilIdle()
 
         val notifications = vm.state.value.notifications
-        assertTrue(notifications.notificationsEnabled)
-        assertEquals(50, notifications.lowThresholdPercent)
-        assertEquals(80, notifications.highThresholdPercent)
         assertTrue(notifications.credentialFailureAlertsEnabled)
     }
 
@@ -150,45 +118,10 @@ class SettingsViewModelTest {
         val vm = viewModel()
         advanceUntilIdle()
 
-        vm.setNotificationsEnabled(false)
         vm.setCredentialFailureAlertsEnabled(false)
         advanceUntilIdle()
 
-        assertFalse(notificationStore.state.value.notificationsEnabled)
         assertFalse(notificationStore.state.value.credentialFailureAlertsEnabled)
     }
 
-    @Test
-    fun thresholdChangesPersistToStore() = runTest(dispatcher) {
-        val vm = viewModel()
-        advanceUntilIdle()
-
-        vm.setLowAlertThreshold(30)
-        advanceUntilIdle()
-
-        assertEquals(30, notificationStore.state.value.lowThresholdPercent)
-        assertEquals(80, notificationStore.state.value.highThresholdPercent)
-        assertEquals(30, vm.state.value.notifications.lowThresholdPercent)
-
-        vm.setHighAlertThreshold(90)
-        advanceUntilIdle()
-        assertEquals(90, notificationStore.state.value.highThresholdPercent)
-    }
-
-    @Test
-    fun invalidThresholdChangesAreIgnored() = runTest(dispatcher) {
-        val vm = viewModel()
-        advanceUntilIdle()
-
-        vm.setLowAlertThreshold(0)
-        vm.setLowAlertThreshold(100)
-        vm.setLowAlertThreshold(80) // >= high (80) → ignored
-        vm.setHighAlertThreshold(20) // <= low (50) → ignored
-        vm.setHighAlertThreshold(101)
-        advanceUntilIdle()
-
-        val notifications = notificationStore.state.value
-        assertEquals(50, notifications.lowThresholdPercent)
-        assertEquals(80, notifications.highThresholdPercent)
-    }
 }

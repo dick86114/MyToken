@@ -127,8 +127,8 @@ internal fun commandCodeProgressDetailLines(
     metric: UsageMetric,
     now: Instant,
 ): List<CommandCodeDetailLine> = buildList {
-    add(CommandCodeDetailLine("已用 ${formatCommandCodeAmount(metric.used)} / ${formatCommandCodeAmount(metric.limit)}"))
-    add(CommandCodeDetailLine("剩余 ${formatCommandCodeAmount(metric.remaining)}"))
+    add(CommandCodeDetailLine("已用 ${formatCurrency(metric.used, metric.currencyCode)} / ${formatCurrency(metric.limit, metric.currencyCode)}"))
+    add(CommandCodeDetailLine("剩余 ${formatCurrency(metric.remaining, metric.currencyCode)}"))
     metric.windowEnd?.let { end ->
         add(CommandCodeDetailLine("重置 ${formatResetTime(end)}"))
         add(
@@ -430,13 +430,20 @@ internal fun CommandCodeMetrics(metrics: List<UsageMetric>, modifier: Modifier =
             CommandCodeProgressMetric(byId["five-hour"], "5 小时", colors, Modifier.weight(1f))
             CommandCodeProgressMetric(byId["weekly"], "周", colors, Modifier.weight(1f))
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
             CommandCodeMonthlyMetric(byId["credit-progress"], colors, Modifier.weight(1f))
-            CommandCodeRequestMetric(byId["request-count"], Modifier.weight(1f))
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            CommandCodeValueMetric(byId["purchased-remaining"], "购买剩余", colors, Modifier.weight(1f))
-            CommandCodeValueMetric(byId["free-remaining"], "赠送剩余", colors, Modifier.weight(1f))
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                CommandCodeRequestMetric(byId["request-count"], Modifier.weight(1f))
+                CommandCodeValueMetric(byId["purchased-remaining"], "购买剩余", colors, Modifier.weight(1f))
+                CommandCodeValueMetric(byId["free-remaining"], "赠送剩余", colors, Modifier.weight(1f))
+            }
         }
     }
 }
@@ -510,14 +517,20 @@ private fun CommandCodeRequestMetric(metric: UsageMetric?, modifier: Modifier = 
         CommandCodePlaceholder("累计请求", modifier)
         return
     }
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
             text = metric.label.ifEmpty { "累计请求" },
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f),
         )
-        Text("${formatCompact(metric.value)} 次", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text(
+            text = "${formatCompact(metric.value)} 次",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Clip,
+        )
     }
 }
 

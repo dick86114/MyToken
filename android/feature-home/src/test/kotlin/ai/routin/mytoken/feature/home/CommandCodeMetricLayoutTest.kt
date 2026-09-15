@@ -32,8 +32,8 @@ class CommandCodeMetricLayoutTest {
 
         assertEquals(
             listOf(
-                "已用 2.56 / 14.00",
-                "剩余 11.44",
+                "已用 $2.56 / $14.00",
+                "剩余 $11.44",
                 "重置 ${formatResetTime(metric.windowEnd!!)}",
                 "剩余 23分钟",
             ),
