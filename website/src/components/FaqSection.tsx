@@ -9,6 +9,7 @@ export const FaqSection: React.FC = () => {
     'faq-2': true,
     'faq-3': true,
     'faq-4': true,
+    'faq-4-mimo': true,
     'faq-5': true,
   });
 

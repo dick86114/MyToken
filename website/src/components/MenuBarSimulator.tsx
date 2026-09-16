@@ -28,7 +28,7 @@ interface RealAccountCard {
   avatarChar: string;
   name: string;
   plan: string;
-  providerCode: 'GLM' | 'ROU' | 'DS' | 'VOL' | 'NEW' | 'CMD';
+  providerCode: 'GLM' | 'ROU' | 'DS' | 'VOL' | 'NEW' | 'CMD' | 'MIMO';
   overallStatus: string;
   overallStatusColor: string;
   startDate?: string;
@@ -38,7 +38,7 @@ interface RealAccountCard {
     bg: string;
     glow: string;
   };
-  metricsType: 'dual_progress' | 'triple_progress' | 'balance_grid' | 'stat_grid';
+  metricsType: 'dual_progress' | 'triple_progress' | 'balance_grid' | 'stat_grid' | 'xiaomi_grid';
   // Dual / Triple progress metrics
   metric1?: {
     title: string;
@@ -92,9 +92,47 @@ interface RealAccountCard {
     token60s: string;
     totalReq: string;
   };
+  // 小米 MiMo API 按量指标
+  xiaomiData?: {
+    accountBalance: string;
+    totalConsumption: string;
+    cashBalance: string;
+    giftBalance: string;
+    historyTokens: string;
+    outputTokens: string;
+    cacheHitTokens: string;
+    cacheMissTokens: string;
+  };
 }
 
 const REAL_ACCOUNTS: RealAccountCard[] = [
+  {
+    id: 'mimo-1',
+    avatarChar: '米',
+    name: '小米 MiMo',
+    plan: 'API 按量',
+    providerCode: 'MIMO',
+    overallStatus: '¥58.78',
+    overallStatusColor: '#00856f',
+    startDate: '—',
+    endDate: '—',
+    cardTheme: {
+      border: 'border-[#16463d]/70',
+      bg: 'bg-[#10221f]/85',
+      glow: 'shadow-[0_0_20px_rgba(0,133,111,0.10)]',
+    },
+    metricsType: 'xiaomi_grid',
+    xiaomiData: {
+      accountBalance: '¥58.78',
+      totalConsumption: '¥1.25',
+      cashBalance: '¥58.78',
+      giftBalance: '¥0.00',
+      historyTokens: '3,323,413',
+      outputTokens: '28,658',
+      cacheHitTokens: '2,695,553',
+      cacheMissTokens: '599,202',
+    },
+  },
   {
     id: 'glm-zhao',
     avatarChar: '赵',
@@ -408,7 +446,7 @@ export const MenuBarSimulator: React.FC<MenuBarSimulatorProps> = ({
       const s = String(now.getSeconds()).padStart(2, '0');
       setLastRefreshedTime(`${y}-${mo}-${d} ${h}:${m}:${s}`);
       setIsRefreshing(false);
-      onTriggerNotification('已完成最新快照拉取', '全量 8 个 Key 指标与周期重置倒计时已即时同步。');
+      onTriggerNotification('已完成最新快照拉取', `全量 ${REAL_ACCOUNTS.length} 个 Key 指标与周期重置倒计时已即时同步。`);
     }, 650);
   };
 
@@ -460,6 +498,7 @@ export const MenuBarSimulator: React.FC<MenuBarSimulatorProps> = ({
               { code: 'VOL', percent: 16, color: '#22c55e' },
               { code: 'ROU', percent: 0, color: '#8c9ba5' },
               { code: 'DS', percent: 40, color: '#22c55e' },
+              { code: 'MIMO', percent: 55, color: '#00856f' },
             ].map((item) => (
               <div key={item.code} className="flex items-center gap-1">
                 <div className="flex flex-col text-[7px] font-mono font-extrabold text-white leading-[7px] tracking-tighter text-center">
@@ -549,7 +588,7 @@ export const MenuBarSimulator: React.FC<MenuBarSimulatorProps> = ({
               账户用量
             </h3>
             <span className="text-xs text-[#94a3b8] font-mono mt-1 block">
-              8 个 Key
+              {REAL_ACCOUNTS.length} 个 Key
             </span>
           </div>
 
@@ -563,6 +602,7 @@ export const MenuBarSimulator: React.FC<MenuBarSimulatorProps> = ({
               { label: 'DeepSeek', code: 'DS' },
               { label: 'New API', code: 'NEW' },
               { label: 'Command Code', code: 'CMD' },
+              { label: '小米 MiMo', code: 'MIMO' },
             ].map((tab) => (
               <button
                 key={tab.code}
@@ -823,6 +863,40 @@ export const MenuBarSimulator: React.FC<MenuBarSimulatorProps> = ({
                 )}
 
                 {/* 5. STAT GRID (New API) */}
+                {/* 小米 MiMo API 指标：字段在上、数值在下的四列布局 */}
+                {card.metricsType === 'xiaomi_grid' && card.xiaomiData && (
+                  <div className="my-1 flex flex-col gap-3 text-[11px] font-mono">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {[
+                        ['账户余额', card.xiaomiData.accountBalance],
+                        ['累计消费', card.xiaomiData.totalConsumption],
+                        ['现金余额', card.xiaomiData.cashBalance],
+                        ['赠送余额', card.xiaomiData.giftBalance],
+                      ].map(([label, value]) => (
+                        <div key={label} className="flex flex-col gap-0.5">
+                          <span className="text-[#8c9ba5]">{label}</span>
+                          <span className="font-semibold text-[#00856f]">{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <span className="text-[10px] font-semibold text-[#8c9ba5]">Token</span>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {[
+                          ['历史消耗', card.xiaomiData.historyTokens],
+                          ['输出', card.xiaomiData.outputTokens],
+                          ['命中缓存', card.xiaomiData.cacheHitTokens],
+                          ['未命中缓存', card.xiaomiData.cacheMissTokens],
+                        ].map(([label, value]) => (
+                          <div key={label} className="flex flex-col gap-0.5">
+                            <span className="text-[#8c9ba5]">{label}</span>
+                            <span className="font-semibold text-white">{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {card.metricsType === 'stat_grid' && card.newApiData && (
                   <div className="grid grid-cols-2 gap-2 my-1 text-[11px] font-mono">
                     <div>

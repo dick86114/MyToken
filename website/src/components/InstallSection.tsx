@@ -96,7 +96,7 @@ export const InstallSection: React.FC<InstallSectionProps> = ({
               </div>
               <h3 className="font-title-card text-[#F8FAFC] mb-2">配置凭据即刻使用</h3>
               <p className="font-body-base text-[#c1c6d7] mb-6 leading-relaxed">
-                点击顶部菜单栏图标打开设置，选择对应供应商填写 Key 并点击“验证并保存”，实时指标立即点亮。
+                点击顶部菜单栏图标打开设置，选择对应供应商填写 Key、Cookie 或 serviceToken，并点击“验证并保存”，实时指标立即点亮。
               </p>
             </div>
             <div className="p-3 rounded-xl bg-[#0a0e16] text-[#94A3B8] font-mono text-xs flex items-center justify-between border border-white/5">
