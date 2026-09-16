@@ -121,6 +121,22 @@ export const INITIAL_PROVIDERS: ProviderItem[] = [
     subValue: '$42.80 / $70.00',
     lastUpdated: '10:42:18',
   },
+  {
+    id: 'mimo-1',
+    code: 'MIMO',
+    name: '小米 MiMo API 按量',
+    keyMask: 'api-platform_***bc34',
+    tagColor: '#00856F',
+    badgeBg: 'rgba(0, 133, 111, 0.1)',
+    status: 'active',
+    statusLabel: '余额 ¥58.78 · 正常',
+    primaryMetric: '账户余额',
+    primaryValue: '¥58.78',
+    subMetric: '历史消耗',
+    subValue: '3,323,413 Token',
+    detailPills: ['累计消费 ¥1.25', '命中缓存 2,695,553', '未命中 599,202'],
+    lastUpdated: '10:42:18',
+  },
 ];
 
 export const MATRIX_DATA: MatrixRow[] = [
@@ -293,6 +309,12 @@ export const FAQS: FaqItem[] = [
     question: 'Command Code 需要哪些信息？',
     answer:
       '只需要 Bearer API Key。应用会读取账号所属组织、套餐状态与周期、月度额度、购买/赠送剩余、5 小时/周限额和累计请求。',
+  },
+  {
+    id: 'faq-4-mimo',
+    question: '小米 MiMo 支持哪些查询方式？',
+    answer:
+      '支持 API 按量和 Token Plan 两种模式。API 模式展示账户余额、累计消费、现金余额、赠送余额，以及历史消耗、输出、命中缓存和未命中缓存；Token Plan 模式展示套餐周期额度与订阅状态。',
   },
   {
     id: 'faq-5',

@@ -54,7 +54,7 @@ export const CapabilitiesSection: React.FC<CapabilitiesSectionProps> = ({
                 <span className="text-[#60A5FA] font-mono font-medium">DS</span>、
                 <span className="text-[#A78BFA] font-mono font-medium">GLM</span>、
                 <span className="text-[#FB923C] font-mono font-medium">VOL</span>、
-                <span className="text-[#34D399] font-mono font-medium">NEW</span>、<span className="text-[#22D3EE] font-mono font-medium">CMD</span>。进度条真实映射各供应商的有上限额度，余额健康状态精确显示，绝不伪造百分比。
+                <span className="text-[#34D399] font-mono font-medium">NEW</span>、<span className="text-[#22D3EE] font-mono font-medium">CMD</span>、<span className="text-[#00856F] font-mono font-medium">MIMO</span>。进度条真实映射各供应商的有上限额度，余额健康状态精确显示，绝不伪造百分比。
               </p>
             </div>
 
@@ -72,8 +72,14 @@ export const CapabilitiesSection: React.FC<CapabilitiesSectionProps> = ({
               <span className="px-2.5 py-1 rounded bg-[#1c2028] font-mono text-xs text-[#FB923C] font-semibold border border-white/5">
                 VOL 18%
               </span>
+              <span className="px-2.5 py-1 rounded bg-[#1c2028] font-mono text-xs text-[#34D399] font-semibold border border-white/5">
+                NEW $86.2
+              </span>
               <span className="px-2.5 py-1 rounded bg-[#1c2028] font-mono text-xs text-[#22D3EE] font-semibold border border-white/5">
                 CMD $42.8
+              </span>
+              <span className="px-2.5 py-1 rounded bg-[#1c2028] font-mono text-xs text-[#00856F] font-semibold border border-white/5">
+                MIMO ¥58.78
               </span>
             </div>
           </div>
