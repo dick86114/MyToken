@@ -1,0 +1,27 @@
+# Nginx / 宝塔面板站点配置示例
+server {
+    listen 80;
+    server_name yourdomain.com;
+    root /www/wwwroot/yourdomain.com; # 指向解压后的部署目录
+    index index.html index.php;
+
+    # 单页面应用 (SPA) 路由支持与静态文件处理
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 静态资源长期缓存与 Gzip
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 30d;
+        add_header Cache-Control "public, no-transform";
+        access_log off;
+    }
+
+    # PHP 脚本支持（如需通过 index.php 访问）
+    location ~ \.php$ {
+        include fastcgi_params;
+        fastcgi_pass 127.0.0.1:9000; # 或 unix:/run/php/php-fpm.sock;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+    }
+}

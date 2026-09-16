@@ -12,7 +12,6 @@ import ai.routin.mytoken.domain.model.UsageMetricUnit
 import ai.routin.mytoken.domain.model.UsageSnapshot
 import ai.routin.mytoken.domain.usage.RefreshStatus
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -179,26 +178,26 @@ class HomeScreenTest {
             }
         }
 
-        listOf("5 小时", "周", "月", "累计请求", "购买剩余", "赠送剩余").forEach {
+        listOf("5 小时", "周", "月", "累计请求").forEach {
             composeRule.onNodeWithText(it).assertIsDisplayed()
         }
         composeRule.onNodeWithText("额度单位：美元（USD）").assertDoesNotExist()
         composeRule.onNodeWithText("已用 \$24.11").assertIsDisplayed()
         composeRule.onNodeWithText("剩余 \$45.89").assertIsDisplayed()
-        composeRule.onAllNodesWithText("\$0.00", useUnmergedTree = true).assertCountEquals(2)
+        composeRule.onNodeWithText("购买剩余").assertDoesNotExist()
+        composeRule.onNodeWithText("赠送剩余").assertDoesNotExist()
         val requestTextResults = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
         composeRule.onNodeWithText("9.7K 次", useUnmergedTree = true)
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
                 action(requestTextResults)
             }
         assertEquals(1, requestTextResults.single().lineCount)
-        val request = composeRule.onNodeWithText("累计请求", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        val purchased = composeRule.onNodeWithText("购买剩余", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        val free = composeRule.onNodeWithText("赠送剩余", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        assertEquals(request.top, purchased.top)
-        assertEquals(purchased.top, free.top)
-        assertTrue(request.left < purchased.left)
-        assertTrue(purchased.left < free.left)
+        val requestLabel = composeRule.onNodeWithText("累计请求", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val requestValue = composeRule.onNodeWithText("9.7K 次", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val monthly = composeRule.onNodeWithText("月", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertTrue(kotlin.math.abs(requestLabel.top.value - requestValue.top.value) < 1f)
+        assertTrue(monthly.left < requestLabel.left)
+        assertTrue(requestLabel.left < requestValue.left)
     }
 
     @Test

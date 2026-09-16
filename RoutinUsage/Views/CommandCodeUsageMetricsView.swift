@@ -109,9 +109,25 @@ enum CommandCodeMetricFormatter {
     }
 }
 
+enum CommandCodeUsageMetricsDisplayMode: Equatable {
+    case card
+    case details
+}
+
 struct CommandCodeUsageMetricsView: View {
     let metrics: [NormalizedUsageMetric]
     let now: Date
+    let displayMode: CommandCodeUsageMetricsDisplayMode
+
+    init(
+        metrics: [NormalizedUsageMetric],
+        now: Date,
+        displayMode: CommandCodeUsageMetricsDisplayMode = .details
+    ) {
+        self.metrics = metrics
+        self.now = now
+        self.displayMode = displayMode
+    }
 
     private var layout: CommandCodeMetricLayout {
         CommandCodeMetricLayoutPolicy.layout(metrics: metrics)
@@ -126,10 +142,47 @@ struct CommandCodeUsageMetricsView: View {
 
             HStack(alignment: .top, spacing: 16) {
                 monthlyCell(layout.monthly)
-                summaryMetricsCell
+                switch displayMode {
+                case .card:
+                    requestCountSummaryCell(layout.requestCount)
+                case .details:
+                    summaryMetricsCell
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func requestCountSummaryCell(_ metric: NormalizedUsageMetric?) -> some View {
+        if let metric {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(metric.label.isEmpty ? "累计请求" : metric.label)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                Spacer(minLength: 12)
+                Text("\(numberText(metric.value)) 次")
+                    .font(.system(.headline, design: .rounded, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .monospacedDigit()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(
+                "\(metric.label)，\(numberText(metric.value)) 次"
+            )
+        } else {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text("累计请求")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                Spacer(minLength: 12)
+                Text("—")
+                    .font(.system(.headline, design: .rounded, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     private var summaryMetricsCell: some View {
