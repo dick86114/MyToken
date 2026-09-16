@@ -31,6 +31,15 @@ final class UpdateNotesAccessibilityTests: XCTestCase {
         )
     }
 
+    func test更新通知文案移除HTML标签并压缩空白() {
+        XCTAssertEqual(
+            UpdateNotesRenderer.notificationText(
+                notes: "<p>优化布局、修复安卓端若干 bug</p>\n<p>补充说明</p>"
+            ),
+            "优化布局、修复安卓端若干 bug 补充说明"
+        )
+    }
+
     func testHTML更新日志去除标签后再朗读() {
         XCTAssertEqual(
             UpdateNotesAccessibility.label(notes: "<p><strong>Full Changelog</strong>: https://example.com/releases</p>"),

@@ -2,6 +2,7 @@ package ai.routin.mytoken.feature.home
 
 import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.model.CredentialKind
+import ai.routin.mytoken.domain.model.CredentialMetadataKey
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
@@ -15,9 +16,12 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
 import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,6 +40,9 @@ class CommandCodeDetailScreenTest {
             providerId = ProviderId.CommandCode,
             credentialKind = CredentialKind.BearerApiKey,
             name = "邵",
+            metadata = mapOf(
+                CredentialMetadataKey.WebsiteURL to "https://commandcode.ai/",
+            ),
         )
         val metrics = listOf(
             metric("five-hour", "5 小时", "2.45", "14", "11.55"),
@@ -77,7 +84,7 @@ class CommandCodeDetailScreenTest {
             }
         }
 
-        listOf("5 小时", "周", "月", "购买剩余", "赠送剩余").forEach { label ->
+        listOf("5 小时", "周", "月", "购买剩余", "赠送剩余", "累计请求").forEach { label ->
             composeRule.onNodeWithText(label).assertIsDisplayed()
         }
         listOf("套餐状态", "订阅与周期", "账户与模型").forEach { label ->
@@ -86,6 +93,14 @@ class CommandCodeDetailScreenTest {
         listOf("有效", "周期订阅", "claude-sonnet-5").forEach { value ->
             composeRule.onNodeWithText(value).performScrollTo().assertIsDisplayed()
         }
+        composeRule.onNodeWithText("官网地址").performScrollTo().assertIsDisplayed()
+        val urlLayoutResults = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        composeRule.onNodeWithText("https://commandcode.ai/", useUnmergedTree = true)
+            .performScrollTo()
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
+                action(urlLayoutResults)
+            }
+        assertEquals(1, urlLayoutResults.single().lineCount)
     }
 
     private fun metric(

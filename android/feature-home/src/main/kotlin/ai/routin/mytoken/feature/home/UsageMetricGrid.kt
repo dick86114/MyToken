@@ -422,7 +422,12 @@ private fun MetricText(text: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-internal fun CommandCodeMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modifier, columns: Int = 2) {
+internal fun CommandCodeMetrics(
+    metrics: List<UsageMetric>,
+    modifier: Modifier = Modifier,
+    columns: Int = 2,
+    showsBalanceBreakdown: Boolean = true,
+) {
     val byId = metrics.associateBy(UsageMetric::id)
     val colors = statusColors()
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -435,14 +440,22 @@ internal fun CommandCodeMetrics(metrics: List<UsageMetric>, modifier: Modifier =
             verticalAlignment = Alignment.Top,
         ) {
             CommandCodeMonthlyMetric(byId["credit-progress"], colors, Modifier.weight(1f))
-            Row(
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.Top,
-            ) {
-                CommandCodeRequestMetric(byId["request-count"], Modifier.weight(1f))
-                CommandCodeValueMetric(byId["purchased-remaining"], "购买剩余", colors, Modifier.weight(1f))
-                CommandCodeValueMetric(byId["free-remaining"], "赠送剩余", colors, Modifier.weight(1f))
+            if (showsBalanceBreakdown) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    CommandCodeRequestMetric(byId["request-count"], Modifier.weight(1f))
+                    CommandCodeValueMetric(byId["purchased-remaining"], "购买剩余", colors, Modifier.weight(1f))
+                    CommandCodeValueMetric(byId["free-remaining"], "赠送剩余", colors, Modifier.weight(1f))
+                }
+            } else {
+                CommandCodeRequestMetric(
+                    metric = byId["request-count"],
+                    modifier = Modifier.weight(1f),
+                    horizontal = true,
+                )
             }
         }
     }
@@ -512,25 +525,61 @@ private fun CommandCodeMonthlyMetric(
 }
 
 @Composable
-private fun CommandCodeRequestMetric(metric: UsageMetric?, modifier: Modifier = Modifier) {
+private fun CommandCodeRequestMetric(
+    metric: UsageMetric?,
+    modifier: Modifier = Modifier,
+    horizontal: Boolean = false,
+) {
     if (metric == null) {
-        CommandCodePlaceholder("累计请求", modifier)
+        if (horizontal) {
+            Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "累计请求",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                Text("-", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            }
+        } else {
+            CommandCodePlaceholder("累计请求", modifier)
+        }
         return
     }
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text = metric.label.ifEmpty { "累计请求" },
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = "${formatCompact(metric.value)} 次",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Clip,
-        )
+    if (horizontal) {
+        Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = metric.label.ifEmpty { "累计请求" },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = "${formatCompact(metric.value)} 次",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+            )
+        }
+    } else {
+        Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = metric.label.ifEmpty { "累计请求" },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "${formatCompact(metric.value)} 次",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+            )
+        }
     }
 }
 

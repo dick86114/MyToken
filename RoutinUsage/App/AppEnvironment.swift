@@ -430,12 +430,10 @@ final class AppEnvironment {
         }
         defaults.set(update.version, forKey: deduplicationKey)
 
-        let notes = update.notes
-            .replacingOccurrences(of: "\n", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let notes = UpdateNotesRenderer.notificationText(notes: update.notes)
         let content = UNMutableNotificationContent()
         content.title = "MyToken 有新版本 v\(update.version)"
-        content.body = notes.isEmpty ? "打开 MyToken 查看更新内容。" : String(notes.prefix(100))
+        content.body = notes.isEmpty ? "打开 MyToken 查看更新内容。" : notes
 
         let request = UNNotificationRequest(
             identifier: "update-available-\(update.version)",

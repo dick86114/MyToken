@@ -27,6 +27,15 @@ enum UpdateNotesRenderer {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    static func notificationText(notes: String, maxLength: Int = 100) -> String {
+        let flattened = plainText(notes: notes)
+            .components(separatedBy: .newlines)
+            .joined(separator: " ")
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+        return String(flattened.prefix(maxLength))
+    }
+
     private static func htmlAttributedText(notes: String) -> NSAttributedString? {
         guard notes.contains("<"), notes.contains(">"),
               let data = notes.data(using: .utf8) else {

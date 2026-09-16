@@ -1,0 +1,65 @@
+<!doctype html>
+<html class="dark" lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MyToken - 在菜单栏看清每个 AI 账户的额度</title>
+    <meta name="description" content="本地运行的 macOS 菜单栏大模型用量与额度监控工具，支持 Routin、DeepSeek、GLM、火山方舟及 New API 凭证管理。" />
+    <meta property="og:title" content="MyToken - 在菜单栏看清每个 AI 账户的额度" />
+    <meta property="og:description" content="本地运行的 macOS 菜单栏大模型用量与额度监控工具，支持 Routin、DeepSeek、GLM、火山方舟及 New API 凭证管理。" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/png" href="/app-icon.png" />
+    <link rel="preconnect" href="https://fonts.loli.net" />
+    <link rel="preconnect" href="https://gstatic.loli.net" crossorigin />
+    <link href="https://fonts.loli.net/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script>
+      (function () {
+        try {
+          var globalObj = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : self);
+          if (!globalObj) return;
+
+          var origFetch = globalObj.fetch;
+          var currentFetch = typeof origFetch === 'function' ? origFetch.bind(globalObj) : origFetch;
+
+          // Define getter and setter on window to allow external scripts/proxies to reassign window.fetch safely
+          Object.defineProperty(globalObj, 'fetch', {
+            get: function () {
+              return currentFetch;
+            },
+            set: function (newFetch) {
+              currentFetch = newFetch;
+            },
+            configurable: true,
+            enumerable: true,
+          });
+
+          // Defensively suppress any uncaught errors related to window.fetch getter
+          globalObj.addEventListener(
+            'error',
+            function (event) {
+              if (
+                event &&
+                event.message &&
+                typeof event.message === 'string' &&
+                event.message.indexOf('Cannot set property fetch of') !== -1
+              ) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                return true;
+              }
+            },
+            true
+          );
+        } catch (e) {
+          // silently handle
+        }
+      })();
+    </script>
+  </head>
+  <body class="bg-[#0f131c] text-[#dfe2ee] antialiased selection:bg-[#438fff] selection:text-[#002959] min-h-screen relative overflow-x-hidden">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

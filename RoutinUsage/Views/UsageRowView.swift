@@ -374,7 +374,11 @@ private extension UsageRowView {
     func normalizedMetricsContent(snapshot: UsageSnapshot, now: Date) -> some View {
         if state.configuration.providerID == .commandCode {
             return AnyView(
-                CommandCodeUsageMetricsView(metrics: snapshot.normalizedMetrics, now: now)
+                CommandCodeUsageMetricsView(
+                    metrics: snapshot.normalizedMetrics,
+                    now: now,
+                    displayMode: .card
+                )
             )
         }
 

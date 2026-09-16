@@ -121,7 +121,7 @@ final class UsagePresentationPolicyTests: XCTestCase {
         XCTAssertTrue(lines.last?.highlights == true)
     }
 
-    func testCommandCode摘要指标同排显示且名称在上值在下() throws {
+    func testCommandCode摘要卡保留请求次数并改为左右布局() throws {
         let source = try String(
             contentsOf: URL(fileURLWithPath: #filePath)
                 .deletingLastPathComponent()
@@ -134,6 +134,9 @@ final class UsagePresentationPolicyTests: XCTestCase {
 
         XCTAssertFalse(source.contains("额度单位：美元（USD）"))
         XCTAssertTrue(source.contains("private var summaryMetricsCell: some View"))
+        XCTAssertTrue(source.contains("case .card:"))
+        XCTAssertTrue(source.contains("requestCountSummaryCell(layout.requestCount)"))
+        XCTAssertTrue(source.contains("case .details:"))
         XCTAssertTrue(source.contains("requestCountCell(layout.requestCount)"))
         XCTAssertTrue(source.contains("valueCell(layout.purchasedRemaining, fallbackLabel: \"购买剩余\")"))
         XCTAssertTrue(source.contains("valueCell(layout.freeRemaining, fallbackLabel: \"赠送剩余\")"))
