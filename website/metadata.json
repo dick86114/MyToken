@@ -1,6 +1,6 @@
 {
   "name": "MyToken",
-  "description": "本地运行的 macOS 菜单栏大模型用量与额度监控工具，支持 Routin、DeepSeek、GLM、火山方舟及 New API 凭证管理。",
+  "description": "本地运行的 macOS 菜单栏大模型用量与额度监控工具，支持 Routin、DeepSeek、GLM、火山方舟、New API、Command Code 及小米 MiMo 凭证管理。",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

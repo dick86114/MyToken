@@ -246,6 +246,27 @@ export const MATRIX_DATA: MatrixRow[] = [
     officialDocUrl: 'https://commandcode.ai',
     sampleEndpoint: 'https://api.commandcode.ai/alpha/billing/credits',
   },
+  {
+    provider: '小米 MiMo',
+    code: 'MIMO',
+    color: '#00856F',
+    credential: '网页 Cookie / serviceToken',
+    credentialFormat: 'api-platform_serviceToken=xxxxxxxx',
+    metrics: [
+      '账户余额 / 累计消费 / 现金余额 / 赠送余额',
+      '历史消耗 / 输出 / 命中缓存 / 未命中缓存',
+      'Token Plan 周期额度',
+      '订阅有效期与自动续费状态',
+    ],
+    exclusiveFeatures: [
+      'API 按量与 Token Plan 两种查询模式',
+      '支持直接粘贴 serviceToken 或完整 Cookie',
+      'API 指标采用两行四列卡片，Token 数值千分位显示',
+      '余额与订阅额度使用独立指标语义',
+    ],
+    officialDocUrl: 'https://platform.xiaomimimo.com',
+    sampleEndpoint: 'https://platform.xiaomimimo.com/api/v1/balance',
+  },
 ];
 
 export const FAQS: FaqItem[] = [

@@ -179,6 +179,9 @@ final class CredentialManagementModel {
         if configuration.providerID == .volcengine {
             return configuration.metadata["planType"] == "coding" ? "Coding Plan" : "Agent Plan"
         }
+        if configuration.providerID == .xiaomi {
+            return configuration.metadata["usageKind"] == "plan" ? "Token Plan" : "API 按量"
+        }
         switch configuration.credentialKind {
         case .bearerAPIKey:
             return configuration.providerID == .routin ? "Plan Key" : "Bearer Token"

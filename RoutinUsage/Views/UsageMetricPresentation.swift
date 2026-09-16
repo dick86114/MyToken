@@ -88,6 +88,8 @@ enum ProviderTheme {
             return .purple
         case .commandCode:
             return .teal
+        case .xiaomi:
+            return .mint
         }
     }
 

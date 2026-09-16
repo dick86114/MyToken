@@ -51,7 +51,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
         {/* Subheadline */}
         <p className="font-body-large text-[#c1c6d7] max-w-3xl mx-auto mb-8 leading-relaxed">
-          MyToken 是本地运行的 macOS 菜单栏用量监控工具，并提供 Android 伴侣应用。一次配置 Routin、DeepSeek、GLM、火山方舟、New API 或 Command Code 凭证，即可分别查看套餐周期、5 小时/周限额、月度额度、Token 资源包、余额、购买/赠送剩余、调用次数、重置时间和账户状态。
+          MyToken 是本地运行的 macOS 菜单栏用量监控工具，并提供 Android 伴侣应用。一次配置 Routin、DeepSeek、GLM、火山方舟、New API、Command Code 或小米 MiMo 凭证，即可分别查看套餐周期、5 小时/周限额、月度额度、Token 资源包、余额、购买/赠送剩余、调用次数、重置时间和账户状态。
         </p>
 
         {/* Primary & Secondary CTAs */}

@@ -41,7 +41,7 @@ export const ProviderMatrixSection: React.FC = () => {
               Provider Matrix
             </span>
             <h2 className="font-headline-section text-[#F8FAFC] tracking-tight">
-              内置六大供应商矩阵与深度适配
+              内置七大供应商矩阵与深度适配
             </h2>
             <p className="font-body-large text-[#c1c6d7] mt-3">
               针对主流 AI 基础模型服务与中转协议定制解析规则，同时展示套餐周期、剩余额度和账户状态。

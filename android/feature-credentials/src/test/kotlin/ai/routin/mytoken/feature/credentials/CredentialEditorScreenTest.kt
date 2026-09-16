@@ -81,6 +81,7 @@ class CredentialEditorScreenTest {
                     onRegionChange = viewModel::setRegion,
                     onBaseURLChange = viewModel::setBaseURL,
                     onUserIDChange = viewModel::setUserID,
+                    onXiaomiUsageKindChange = viewModel::setXiaomiUsageKind,
                     onWebsiteURLChange = viewModel::setWebsiteURL,
                     onToggleSecretVisible = viewModel::toggleSecretVisible,
                     onTestConnection = viewModel::testConnection,

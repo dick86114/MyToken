@@ -205,6 +205,7 @@ fun CredentialDetailScreen(
             if (card.credential.providerId == ai.routin.mytoken.domain.model.ProviderId.Routin ||
                 card.credential.providerId == ai.routin.mytoken.domain.model.ProviderId.Volcengine ||
                 card.credential.providerId == ai.routin.mytoken.domain.model.ProviderId.CommandCode
+                || card.credential.providerId == ai.routin.mytoken.domain.model.ProviderId.Xiaomi
             ) {
                 PlanDetailsSection(card)
             } else if (card.credential.providerId == ai.routin.mytoken.domain.model.ProviderId.Glm ||
@@ -436,12 +437,16 @@ private fun planName(card: CredentialCardUi): String {
             if (card.credential.metadata[CredentialMetadataKey.PlanType] == "coding") "Coding Plan" else "Agent Plan"
         ai.routin.mytoken.domain.model.ProviderId.NewAPI -> "API 额度"
         ai.routin.mytoken.domain.model.ProviderId.CommandCode -> "Command Code"
+        ai.routin.mytoken.domain.model.ProviderId.Xiaomi ->
+            if (card.credential.metadata[CredentialMetadataKey.UsageKind] == "plan") "Token Plan" else "API 按量"
     }
 }
 
 private fun usageType(kind: String?): String = when (kind) {
     "periodic" -> "周期订阅"
     "tokenPack" -> "Token 资源包"
+    "api" -> "API 按量"
+    "plan" -> "Token Plan"
     "balance" -> "余额查询"
     "codingPlan" -> "Coding Plan"
     "agentPlan" -> "Agent Plan"
@@ -468,6 +473,11 @@ private fun metadataLabel(key: CredentialMetadataKey): String = when (key) {
 
 private fun metadataValue(key: CredentialMetadataKey, value: String): String = when (key) {
     CredentialMetadataKey.PlanType -> if (value == "coding") "Coding Plan" else "Agent Plan"
-    CredentialMetadataKey.UsageKind -> if (value == "tokenPack") "Token 资源包" else value
+    CredentialMetadataKey.UsageKind -> when (value) {
+        "tokenPack" -> "Token 资源包"
+        "api" -> "API 按量"
+        "plan" -> "Token Plan"
+        else -> value
+    }
     else -> value
 }

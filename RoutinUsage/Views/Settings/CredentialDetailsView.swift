@@ -16,6 +16,10 @@ struct CredentialDetailsView: View {
                    state.configuration.providerID == .volcengine ||
                    state.configuration.providerID == .commandCode {
                     planDetails
+                } else if state.configuration.providerID == .xiaomi {
+                    // 小米 API 模式同样展示账户/消费明细，Plan 模式额外展示订阅周期。
+                    // planDetails 中的字段均为可选，缺失时显示“接口未返回”。
+                    planDetails
                 } else if state.configuration.providerID == .glm || state.configuration.providerID == .deepseek {
                     modelDetails
                 }
@@ -370,7 +374,12 @@ struct CredentialDetailsView: View {
         case "planType":
             return value == "coding" ? "Coding Plan" : "Agent Plan"
         case "usageKind":
-            return value == "tokenPack" ? "Token 资源包" : value
+            switch value {
+            case "tokenPack": return "Token 资源包"
+            case "api": return "API 按量"
+            case "plan": return "Token Plan"
+            default: return value
+            }
         default:
             return value
         }

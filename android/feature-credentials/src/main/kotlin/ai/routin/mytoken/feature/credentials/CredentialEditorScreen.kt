@@ -66,6 +66,7 @@ fun CredentialEditorScreen(
     onRegionChange: (String) -> Unit,
     onBaseURLChange: (String) -> Unit,
     onUserIDChange: (String) -> Unit,
+    onXiaomiUsageKindChange: (String) -> Unit,
     onWebsiteURLChange: (String) -> Unit,
     onToggleSecretVisible: () -> Unit,
     onTestConnection: () -> Unit,
@@ -148,7 +149,40 @@ fun CredentialEditorScreen(
                     .testTag("editor_name"),
             )
 
-            when (state.credentialKind) {
+            if (state.providerId == ProviderId.Xiaomi) {
+                Text(
+                    text = "查询方式",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    listOf("api" to "API 按量", "plan" to "Token Plan").forEach { (value, label) ->
+                        FilterChip(
+                            selected = state.xiaomiUsageKind == value,
+                            onClick = { onXiaomiUsageKindChange(value) },
+                            label = { Text(label) },
+                            colors = glassFilterChipColors(selected = state.xiaomiUsageKind == value),
+                            border = glassFilterChipBorder(selected = state.xiaomiUsageKind == value),
+                        )
+                    }
+                }
+                SecretField(
+                    label = "网页 Cookie 或 serviceToken",
+                    value = state.apiKey,
+                    onValueChange = onApiKeyChange,
+                    isVisible = state.isSecretVisible,
+                    onToggleVisible = onToggleSecretVisible,
+                    testTag = "editor_api_key",
+                )
+                Text(
+                    text = "登录 platform.xiaomimimo.com 后复制 Cookie；也可只粘贴 api-platform_serviceToken 的值。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else when (state.credentialKind) {
                 CredentialKind.BearerApiKey -> SecretField(
                     label = "API Key（Bearer Token）",
                     value = state.apiKey,

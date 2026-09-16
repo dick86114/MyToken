@@ -33,6 +33,8 @@ enum UsageMetricGridPolicy {
             return UsageMetricGridLayout(metrics: metrics, columns: 2)
         case .commandCode:
             return UsageMetricGridLayout(metrics: metrics, columns: 2)
+        case .xiaomi:
+            return UsageMetricGridLayout(metrics: metrics, columns: 2)
         }
     }
 }
@@ -245,9 +247,6 @@ private struct NormalizedUsageMetricCell: View {
                     .foregroundStyle(healthColor)
                     .monospacedDigit()
             }
-            Text("账户余额")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)

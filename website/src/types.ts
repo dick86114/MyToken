@@ -1,4 +1,4 @@
-export type ProviderType = 'ROU' | 'DS' | 'GLM' | 'VOL' | 'NEW' | 'CMD';
+export type ProviderType = 'ROU' | 'DS' | 'GLM' | 'VOL' | 'NEW' | 'CMD' | 'MIMO';
 
 export interface ProviderItem {
   id: string;

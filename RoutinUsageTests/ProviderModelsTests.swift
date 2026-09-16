@@ -54,7 +54,10 @@ final class ProviderModelsTests: XCTestCase {
     func test首期供应商描述包含简称凭证类型和能力() {
         let descriptors = ProviderRegistry.builtInDescriptors
 
-        XCTAssertEqual(descriptors.map(\.id), [.routin, .deepseek, .glm, .volcengine, .newAPI, .commandCode])
+        XCTAssertEqual(
+            descriptors.map(\.id),
+            [.routin, .deepseek, .glm, .volcengine, .newAPI, .commandCode, .xiaomi]
+        )
         XCTAssertEqual(descriptors.first(where: { $0.id == .deepseek })?.shortCode, "DS")
         XCTAssertEqual(descriptors.first(where: { $0.id == .glm })?.shortCode, "GLM")
         XCTAssertEqual(descriptors.first(where: { $0.id == .volcengine })?.shortCode, "VOL")
@@ -64,6 +67,9 @@ final class ProviderModelsTests: XCTestCase {
         XCTAssertTrue(descriptors.first(where: { $0.id == .newAPI })?.capabilities.contains(.balance) == true)
         XCTAssertEqual(descriptors.first(where: { $0.id == .commandCode })?.shortCode, "CMD")
         XCTAssertTrue(descriptors.first(where: { $0.id == .commandCode })?.capabilities.contains(.quotaWindow) == true)
+        XCTAssertEqual(descriptors.first(where: { $0.id == .xiaomi })?.shortCode, "MIMO")
+        XCTAssertTrue(descriptors.first(where: { $0.id == .xiaomi })?.capabilities.contains(.balance) == true)
+        XCTAssertTrue(descriptors.first(where: { $0.id == .xiaomi })?.capabilities.contains(.quotaWindow) == true)
     }
 
     func test旧KeyConfiguration默认映射为Routin凭证() throws {

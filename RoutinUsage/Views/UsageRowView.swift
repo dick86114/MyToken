@@ -179,7 +179,8 @@ private extension UsageRowView {
                         if let metric = state.snapshot?.normalizedMetrics.first,
                            metric.presentation != .progress,
                            state.configuration.providerID != .deepseek,
-                           state.configuration.providerID != .newAPI {
+                           state.configuration.providerID != .newAPI,
+                           state.configuration.providerID != .xiaomi {
                             normalizedHeaderMetric(metric)
                         }
 
@@ -372,6 +373,12 @@ private extension UsageRowView {
     }
 
     func normalizedMetricsContent(snapshot: UsageSnapshot, now: Date) -> some View {
+        if state.configuration.providerID == .xiaomi,
+           state.configuration.metadata["usageKind"] != "plan" {
+            return AnyView(
+                XiaomiAPIMetricsView(metrics: snapshot.normalizedMetrics)
+            )
+        }
         if state.configuration.providerID == .commandCode {
             return AnyView(
                 CommandCodeUsageMetricsView(

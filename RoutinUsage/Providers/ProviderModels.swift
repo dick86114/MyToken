@@ -7,6 +7,7 @@ enum ProviderID: String, Codable, CaseIterable, Identifiable, Sendable {
     case volcengine
     case newAPI
     case commandCode
+    case xiaomi
 
     var id: String { rawValue }
 }

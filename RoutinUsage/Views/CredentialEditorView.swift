@@ -20,6 +20,7 @@ enum CredentialEditorValidation {
         planType: String = "agent",
         newAPIBaseURL: String = "",
         newAPIUserID: String = "",
+        xiaomiUsageKind: String = "api",
         websiteURL: String = ""
     ) throws -> ValidatedCredentialInput {
         let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -119,6 +120,28 @@ enum CredentialEditorValidation {
                 secret: secret,
                 metadata: websiteMetadata
             )
+        case .xiaomi:
+            let cookie = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !cookie.isEmpty else { throw UsageStoreError.invalidSecret }
+            let usageKind = xiaomiUsageKind.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard usageKind == "api" || usageKind == "plan" else {
+                throw UsageStoreError.invalidSecret
+            }
+            var metadata = ["usageKind": usageKind]
+            let threshold = balanceWarningThreshold.trimmingCharacters(in: .whitespacesAndNewlines)
+            if usageKind == "api", !threshold.isEmpty {
+                guard Decimal(string: threshold) != nil else {
+                    throw UsageStoreError.invalidSecret
+                }
+                metadata["balanceWarningThreshold"] = threshold
+            }
+            return ValidatedCredentialInput(
+                providerID: .xiaomi,
+                credentialKind: .bearerAPIKey,
+                name: normalizedName,
+                secret: cookie,
+                metadata: metadata.merging(websiteMetadata) { current, _ in current }
+            )
         }
     }
 
@@ -148,6 +171,7 @@ struct CredentialEditorView: View {
     let initialName: String
     let initialSecret: String
     let initialMetadata: [String: String]
+    let xiaomiWebSession: XiaomiWebSession?
     let save: @MainActor (ValidatedCredentialInput) async throws -> KeyEditorSaveResult
     let onSaved: @MainActor () -> Void
     let onClose: () -> Void
@@ -163,9 +187,11 @@ struct CredentialEditorView: View {
     @State private var planType: String
     @State private var newAPIBaseURL: String
     @State private var newAPIUserID: String
+    @State private var xiaomiUsageKind: String
     @State private var websiteURL: String
     @State private var isSecretVisible = false
     @State private var isSaving = false
+    @State private var showsXiaomiLogin = false
     @State private var errorMessage: String?
 
     init(
@@ -174,6 +200,7 @@ struct CredentialEditorView: View {
         initialName: String = "",
         initialSecret: String = "",
         initialMetadata: [String: String] = [:],
+        xiaomiWebSession: XiaomiWebSession? = nil,
         save: @escaping @MainActor (ValidatedCredentialInput) async throws -> KeyEditorSaveResult,
         onSaved: @escaping @MainActor () -> Void = {},
         onClose: @escaping () -> Void = {}
@@ -183,6 +210,7 @@ struct CredentialEditorView: View {
         self.initialName = initialName
         self.initialSecret = initialSecret
         self.initialMetadata = initialMetadata
+        self.xiaomiWebSession = xiaomiWebSession
         self.save = save
         self.onSaved = onSaved
         self.onClose = onClose
@@ -196,6 +224,7 @@ struct CredentialEditorView: View {
         _planType = State(initialValue: initialMetadata["planType"] ?? "agent")
         _newAPIBaseURL = State(initialValue: initialMetadata["baseURL"] ?? "")
         _newAPIUserID = State(initialValue: initialMetadata["userID"] ?? "")
+        _xiaomiUsageKind = State(initialValue: initialMetadata["usageKind"] ?? "api")
         _websiteURL = State(initialValue: initialMetadata["websiteURL"] ?? "")
     }
 
@@ -297,6 +326,54 @@ struct CredentialEditorView: View {
                         .accessibilityLabel(isSecretVisible ? "隐藏 SecretAccessKey" : "显示 SecretAccessKey")
                     }
                     TextField("区域", text: $region)
+                } else if providerID == .xiaomi {
+                    Picker("查询方式", selection: $xiaomiUsageKind) {
+                        Text("API 按量").tag("api")
+                        Text("Token Plan").tag("plan")
+                    }
+                    HStack(spacing: 8) {
+                        if isSecretVisible {
+                            TextField("网页 Cookie 或 serviceToken", text: $apiKey)
+                                .frame(minWidth: 360)
+                        } else {
+                            SecureField("网页 Cookie 或 serviceToken", text: $apiKey)
+                                .frame(minWidth: 360)
+                        }
+                        Button {
+                            isSecretVisible.toggle()
+                        } label: {
+                            Image(systemName: CredentialVisibility.iconName(isVisible: isSecretVisible))
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(CredentialVisibility.canToggle(secret: apiKey) ? .primary : .tertiary)
+                        .disabled(!CredentialVisibility.canToggle(secret: apiKey))
+                        .help(isSecretVisible ? "隐藏 Cookie" : "显示 Cookie")
+                        .accessibilityLabel(isSecretVisible ? "隐藏 Cookie" : "显示 Cookie")
+                    }
+                    HStack(spacing: 8) {
+                        Text("登录 platform.xiaomimimo.com 后复制 Cookie；也可只粘贴 api-platform_serviceToken 的值。")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Spacer(minLength: 8)
+                        Button("登录并获取 Cookie") {
+                            showsXiaomiLogin = true
+                        }
+                        .buttonStyle(.borderless)
+                        .disabled(xiaomiWebSession == nil)
+                        Button("打开控制台") {
+                            if let url = URL(string: "https://platform.xiaomimimo.com/console/balance") {
+                                openURL(url)
+                            }
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                    if xiaomiUsageKind == "api" {
+                        HStack(spacing: 8) {
+                            TextField("低余额预警值（可选）", text: $balanceWarningThreshold)
+                            Text("元")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 } else {
                     HStack(spacing: 8) {
                         if isSecretVisible {
@@ -370,6 +447,18 @@ struct CredentialEditorView: View {
                 isSecretVisible = false
             }
         }
+        .sheet(isPresented: $showsXiaomiLogin) {
+            if let xiaomiWebSession {
+                XiaomiLoginWindow(
+                    session: xiaomiWebSession,
+                    onCaptured: { cookie in
+                        apiKey = cookie
+                        showsXiaomiLogin = false
+                    },
+                    onClose: { showsXiaomiLogin = false }
+                )
+            }
+        }
     }
 
     private func submit() async {
@@ -386,6 +475,7 @@ struct CredentialEditorView: View {
                 planType: planType,
                 newAPIBaseURL: newAPIBaseURL,
                 newAPIUserID: newAPIUserID,
+                xiaomiUsageKind: xiaomiUsageKind,
                 websiteURL: websiteURL
             )
             isSaving = true

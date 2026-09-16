@@ -71,8 +71,9 @@ UUID 字段在 JSON 中为大写带连字符字符串；Java 端发送/比较时
 
 - `schemaVersion` 恒为 1。
 - `credentials[].credentialId`：UUID 大写字符串；`providerId` ∈
-  {routin, deepseek, glm, volcengine, newAPI, commandCode}；`credentialKind` ∈
+  {routin, deepseek, glm, volcengine, newAPI, commandCode, xiaomi}；`credentialKind` ∈
   {bearerAPIKey, apiKey, accessKeyPair}。
+  `xiaomi` 使用 `usageKind` 区分 `api` 与 `plan` 两种查询模式。
 - `metadata` 白名单键：`baseURL, userID, region, planType, usageKind,
   websiteURL`；其余键拒绝。
 - `preferences`：`refreshIntervalMinutes` ∈ {1,5,15,30}；`alertThresholds`

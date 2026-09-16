@@ -5,6 +5,7 @@ import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -209,6 +210,78 @@ fun UsageMetricGrid(
                 repeat(columns - row.size) { Spacer(modifier = Modifier.weight(1f)) }
             }
         }
+    }
+}
+
+
+@Composable
+internal fun XiaomiAPIMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modifier) {
+    val byID = metrics.associateBy(UsageMetric::id)
+    val accountOrder = listOf("account-balance", "total-consumption", "cash-balance", "gift-balance")
+    val tokenOrder = listOf("total-tokens", "output-tokens", "cache-tokens", "input-tokens")
+
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val columns = if (maxWidth >= 620.dp) 4 else 2
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            XiaomiMetricRows(accountOrder, byID, columns)
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(
+                    text = "Token",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                XiaomiMetricRows(tokenOrder, byID, columns)
+            }
+        }
+    }
+}
+
+@Composable
+private fun XiaomiMetricRows(
+    order: List<String>,
+    byID: Map<String, UsageMetric>,
+    columns: Int,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        order.chunked(columns).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                row.forEach { id ->
+                    XiaomiMetricCell(byID[id], Modifier.weight(1f))
+                }
+                repeat(columns - row.size) { Spacer(modifier = Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun XiaomiMetricCell(metric: UsageMetric?, modifier: Modifier = Modifier) {
+    val colors = statusColors()
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(
+            text = metric?.label ?: "-",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = when {
+                metric == null -> "-"
+                metric.unit == ai.routin.mytoken.domain.model.UsageMetricUnit.Currency -> formatCurrency(metric.value, metric.currencyCode)
+                else -> formatGrouped(metric.value)
+            },
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = if (metric?.presentation == ai.routin.mytoken.domain.model.UsageMetricPresentation.Balance) {
+                statusColor(metric, null, colors)
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
