@@ -357,6 +357,7 @@ fun MyTokenApp(
                         onRegionChange = editorViewModel::setRegion,
                         onBaseURLChange = editorViewModel::setBaseURL,
                         onUserIDChange = editorViewModel::setUserID,
+                        onXiaomiUsageKindChange = editorViewModel::setXiaomiUsageKind,
                         onWebsiteURLChange = editorViewModel::setWebsiteURL,
                         onToggleSecretVisible = editorViewModel::toggleSecretVisible,
                         onTestConnection = editorViewModel::testConnection,

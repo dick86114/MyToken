@@ -32,7 +32,7 @@ export const Footer: React.FC = () => {
             <span className="font-semibold text-white text-base">MyToken</span>
           </div>
           <p className="text-xs text-[#64748B] leading-relaxed">
-            本地运行的 macOS 菜单栏与 Android 大模型用量监控工具，支持 Routin、DeepSeek、GLM、火山方舟、New API 及 Command Code 凭证管理。
+            本地运行的 macOS 菜单栏与 Android 大模型用量监控工具，支持 Routin、DeepSeek、GLM、火山方舟、New API、Command Code 及小米 MiMo 凭证管理。
           </p>
 
           <div className="flex items-center gap-3 text-[11px] font-mono text-[#10B981]">

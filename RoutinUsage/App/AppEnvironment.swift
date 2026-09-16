@@ -64,6 +64,7 @@ final class AppEnvironment {
     let codexGroupDetection: CodexGroupDetectionService
     let providerRegistry: ProviderRegistry?
     let routinWebSession: RoutinWebSession?
+    let xiaomiWebSession: XiaomiWebSession?
     var showsOnboarding = false
     private(set) var updateStatus: AppUpdateStatus = .idle
     private(set) var releaseHistoryState: AppReleaseHistoryState = .idle
@@ -105,6 +106,7 @@ final class AppEnvironment {
         routinCheckIn: RoutinCheckInService? = nil,
         codexGroupDetection: CodexGroupDetectionService? = nil,
         routinWebSession: RoutinWebSession? = nil,
+        xiaomiWebSession: XiaomiWebSession? = nil,
         providerRegistry: ProviderRegistry? = nil
     ) {
         self.settings = settings
@@ -123,6 +125,7 @@ final class AppEnvironment {
             ?? UpdateCheckScheduler(interval: 3_600)
         self.notificationTaskYield = notificationTaskYield
         self.routinWebSession = routinWebSession
+        self.xiaomiWebSession = xiaomiWebSession
         self.providerRegistry = providerRegistry
         self.routinCheckIn = routinCheckIn ?? RoutinCheckInService(session: UnavailableRoutinWebSession())
         self.codexGroupDetection = codexGroupDetection ?? CodexGroupDetectionService(
@@ -163,6 +166,7 @@ final class AppEnvironment {
             sender: UserNotificationSender()
         )
         let routinWebSession = RoutinWebSession()
+        let xiaomiWebSession = XiaomiWebSession()
         let routinCheckIn = RoutinCheckInService(session: routinWebSession)
         let codexGroupDetection = CodexGroupDetectionService(
             webSession: RoutinGroupDetectionWebSession(session: routinWebSession),
@@ -175,7 +179,8 @@ final class AppEnvironment {
             GLMUsageProvider(session: .shared),
             VolcenginePlanUsageProvider(session: .shared),
             NewAPIUsageProvider(session: .shared),
-            CommandCodeUsageProvider(session: .shared)
+            CommandCodeUsageProvider(session: .shared),
+            XiaomiMiMoUsageProvider(session: .shared)
         ])
         routinWebSession.onLoginCompleted = {
             Task { @MainActor in
@@ -227,8 +232,9 @@ final class AppEnvironment {
             logWriter: logWriter,
             routinCheckIn: routinCheckIn,
             codexGroupDetection: codexGroupDetection,
-            routinWebSession: routinWebSession
-            ,providerRegistry: providerRegistry
+            routinWebSession: routinWebSession,
+            xiaomiWebSession: xiaomiWebSession,
+            providerRegistry: providerRegistry
         )
     }
 

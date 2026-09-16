@@ -1,5 +1,86 @@
 import SwiftUI
 
+struct XiaomiAPIMetricsView: View {
+    let metrics: [NormalizedUsageMetric]
+
+    private let accountIDs = [
+        "account-balance",
+        "total-consumption",
+        "cash-balance",
+        "gift-balance"
+    ]
+    private let tokenIDs = [
+        "total-tokens",
+        "output-tokens",
+        "cache-tokens",
+        "input-tokens"
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            metricRow(accountIDs)
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Token")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                metricRow(tokenIDs)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func metricRow(_ ids: [String]) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            ForEach(ids, id: \.self) { id in
+                metricCell(metrics.first(where: { $0.id == id }))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private func metricCell(_ metric: NormalizedUsageMetric?) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(metric?.label ?? "—")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Text(valueText(metric))
+                .font(.system(.headline, design: .rounded, weight: .semibold))
+                .foregroundStyle(color(metric?.healthState))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(metric?.label ?? "—")，\(valueText(metric))")
+    }
+
+    private func valueText(_ metric: NormalizedUsageMetric?) -> String {
+        guard let metric else { return "—" }
+        switch metric.unit {
+        case .currency:
+            return UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode)
+        case .token:
+            return UsageFormatter.exactTokenText(metric.value)
+        case .request:
+            return "\(UsageFormatter.numberText(metric.value, grouping: true)) 次"
+        case .boolean, .text:
+            return UsageFormatter.numberText(metric.value, grouping: true)
+        }
+    }
+
+    private func color(_ healthState: UsageMetricHealthState?) -> Color {
+        switch healthState {
+        case .normal: return .green
+        case .warning: return .orange
+        case .critical, .unavailable: return .red
+        case .stale, .unknown: return .secondary
+        case nil: return .secondary
+        }
+    }
+}
+
 struct VolcengineCodingPlanMetricsView: View {
     let metrics: [NormalizedUsageMetric]
     let now: Date

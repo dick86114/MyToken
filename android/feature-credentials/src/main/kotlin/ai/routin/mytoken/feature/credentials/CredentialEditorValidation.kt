@@ -38,6 +38,7 @@ object CredentialEditorValidation {
         val region: String = "",
         val newAPIBaseURL: String = "",
         val newAPIUserID: String = "",
+        val xiaomiUsageKind: String = "api",
         val websiteURL: String = "",
     )
 
@@ -121,6 +122,20 @@ object CredentialEditorValidation {
                     name = normalizedName,
                     secret = CredentialSecret.BearerToken(secret),
                     metadata = websiteMetadata,
+                )
+            }
+            ProviderId.Xiaomi -> {
+                val cookie = fields.apiKey.trim()
+                if (cookie.isEmpty()) throw CredentialValidationException("请输入网页 Cookie")
+                val usageKind = fields.xiaomiUsageKind.trim().lowercase()
+                if (usageKind !in setOf("api", "plan")) {
+                    throw CredentialValidationException("请选择有效的查询方式")
+                }
+                ValidatedCredentialInput(
+                    credentialKind = CredentialKind.BearerApiKey,
+                    name = normalizedName,
+                    secret = CredentialSecret.BearerToken(cookie),
+                    metadata = mapOf(CredentialMetadataKey.UsageKind to usageKind) + websiteMetadata,
                 )
             }
         }

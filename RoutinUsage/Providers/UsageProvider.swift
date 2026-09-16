@@ -126,6 +126,16 @@ struct ProviderRegistry: Sendable {
             credentialSchemas: [
                 .bearerAPIKey: [CredentialField(id: "secret", label: "API Key", isSecret: true)]
             ]
+        ),
+        ProviderDescriptor(
+            id: .xiaomi,
+            displayName: "小米 MiMo",
+            shortCode: "MIMO",
+            iconName: "cpu",
+            capabilities: [.quotaWindow, .balance, .tokenUsage, .resetTime, .planDetection],
+            credentialSchemas: [
+                .bearerAPIKey: [CredentialField(id: "secret", label: "网页 Cookie", isSecret: true)]
+            ]
         )
     ]
 }

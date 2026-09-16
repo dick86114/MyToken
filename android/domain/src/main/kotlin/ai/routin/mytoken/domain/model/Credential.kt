@@ -9,7 +9,8 @@ enum class ProviderId(val rawValue: String) {
     Glm("glm"),
     Volcengine("volcengine"),
     NewAPI("newAPI"),
-    CommandCode("commandCode");
+    CommandCode("commandCode"),
+    Xiaomi("xiaomi");
 
     companion object {
         fun fromRawValue(value: String): ProviderId? = entries.firstOrNull { it.rawValue == value }

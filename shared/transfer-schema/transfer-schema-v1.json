@@ -20,7 +20,7 @@
       "properties": {
         "schemaVersion": { "const": 1 },
         "credentialId": { "type": "string", "format": "uuid" },
-        "providerId": { "enum": ["routin", "deepseek", "glm", "volcengine", "newAPI", "commandCode"] },
+        "providerId": { "enum": ["routin", "deepseek", "glm", "volcengine", "newAPI", "commandCode", "xiaomi"] },
         "credentialKind": { "enum": ["bearerAPIKey", "apiKey", "accessKeyPair"] },
         "name": { "type": "string" },
         "isEnabled": { "type": "boolean" },
@@ -33,7 +33,7 @@
             "userID": { "type": "string" },
             "region": { "type": "string" },
             "planType": { "enum": ["personal", "coding"] },
-            "usageKind": { "enum": ["periodic", "tokenPack"] },
+            "usageKind": { "enum": ["periodic", "tokenPack", "api", "plan"] },
             "websiteURL": { "type": "string", "format": "uri" }
           }
         }

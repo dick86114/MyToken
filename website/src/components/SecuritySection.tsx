@@ -102,7 +102,7 @@ export const SecuritySection: React.FC = () => {
                 Direct Provider Endpoints
               </span>
               <span className="mt-2 px-2 py-0.5 rounded-full bg-[#38BDF8]/15 text-[#38BDF8] font-mono text-[10px]">
-                Routin / DeepSeek / GLM / 火山 / New API / CMD
+                Routin / DeepSeek / GLM / 火山 / New API / CMD / 小米 MiMo
               </span>
             </div>
           </div>

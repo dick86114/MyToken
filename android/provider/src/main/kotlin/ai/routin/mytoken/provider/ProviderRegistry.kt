@@ -9,6 +9,7 @@ import ai.routin.mytoken.provider.http.JavaHttpTransport
 import ai.routin.mytoken.provider.newapi.NewAPIUsageProvider
 import ai.routin.mytoken.provider.routin.RoutinUsageProvider
 import ai.routin.mytoken.provider.volcengine.VolcengineUsageProvider
+import ai.routin.mytoken.provider.xiaomi.XiaomiUsageProvider
 
 /**
  * Builds the production provider registry with a shared Android HTTP transport.
@@ -24,5 +25,6 @@ fun defaultUsageProviders(): Map<ProviderId, UsageProvider> {
         ProviderId.Volcengine to VolcengineUsageProvider(transport),
         ProviderId.NewAPI to NewAPIUsageProvider(transport),
         ProviderId.CommandCode to CommandCodeUsageProvider(transport),
+        ProviderId.Xiaomi to XiaomiUsageProvider(transport),
     )
 }

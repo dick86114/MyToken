@@ -36,6 +36,7 @@ class CredentialEditorAdaptiveTest {
                     onRegionChange = {},
                     onBaseURLChange = {},
                     onUserIDChange = {},
+                    onXiaomiUsageKindChange = {},
                     onWebsiteURLChange = {},
                     onToggleSecretVisible = {},
                     onTestConnection = {},

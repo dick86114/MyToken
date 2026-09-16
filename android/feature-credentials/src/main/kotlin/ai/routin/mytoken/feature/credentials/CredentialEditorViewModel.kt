@@ -32,6 +32,7 @@ data class CredentialEditorUiState(
     val region: String = "",
     val baseURL: String = "",
     val userID: String = "",
+    val xiaomiUsageKind: String = "api",
     val websiteURL: String = "",
     val isSecretVisible: Boolean = false,
     val isSaving: Boolean = false,
@@ -86,6 +87,7 @@ class CredentialEditorViewModel(
                     region = existing.metadata[CredentialMetadataKey.Region].orEmpty(),
                     baseURL = existing.metadata[CredentialMetadataKey.BaseURL].orEmpty(),
                     userID = existing.metadata[CredentialMetadataKey.UserID].orEmpty(),
+                    xiaomiUsageKind = existing.metadata[CredentialMetadataKey.UsageKind] ?: "api",
                     websiteURL = existing.metadata[CredentialMetadataKey.WebsiteURL].orEmpty(),
                 )
             }
@@ -127,6 +129,7 @@ class CredentialEditorViewModel(
     fun setRegion(value: String) = _state.update { it.copy(region = value) }
     fun setBaseURL(value: String) = _state.update { it.copy(baseURL = value) }
     fun setUserID(value: String) = _state.update { it.copy(userID = value) }
+    fun setXiaomiUsageKind(value: String) = _state.update { it.copy(xiaomiUsageKind = value) }
     fun setWebsiteURL(value: String) = _state.update { it.copy(websiteURL = value) }
 
     fun toggleSecretVisible() {
@@ -220,6 +223,7 @@ class CredentialEditorViewModel(
             region = s.region,
             newAPIBaseURL = s.baseURL,
             newAPIUserID = s.userID,
+            xiaomiUsageKind = s.xiaomiUsageKind,
             websiteURL = s.websiteURL,
         )
     }
@@ -228,5 +232,6 @@ class CredentialEditorViewModel(
         ProviderId.Routin, ProviderId.NewAPI, ProviderId.CommandCode -> CredentialKind.BearerApiKey
         ProviderId.DeepSeek, ProviderId.Glm -> CredentialKind.ApiKey
         ProviderId.Volcengine -> CredentialKind.AccessKeyPair
+        ProviderId.Xiaomi -> CredentialKind.BearerApiKey
     }
 }

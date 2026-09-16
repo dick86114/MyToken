@@ -117,6 +117,12 @@ fun CredentialUsageCard(
                     columns = metricColumns,
                     showsBalanceBreakdown = false,
                 )
+                ai.routin.mytoken.domain.model.ProviderId.Xiaomi ->
+                    if (card.credential.metadata[ai.routin.mytoken.domain.model.CredentialMetadataKey.UsageKind] == "plan") {
+                        UsageMetricGrid(metrics = metrics, columns = metricColumns)
+                    } else {
+                        XiaomiAPIMetrics(metrics = metrics)
+                    }
                 else -> UsageMetricGrid(metrics = metrics, columns = metricColumns)
             }
 

@@ -6,7 +6,9 @@ MyToken 是一个 macOS 菜单栏用量监控工具，用于在本地查看多�
 
 - 菜单栏最多显示 4 个选中凭证的竖向用量/余额指标。
 - 左键打开按供应商分组的用量弹窗，查看多个凭证的独立用量、余额、剩余时间和供应商明细。
-- 首期支持 Routin、DeepSeek、GLM Coding Plan、火山方舟个人 Agent Plan/Coding Plan。
+- 支持 Routin、DeepSeek、GLM Coding Plan、火山方舟个人 Agent Plan/Coding Plan、New API、Command Code 和小米 MiMo。
+- 小米 MiMo 可分别查询 API 按量余额/消费或 Token Plan 订阅 Credits，额度与余额不会混算。
+- 小米 MiMo API 卡片按“账户余额、累计消费、现金余额、赠送余额”和“历史消耗、输出、命中缓存、未命中缓存”两行展示，Token 数值使用千分位格式。
 - 右键菜单支持切换账号、打开设置、检查更新和退出应用。
 - 支持从右键菜单或设置页提交问题，自动生成脱敏日志并打开 GitHub Issue 页面。
 - 支持 5 小时和周用量维度，以及别名、别名加竖向进度条等显示样式。
@@ -49,6 +51,7 @@ Android 端凭证密钥经 Android Keystore 加密保存在本机（不进入云
 1. 下载对应版本的安装包（例如 `MyToken-1.2.0-arm64.dmg`），或从 GitHub Release 下载正式版本。
 2. 打开 DMG，将 `MyToken` 拖入“应用程序”文件夹。
 3. 启动应用，在设置中选择供应商并手动添加 API Key 或 Access Key/SecretAccessKey。
+   小米 MiMo 当前需要从官方控制台复制网页 Cookie 或 `api-platform_serviceToken` 值，并选择 API 按量或 Token Plan。
 4. 点击菜单栏中的 MyToken 图标查看用量。
 
 首次运行的未签名版本可能会被 macOS Gatekeeper 拦截。请前往“系统设置 → 隐私与安全性”，选择“仍要打开”，然后确认启动应用。
@@ -70,6 +73,8 @@ Android 端凭证密钥经 Android Keystore 加密保存在本机（不进入云
 升级过程中如果检测到上一轮测试版本遗留的 Keychain 项，应用只会尝试一次回迁到本地存储，成功后不再访问 Keychain。
 
 Routin 每日签到使用内置网页承载 Routin 官方登录和签到流程。该功能只对 Routin 凭证显示。应用不会保存 Routin 的账号密码、验证码、Token 或 Cookie，也不会把网页内容或会话信息写入诊断日志。若网页结构变化导致应用无法确认结果，请以打开的 Routin 官方页面为准。
+
+小米 MiMo 用量查询使用用户手动提供的网页 Cookie 或 `api-platform_serviceToken`。该值作为秘密凭证保存在本地存储中，仅用于直接请求小米官方平台，不会写入诊断日志。
 
 卸载应用不会自动删除本地配置。如需彻底清除数据，请先在设置中删除所有凭证，再卸载应用。
 

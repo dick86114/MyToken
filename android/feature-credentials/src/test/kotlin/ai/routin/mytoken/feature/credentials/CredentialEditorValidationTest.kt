@@ -25,6 +25,7 @@ class CredentialEditorValidationTest {
         region: String = "",
         newAPIBaseURL: String = "",
         newAPIUserID: String = "",
+        xiaomiUsageKind: String = "api",
         websiteURL: String = "",
     ) = CredentialEditorValidation.validate(
         providerId = providerId,
@@ -36,6 +37,7 @@ class CredentialEditorValidationTest {
             region = region,
             newAPIBaseURL = newAPIBaseURL,
             newAPIUserID = newAPIUserID,
+            xiaomiUsageKind = xiaomiUsageKind,
             websiteURL = websiteURL,
         ),
     )
@@ -49,11 +51,12 @@ class CredentialEditorValidationTest {
         region: String = "",
         newAPIBaseURL: String = "",
         newAPIUserID: String = "",
+        xiaomiUsageKind: String = "api",
         websiteURL: String = "",
     ): String = try {
         validate(
             providerId, name, apiKey, accessKeyID, secretAccessKey,
-            region, newAPIBaseURL, newAPIUserID, websiteURL,
+            region, newAPIBaseURL, newAPIUserID, xiaomiUsageKind, websiteURL,
         )
         ""
     } catch (error: CredentialValidationException) {
@@ -191,5 +194,22 @@ class CredentialEditorValidationTest {
         assertEquals(CredentialKind.BearerApiKey, input.credentialKind)
         assertEquals("cmd-key", (input.secret as CredentialSecret.BearerToken).token)
         assertEquals("https://commandcode.ai/", input.metadata[CredentialMetadataKey.WebsiteURL])
+    }
+
+    @Test
+    fun xiaomiRequiresCookieAndStoresQueryMode() {
+        assertEquals("请输入网页 Cookie", failure(ProviderId.Xiaomi, name = "小米 MiMo"))
+        val input = validate(
+            ProviderId.Xiaomi,
+            name = "小米 MiMo",
+            apiKey = "Cookie: api-platform_serviceToken=abc",
+            xiaomiUsageKind = "plan",
+        )
+        assertEquals(CredentialKind.BearerApiKey, input.credentialKind)
+        assertEquals("plan", input.metadata[CredentialMetadataKey.UsageKind])
+        assertEquals(
+            "Cookie: api-platform_serviceToken=abc",
+            (input.secret as CredentialSecret.BearerToken).token,
+        )
     }
 }
