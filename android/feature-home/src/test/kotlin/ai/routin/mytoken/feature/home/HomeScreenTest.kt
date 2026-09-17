@@ -1,6 +1,7 @@
 package ai.routin.mytoken.feature.home
 
 import ai.routin.mytoken.domain.model.AppError
+import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.model.CredentialKind
 import ai.routin.mytoken.domain.model.ProviderId
@@ -199,6 +200,43 @@ class HomeScreenTest {
         assertTrue(kotlin.math.abs(requestLabel.top.value - requestValue.top.value) < 1f)
         assertTrue(monthly.left < requestLabel.left)
         assertTrue(requestLabel.left < requestValue.left)
+    }
+
+    @Test
+    @Config(qualifiers = "w1200dp-h800dp")
+    fun credentialCardKeepsNarrowMetricLayoutOnWideScreens() {
+        val credential = credential("宽屏主账号", ProviderId.Routin)
+        val card = card(
+            credential,
+            metrics = listOf(progress(12.0, 60.0), balance(38.42)),
+        )
+
+        composeRule.setContent {
+            MaterialTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = listOf(card),
+                        groups = listOf(group(ProviderId.Routin, listOf(card))),
+                        credentialCount = 1,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    layoutMode = MyTokenLayoutMode.Expanded,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("home_grid_3_columns").assertExists()
+        val progressLabel = composeRule.onNodeWithText("5 小时", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val balanceLabel = composeRule.onNodeWithText("账户余额", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+
+        assertTrue(balanceLabel.left.value > progressLabel.left.value)
     }
 
     @Test
