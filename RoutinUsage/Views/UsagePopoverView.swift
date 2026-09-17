@@ -733,51 +733,53 @@ private struct UpdateReleasePopup: View {
         switch status {
         case .downloading(let progress):
             VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("正在下载更新")
-                        .font(.callout.weight(.medium))
-                        .foregroundStyle(titleColor)
-                    Spacer(minLength: 8)
-                    if let progress {
-                        Text("\(Int((progress * 100).rounded()))%")
-                            .font(.callout.weight(.semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(installBlue)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("正在下载更新")
+                            .font(.callout.weight(.medium))
+                            .foregroundStyle(titleColor)
+                        Spacer(minLength: 8)
+                        if let progress {
+                            Text("\(Int((progress * 100).rounded()))%")
+                                .font(.callout.weight(.semibold))
+                                .monospacedDigit()
+                                .foregroundStyle(installBlue)
+                        }
                     }
+                    ProgressView(value: progress ?? 0, total: 1)
+                        .progressViewStyle(.linear)
+                        .tint(installBlue)
+                    Text("下载完成后将自动安装并重启 MyToken")
+                        .font(.caption)
+                        .foregroundStyle(secondaryGray)
                 }
-                ProgressView(value: progress ?? 0, total: 1)
-                    .progressViewStyle(.linear)
-                    .tint(installBlue)
-                Text("下载完成后将自动安装并重启 MyToken")
-                    .font(.caption)
-                    .foregroundStyle(secondaryGray)
-            }
 
-            HStack {
-                Spacer(minLength: 8)
+                HStack {
+                    Spacer(minLength: 8)
 
-                Button {
-                    onBackground()
-                } label: {
-                    Text("后台更新")
-                        .font(.callout.weight(.medium))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
+                    Button {
+                        onBackground()
+                    } label: {
+                        Text("后台更新")
+                            .font(.callout.weight(.medium))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.plain)
+                    .background {
+                        Capsule()
+                            .fill(isBackgroundHovered ? Color.black.opacity(0.09) : cancelFill)
+                    }
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(Color.black.opacity(isBackgroundHovered ? 0.16 : 0.08))
+                    }
+                    .foregroundStyle(titleColor)
+                    .onHover { isBackgroundHovered = $0 }
+                    .help("隐藏更新窗口，在底部继续查看下载进度")
+                    .accessibilityLabel("后台更新")
+                    .accessibilityHint("隐藏更新窗口，在弹窗底部继续查看下载进度")
                 }
-                .buttonStyle(.plain)
-                .background {
-                    Capsule()
-                        .fill(isBackgroundHovered ? Color.black.opacity(0.09) : cancelFill)
-                }
-                .overlay {
-                    Capsule()
-                        .strokeBorder(Color.black.opacity(isBackgroundHovered ? 0.16 : 0.08))
-                }
-                .foregroundStyle(titleColor)
-                .onHover { isBackgroundHovered = $0 }
-                .help("隐藏更新窗口，在底部继续查看下载进度")
-                .accessibilityLabel("后台更新")
-                .accessibilityHint("隐藏更新窗口，在弹窗底部继续查看下载进度")
             }
 
         case .completed(let version):
