@@ -25,6 +25,6 @@ object ProviderCatalog {
         ProviderId.Volcengine -> Color(0xFFEF6C00)
         ProviderId.NewAPI -> Color(0xFF6A1B9A)
         ProviderId.CommandCode -> Color(0xFF00897B)
-        ProviderId.Xiaomi -> Color(0xFF00856F)
+        ProviderId.Xiaomi -> Color(0xFFAD1457)
     }
 }
