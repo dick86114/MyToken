@@ -163,7 +163,7 @@ fun HomeScreen(
                             minItemWidth = 260.dp,
                             spacing = 12.dp,
                         )
-                        val metricColumns = if (columns == 1) 2 else 1
+                        val metricColumns = 2
                         LazyVerticalGrid(
                             state = rememberLazyGridState(),
                             modifier = Modifier
