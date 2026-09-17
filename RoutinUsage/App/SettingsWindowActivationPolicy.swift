@@ -43,11 +43,18 @@ enum SettingsWindowActivationPolicy {
             guard let window = notification.object as? NSWindow else {
                 return
             }
-            MainActor.assumeIsolated {
-                guard trackedWindows.allObjects.contains(window) else {
-                    return
+            // willClose 仍在窗口关闭流程内；立刻切换策略可能被当前事件吞掉，
+            // 等本轮事件结束后确认窗口不可见再恢复菜单栏形态。
+            DispatchQueue.main.async { [weak window] in
+                MainActor.assumeIsolated {
+                    guard let window, !window.isVisible else {
+                        return
+                    }
+                    guard trackedWindows.allObjects.contains(window) else {
+                        return
+                    }
+                    unregister(window)
                 }
-                unregister(window)
             }
         }
     }
