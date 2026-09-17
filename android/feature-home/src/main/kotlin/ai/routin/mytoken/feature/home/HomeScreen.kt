@@ -7,7 +7,6 @@ import ai.routin.mytoken.core.ui.maxColumns
 
 import ai.routin.mytoken.domain.model.ProviderId
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -20,25 +19,24 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import ai.routin.mytoken.core.ui.GlassButton
 import ai.routin.mytoken.core.ui.GlassButtonTone
-import ai.routin.mytoken.core.ui.glassFilterChipBorder
-import ai.routin.mytoken.core.ui.glassFilterChipColors
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -68,7 +66,32 @@ fun HomeScreen(
     val allCards = remember(state.cards) {
         state.cards.filter { it.status != ai.routin.mytoken.domain.usage.RefreshStatus.Disabled }
     }
-    val visibleProviders = remember(state.groups) { state.groups.map { it.providerId } }
+    val providerCounts = remember(allCards) {
+        allCards.groupingBy { it.credential.providerId }.eachCount()
+    }
+    val visibleProviders = remember(state.groups, providerCounts) {
+        state.groups.map { it.providerId }.filter { (providerCounts[it] ?: 0) > 0 }
+    }
+    val filterOptions = remember(providerCounts, visibleProviders) {
+        buildList {
+            add(
+                ProviderFilterOption(
+                    providerId = null,
+                    title = "全部",
+                    count = providerCounts.values.sum(),
+                )
+            )
+            visibleProviders.forEach { provider ->
+                add(
+                    ProviderFilterOption(
+                        providerId = provider,
+                        title = ProviderCatalog.displayName(provider),
+                        count = providerCounts[provider] ?: 0,
+                    )
+                )
+            }
+        }
+    }
     val visibleCards = remember(allCards, selectedProvider) {
         selectedProvider
             ?.let { provider -> allCards.filter { it.credential.providerId == provider } }
@@ -93,6 +116,11 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    ProviderFilterMenu(
+                        selectedProvider = selectedProvider,
+                        options = filterOptions,
+                        onSelect = { selectedProvider = it },
+                    )
                     IconButton(onClick = onRefreshAll) {
                         Icon(imageVector = Icons.Filled.Refresh, contentDescription = "刷新全部")
                     }
@@ -149,16 +177,6 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            item(
-                                key = "provider_filters",
-                                span = { GridItemSpan(maxLineSpan) },
-                            ) {
-                                ProviderFilters(
-                                    selectedProvider = selectedProvider,
-                                    visibleProviders = visibleProviders,
-                                    onSelect = { selectedProvider = it },
-                                )
-                            }
                             gridItems(
                                 visibleCards,
                                 key = { it.credential.id },
@@ -179,50 +197,61 @@ fun HomeScreen(
     }
 }
 
-@Composable
-private fun ProviderFilters(
-    selectedProvider: ProviderId?,
-    visibleProviders: List<ProviderId>,
-    onSelect: (ProviderId?) -> Unit,
+private data class ProviderFilterOption(
+    val providerId: ProviderId?,
+    val title: String,
+    val count: Int,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        ProviderFilterChips(
-            selectedProvider = selectedProvider,
-            visibleProviders = visibleProviders,
-            onSelect = onSelect,
-        )
-    }
+    val menuTitle: String get() = "$title（$count）"
 }
 
 @Composable
-private fun ProviderFilterChips(
+private fun ProviderFilterMenu(
     selectedProvider: ProviderId?,
-    visibleProviders: List<ProviderId>,
+    options: List<ProviderFilterOption>,
     onSelect: (ProviderId?) -> Unit,
 ) {
-    FilterChip(
-        selected = selectedProvider == null,
-        onClick = { onSelect(null) },
-        label = { Text(text = "全部") },
-        colors = glassFilterChipColors(selected = selectedProvider == null),
-        border = glassFilterChipBorder(selected = selectedProvider == null),
-    )
-    visibleProviders.forEach { provider ->
-        FilterChip(
-            selected = selectedProvider == provider,
-            onClick = {
-                onSelect(if (selectedProvider == provider) null else provider)
-            },
-            label = { Text(text = ProviderCatalog.displayName(provider)) },
-            colors = glassFilterChipColors(selected = selectedProvider == provider),
-            border = glassFilterChipBorder(selected = selectedProvider == provider),
-        )
+    var isExpanded by remember { mutableStateOf(false) }
+    val selectedTitle = if (selectedProvider == null) {
+        "供应商：全部"
+    } else {
+        val title = options.firstOrNull { it.providerId == selectedProvider }?.title
+            ?: ProviderCatalog.displayName(selectedProvider)
+        "供应商：$title"
+    }
+
+    Box {
+        TextButton(
+            onClick = { isExpanded = true },
+            modifier = Modifier.testTag("provider_filter_menu"),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+        ) {
+            Text(
+                text = selectedTitle,
+                modifier = Modifier.testTag("provider_filter_selected"),
+                style = MaterialTheme.typography.labelLarge,
+            )
+            Icon(imageVector = Icons.Filled.ArrowDropDown, contentDescription = null)
+        }
+
+        DropdownMenu(
+            expanded = isExpanded,
+            onDismissRequest = { isExpanded = false },
+        ) {
+            options.forEach { option ->
+                val providerId = option.providerId
+                DropdownMenuItem(
+                    text = { Text(text = option.menuTitle) },
+                    onClick = {
+                        onSelect(providerId)
+                        isExpanded = false
+                    },
+                    modifier = providerId?.let { provider ->
+                        Modifier.testTag("provider_filter_item_${provider.rawValue}")
+                    } ?: Modifier,
+                )
+            }
+        }
     }
 }
 

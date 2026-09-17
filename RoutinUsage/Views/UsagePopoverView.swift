@@ -299,21 +299,11 @@ private extension UsagePopoverView {
 
             Spacer(minLength: 8)
 
-            WrappingFilterChips {
-                filterChip(title: "全部", isSelected: providerFilter == nil) {
-                    providerFilter = nil
-                }
-
-                ForEach(visibleProviderIDs, id: \.self) { providerID in
-                    filterChip(
-                        title: providerName(providerID),
-                        isSelected: providerFilter == providerID
-                    ) {
-                        providerFilter = providerFilter == providerID ? nil : providerID
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .trailing)
+            ProviderFilterMenu(
+                selection: $providerFilter,
+                options: filterOptions
+            )
+            .frame(maxWidth: 210, alignment: .trailing)
         }
         .padding(.horizontal, 16)
         .padding(.top, 10)
@@ -333,6 +323,7 @@ private extension UsagePopoverView {
                     update: selectedUpdate,
                     status: updateStatus,
                     onCancel: { self.selectedUpdate = nil },
+                    onBackground: { self.selectedUpdate = nil },
                     onInstall: { Task { await installAvailableUpdate() } }
                 )
                 .padding(.horizontal, 28)
@@ -349,58 +340,32 @@ private extension UsagePopoverView {
     }
 
     var visibleProviderIDs: [ProviderID] {
-        let visibleIDs = Set(popoverKeyIDs.compactMap {
-            store.state(for: $0)?.configuration.providerID
-        })
-        return ProviderID.allCases.filter { visibleIDs.contains($0) }
+        let counts = providerCounts
+        return ProviderID.allCases.filter { (counts[$0] ?? 0) > 0 }
+    }
+
+    var providerCounts: [ProviderID: Int] {
+        popoverKeyIDs.reduce(into: [:]) { counts, keyID in
+            guard let providerID = store.state(for: keyID)?.configuration.providerID else {
+                return
+            }
+            counts[providerID, default: 0] += 1
+        }
+    }
+
+    var filterOptions: [ProviderFilterOption] {
+        let counts = providerCounts
+        let allCount = counts.values.reduce(0, +)
+        return ProviderFilterMenuModel.options(
+            counts: counts,
+            allCount: allCount,
+            providerName: providerName
+        )
     }
 
     func providerName(_ providerID: ProviderID) -> String {
         ProviderRegistry.builtInDescriptors.first(where: { $0.id == providerID })?.displayName
             ?? providerID.rawValue
-    }
-
-    func filterChip(
-        title: String,
-        isSelected: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        ProviderFilterChip(title: title, isSelected: isSelected, action: action)
-    }
-}
-
-private struct ProviderFilterChip: View {
-    let title: String
-    let isSelected: Bool
-    let action: () -> Void
-
-    @State private var isHovered = false
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.caption.weight(.medium))
-                .monospacedDigit()
-                .lineLimit(1)
-                .padding(.horizontal, 9)
-                .padding(.vertical, 4)
-                .background {
-                    Capsule()
-                        .fill(isSelected ? Color.accentColor.opacity(0.16) : Color.primary.opacity(isHovered ? 0.10 : 0.05))
-                }
-                .overlay {
-                    Capsule()
-                        .strokeBorder(
-                            isSelected ? Color.accentColor.opacity(0.58) : Color.primary.opacity(isHovered ? 0.24 : 0.12),
-                            lineWidth: 1
-                        )
-                }
-                .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovered = $0 }
-        .accessibilityLabel("\(title)供应商筛选")
-        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
 }
@@ -409,7 +374,8 @@ private extension UsagePopoverView {
     @ViewBuilder
     var footerStatuses: some View {
         VStack(alignment: .leading, spacing: 9) {
-            if case let .downloading(progress) = updateStatus {
+            if shouldShowFooterUpdateProgress,
+               case let .downloading(progress) = updateStatus {
                 updateProgressView(progress)
             }
 
@@ -422,6 +388,16 @@ private extension UsagePopoverView {
 
             codexGroupDetectionStatus
         }
+    }
+
+    private var shouldShowFooterUpdateProgress: Bool {
+        guard selectedUpdate == nil else {
+            return false
+        }
+        guard case .downloading = updateStatus else {
+            return false
+        }
+        return true
     }
 
     var bottomBar: some View {
@@ -658,85 +634,16 @@ private struct ThinVerticalScrollIndicator: View {
     }
 }
 
-private struct WrappingFilterChips: Layout {
-    var spacing: CGFloat = 6
-
-    func sizeThatFits(
-        proposal: ProposedViewSize,
-        subviews: Subviews,
-        cache: inout ()
-    ) -> CGSize {
-        let maxWidth = proposal.width ?? 320
-        let rows = calculateRows(subviews: subviews, maxWidth: maxWidth)
-        var height: CGFloat = 0
-
-        for row in rows {
-            height += row.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
-            height += spacing
-        }
-
-        return CGSize(width: maxWidth, height: max(height - spacing, 0))
-    }
-
-    func placeSubviews(
-        in bounds: CGRect,
-        proposal: ProposedViewSize,
-        subviews: Subviews,
-        cache: inout ()
-    ) {
-        let rows = calculateRows(subviews: subviews, maxWidth: bounds.width)
-        var y = bounds.minY
-
-        for row in rows {
-            let rowHeight = row.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
-            let rowWidth = row.reduce(0) { partial, view in
-                partial + view.sizeThatFits(.unspecified).width
-            } + CGFloat(max(row.count - 1, 0)) * spacing
-            var x = bounds.maxX - rowWidth
-
-            for view in row {
-                let size = view.sizeThatFits(.unspecified)
-                view.place(
-                    at: CGPoint(x: x, y: y + (rowHeight - size.height) / 2),
-                    anchor: .topLeading,
-                    proposal: .unspecified
-                )
-                x += size.width + spacing
-            }
-
-            y += rowHeight + spacing
-        }
-    }
-
-    private func calculateRows(
-        subviews: Subviews,
-        maxWidth: CGFloat
-    ) -> [[Subviews.Element]] {
-        var rows: [[Subviews.Element]] = [[]]
-        var x: CGFloat = 0
-
-        for view in subviews {
-            let size = view.sizeThatFits(.unspecified)
-            if x > 0, x + size.width > maxWidth {
-                rows.append([])
-                x = 0
-            }
-            rows[rows.count - 1].append(view)
-            x += size.width + spacing
-        }
-
-        return rows.filter { !$0.isEmpty }
-    }
-}
-
 private struct UpdateReleasePopup: View {
     let update: AppUpdate
     let status: AppUpdateStatus
     let onCancel: () -> Void
+    let onBackground: () -> Void
     let onInstall: () -> Void
 
     @State private var isCancelHovered = false
     @State private var isInstallHovered = false
+    @State private var isBackgroundHovered = false
 
     private let titleColor = Color(red: 0.10, green: 0.11, blue: 0.13)
     private let secondaryGray = Color(red: 0.45, green: 0.48, blue: 0.52)
@@ -844,6 +751,33 @@ private struct UpdateReleasePopup: View {
                 Text("下载完成后将自动安装并重启 MyToken")
                     .font(.caption)
                     .foregroundStyle(secondaryGray)
+            }
+
+            HStack {
+                Spacer(minLength: 8)
+
+                Button {
+                    onBackground()
+                } label: {
+                    Text("后台更新")
+                        .font(.callout.weight(.medium))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                }
+                .buttonStyle(.plain)
+                .background {
+                    Capsule()
+                        .fill(isBackgroundHovered ? Color.black.opacity(0.09) : cancelFill)
+                }
+                .overlay {
+                    Capsule()
+                        .strokeBorder(Color.black.opacity(isBackgroundHovered ? 0.16 : 0.08))
+                }
+                .foregroundStyle(titleColor)
+                .onHover { isBackgroundHovered = $0 }
+                .help("隐藏更新窗口，在底部继续查看下载进度")
+                .accessibilityLabel("后台更新")
+                .accessibilityHint("隐藏更新窗口，在弹窗底部继续查看下载进度")
             }
 
         case .completed(let version):

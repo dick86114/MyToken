@@ -13,6 +13,7 @@ import ai.routin.mytoken.domain.model.UsageSnapshot
 import ai.routin.mytoken.domain.usage.RefreshStatus
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -239,10 +240,13 @@ class HomeScreenTest {
         composeRule.onNodeWithText("启用").assertIsDisplayed()
         composeRule.onNodeWithText("停用").assertDoesNotExist()
 
-        composeRule.onAllNodesWithText("Routin")[0].performClick()
+        composeRule.onNodeWithTag("provider_filter_menu").performClick()
+        composeRule.onNodeWithTag("provider_filter_item_routin").performClick()
         composeRule.onNodeWithText("备用").assertDoesNotExist()
         composeRule.onNodeWithText("2 个凭证").assertDoesNotExist()
         composeRule.onNodeWithText("1 个凭证").assertIsDisplayed()
+        composeRule.onNodeWithTag("provider_filter_selected", useUnmergedTree = true)
+            .assertTextContains("供应商：Routin")
     }
 
     @Test

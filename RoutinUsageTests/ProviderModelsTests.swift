@@ -51,6 +51,33 @@ final class ProviderModelsTests: XCTestCase {
         XCTAssertEqual(Set(colors).count, ProviderID.allCases.count)
     }
 
+    func test供应商主题色保持可感知区分() {
+        let colors = ProviderID.allCases.map { providerID in
+            NSColor(ProviderTheme.accentColor(for: providerID))
+                .usingColorSpace(.sRGB)!
+        }
+
+        for firstIndex in colors.indices {
+            for secondIndex in colors.indices where firstIndex < secondIndex {
+                let first = colors[firstIndex]
+                let second = colors[secondIndex]
+                let redDelta = first.redComponent - second.redComponent
+                let greenDelta = first.greenComponent - second.greenComponent
+                let blueDelta = first.blueComponent - second.blueComponent
+                let distance = (redDelta * redDelta
+                    + greenDelta * greenDelta
+                    + blueDelta * blueDelta)
+                    .squareRoot()
+
+                XCTAssertGreaterThan(
+                    distance,
+                    0.25,
+                    "\(ProviderID.allCases[firstIndex]) 和 \(ProviderID.allCases[secondIndex]) 主题色过于接近"
+                )
+            }
+        }
+    }
+
     func test首期供应商描述包含简称凭证类型和能力() {
         let descriptors = ProviderRegistry.builtInDescriptors
 

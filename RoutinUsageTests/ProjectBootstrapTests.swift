@@ -366,7 +366,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(credentials.contains("LazyVGrid"))
     }
 
-    func test弹窗简化为单层窗口玻璃并保留固定底栏() throws {
+    func test弹窗筛选器使用单行供应商菜单并保留固定底栏() throws {
         let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
         let row = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
         let onboarding = try sourceText(at: "RoutinUsage/Views/OnboardingView.swift")
@@ -374,7 +374,10 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(popover.contains("ScrollView(.vertical, showsIndicators: false)"))
         XCTAssertTrue(popover.contains("ThinVerticalScrollIndicator"))
         XCTAssertTrue(popover.contains("账户用量"))
-        XCTAssertTrue(popover.contains("WrappingFilterChips"))
+        XCTAssertTrue(popover.contains("ProviderFilterMenu("))
+        XCTAssertTrue(popover.contains("providerCounts"))
+        XCTAssertTrue(popover.contains("ProviderFilterMenuModel.options"))
+        XCTAssertFalse(popover.contains("WrappingFilterChips"))
         XCTAssertTrue(popover.contains("visibleProviderIDs"))
         XCTAssertTrue(popover.contains("updateReleaseOverlay"))
         XCTAssertTrue(popover.contains("UpdateReleasePopup"))
@@ -584,6 +587,10 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(service.contains("if error == nil"))
         XCTAssertTrue(service.contains("新版本已安装到“应用程序”文件夹"))
         XCTAssertTrue(popover.contains("ProgressView(value: progress"))
+        XCTAssertTrue(popover.contains("onBackground"))
+        XCTAssertTrue(popover.contains("后台更新"))
+        XCTAssertTrue(popover.contains("guard selectedUpdate == nil else"))
+        XCTAssertTrue(popover.contains("shouldShowFooterUpdateProgress"))
         XCTAssertTrue(popover.contains("更新完成"))
         XCTAssertTrue(settings.contains("ProgressView(value: progress"))
         XCTAssertTrue(settings.contains("更新完成"))
