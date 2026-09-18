@@ -12,6 +12,8 @@ struct UsagePopoverView: View {
     let updateStatus: AppUpdateStatus
     let installAvailableUpdate: InstallAvailableUpdate
     let startCodexGroupDetection: StartCodexGroupDetection
+    let refreshCredential: @MainActor (UUID) async -> Void
+    let retryCredential: @MainActor (UUID) async -> Void
     let openSettings: @MainActor () -> Void
 
     @Environment(\.openWindow) private var openWindow
@@ -31,6 +33,8 @@ struct UsagePopoverView: View {
         updateStatus: AppUpdateStatus = .idle,
         installAvailableUpdate: @escaping InstallAvailableUpdate = {},
         startCodexGroupDetection: @escaping StartCodexGroupDetection = { _ in },
+        refreshCredential: @escaping @MainActor (UUID) async -> Void = { _ in },
+        retryCredential: @escaping @MainActor (UUID) async -> Void = { _ in },
         openSettings: @escaping @MainActor () -> Void = {}
     ) {
         self.store = store
@@ -39,6 +43,8 @@ struct UsagePopoverView: View {
         self.updateStatus = updateStatus
         self.installAvailableUpdate = installAvailableUpdate
         self.startCodexGroupDetection = startCodexGroupDetection
+        self.refreshCredential = refreshCredential
+        self.retryCredential = retryCredential
         self.openSettings = openSettings
     }
 
@@ -266,7 +272,13 @@ private extension UsagePopoverView {
                             isAnotherDetectionActive: codexGroupDetection.activeKeyID != nil
                                 && codexGroupDetection.activeKeyID != id,
                             requestDetection: { pendingDetectionKeyID = id },
-                            actions: nil
+                            actions: nil,
+                            refreshCredential: {
+                                Task { await refreshCredential(id) }
+                            },
+                            retryCredential: {
+                                Task { await retryCredential(id) }
+                            }
                         )
                     }
                 }

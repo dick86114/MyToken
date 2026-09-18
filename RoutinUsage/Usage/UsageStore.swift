@@ -54,6 +54,8 @@ struct KeyUsageState: Equatable, Sendable {
     var isRefreshing: Bool
     var isStale: Bool
     var error: UsageDisplayError?
+    var failureMessage: String? = nil
+    var failureIsAuthentication: Bool = false
 }
 
 @MainActor
@@ -184,6 +186,8 @@ final class UsageStore {
         state.isRefreshing = refreshingKeyIDs.contains(keyID)
         state.isStale = false
         state.error = snapshot == nil ? .noSubscription : nil
+        state.failureMessage = nil
+        state.failureIsAuthentication = false
         states[keyID] = state
 
         if let snapshot {
@@ -457,7 +461,13 @@ final class UsageStore {
                             credentialFingerprint: request.credentialFingerprint,
                             refreshGeneration: request.refreshGeneration,
                             requestedAt: request.requestedAt,
-                            result: Task.isCancelled ? .cancelled : .failure(error)
+                            result: Task.isCancelled
+                                ? .cancelled
+                                : .failure(
+                                    error,
+                                    message: nil,
+                                    isAuthenticationFailure: Self.isAuthenticationFailure(error)
+                                )
                         )
                     } catch let error as UsageProviderError {
                         return RefreshOutcome(
@@ -465,7 +475,13 @@ final class UsageStore {
                             credentialFingerprint: request.credentialFingerprint,
                             refreshGeneration: request.refreshGeneration,
                             requestedAt: request.requestedAt,
-                            result: Task.isCancelled ? .cancelled : .failure(Self.apiError(from: error))
+                            result: Task.isCancelled
+                                ? .cancelled
+                                : .failure(
+                                    Self.apiError(from: error),
+                                    message: Self.failureMessage(from: error),
+                                    isAuthenticationFailure: Self.isAuthenticationFailure(error)
+                                )
                         )
                     } catch {
                         return RefreshOutcome(
@@ -473,7 +489,13 @@ final class UsageStore {
                             credentialFingerprint: request.credentialFingerprint,
                             refreshGeneration: request.refreshGeneration,
                             requestedAt: request.requestedAt,
-                            result: Task.isCancelled ? .cancelled : .failure(.invalidResponse)
+                            result: Task.isCancelled
+                                ? .cancelled
+                                : .failure(
+                                    .invalidResponse,
+                                    message: nil,
+                                    isAuthenticationFailure: false
+                                )
                         )
                     }
                 }
@@ -533,6 +555,8 @@ final class UsageStore {
             state.lastSuccessAt = snapshot?.fetchedAt ?? outcome.requestedAt
             state.isStale = false
             state.error = snapshot == nil ? .noSubscription : nil
+            state.failureMessage = nil
+            state.failureIsAuthentication = false
             states[outcome.keyID] = state
             if let snapshot {
                 try? cache.save(snapshot, for: outcome.keyID)
@@ -554,23 +578,35 @@ final class UsageStore {
             } else {
                 try? cache.delete(for: outcome.keyID)
             }
-        case let .failure(error):
+        case let .failure(error, message, isAuthenticationFailure):
             let displayError = Self.displayError(from: error)
             if displayError == .invalidKey {
                 invalidKeyFingerprintsByKeyID[outcome.keyID] = outcome.credentialFingerprint
             }
-            applyFailure(displayError, to: outcome.keyID)
+            applyFailure(
+                displayError,
+                message: message,
+                isAuthenticationFailure: isAuthenticationFailure,
+                to: outcome.keyID
+            )
         case .cancelled:
             break
         }
         return nil
     }
 
-    private func applyFailure(_ error: UsageDisplayError, to keyID: UUID) {
+    private func applyFailure(
+        _ error: UsageDisplayError,
+        message: String? = nil,
+        isAuthenticationFailure: Bool = false,
+        to keyID: UUID
+    ) {
         guard var state = states[keyID] else {
             return
         }
         state.error = error
+        state.failureMessage = message
+        state.failureIsAuthentication = isAuthenticationFailure
         state.isStale = state.snapshot != nil && state.lastSuccessAt.map {
             UsageFreshness.isStale(
                 lastSuccess: $0,
@@ -667,7 +703,41 @@ final class UsageStore {
         case .providerUnavailable:
             return .server(statusCode: 503)
         case .providerMessage:
-            return .invalidResponse
+            return Self.isAuthenticationFailure(error) ? .invalidKey : .invalidResponse
+        }
+    }
+
+    nonisolated private static func failureMessage(from error: UsageProviderError) -> String? {
+        switch error {
+        case let .providerMessage(message):
+            return message
+        default:
+            return error.localizedDescription
+        }
+    }
+
+    nonisolated private static func isAuthenticationFailure(_ error: UsageAPIError) -> Bool {
+        switch error {
+        case .invalidKey, .server(statusCode: 401), .server(statusCode: 403):
+            return true
+        case .transport, .invalidResponse, .server:
+            return false
+        }
+    }
+
+    nonisolated private static func isAuthenticationFailure(_ error: UsageProviderError) -> Bool {
+        switch error {
+        case .invalidCredential, .unauthorized:
+            return true
+        case let .providerMessage(message):
+            let normalized = message.lowercased()
+            return normalized.contains("未登录")
+                || normalized.contains("unauthorized")
+                || normalized.contains("invalid token")
+                || normalized.contains("认证失败")
+                || normalized.contains("登录已失效")
+        case .rateLimited, .transport, .timeout, .invalidResponse, .providerUnavailable:
+            return false
         }
     }
 
@@ -715,7 +785,11 @@ private struct RefreshOutcome: Sendable {
 
 private enum RefreshResult: Sendable {
     case success(UsageSnapshot?)
-    case failure(UsageAPIError)
+    case failure(
+        UsageAPIError,
+        message: String?,
+        isAuthenticationFailure: Bool
+    )
     case cancelled
 
     var isCancelled: Bool {

@@ -208,6 +208,30 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertFalse(String(describing: store.state(for: key.id)).contains(secret))
     }
 
+    func test供应商原始错误信息保留用于失败详情() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let key = try context.repository.add(
+            name: "小米 MiMo",
+            secret: "old-cookie",
+            providerID: .xiaomi,
+            credentialKind: .bearerAPIKey,
+            metadata: ["usageKind": "api"]
+        )
+        let providerRegistry = ProviderRegistry(providers: [ProviderMessageUsageProvider()])
+        let store = context.makeStore(providerRegistry: providerRegistry)
+
+        await store.refresh(keyID: key.id)
+
+        let state = try XCTUnwrap(store.state(for: key.id))
+        XCTAssertEqual(state.error, .invalidKey)
+        XCTAssertEqual(state.failureMessage, "小米 MiMo：未登录")
+        XCTAssertTrue(
+            UsageFormatter.refreshFailureTooltip(state: state)
+                .contains("小米 MiMo：未登录")
+        )
+    }
+
     func test重复刷新同一Key只创建一个请求() async throws {
         let context = try makeContext()
         defer { context.cleanUp() }
@@ -807,7 +831,8 @@ private struct UsageStoreTestContext {
         notificationsEnabled: Bool = false,
         usagePreferences: @escaping @MainActor @Sendable (UUID) -> CredentialUsagePreferences = { _ in .defaultValue },
         setUsagePreferences: @escaping @MainActor @Sendable (CredentialUsagePreferences, UUID) -> Void = { _, _ in },
-        metricCapabilities: @escaping @MainActor @Sendable (KeyConfiguration) -> [UsageMetricCapability] = { _ in [] }
+        metricCapabilities: @escaping @MainActor @Sendable (KeyConfiguration) -> [UsageMetricCapability] = { _ in [] },
+        providerRegistry: ProviderRegistry? = nil
     ) -> UsageStore {
         let currentTime = now
         return UsageStore(
@@ -823,12 +848,25 @@ private struct UsageStoreTestContext {
             usagePreferencesProvider: usagePreferences,
             setUsagePreferencesHandler: setUsagePreferences,
             metricCapabilitiesProvider: metricCapabilities,
+            providerRegistry: providerRegistry,
             now: { currentTime }
         )
     }
 
     func cleanUp() {
         defaults.removePersistentDomain(forName: suiteName)
+    }
+}
+
+private struct ProviderMessageUsageProvider: UsageProvider {
+    let descriptor = ProviderRegistry.builtInDescriptors.first(where: { $0.id == .xiaomi })!
+
+    func validate(_ credential: ProviderCredential, now: Date) async throws -> UsageSnapshot? {
+        try await fetchUsage(credential, now: now)
+    }
+
+    func fetchUsage(_ credential: ProviderCredential, now: Date) async throws -> UsageSnapshot? {
+        throw UsageProviderError.providerMessage("小米 MiMo：未登录")
     }
 }
 
