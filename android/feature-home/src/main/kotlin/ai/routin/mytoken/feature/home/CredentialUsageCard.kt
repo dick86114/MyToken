@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -122,10 +123,27 @@ fun CredentialUsageCard(
                     }
                 }
                 Spacer(modifier = Modifier.width(8.dp))
+                if (card.status == RefreshStatus.Failed) {
+                    IconButton(
+                        onClick = { showsFailureDetails = true },
+                        modifier = Modifier
+                            .size(32.dp)
+                            .testTag("credential_failure_${card.credential.id}"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Warning,
+                            contentDescription = "查看刷新失败详情",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
                 IconButton(
                     onClick = onRefresh,
                     enabled = card.status != RefreshStatus.Loading && card.credential.isEnabled,
-                    modifier = Modifier.testTag("credential_refresh_${card.credential.id}"),
+                    modifier = Modifier
+                        .size(36.dp)
+                        .testTag("credential_refresh_${card.credential.id}"),
                 ) {
                     if (card.status == RefreshStatus.Loading) {
                         CircularProgressIndicator(
@@ -162,33 +180,6 @@ fun CredentialUsageCard(
 
             if (card.status == RefreshStatus.Loading) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(3.dp))
-            }
-            val status = when {
-                card.status == RefreshStatus.Loading -> "正在加载"
-                card.isStale -> "显示上次成功数据"
-                else -> null
-            }
-            status?.let {
-                Text(text = it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
-            }
-            if (card.status == RefreshStatus.Failed) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = { showsFailureDetails = true },
-                        modifier = Modifier.testTag("credential_failure_${card.credential.id}"),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Warning,
-                            contentDescription = "查看刷新失败详情",
-                            tint = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                    Text(
-                        text = "更新失败",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                }
             }
         }
     }

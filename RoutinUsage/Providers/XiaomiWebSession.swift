@@ -21,9 +21,18 @@ final class XiaomiWebSession: NSObject {
         webView.allowsBackForwardNavigationGestures = true
     }
 
-    func prepareLogin() async {
+    func prepareLogin(resetSession: Bool = false) async {
+        if resetSession {
+            webView.stopLoading()
+            await clearWebsiteData()
+        }
         isAwaitingLogin = true
-        webView.load(URLRequest(url: Self.consoleURL))
+        let request = URLRequest(
+            url: Self.consoleURL,
+            cachePolicy: resetSession ? .reloadIgnoringLocalAndRemoteCacheData : .useProtocolCachePolicy,
+            timeoutInterval: 30
+        )
+        webView.load(request)
     }
 
     func captureCookieHeader() async -> String? {
@@ -65,7 +74,12 @@ final class XiaomiWebSession: NSObject {
         let records = await dataStore.dataRecords(ofTypes: dataTypes)
         let xiaomiRecords = records.filter { record in
             let host = record.displayName.lowercased()
-            return host == "xiaomimimo.com" || host.hasSuffix(".xiaomimimo.com")
+            return host == "xiaomimimo.com"
+                || host.hasSuffix(".xiaomimimo.com")
+                || host == "xiaomi.com"
+                || host.hasSuffix(".xiaomi.com")
+                || host == "mi.com"
+                || host.hasSuffix(".mi.com")
         }
         guard !xiaomiRecords.isEmpty else {
             return

@@ -22,6 +22,7 @@ enum AppUpdateStatus: Equatable {
 struct XiaomiLoginRequest: Identifiable, Equatable, Sendable {
     let id = UUID()
     let credentialID: UUID
+    var resetsWebSession = false
 }
 
 extension RefreshScheduler: RefreshScheduling {}
@@ -576,7 +577,10 @@ final class AppEnvironment {
         }
 
         guard let cookie = await xiaomiCookieReader(), !cookie.isEmpty else {
-            xiaomiLoginRequest = XiaomiLoginRequest(credentialID: keyID)
+            xiaomiLoginRequest = XiaomiLoginRequest(
+                credentialID: keyID,
+                resetsWebSession: true
+            )
             return
         }
 
@@ -587,7 +591,10 @@ final class AppEnvironment {
         guard store.state(for: keyID)?.failureIsAuthentication == true else {
             return
         }
-        xiaomiLoginRequest = XiaomiLoginRequest(credentialID: keyID)
+        xiaomiLoginRequest = XiaomiLoginRequest(
+            credentialID: keyID,
+            resetsWebSession: true
+        )
     }
 
     func completeXiaomiLogin(_ request: XiaomiLoginRequest, cookie: String) async {

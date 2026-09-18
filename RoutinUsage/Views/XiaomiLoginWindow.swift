@@ -4,6 +4,7 @@ import WebKit
 @MainActor
 struct XiaomiLoginWindow: View {
     let session: XiaomiWebSession
+    var resetSession = false
     let onCaptured: (String) -> Void
     let onClose: () -> Void
 
@@ -70,7 +71,7 @@ struct XiaomiLoginWindow: View {
         .liquidGlassWindowBackground()
         .onAppear {
             Task {
-                await session.prepareLogin()
+                await session.prepareLogin(resetSession: resetSession)
             }
         }
     }
@@ -88,6 +89,7 @@ struct XiaomiRetryLoginSheet: View {
             if let session {
                 XiaomiLoginWindow(
                     session: session,
+                    resetSession: request.resetsWebSession,
                     onCaptured: { cookie in
                         Task { await onCaptured(cookie) }
                     },

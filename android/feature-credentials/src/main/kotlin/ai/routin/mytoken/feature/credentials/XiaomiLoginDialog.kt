@@ -2,6 +2,8 @@ package ai.routin.mytoken.feature.credentials
 
 import android.annotation.SuppressLint
 import android.webkit.CookieManager
+import android.webkit.WebSettings
+import android.webkit.WebStorage
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.Arrangement
@@ -54,6 +56,7 @@ object XiaomiCookieReader {
 fun XiaomiLoginDialog(
     onCaptured: (String) -> Unit,
     onDismiss: () -> Unit,
+    resetSession: Boolean = false,
 ) {
     var webView by remember { mutableStateOf<WebView?>(null) }
     var isLoading by remember { mutableStateOf(true) }
@@ -100,6 +103,9 @@ fun XiaomiLoginDialog(
                             WebView(context).apply {
                                 settings.javaScriptEnabled = true
                                 settings.domStorageEnabled = true
+                                if (resetSession) {
+                                    settings.cacheMode = WebSettings.LOAD_NO_CACHE
+                                }
                                 CookieManager.getInstance().setAcceptCookie(true)
                                 CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
                                 webViewClient = object : WebViewClient() {
@@ -112,7 +118,16 @@ fun XiaomiLoginDialog(
                                         isLoading = false
                                     }
                                 }
-                                loadUrl(XiaomiConsoleUrl)
+                                if (resetSession) {
+                                    clearCache(true)
+                                    clearHistory()
+                                    WebStorage.getInstance().deleteAllData()
+                                    CookieManager.getInstance().removeAllCookies {
+                                        loadUrl(XiaomiConsoleUrl)
+                                    }
+                                } else {
+                                    loadUrl(XiaomiConsoleUrl)
+                                }
                             }.also { webView = it }
                         },
                         update = {},

@@ -196,7 +196,12 @@ private extension UsageRowView {
                     }
                 }
 
-                headerRefreshButton
+                HStack(spacing: 2) {
+                    if state.error != nil {
+                        refreshFailureIndicator
+                    }
+                    headerRefreshButton
+                }
             }
         }
     }
@@ -541,16 +546,8 @@ private extension UsageRowView {
 
     @ViewBuilder
     func subscriptionDescription(now: Date) -> some View {
-        HStack(spacing: 8) {
-            subscriptionDescriptionContent(now: now)
-
-            Spacer(minLength: 8)
-
-            if state.error != nil {
-                refreshFailureIndicator
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        subscriptionDescriptionContent(now: now)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
