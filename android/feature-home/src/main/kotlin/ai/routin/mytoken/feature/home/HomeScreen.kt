@@ -57,6 +57,7 @@ fun HomeScreen(
     state: HomeUiState,
     onRefreshAll: () -> Unit,
     onRefreshCredential: (UUID) -> Unit,
+    onRetryCredential: (UUID) -> Unit = onRefreshCredential,
     onOpenCredential: (UUID) -> Unit,
     onImportFromMac: () -> Unit,
     onAddManually: () -> Unit,
@@ -186,7 +187,8 @@ fun HomeScreen(
                                     card = card,
                                     metricColumns = metricColumns,
                                     onOpen = { onOpenCredential(card.credential.id) },
-                                    onRetry = { onRefreshCredential(card.credential.id) },
+                                    onRefresh = { onRefreshCredential(card.credential.id) },
+                                    onRetry = { onRetryCredential(card.credential.id) },
                                 )
                             }
                         }

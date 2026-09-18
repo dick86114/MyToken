@@ -5,17 +5,30 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -23,6 +36,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.testTag
 
 internal data class StatusColors(
     val normal: Color,
@@ -54,11 +68,13 @@ fun CredentialUsageCard(
     metricColumns: Int = 2,
     onOpen: () -> Unit,
     onRetry: () -> Unit,
+    onRefresh: () -> Unit = onRetry,
     modifier: Modifier = Modifier,
 ) {
     val accent = ProviderCatalog.accentColor(card.credential.providerId)
     val providerName = ProviderCatalog.displayName(card.credential.providerId)
     val plan = card.snapshot?.planName.orEmpty()
+    var showsFailureDetails by remember(card.credential.id) { mutableStateOf(false) }
     Card(
         onClick = onOpen,
         modifier = modifier.fillMaxWidth(),
@@ -105,6 +121,24 @@ fun CredentialUsageCard(
                         }
                     }
                 }
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(
+                    onClick = onRefresh,
+                    enabled = card.status != RefreshStatus.Loading && card.credential.isEnabled,
+                    modifier = Modifier.testTag("credential_refresh_${card.credential.id}"),
+                ) {
+                    if (card.status == RefreshStatus.Loading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.width(18.dp).height(18.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Filled.Refresh,
+                            contentDescription = "刷新 ${card.credential.name}",
+                        )
+                    }
+                }
             }
 
             val metrics = card.snapshot?.metrics.orEmpty()
@@ -131,7 +165,6 @@ fun CredentialUsageCard(
             }
             val status = when {
                 card.status == RefreshStatus.Loading -> "正在加载"
-                card.status == RefreshStatus.Failed -> card.error?.message ?: "更新失败"
                 card.isStale -> "显示上次成功数据"
                 else -> null
             }
@@ -139,10 +172,71 @@ fun CredentialUsageCard(
                 Text(text = it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
             }
             if (card.status == RefreshStatus.Failed) {
-                TextButton(onClick = onRetry, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
-                    Text(text = "重试")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = { showsFailureDetails = true },
+                        modifier = Modifier.testTag("credential_failure_${card.credential.id}"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Warning,
+                            contentDescription = "查看刷新失败详情",
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    Text(
+                        text = "更新失败",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
                 }
             }
         }
     }
+
+    if (showsFailureDetails) {
+        RefreshFailureDialog(
+            card = card,
+            onDismiss = { showsFailureDetails = false },
+            onRetry = {
+                showsFailureDetails = false
+                onRetry()
+            },
+        )
+    }
+}
+
+@Composable
+private fun RefreshFailureDialog(
+    card: CredentialCardUi,
+    onDismiss: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = "刷新失败") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(text = card.error?.message ?: "更新失败")
+                Text(
+                    text = if (card.snapshot == null) {
+                        "暂无可用缓存，重试将重新请求用量数据。"
+                    } else {
+                        "当前显示上次成功数据。"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onRetry) {
+                Text(text = "重试")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = "关闭")
+            }
+        },
+    )
 }

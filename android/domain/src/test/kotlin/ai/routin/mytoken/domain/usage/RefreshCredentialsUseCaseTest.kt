@@ -199,6 +199,27 @@ class RefreshCredentialsUseCaseTest {
     }
 
     @Test
+    fun providerMessageWithLoginFailureMapsToAuthentication() = runTest {
+        val cred = credential("33333333-3333-4333-8333-333333333333", ProviderId.Xiaomi)
+        val provider = FakeProvider(ProviderId.Xiaomi) {
+            Result.failure(UsageProviderException.ProviderMessage("小米 MiMo：未登录"))
+        }
+        val useCase = RefreshCredentialsUseCase(
+            repository = FakeCredentialRepository(
+                listOf(cred),
+                mapOf(cred.id to CredentialSecret.BearerToken("cookie")),
+            ),
+            providers = mapOf(ProviderId.Xiaomi to provider),
+        )
+
+        useCase.refreshAll()
+
+        val error = useCase.states.value.getValue(cred.id).error
+        assertTrue(error is AppError.Authentication)
+        assertEquals("小米 MiMo：未登录", error?.message)
+    }
+
+    @Test
     fun refreshAll_tracksPerCredentialStatesIndependently() = runTest {
         val ok = credential("11111111-1111-4111-8111-111111111111", ProviderId.Routin)
         val failing = credential("22222222-2222-4222-8222-222222222222", ProviderId.DeepSeek)
