@@ -639,14 +639,17 @@ final class ProjectBootstrapTests: XCTestCase {
                 .appendingPathComponent("android/feature-credentials/src/main/kotlin/ai/routin/mytoken/feature/credentials/XiaomiLoginDialog.kt"),
             encoding: .utf8
         )
-        let headerStart = try XCTUnwrap(card.range(of: "Row(verticalAlignment = Alignment.Top)"))
+        let headerStart = try XCTUnwrap(card.range(of: "modifier = Modifier.fillMaxWidth(),\n                verticalAlignment = Alignment.Top,"))
         let metricsStart = try XCTUnwrap(card.range(of: "val metrics = card.snapshot?.metrics.orEmpty()"))
         let header = card[headerStart.lowerBound..<metricsStart.lowerBound]
 
         XCTAssertTrue(header.contains("credential_failure_"))
         XCTAssertTrue(header.contains("credential_refresh_"))
+        XCTAssertTrue(card.contains("widthIn(max = 96.dp)"))
         XCTAssertTrue(dialog.contains("WebSettings.LOAD_NO_CACHE"))
         XCTAssertTrue(dialog.contains("removeAllCookies"))
+        XCTAssertTrue(dialog.contains("onReceivedHttpError"))
+        XCTAssertTrue(dialog.contains("/api/v1/userProfile"))
     }
 
     func test弹窗设置入口复用右键菜单设置逻辑() throws {

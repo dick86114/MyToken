@@ -2,6 +2,8 @@ package ai.routin.mytoken.feature.credentials
 
 import android.annotation.SuppressLint
 import android.webkit.CookieManager
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebStorage
 import android.webkit.WebView
@@ -99,6 +101,7 @@ fun XiaomiLoginDialog(
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     AndroidView(
                         factory = { context ->
+                            var authRecoveryAttempted = false
                             @SuppressLint("SetJavaScriptEnabled")
                             WebView(context).apply {
                                 settings.javaScriptEnabled = true
@@ -117,13 +120,35 @@ fun XiaomiLoginDialog(
                                     override fun onPageFinished(view: WebView?, url: String?) {
                                         isLoading = false
                                     }
+
+                                    override fun onReceivedHttpError(
+                                        view: WebView?,
+                                        request: WebResourceRequest?,
+                                        errorResponse: WebResourceResponse?,
+                                    ) {
+                                        val isUnauthorizedProfile =
+                                            request?.url?.toString()?.contains("/api/v1/userProfile") == true &&
+                                                errorResponse?.statusCode == 401
+                                        if (!isUnauthorizedProfile || authRecoveryAttempted) return
+
+                                        authRecoveryAttempted = true
+                                        CookieManager.getInstance().removeAllCookies {
+                                            view?.loadUrl(
+                                                XiaomiConsoleUrl,
+                                                mapOf("Cache-Control" to "no-cache"),
+                                            )
+                                        }
+                                    }
                                 }
                                 if (resetSession) {
                                     clearCache(true)
                                     clearHistory()
                                     WebStorage.getInstance().deleteAllData()
                                     CookieManager.getInstance().removeAllCookies {
-                                        loadUrl(XiaomiConsoleUrl)
+                                        loadUrl(
+                                            XiaomiConsoleUrl,
+                                            mapOf("Cache-Control" to "no-cache"),
+                                        )
                                     }
                                 } else {
                                     loadUrl(XiaomiConsoleUrl)
