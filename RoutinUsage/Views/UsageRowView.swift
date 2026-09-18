@@ -8,6 +8,10 @@ struct UsageRowView: View {
     let isAnotherDetectionActive: Bool
     let requestDetection: () -> Void
     var actions: AnyView?
+    var refreshCredential: () -> Void = {}
+    var retryCredential: () -> Void = {}
+
+    @State private var showsFailureDetails = false
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { timeline in
@@ -40,7 +44,7 @@ struct UsageRowView: View {
             }
             .saturation(state.configuration.isEnabled ? 1 : 0)
             .opacity(isSubscriptionExpired(now: timeline.date) ? 0.45 : 1)
-            .accessibilityElement(children: .combine)
+            .accessibilityElement(children: .contain)
             .accessibilityLabel(accessibilityLabel(now: timeline.date))
             .accessibilityHint(accessibilityHint)
         }
@@ -191,8 +195,29 @@ private extension UsageRowView {
                         }
                     }
                 }
+
+                headerRefreshButton
             }
         }
+    }
+
+    var headerRefreshButton: some View {
+        Button(action: refreshCredential) {
+            Group {
+                if state.isRefreshing {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+            }
+            .frame(width: 20, height: 20)
+        }
+        .buttonStyle(.borderless)
+        .disabled(state.isRefreshing || !state.configuration.isEnabled)
+        .help("刷新 \(state.configuration.displayName)")
+        .accessibilityLabel("刷新 \(state.configuration.displayName)")
     }
 
     @ViewBuilder
@@ -567,11 +592,26 @@ private extension UsageRowView {
     }
 
     var refreshFailureIndicator: some View {
-        Image(systemName: "exclamationmark.triangle.fill")
-            .font(.caption)
-            .foregroundStyle(.orange)
-            .help(UsageFormatter.refreshFailureTooltip(state: state))
-            .accessibilityLabel(UsageFormatter.refreshFailureTooltip(state: state))
+        Button {
+            showsFailureDetails = true
+        } label: {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .frame(width: 16, height: 16)
+        }
+        .buttonStyle(.borderless)
+        .help(UsageFormatter.refreshFailureTooltip(state: state))
+        .accessibilityLabel("查看刷新失败详情")
+        .popover(isPresented: $showsFailureDetails, arrowEdge: .bottom) {
+            RefreshFailurePopover(
+                state: state,
+                retry: {
+                    showsFailureDetails = false
+                    retryCredential()
+                }
+            )
+        }
     }
 
     func subscriptionDescriptionText(for snapshot: UsageSnapshot) -> String {
@@ -637,5 +677,56 @@ private extension UsageRowView {
 
     var accessibilityHint: String {
         UsageRowAccessibility.hint()
+    }
+}
+
+private struct RefreshFailurePopover: View {
+    let state: KeyUsageState
+    let retry: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("刷新失败", systemImage: "exclamationmark.triangle.fill")
+                .font(.headline)
+                .foregroundStyle(.orange)
+
+            Text(failureReason)
+                .font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(dataSourceText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack {
+                Spacer()
+                Button(action: retry) {
+                    Label("重试", systemImage: "arrow.clockwise")
+                }
+                .liquidGlassButton(prominent: true)
+                .disabled(state.isRefreshing)
+                .accessibilityLabel("重试刷新 \(state.configuration.displayName)")
+            }
+        }
+        .padding(16)
+        .frame(width: 320)
+    }
+
+    private var failureReason: String {
+        if let message = state.failureMessage, !message.isEmpty {
+            return message
+        }
+        guard let error = state.error else {
+            return "未知错误"
+        }
+        return UsageFormatter.errorText(error)
+    }
+
+    private var dataSourceText: String {
+        guard let lastSuccessAt = state.lastSuccessAt, state.snapshot != nil else {
+            return "暂无可用缓存，重试将重新请求用量数据。"
+        }
+        return "当前显示 \(lastSuccessAt.formatted(date: .abbreviated, time: .shortened)) 的上次成功数据。"
     }
 }

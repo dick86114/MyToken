@@ -19,6 +19,11 @@ enum AppUpdateStatus: Equatable {
     case failed(String)
 }
 
+struct XiaomiLoginRequest: Identifiable, Equatable, Sendable {
+    let id = UUID()
+    let credentialID: UUID
+}
+
 extension RefreshScheduler: RefreshScheduling {}
 
 actor AuthorizationCachingNotificationSender: NotificationSending {
@@ -66,6 +71,7 @@ final class AppEnvironment {
     let routinWebSession: RoutinWebSession?
     let xiaomiWebSession: XiaomiWebSession?
     var showsOnboarding = false
+    var xiaomiLoginRequest: XiaomiLoginRequest?
     private(set) var updateStatus: AppUpdateStatus = .idle
     private(set) var releaseHistoryState: AppReleaseHistoryState = .idle
     private(set) var updateCompletionNotice: String?
@@ -80,6 +86,7 @@ final class AppEnvironment {
     @ObservationIgnored private let codexGroupDetectionScheduler: any UpdateCheckScheduling
     @ObservationIgnored private let notificationTaskYield: @Sendable () async -> Void
     @ObservationIgnored private let applicationNotificationCenter: NotificationCenter
+    @ObservationIgnored private let xiaomiCookieReader: @MainActor () async -> String?
     @ObservationIgnored private var terminationObservation: ApplicationTerminationObservation?
     @ObservationIgnored private var isStarted = false
     @ObservationIgnored private var hasRequestedNotificationAuthorization = false
@@ -107,6 +114,7 @@ final class AppEnvironment {
         codexGroupDetection: CodexGroupDetectionService? = nil,
         routinWebSession: RoutinWebSession? = nil,
         xiaomiWebSession: XiaomiWebSession? = nil,
+        xiaomiCookieReader: (@MainActor () async -> String?)? = nil,
         providerRegistry: ProviderRegistry? = nil
     ) {
         self.settings = settings
@@ -126,6 +134,9 @@ final class AppEnvironment {
         self.notificationTaskYield = notificationTaskYield
         self.routinWebSession = routinWebSession
         self.xiaomiWebSession = xiaomiWebSession
+        self.xiaomiCookieReader = xiaomiCookieReader ?? {
+            await xiaomiWebSession?.captureCookieHeader()
+        }
         self.providerRegistry = providerRegistry
         self.routinCheckIn = routinCheckIn ?? RoutinCheckInService(session: UnavailableRoutinWebSession())
         self.codexGroupDetection = codexGroupDetection ?? CodexGroupDetectionService(
@@ -554,6 +565,46 @@ final class AppEnvironment {
         try? keyRepository.read(id: id)
     }
 
+    func refreshCredential(_ keyID: UUID) async {
+        await store.refresh(keyID: keyID)
+    }
+
+    func retryCredential(_ keyID: UUID) async {
+        guard store.state(for: keyID)?.configuration.providerID == .xiaomi else {
+            await store.refresh(keyID: keyID)
+            return
+        }
+
+        guard let cookie = await xiaomiCookieReader(), !cookie.isEmpty else {
+            xiaomiLoginRequest = XiaomiLoginRequest(credentialID: keyID)
+            return
+        }
+
+        guard updateCredentialSecret(keyID: keyID, secret: cookie) else {
+            return
+        }
+        await store.refresh(keyID: keyID)
+        guard store.state(for: keyID)?.failureIsAuthentication == true else {
+            return
+        }
+        xiaomiLoginRequest = XiaomiLoginRequest(credentialID: keyID)
+    }
+
+    func completeXiaomiLogin(_ request: XiaomiLoginRequest, cookie: String) async {
+        xiaomiLoginRequest = nil
+        guard updateCredentialSecret(keyID: request.credentialID, secret: cookie) else {
+            return
+        }
+        await store.refresh(keyID: request.credentialID)
+    }
+
+    func cancelXiaomiLogin(_ request: XiaomiLoginRequest) {
+        guard xiaomiLoginRequest?.id == request.id else {
+            return
+        }
+        xiaomiLoginRequest = nil
+    }
+
     func startCodexGroupDetection(for keyID: UUID) async {
         guard let secret = try? keyRepository.read(id: keyID) else {
             codexGroupDetection.clearRecord(for: keyID)
@@ -608,6 +659,27 @@ final class AppEnvironment {
         releaseHistoryTask = nil
         codexGroupDetectionScheduler.stop()
         cancelActiveUpdateCheck()
+    }
+
+    @discardableResult
+    private func updateCredentialSecret(keyID: UUID, secret: String) -> Bool {
+        guard let configuration = keyRepository.list().first(where: { $0.id == keyID }) else {
+            return false
+        }
+        do {
+            _ = try keyRepository.update(
+                id: keyID,
+                name: configuration.name,
+                secret: secret,
+                providerID: configuration.providerID,
+                credentialKind: configuration.credentialKind,
+                metadata: configuration.metadata
+            )
+            store.reloadConfigurations()
+            return true
+        } catch {
+            return false
+        }
     }
 
     deinit {

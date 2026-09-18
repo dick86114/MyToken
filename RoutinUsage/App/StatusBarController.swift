@@ -455,6 +455,8 @@ private struct StatusPopoverContent: View {
             updateStatus: environment.updateStatus,
             installAvailableUpdate: environment.installAvailableUpdate,
             startCodexGroupDetection: environment.startCodexGroupDetection(for:),
+            refreshCredential: environment.refreshCredential(_:),
+            retryCredential: environment.retryCredential(_:),
             openSettings: openSettings
         )
         .sheet(isPresented: $environment.showsOnboarding) {
@@ -464,6 +466,18 @@ private struct StatusPopoverContent: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name.showSettingsWindow)) { _ in
             openWindow(id: "settings")
+        }
+        .sheet(item: $environment.xiaomiLoginRequest) { request in
+            XiaomiRetryLoginSheet(
+                request: request,
+                session: environment.xiaomiWebSession,
+                onCaptured: { cookie in
+                    await environment.completeXiaomiLogin(request, cookie: cookie)
+                },
+                onClose: {
+                    environment.cancelXiaomiLogin(request)
+                }
+            )
         }
     }
 }

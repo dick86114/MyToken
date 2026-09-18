@@ -351,7 +351,9 @@ enum UsageFormatter {
         guard let error = state.error else {
             return "刷新失败"
         }
-        let reason = errorText(error)
+        let reason = state.failureMessage.flatMap { message in
+            message.isEmpty ? nil : message
+        } ?? errorText(error)
         guard state.snapshot != nil else {
             return "\(reason)。暂无可用缓存，将在下次刷新时重试。"
         }
@@ -398,6 +400,21 @@ enum UsageFormatter {
     /// Token 消耗需要保留完整数值，避免 compact 格式让用户无法核对后台总量。
     static func exactTokenText(_ value: Decimal?) -> String {
         numberText(value, grouping: true)
+    }
+
+    static func errorText(_ error: UsageDisplayError) -> String {
+        switch error {
+        case .noSubscription:
+            return "当前没有可用订阅"
+        case .invalidKey:
+            return "Key 无效"
+        case .network:
+            return "网络错误，将自动重试"
+        case .invalidResponse:
+            return "接口数据异常，请刷新重试"
+        case let .server(statusCode):
+            return "服务器错误（\(statusCode)），请稍后重试"
+        }
     }
 }
 
@@ -458,18 +475,4 @@ private extension UsageFormatter {
             ?? NSDecimalNumber(decimal: value).stringValue
     }
 
-    static func errorText(_ error: UsageDisplayError) -> String {
-        switch error {
-        case .noSubscription:
-            return "当前没有可用订阅"
-        case .invalidKey:
-            return "Key 无效"
-        case .network:
-            return "网络错误，将自动重试"
-        case .invalidResponse:
-            return "接口数据异常，请刷新重试"
-        case let .server(statusCode):
-            return "服务器错误（\(statusCode)），请稍后重试"
-        }
-    }
 }

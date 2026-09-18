@@ -62,6 +62,18 @@ struct CredentialManagementView: View {
                 showsTransferToAndroid = false
             }
         }
+        .sheet(item: $environment.xiaomiLoginRequest) { request in
+            XiaomiRetryLoginSheet(
+                request: request,
+                session: environment.xiaomiWebSession,
+                onCaptured: { cookie in
+                    await environment.completeXiaomiLogin(request, cookie: cookie)
+                },
+                onClose: {
+                    environment.cancelXiaomiLogin(request)
+                }
+            )
+        }
         .confirmationDialog(
             "确定删除这个凭证？",
             isPresented: Binding(
@@ -228,7 +240,13 @@ struct CredentialManagementView: View {
                 detectionRecord: nil,
                 isAnotherDetectionActive: false,
                 requestDetection: {},
-                actions: nil
+                actions: nil,
+                refreshCredential: {
+                    Task { await environment.refreshCredential(state.configuration.id) }
+                },
+                retryCredential: {
+                    Task { await environment.retryCredential(state.configuration.id) }
+                }
             )
             .accessibilityElement(children: .contain)
             .accessibilityLabel(model.accessibilitySummary(

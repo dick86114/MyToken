@@ -77,6 +77,41 @@ struct XiaomiLoginWindow: View {
 }
 
 @MainActor
+struct XiaomiRetryLoginSheet: View {
+    let request: XiaomiLoginRequest
+    let session: XiaomiWebSession?
+    let onCaptured: @MainActor (String) async -> Void
+    let onClose: @MainActor () -> Void
+
+    var body: some View {
+        Group {
+            if let session {
+                XiaomiLoginWindow(
+                    session: session,
+                    onCaptured: { cookie in
+                        Task { await onCaptured(cookie) }
+                    },
+                    onClose: onClose
+                )
+            } else {
+                ContentUnavailableView("小米 MiMo 登录暂不可用", systemImage: "wifi.exclamationmark")
+                    .frame(minWidth: 420, minHeight: 260)
+                    .overlay(alignment: .topTrailing) {
+                        Button(action: onClose) {
+                            Image(systemName: "xmark")
+                        }
+                        .liquidGlassButton()
+                        .padding(14)
+                        .help("关闭")
+                        .accessibilityLabel("关闭")
+                    }
+            }
+        }
+        .onDisappear(perform: onClose)
+    }
+}
+
+@MainActor
 private struct XiaomiWebView: NSViewRepresentable {
     let webView: WKWebView
 
