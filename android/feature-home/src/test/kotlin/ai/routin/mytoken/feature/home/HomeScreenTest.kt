@@ -18,6 +18,7 @@ import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -362,6 +363,17 @@ class HomeScreenTest {
             "credential_refresh_${credential.id}",
             useUnmergedTree = true,
         ).performSemanticsAction(SemanticsActions.OnClick)
+        val refreshBounds = composeRule.onNodeWithTag(
+            "credential_refresh_${credential.id}",
+            useUnmergedTree = true,
+        ).getUnclippedBoundsInRoot()
+        val failureBounds = composeRule.onNodeWithTag(
+            "credential_failure_${credential.id}",
+            useUnmergedTree = true,
+        ).getUnclippedBoundsInRoot()
+        assertTrue(failureBounds.left < refreshBounds.left)
+        assertTrue(kotlin.math.abs(failureBounds.top.value - refreshBounds.top.value) < 1f)
+        assertTrue(refreshBounds.right <= composeRule.onRoot().getUnclippedBoundsInRoot().right)
         assertEquals(true, refreshed)
         composeRule.onNodeWithTag(
             "credential_failure_${credential.id}",
@@ -371,5 +383,29 @@ class HomeScreenTest {
         composeRule.onNodeWithText("凭证无效").assertIsDisplayed()
         composeRule.onNodeWithText("重试").performClick()
         assertEquals(true, retried)
+    }
+
+    @Test
+    fun loadingCardKeepsRefreshAffordanceVisible() {
+        val credential = credential("加载中")
+        val loadingCard = card(
+            credential,
+            status = RefreshStatus.Loading,
+            metrics = emptyList(),
+        )
+        composeRule.setContent {
+            MaterialTheme {
+                CredentialUsageCard(loadingCard, onOpen = {}, onRetry = {})
+            }
+        }
+
+        composeRule.onNodeWithTag(
+            "credential_refresh_${credential.id}",
+            useUnmergedTree = true,
+        ).assertExists()
+        composeRule.onNodeWithContentDescription(
+            "刷新 加载中",
+            useUnmergedTree = true,
+        ).assertExists()
     }
 }

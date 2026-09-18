@@ -3,14 +3,14 @@ package ai.routin.mytoken.feature.home
 import ai.routin.mytoken.domain.usage.RefreshStatus
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
@@ -88,19 +88,29 @@ fun CredentialUsageCard(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(verticalAlignment = Alignment.Top) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top,
+            ) {
                 Text(
                     text = card.credential.name,
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 96.dp),
                 )
-                Column(modifier = Modifier.padding(start = 10.dp, top = 4.dp)) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 10.dp, top = 4.dp),
+                ) {
                     Text(
                         text = if (plan.isEmpty()) providerName else "$providerName · $plan",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                     val start = card.snapshot?.subscriptionStartAt
                     val end = card.snapshot?.subscriptionEndAt
@@ -122,39 +132,46 @@ fun CredentialUsageCard(
                         }
                     }
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                if (card.status == RefreshStatus.Failed) {
-                    IconButton(
-                        onClick = { showsFailureDetails = true },
-                        modifier = Modifier
-                            .size(32.dp)
-                            .testTag("credential_failure_${card.credential.id}"),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Warning,
-                            contentDescription = "查看刷新失败详情",
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                }
-                IconButton(
-                    onClick = onRefresh,
-                    enabled = card.status != RefreshStatus.Loading && card.credential.isEnabled,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .testTag("credential_refresh_${card.credential.id}"),
+                Row(
+                    modifier = Modifier.padding(start = 8.dp),
+                    verticalAlignment = Alignment.Top,
                 ) {
-                    if (card.status == RefreshStatus.Loading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.width(18.dp).height(18.dp),
-                            strokeWidth = 2.dp,
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Filled.Refresh,
-                            contentDescription = "刷新 ${card.credential.name}",
-                        )
+                    if (card.status == RefreshStatus.Failed) {
+                        IconButton(
+                            onClick = { showsFailureDetails = true },
+                            modifier = Modifier
+                                .size(32.dp)
+                                .testTag("credential_failure_${card.credential.id}"),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Warning,
+                                contentDescription = "查看刷新失败详情",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                    IconButton(
+                        onClick = onRefresh,
+                        enabled = card.status != RefreshStatus.Loading && card.credential.isEnabled,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .testTag("credential_refresh_${card.credential.id}"),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Filled.Refresh,
+                                contentDescription = "刷新 ${card.credential.name}",
+                            )
+                            if (card.status == RefreshStatus.Loading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier
+                                        .matchParentSize()
+                                        .padding(6.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                            }
+                        }
                     }
                 }
             }
