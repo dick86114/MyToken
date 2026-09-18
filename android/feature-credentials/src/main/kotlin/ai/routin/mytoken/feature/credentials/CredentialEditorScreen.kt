@@ -26,6 +26,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import ai.routin.mytoken.core.ui.GlassButton
 import ai.routin.mytoken.core.ui.GlassButtonTone
 import ai.routin.mytoken.core.ui.GlassTextField
@@ -73,6 +77,8 @@ fun CredentialEditorScreen(
     onSave: () -> Unit,
     layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
 ) {
+    var showsXiaomiLogin by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -177,11 +183,23 @@ fun CredentialEditorScreen(
                     onToggleVisible = onToggleSecretVisible,
                     testTag = "editor_api_key",
                 )
-                Text(
-                    text = "登录 platform.xiaomimimo.com 后复制 Cookie；也可只粘贴 api-platform_serviceToken 的值。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = "登录 platform.xiaomimimo.com 后复制 Cookie；也可只粘贴 api-platform_serviceToken 的值。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    GlassButton(
+                        onClick = { showsXiaomiLogin = true },
+                        modifier = Modifier.testTag("editor_xiaomi_login"),
+                        text = "登录并获取 Cookie",
+                    )
+                }
             } else when (state.credentialKind) {
                 CredentialKind.BearerApiKey -> SecretField(
                     label = "API Key（Bearer Token）",
@@ -298,6 +316,16 @@ fun CredentialEditorScreen(
             )
         }
         }
+    }
+
+    if (showsXiaomiLogin) {
+        XiaomiLoginDialog(
+            onCaptured = { cookie ->
+                onApiKeyChange(cookie)
+                showsXiaomiLogin = false
+            },
+            onDismiss = { showsXiaomiLogin = false },
+        )
     }
 }
 

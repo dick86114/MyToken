@@ -318,6 +318,7 @@ class HomeScreenTest {
     @Test
     fun failedCardShowsErrorStaleDataAndRetry() {
         val credential = credential("失败")
+        var refreshed = false
         var retried = false
         val failedCard = card(
             credential,
@@ -349,13 +350,24 @@ class HomeScreenTest {
                         credentialCount = 1,
                     ),
                     onRefreshAll = {},
-                    onRefreshCredential = { retried = true },
+                    onRefreshCredential = { refreshed = true },
+                    onRetryCredential = { retried = true },
                     onOpenCredential = {},
                     onImportFromMac = {},
                     onAddManually = {},
                 )
             }
         }
+        composeRule.onNodeWithTag(
+            "credential_refresh_${credential.id}",
+            useUnmergedTree = true,
+        ).performSemanticsAction(SemanticsActions.OnClick)
+        assertEquals(true, refreshed)
+        composeRule.onNodeWithTag(
+            "credential_failure_${credential.id}",
+            useUnmergedTree = true,
+        ).performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.onNodeWithText("刷新失败").assertIsDisplayed()
         composeRule.onNodeWithText("凭证无效").assertIsDisplayed()
         composeRule.onNodeWithText("重试").performClick()
         assertEquals(true, retried)

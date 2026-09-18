@@ -171,10 +171,25 @@ class RefreshCredentialsUseCase(
         is UsageProviderException.RateLimited -> AppError.Network(error.message)
         is UsageProviderException.Transport -> AppError.Network(error.message)
         is UsageProviderException.ProviderUnavailable -> AppError.Network(error.message)
-        is UsageProviderException.ProviderMessage -> AppError.Network(error.message)
+        is UsageProviderException.ProviderMessage -> providerMessageError(error)
         is UsageProviderException.InvalidResponse -> AppError.Decode(error.message)
         is UsageProviderException.InvalidCredential -> AppError.Unknown(error.message)
         else -> AppError.Unknown(error.message ?: "刷新用量失败")
+    }
+
+    private fun providerMessageError(error: UsageProviderException.ProviderMessage): AppError {
+        val message = error.message.orEmpty()
+        val normalized = message.lowercase()
+        val isAuthenticationFailure = normalized.contains("未登录") ||
+            normalized.contains("unauthorized") ||
+            normalized.contains("invalid token") ||
+            normalized.contains("认证失败") ||
+            normalized.contains("登录已失效")
+        return if (isAuthenticationFailure) {
+            AppError.Authentication(message)
+        } else {
+            AppError.Network(message)
+        }
     }
 
     companion object {

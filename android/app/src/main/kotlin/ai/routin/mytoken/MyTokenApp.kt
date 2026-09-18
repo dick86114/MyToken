@@ -7,7 +7,10 @@ import ai.routin.mytoken.feature.credentials.CredentialEditorViewModel
 import ai.routin.mytoken.feature.credentials.CredentialListScreen
 import ai.routin.mytoken.feature.credentials.CredentialListViewModel
 import ai.routin.mytoken.feature.credentials.RoutinCheckInLauncher
+import ai.routin.mytoken.feature.credentials.XiaomiCookieReader
+import ai.routin.mytoken.feature.credentials.XiaomiLoginDialog
 import ai.routin.mytoken.feature.credentials.pruneCredential
+import ai.routin.mytoken.feature.home.CredentialRetryResult
 import ai.routin.mytoken.feature.home.HomeScreen
 import ai.routin.mytoken.feature.home.HomeViewModel
 import ai.routin.mytoken.feature.home.CredentialDetailScreen
@@ -89,6 +92,7 @@ fun MyTokenApp(
 ) {
     var selectedTab by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     var screen by remember { mutableStateOf<AppScreen>(AppScreen.Home) }
+    var xiaomiLoginCredential by remember { mutableStateOf<Credential?>(null) }
     val backStack = remember { mutableStateListOf<AppScreen>() }
     val scope = rememberCoroutineScope()
 
@@ -231,6 +235,21 @@ fun MyTokenApp(
                                     homeState.groups.flatMap { it.cards }
                                         .firstOrNull { it.credential.id == id }
                                         ?.let { homeViewModel.refreshCredential(it.credential) }
+                                },
+                                onRetryCredential = { id ->
+                                    val credential = homeState.groups.flatMap { it.cards }
+                                        .firstOrNull { it.credential.id == id }
+                                        ?.credential
+                                    credential?.let {
+                                        scope.launch {
+                                            val result = homeViewModel.retryCredentialAndAwait(it) {
+                                                XiaomiCookieReader.readCookieHeader()
+                                            }
+                                            if (result == CredentialRetryResult.NeedsLogin) {
+                                                xiaomiLoginCredential = it
+                                            }
+                                        }
+                                    }
                                 },
                                 onOpenCredential = { id -> navigate(AppScreen.Detail(id)) },
                                 onImportFromMac = { navigate(AppScreen.Transfer) },
@@ -411,6 +430,18 @@ fun MyTokenApp(
                 else -> Unit
             }
         }
+    }
+
+    xiaomiLoginCredential?.let { credential ->
+        XiaomiLoginDialog(
+            onCaptured = { cookie ->
+                xiaomiLoginCredential = null
+                scope.launch {
+                    homeViewModel.completeXiaomiLoginAndAwait(credential, cookie)
+                }
+            },
+            onDismiss = { xiaomiLoginCredential = null },
+        )
     }
 }
 }
