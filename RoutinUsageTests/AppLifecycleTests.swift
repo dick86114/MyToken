@@ -298,6 +298,7 @@ final class AppLifecycleTests: XCTestCase {
         await environment.retryCredential(key.id)
 
         XCTAssertEqual(environment.xiaomiLoginRequest?.credentialID, key.id)
+        XCTAssertEqual(environment.xiaomiLoginRequest?.resetsWebSession, true)
         XCTAssertEqual(try context.repository.read(id: key.id), "old-cookie")
     }
 
@@ -325,6 +326,7 @@ final class AppLifecycleTests: XCTestCase {
             UsageDisplayError.invalidKey
         )
         XCTAssertEqual(environment.xiaomiLoginRequest?.credentialID, key.id)
+        XCTAssertEqual(environment.xiaomiLoginRequest?.resetsWebSession, true)
     }
 
     func test完成小米登录后保存Cookie并刷新() async throws {

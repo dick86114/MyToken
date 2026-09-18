@@ -596,6 +596,59 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(settings.contains("更新完成"))
     }
 
+    func test小米重试登录清理旧Web会话并绕过缓存() throws {
+        let projectRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let session = try String(
+            contentsOf: projectRoot
+                .appendingPathComponent("RoutinUsage/Providers/XiaomiWebSession.swift"),
+            encoding: .utf8
+        )
+        let loginWindow = try String(
+            contentsOf: projectRoot
+                .appendingPathComponent("RoutinUsage/Views/XiaomiLoginWindow.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(session.contains("await clearWebsiteData()"))
+        XCTAssertTrue(session.contains(".reloadIgnoringLocalAndRemoteCacheData"))
+        XCTAssertTrue(loginWindow.contains("resetSession: request.resetsWebSession"))
+    }
+
+    func test更新弹窗操作按钮整块可点击() throws {
+        let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
+        let phase = try XCTUnwrap(popover.range(of: "Text(\"取消\")"))
+        let end = try XCTUnwrap(popover.range(of: ".font(.callout.weight(.medium))", range: phase.upperBound..<popover.endIndex))
+        let actionButtons = popover[phase.lowerBound..<end.lowerBound]
+
+        XCTAssertEqual(actionButtons.components(separatedBy: ".contentShape(Rectangle())").count - 1, 2)
+    }
+
+    func testAndroid卡片失败标识与刷新按钮同处标题区() throws {
+        let projectRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let card = try String(
+            contentsOf: projectRoot
+                .appendingPathComponent("android/feature-home/src/main/kotlin/ai/routin/mytoken/feature/home/CredentialUsageCard.kt"),
+            encoding: .utf8
+        )
+        let dialog = try String(
+            contentsOf: projectRoot
+                .appendingPathComponent("android/feature-credentials/src/main/kotlin/ai/routin/mytoken/feature/credentials/XiaomiLoginDialog.kt"),
+            encoding: .utf8
+        )
+        let headerStart = try XCTUnwrap(card.range(of: "Row(verticalAlignment = Alignment.Top)"))
+        let metricsStart = try XCTUnwrap(card.range(of: "val metrics = card.snapshot?.metrics.orEmpty()"))
+        let header = card[headerStart.lowerBound..<metricsStart.lowerBound]
+
+        XCTAssertTrue(header.contains("credential_failure_"))
+        XCTAssertTrue(header.contains("credential_refresh_"))
+        XCTAssertTrue(dialog.contains("WebSettings.LOAD_NO_CACHE"))
+        XCTAssertTrue(dialog.contains("removeAllCookies"))
+    }
+
     func test弹窗设置入口复用右键菜单设置逻辑() throws {
         let usagePopoverView = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
         let statusBarController = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")

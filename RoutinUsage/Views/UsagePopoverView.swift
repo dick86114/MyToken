@@ -843,9 +843,10 @@ private struct UpdateReleasePopup: View {
                 } label: {
                     Text("取消")
                         .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .padding(.vertical, 7)
                 .background {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(isCancelHovered ? Color.black.opacity(0.09) : cancelFill)
@@ -862,9 +863,10 @@ private struct UpdateReleasePopup: View {
                 } label: {
                     Text("立即更新")
                         .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .padding(.vertical, 7)
                 .background {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(isInstallHovered ? installBlue.opacity(0.85) : installBlue)
