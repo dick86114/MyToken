@@ -33,4 +33,59 @@ final class SettingsComponentTests: XCTestCase {
         XCTAssertFalse(source.contains("CardFramePreferenceKey"))
         XCTAssertFalse(source.contains("onPreferenceChange"))
     }
+
+    func test排序拖动上下相邻目标与补偿位移对称() {
+        XCTAssertEqual(
+            ReorderableCardGeometry.targetIndex(
+                startIndex: 0,
+                translation: 60,
+                step: 100,
+                count: 4
+            ),
+            1
+        )
+        XCTAssertEqual(
+            ReorderableCardGeometry.targetIndex(
+                startIndex: 2,
+                translation: -60,
+                step: 100,
+                count: 4
+            ),
+            1
+        )
+
+        XCTAssertEqual(
+            ReorderableCardGeometry.reorderedIDs([
+                "A", "B", "C", "D"
+            ], moving: "A", to: 1),
+            ["B", "A", "C", "D"]
+        )
+        XCTAssertEqual(
+            ReorderableCardGeometry.reorderedIDs([
+                "A", "B", "C", "D"
+            ], moving: "C", to: 1),
+            ["A", "C", "B", "D"]
+        )
+
+        XCTAssertEqual(
+            ReorderableCardGeometry.offset(
+                index: 1,
+                startIndex: 0,
+                targetIndex: 1,
+                step: 100,
+                activeTranslation: nil
+            ),
+            -100
+        )
+        XCTAssertEqual(
+            ReorderableCardGeometry.offset(
+                index: 1,
+                startIndex: 2,
+                targetIndex: 1,
+                step: 100,
+                activeTranslation: nil
+            ),
+            100
+        )
+    }
 }
