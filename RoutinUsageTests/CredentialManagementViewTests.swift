@@ -154,7 +154,7 @@ final class CredentialManagementViewTests: XCTestCase {
             context.repository.list().first { $0.id == first.id }?.isEnabled,
             false
         )
-        XCTAssertEqual(context.settings.displayOrder.menuBarCredentialIDs, [first.id])
+        XCTAssertTrue(context.settings.displayOrder.menuBarCredentialIDs.isEmpty)
         XCTAssertEqual(context.settings.displayOrder.popoverCredentialIDs, [first.id, second.id])
         XCTAssertEqual(model.allStates.map(\.configuration.id), [first.id, second.id])
         model.filter.status = .enabled

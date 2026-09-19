@@ -39,6 +39,14 @@ struct MenuBarManagementView: View {
         displayOrder.visible(enabledIDs: enabledIDs)
     }
 
+    private var displayOrderWithoutDisabledMenuBarIDs: CredentialDisplayOrder {
+        var order = displayOrder
+        order.menuBarCredentialIDs = order.menuBarCredentialIDs.filter {
+            enabledIDs.contains($0)
+        }
+        return order
+    }
+
     private var unifiedStates: [KeyUsageState] {
         visibility.popoverIDs.compactMap { environment.store.state(for: $0) }
     }
@@ -426,7 +434,10 @@ struct MenuBarManagementView: View {
     }
 
     private func moveDisplay(_ draggedID: UUID, to targetIndex: Int) -> Bool {
-        let updated = displayOrder.movingDisplay(id: draggedID, toIndex: targetIndex)
+        let updated = displayOrderWithoutDisabledMenuBarIDs.movingDisplay(
+            id: draggedID,
+            toIndex: targetIndex
+        )
         guard updated != displayOrder else { return false }
 
         var transaction = Transaction()
@@ -446,7 +457,7 @@ struct MenuBarManagementView: View {
     }
 
     private func setMenuBarMembership(isInMenuBar: Bool, id: UUID) {
-        var updated = displayOrder
+        var updated = displayOrderWithoutDisabledMenuBarIDs
         if isInMenuBar {
             let index = visibility.popoverIDs.firstIndex(of: id) ?? visibility.popoverIDs.count
             updated = updated.addingToMenuBar(id, toIndex: index)

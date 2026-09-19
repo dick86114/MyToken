@@ -3,6 +3,37 @@ import XCTest
 
 @MainActor
 final class CredentialOrderingControllerTests: XCTestCase {
+    func test停用凭证会释放菜单栏名额且保留弹窗顺序() throws {
+        let suiteName = "credential-order-controller.disable.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = AppSettings(defaults: defaults)
+        let menuBarIDs = (0..<CredentialDisplayOrder.maximumMenuBarCount).map { _ in UUID() }
+        let candidate = UUID()
+        settings.displayOrder.menuBarCredentialIDs = menuBarIDs
+        settings.displayOrder.popoverCredentialIDs = menuBarIDs + [candidate]
+        let controller = CredentialOrderingController(
+            settings: settings,
+            addCredential: { _ in
+                CredentialAddOutcome(saveResult: .saved, addedCredentialID: nil)
+            },
+            setKeyEnabled: { _, _ in },
+            delete: { _ in }
+        )
+
+        try controller.setEnabled(menuBarIDs[0], enabled: false)
+
+        XCTAssertEqual(settings.displayOrder.menuBarCredentialIDs, Array(menuBarIDs.dropFirst()))
+        XCTAssertEqual(settings.displayOrder.popoverCredentialIDs, menuBarIDs + [candidate])
+
+        controller.addingToMenuBar(candidate, toIndex: 0)
+        XCTAssertEqual(
+            settings.displayOrder.menuBarCredentialIDs,
+            [candidate] + Array(menuBarIDs.dropFirst())
+        )
+    }
+
     func test删除凭证成功时同步清理独立顺序() throws {
         let suiteName = "credential-order-controller.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))

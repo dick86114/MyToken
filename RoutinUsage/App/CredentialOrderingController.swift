@@ -50,6 +50,8 @@ final class CredentialOrderingController {
 
     func setEnabled(_ id: UUID, enabled: Bool) throws {
         try setKeyEnabled(id, enabled)
+        guard !enabled else { return }
+        settings.displayOrder = settings.displayOrder.removingFromMenuBar(id)
     }
 
     func delete(_ id: UUID) throws -> CredentialDeletionOutcome {
