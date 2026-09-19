@@ -116,6 +116,24 @@ struct CredentialDisplayOrder: Codable, Equatable, Sendable {
         movingDisplay(id: id, toIndex: target, membershipAnchorID: nil)
     }
 
+    func reorderingDisplay(id: UUID, toIndex target: Int) -> Self {
+        guard let sourceIndex = popoverCredentialIDs.firstIndex(of: id) else {
+            return self
+        }
+
+        var reorderedIDs = popoverCredentialIDs
+        reorderedIDs.remove(at: sourceIndex)
+        let destinationIndex = max(0, min(target, reorderedIDs.count))
+        reorderedIDs.insert(id, at: destinationIndex)
+
+        var result = self
+        result.popoverCredentialIDs = reorderedIDs
+        result.menuBarCredentialIDs = result.popoverCredentialIDs.filter {
+            result.menuBarCredentialIDs.contains($0)
+        }
+        return result
+    }
+
     private func movingDisplay(
         id: UUID,
         toIndex target: Int,

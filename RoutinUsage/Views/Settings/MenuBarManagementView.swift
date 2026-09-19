@@ -434,7 +434,7 @@ struct MenuBarManagementView: View {
     }
 
     private func moveDisplay(_ draggedID: UUID, to targetIndex: Int) -> Bool {
-        let updated = displayOrderWithoutDisabledMenuBarIDs.movingDisplay(
+        let updated = displayOrderWithoutDisabledMenuBarIDs.reorderingDisplay(
             id: draggedID,
             toIndex: targetIndex
         )

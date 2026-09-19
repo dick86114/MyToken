@@ -26,7 +26,7 @@ final class SettingsSortingModeTests: XCTestCase {
         ])
 
         XCTAssertTrue(source.contains("ReorderableCredentialCardList"))
-        XCTAssertTrue(source.contains("movingDisplay"))
+        XCTAssertTrue(source.contains("reorderingDisplay"))
         XCTAssertFalse(source.contains("isReorderingMenuBarIndicators"))
         XCTAssertFalse(source.contains("isReorderingAvailableIndicators"))
     }
