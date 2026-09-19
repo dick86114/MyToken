@@ -25,7 +25,7 @@ final class MenuBarManagementViewTests: XCTestCase {
         XCTAssertTrue(source.contains(".lineLimit(1)"))
         XCTAssertTrue(source.contains("ProviderTheme.background(for:"))
         XCTAssertFalse(source.contains("CredentialSummaryRow("))
-        XCTAssertTrue(source.contains("movingDisplay"))
+        XCTAssertTrue(source.contains("reorderingDisplay"))
         XCTAssertTrue(source.contains("Menu {"))
         XCTAssertTrue(source.contains("菜单栏指标"))
         XCTAssertTrue(source.contains("MenuBarMetricResolver.options"))

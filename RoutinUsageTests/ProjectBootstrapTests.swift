@@ -554,7 +554,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(settings.contains("isReorderingMenuBarIndicators"))
         XCTAssertFalse(settings.contains("private struct CredentialSortInteraction"))
         XCTAssertTrue(settings.contains("ReorderableCredentialCardList"))
-        XCTAssertTrue(settings.contains("movingDisplay"))
+        XCTAssertTrue(settings.contains("reorderingDisplay"))
         XCTAssertTrue(settings.contains("accessibilityAction"))
     }
 

@@ -51,6 +51,22 @@ final class CredentialDisplayOrderTests: XCTestCase {
         XCTAssertEqual(result.menuBarCredentialIDs, [two])
     }
 
+    func test普通排序不会改变菜单栏成员关系() {
+        let candidateMovedUp = order.reorderingDisplay(id: three, toIndex: 0)
+        XCTAssertEqual(
+            candidateMovedUp.popoverCredentialIDs,
+            [three, two, one, four]
+        )
+        XCTAssertEqual(candidateMovedUp.menuBarCredentialIDs, [two, one])
+
+        let selectedMovedDown = order.reorderingDisplay(id: one, toIndex: 3)
+        XCTAssertEqual(
+            selectedMovedDown.popoverCredentialIDs,
+            [two, three, four, one]
+        )
+        XCTAssertEqual(selectedMovedDown.menuBarCredentialIDs, [two, one])
+    }
+
     func test弹窗序列第一项移动到第二格会真正换位() {
         let result = order.moving(.popover, id: two, toIndex: 1)
 
