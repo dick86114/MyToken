@@ -2,6 +2,51 @@ import SwiftUI
 
 private let reorderableCardCoordinateSpace = "ReorderableCredentialCardList"
 
+enum ReorderableCardGeometry {
+    static func targetIndex(
+        startIndex: Int,
+        translation: CGFloat,
+        step: CGFloat,
+        count: Int
+    ) -> Int {
+        guard count > 0, step > 0 else { return 0 }
+        let steps = Int((translation / step).rounded())
+        return max(0, min(count - 1, startIndex + steps))
+    }
+
+    static func reorderedIDs<ID: Equatable>(
+        _ ids: [ID],
+        moving id: ID,
+        to targetIndex: Int
+    ) -> [ID] {
+        guard let sourceIndex = ids.firstIndex(of: id) else { return ids }
+        var updatedIDs = ids
+        updatedIDs.remove(at: sourceIndex)
+        let boundedIndex = max(0, min(targetIndex, updatedIDs.count))
+        updatedIDs.insert(id, at: boundedIndex)
+        return updatedIDs
+    }
+
+    static func offset(
+        index: Int,
+        startIndex: Int,
+        targetIndex: Int,
+        step: CGFloat,
+        activeTranslation: CGFloat?
+    ) -> CGFloat {
+        if let activeTranslation {
+            return activeTranslation
+        }
+        if startIndex < targetIndex, index > startIndex, index <= targetIndex {
+            return -step
+        }
+        if startIndex > targetIndex, index >= targetIndex, index < startIndex {
+            return step
+        }
+        return 0
+    }
+}
+
 struct ReorderableCredentialCardList<ID: Hashable, Card: View>: View {
     let ids: [ID]
     let itemHeight: CGFloat
@@ -84,30 +129,28 @@ struct ReorderableCredentialCardList<ID: Hashable, Card: View>: View {
               !workingIDs.isEmpty
         else { return }
 
-        let targetIndex = max(
-            0,
-            min(workingIDs.count - 1, startIndex + Int(round(dragTranslation / step)))
+        let targetIndex = ReorderableCardGeometry.targetIndex(
+            startIndex: startIndex,
+            translation: dragTranslation,
+            step: step,
+            count: workingIDs.count
         )
-        guard targetIndex != currentIndex,
-              let sourceIndex = workingIDs.firstIndex(of: id)
-        else { return }
-
-        var updatedIDs = workingIDs
-        updatedIDs.remove(at: sourceIndex)
-        updatedIDs.insert(id, at: targetIndex)
+        guard targetIndex != currentIndex else { return }
 
         withAnimation(
             reduceMotion
                 ? nil
                 : .interactiveSpring(response: 0.18, dampingFraction: 0.9)
         ) {
-            workingIDs = updatedIDs
             self.currentIndex = targetIndex
         }
     }
 
     private func commitMove(for id: ID) {
         let destinationIndex = currentIndex
+        let previewIDs = destinationIndex.map {
+            ReorderableCardGeometry.reorderedIDs(workingIDs, moving: id, to: $0)
+        } ?? workingIDs
         let didMove = if let startIndex,
                          let destinationIndex,
                          destinationIndex != startIndex {
@@ -121,9 +164,7 @@ struct ReorderableCredentialCardList<ID: Hashable, Card: View>: View {
                 ? nil
                 : .interactiveSpring(response: 0.2, dampingFraction: 0.92)
         ) {
-            if !didMove {
-                workingIDs = ids
-            }
+            workingIDs = didMove ? previewIDs : ids
             activeID = nil
             startIndex = nil
             currentIndex = nil
@@ -132,11 +173,18 @@ struct ReorderableCredentialCardList<ID: Hashable, Card: View>: View {
     }
 
     private func dragOffset(for id: ID) -> CGFloat {
-        guard activeID == id,
-              let startIndex,
-              let currentIndex
+
+        guard let startIndex,
+              let currentIndex,
+              let index = displayedIDs.firstIndex(of: id)
         else { return 0 }
 
-        return dragTranslation - CGFloat(currentIndex - startIndex) * step
+        return ReorderableCardGeometry.offset(
+            index: index,
+            startIndex: startIndex,
+            targetIndex: currentIndex,
+            step: step,
+            activeTranslation: activeID == id ? dragTranslation : nil
+        )
     }
 }
