@@ -94,6 +94,7 @@ fun GlassButton(
     modifier: Modifier = Modifier,
     tone: GlassButtonTone = GlassButtonTone.Neutral,
     enabled: Boolean = true,
+    icon: ImageVector? = null,
 ) {
     val toneColors = GlassToneColors.of(tone)
     val dark = isDarkTheme()
@@ -122,12 +123,25 @@ fun GlassButton(
             .padding(horizontal = 20.dp, vertical = 11.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = toneColors.content.copy(alpha = contentAlpha),
-        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            icon?.let {
+                Icon(
+                    imageVector = it,
+                    contentDescription = null,
+                    tint = toneColors.content.copy(alpha = contentAlpha),
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = toneColors.content.copy(alpha = contentAlpha),
+            )
+        }
     }
 }
 
@@ -217,6 +231,7 @@ fun GlassTextField(
     singleLine: Boolean = true,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     trailingIcon: @Composable (() -> Unit)? = null,
+    supportingText: String? = null,
 ) {
     LiquidGlassSurface(shape = RoundedCornerShape(14.dp)) {
         OutlinedTextField(
@@ -226,6 +241,14 @@ fun GlassTextField(
             singleLine = singleLine,
             visualTransformation = visualTransformation,
             trailingIcon = trailingIcon,
+            supportingText = supportingText?.let { text ->
+                {
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            },
             shape = RoundedCornerShape(14.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,

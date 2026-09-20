@@ -220,7 +220,9 @@ fun MyTokenApp(
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize(),
-                    beyondViewportPageCount = 2,
+                    // 三个根页面都常驻组合会让首页滚动时维护过多无关节点；
+                    // Pager 自身会保留滚动状态，切回时再组合即可。
+                    beyondViewportPageCount = 0,
                     key = { it },
                 ) { page ->
                     when (page) {
@@ -317,7 +319,7 @@ fun MyTokenApp(
                         }
                     CredentialDetailScreen(
                         card = card,
-                        lowThresholdPercent = settingsViewModel.state.value.notifications.lowThresholdPercent,
+                        lowThresholdPercent = settingsState.notifications.lowThresholdPercent,
                         onBack = { goBack() },
                         onRefresh = { card?.let { homeViewModel.refreshCredential(it.credential) } },
                         onEdit = { navigate(AppScreen.Editor(current.credentialId)) },

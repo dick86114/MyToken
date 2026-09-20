@@ -186,6 +186,7 @@ fun HomeScreen(
                                 CredentialUsageCard(
                                     card = card,
                                     metricColumns = metricColumns,
+                                    layoutMode = layoutMode,
                                     onOpen = { onOpenCredential(card.credential.id) },
                                     onRefresh = { onRefreshCredential(card.credential.id) },
                                     onRetry = { onRetryCredential(card.credential.id) },
