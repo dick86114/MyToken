@@ -351,6 +351,13 @@ internal fun GLMMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modifie
     val colors = statusColors()
     val progress = metrics.filter { it.presentation == ai.routin.mytoken.domain.model.UsageMetricPresentation.Progress }
     val calls = metrics.filter { it.id == "model-calls" || it.id == "zcode-mcp" }
+    val activity = listOf(
+        "activity-total-tokens",
+        "activity-peak-tokens",
+        "activity-usage-duration",
+        "activity-current-streak",
+        "activity-longest-streak"
+    ).mapNotNull { id -> metrics.firstOrNull { it.id == id } }
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         progress.chunked(columns).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -383,7 +390,63 @@ internal fun GLMMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modifie
                 repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
+        if (activity.isNotEmpty()) {
+            Text(
+                text = "活跃度",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            activity.chunked(columns).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    row.forEach { metric ->
+                        GLMActivityMetric(metric, Modifier.weight(1f))
+                    }
+                    repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        }
     }
+}
+
+@Composable
+private fun GLMActivityMetric(metric: UsageMetric, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(
+            text = glmActivityText(metric),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = metric.label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+private fun glmActivityText(metric: UsageMetric): String = when (metric.id) {
+    "activity-total-tokens", "activity-peak-tokens" -> formatCompact(metric.value)
+    "activity-usage-duration" -> formatUsageDuration(metric.value)
+    "activity-current-streak", "activity-longest-streak" -> "${formatDecimal(metric.value)}天"
+    else -> formatDecimal(metric.value)
+}
+
+private fun formatUsageDuration(milliseconds: BigDecimal?): String {
+    if (milliseconds == null) return "-"
+    val totalMinutes = milliseconds.divide(BigDecimal(60_000), 0, RoundingMode.DOWN).toLong()
+    val days = totalMinutes / (24 * 60)
+    val hours = (totalMinutes % (24 * 60)) / 60
+    val minutes = totalMinutes % 60
+    val parts = buildList {
+        if (days > 0) add("${days}天")
+        if (hours > 0) add("${hours}小时")
+        if (minutes > 0 || isEmpty()) add("${minutes}分钟")
+    }
+    return parts.joinToString("")
 }
 
 @Composable

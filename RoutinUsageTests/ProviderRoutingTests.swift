@@ -74,8 +74,12 @@ final class ProviderRoutingTests: XCTestCase {
                     providerID: .glm,
                     credentialKind: .apiKey
                 ),
-                ["five-hour", "weekly", "model-calls", "zcode-mcp"],
-                [0, 1, nil, nil]
+                [
+                    "five-hour", "weekly", "model-calls", "zcode-mcp",
+                    "activity-total-tokens", "activity-peak-tokens", "activity-usage-duration",
+                    "activity-current-streak", "activity-longest-streak"
+                ],
+                [0, 1, nil, nil, nil, nil, nil, nil, nil]
             ),
             (
                 "New API",

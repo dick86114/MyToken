@@ -475,6 +475,19 @@ struct GLMUsageMetricsView: View {
         }
     }
 
+    private var activityMetrics: [NormalizedUsageMetric] {
+        let ids = [
+            "activity-total-tokens",
+            "activity-peak-tokens",
+            "activity-usage-duration",
+            "activity-current-streak",
+            "activity-longest-streak"
+        ]
+        return ids.compactMap { id in
+            metrics.first(where: { $0.id == id })
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             if !progressMetrics.isEmpty {
@@ -492,6 +505,24 @@ struct GLMUsageMetricsView: View {
                     GridRow {
                         callCell(callMetrics[safe: 0])
                         callCell(callMetrics[safe: 1])
+                    }
+                }
+            }
+
+            if !activityMetrics.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("活跃度")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+
+                    LazyVGrid(
+                        columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3),
+                        alignment: .leading,
+                        spacing: 10
+                    ) {
+                        ForEach(activityMetrics) { metric in
+                            activityCell(metric)
+                        }
                     }
                 }
             }
@@ -521,6 +552,51 @@ struct GLMUsageMetricsView: View {
         } else {
             Color.clear
         }
+    }
+
+    private func activityCell(_ metric: NormalizedUsageMetric) -> some View {
+        let text = activityValueText(metric)
+        return VStack(alignment: .leading, spacing: 3) {
+            Text(text)
+                .font(.system(.headline, design: .rounded, weight: .semibold))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
+            Text(metric.label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(metric.label)，\(text)")
+    }
+
+    private func activityValueText(_ metric: NormalizedUsageMetric) -> String {
+        switch metric.id {
+        case "activity-total-tokens", "activity-peak-tokens":
+            return UsageFormatter.compactMetricValue(metric.value)
+        case "activity-usage-duration":
+            return Self.durationText(milliseconds: metric.value)
+        case "activity-current-streak", "activity-longest-streak":
+            return "\(UsageFormatter.numberText(metric.value))天"
+        default:
+            return UsageFormatter.numberText(metric.value)
+        }
+    }
+
+    private static func durationText(milliseconds: Decimal?) -> String {
+        guard let milliseconds else { return "—" }
+        let totalMinutes = max(0, NSDecimalNumber(decimal: milliseconds).doubleValue / 60_000)
+        let minutes = Int(totalMinutes.rounded(.down))
+        let days = minutes / (24 * 60)
+        let hours = (minutes % (24 * 60)) / 60
+        let remainingMinutes = minutes % 60
+        var parts: [String] = []
+        if days > 0 { parts.append("\(days)天") }
+        if hours > 0 { parts.append("\(hours)小时") }
+        if remainingMinutes > 0 || parts.isEmpty { parts.append("\(remainingMinutes)分钟") }
+        return parts.joined()
     }
 }
 

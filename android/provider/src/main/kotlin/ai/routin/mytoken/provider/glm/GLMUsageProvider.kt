@@ -56,6 +56,7 @@ class GLMUsageProvider(
         val baseURL = credential.metadata[CredentialMetadataKey.BaseURL]?.takeIf { it.isNotBlank() }
             ?: defaultBaseURL
         val query = "?startTime=${encode(windowStart())}&endTime=${encode(windowEnd())}"
+        val activityQuery = "?startTime=${encode(activityWindowStart())}&endTime=${encode(activityWindowEnd())}&type=1"
 
         val modelResponse = try {
             request(url = baseURL.trimEnd('/') + MODEL_USAGE_PATH + query, key = key)
@@ -69,6 +70,12 @@ class GLMUsageProvider(
             if (error is kotlinx.coroutines.CancellationException) throw error
             return Result.failure(error as? UsageProviderException ?: UsageProviderException.Transport())
         }
+        val activityResponse = runCatching {
+            request(url = baseURL.trimEnd('/') + ACTIVITY_PATH + activityQuery, key = key)
+        }.getOrElse { error ->
+            if (error is kotlinx.coroutines.CancellationException) throw error
+            null
+        }
         val models = runCatching {
             val response = request(url = baseURL.trimEnd('/') + MODEL_LIST_PATH, key = key)
             allowedModels(response)
@@ -78,7 +85,7 @@ class GLMUsageProvider(
         }
 
         return runCatching {
-            mapResponses(modelResponse, quotaResponse, credential.id, models)
+            mapResponses(modelResponse, quotaResponse, activityResponse, credential.id, models)
         }.recoverCatching { error ->
             if (error is UsageProviderException) throw error
             throw UsageProviderException.InvalidResponse()
@@ -111,17 +118,23 @@ class GLMUsageProvider(
     private fun mapResponses(
         modelResponse: ProviderHttpResponse,
         quotaResponse: ProviderHttpResponse,
+        activityResponse: ProviderHttpResponse?,
         credentialId: java.util.UUID,
         allowedModels: List<String>,
     ): UsageSnapshot {
         val modelRoot = ProviderJson.parse(modelResponse.body.decodeToString()).asObjectOrNull()
         val quotaRoot = ProviderJson.parse(quotaResponse.body.decodeToString()).asObjectOrNull()
+        val activityRoot = activityResponse
+            ?.body
+            ?.decodeToString()
+            ?.let { ProviderJson.parse(it).asObjectOrNull() }
 
         val quotaMetrics = quotaMetrics(quotaRoot)
         val metrics = buildList {
             addAll(quotaMetrics.filter { it.id != "zcode-mcp" })
             modelCallMetric(modelRoot)?.let { add(it) }
             quotaMetrics.firstOrNull { it.id == "zcode-mcp" }?.let { add(it) }
+            addAll(activityMetrics(activityRoot))
         }
         if (metrics.isEmpty()) throw UsageProviderException.InvalidResponse()
 
@@ -205,6 +218,36 @@ class GLMUsageProvider(
         )
     }
 
+    private fun activityMetrics(root: JsonObject?): List<UsageMetric> {
+        val summary = root?.objOrNull("data")?.objOrNull("summary") ?: return emptyList()
+        return listOfNotNull(
+            activityMetric(summary, "totalTokens", "activity-total-tokens", "累计 Token 数", UsageMetricUnit.Token),
+            activityMetric(summary, "peakDailyTokens", "activity-peak-tokens", "峰值 Token 数", UsageMetricUnit.Token),
+            activityMetric(summary, "totalUsageDurationMs", "activity-usage-duration", "累计使用时长", UsageMetricUnit.Text),
+            activityMetric(summary, "currentStreakDays", "activity-current-streak", "当前连续天数", UsageMetricUnit.Text),
+            activityMetric(summary, "longestStreakDays", "activity-longest-streak", "最长连续天数", UsageMetricUnit.Text)
+        )
+    }
+
+    private fun activityMetric(
+        summary: JsonObject,
+        key: String,
+        id: String,
+        label: String,
+        unit: UsageMetricUnit,
+    ): UsageMetric? {
+        val value = summary.decimalOrNull(key) ?: return null
+        return UsageMetric(
+            id = id,
+            label = label,
+            value = value,
+            unit = unit,
+            presentation = UsageMetricPresentation.Value,
+            semantic = UsageMetricSemantic.Value,
+            healthState = UsageMetricHealthState.Normal
+        )
+    }
+
     private fun percentMetric(id: String, label: String, percentage: BigDecimal, windowEnd: Instant?): UsageMetric =
         UsageMetric(
             id = id,
@@ -228,6 +271,16 @@ class GLMUsageProvider(
         return format(now.withMinute(59).withSecond(59).withNano(0))
     }
 
+    private fun activityWindowStart(): String {
+        val now = LocalDateTime.now(clock)
+        return format(now.toLocalDate().minusDays(365).atStartOfDay())
+    }
+
+    private fun activityWindowEnd(): String {
+        val now = LocalDateTime.now(clock)
+        return format(now.toLocalDate().plusDays(1).atStartOfDay().minusSeconds(1))
+    }
+
     private fun format(value: LocalDateTime): String = value.format(FORMATTER)
 
     private fun encode(value: String): String {
@@ -248,6 +301,7 @@ class GLMUsageProvider(
         const val DEFAULT_BASE_URL = "https://api.z.ai"
         private const val MODEL_USAGE_PATH = "/api/monitor/usage/model-usage"
         private const val QUOTA_LIMIT_PATH = "/api/monitor/usage/quota/limit"
+        private const val ACTIVITY_PATH = "/api/monitor/credit-usage/activity"
         private const val MODEL_LIST_PATH = "/api/coding/paas/v4/models"
 
         private val FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
