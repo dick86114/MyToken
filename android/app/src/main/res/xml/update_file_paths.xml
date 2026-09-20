@@ -6,4 +6,5 @@
     <files-path
         name="internal_update_apks"
         path="updates/" />
+    <cache-path name="share_images" path="share/" />
 </paths>

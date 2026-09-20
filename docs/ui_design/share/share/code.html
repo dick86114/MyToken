@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MyToken - 分享用量凭证</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    }
+    .font-mono-num {
+      font-family: 'JetBrains Mono', "SF Mono", Menlo, Monaco, Consolas, monospace;
+      font-variant-numeric: tabular-nums;
+    }
+    /* macOS Window Shadow and Glass Effect */
+    .macos-window {
+      box-shadow: 0 25px 65px -15px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.12), 0 1px 3px rgba(0,0,0,0.4);
+    }
+    /* Ticket notch cutout */
+    .ticket-cutout-l {
+      position: absolute;
+      left: -12px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #14171f;
+      box-shadow: inset -2px 0 3px rgba(0,0,0,0.5);
+      z-index: 10;
+    }
+    .ticket-cutout-r {
+      position: absolute;
+      right: -12px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #14171f;
+      box-shadow: inset 2px 0 3px rgba(0,0,0,0.5);
+      z-index: 10;
+    }
+    .tear-line-ticket {
+      background-image: linear-gradient(to right, #475569 50%, rgba(255,255,255,0) 0%);
+      background-position: bottom;
+      background-size: 8px 1.5px;
+      background-repeat: repeat-x;
+    }
+    /* Custom thin scrollbar for editing pane */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+  </style>
+</head>
+<body class="bg-[#090a0d] min-h-screen flex items-center justify-center p-4 md:p-8 text-slate-200 antialiased selection:bg-blue-600 selection:text-white">
+
+  <!-- ==================== macOS Standalone Floating Share Window ==================== -->
+  <div class="macos-window w-full max-w-[1020px] bg-[#161922]/95 backdrop-blur-2xl rounded-2xl border border-white/10 flex flex-col overflow-hidden transition-all duration-200">
+
+    <!-- macOS Title Bar (Unified Toolbar) -->
+    <div class="h-12 bg-[#1b1f2b]/90 border-b border-white/[0.08] px-4 flex items-center justify-between select-none shrink-0">
+      
+      <!-- Traffic Lights (Close / Minimize / Maximize) -->
+      <div class="flex items-center gap-2">
+        <button id="btnCloseWin" class="w-3 h-3 rounded-full bg-[#ff5f56] hover:brightness-110 active:brightness-90 flex items-center justify-center group shadow-sm">
+          <svg class="w-1.5 h-1.5 text-[#4c0000] opacity-0 group-hover:opacity-100 transition-opacity" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+        <button class="w-3 h-3 rounded-full bg-[#ffbd2e] hover:brightness-110 active:brightness-90 flex items-center justify-center group shadow-sm">
+          <svg class="w-1.5 h-1.5 text-[#593d00] opacity-0 group-hover:opacity-100 transition-opacity" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4"><path d="M5 12h14"/></svg>
+        </button>
+        <button class="w-3 h-3 rounded-full bg-[#27c93f] hover:brightness-110 active:brightness-90 flex items-center justify-center group shadow-sm">
+          <svg class="w-1.5 h-1.5 text-[#004d11] opacity-0 group-hover:opacity-100 transition-opacity" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4"><path d="m8 16 8-8m0 0v6m0-6h-6"/></svg>
+        </button>
+
+        <span class="ml-3 text-xs font-semibold text-slate-300 flex items-center gap-2">
+          <span>分享用量卡片</span>
+          <span class="text-slate-500">•</span>
+          <span class="text-slate-400 font-mono-num text-[11px]">Claude 3.5 Team</span>
+        </span>
+      </div>
+
+      <!-- Window Status & Dimension Pill (Window Position & Scale Memory Indicator) -->
+      <div class="hidden sm:flex items-center gap-2 text-[11px] text-slate-400 font-mono-num bg-slate-900/60 px-2.5 py-1 rounded-md border border-white/5">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+        <span>已记住窗口尺寸 (1020 × 680)</span>
+      </div>
+
+      <!-- Right Window Operations -->
+      <div class="flex items-center gap-2">
+        <button class="text-xs px-2.5 py-1 rounded-md text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-colors flex items-center gap-1.5" title="恢复默认布局">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+          <span class="text-[11px]">重置排版</span>
+        </button>
+        <button id="btnCloseIcon" class="w-7 h-7 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors" title="关闭窗口 (Esc)">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Workspace: Split into Left Live Preview (No Scroll, Fits Completely) & Right Editor -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 min-h-[580px] divide-y lg:divide-y-0 lg:divide-x divide-white/[0.08]">
+
+      <!-- ==================== LEFT: LIVE PREVIEW AREA (7 COLS) ==================== -->
+      <div class="lg:col-span-7 bg-[#10121a]/80 p-5 md:p-6 flex flex-col justify-between relative select-none">
+
+        <!-- Top Preview Meta Bar -->
+        <div class="flex items-center justify-between text-xs mb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-slate-400 font-medium text-[11px]">实时导出预览</span>
+            <span id="previewTag" class="text-[10px] px-2 py-0.5 rounded bg-amber-400/10 text-amber-300 border border-amber-400/20 font-bold">
+              票根 Pass 模式
+            </span>
+          </div>
+          <span class="text-[11px] text-slate-500 font-mono-num">
+            自适应高度 · 100% 完整视图
+          </span>
+        </div>
+
+        <!-- The Generated Share Card (Dynamically Rendered / Switchable via JS) -->
+        <div class="flex-1 flex items-center justify-center py-2">
+          
+          <!-- Card Container with fixed max width for high quality visual ratio -->
+          <div id="shareCardContainer" class="w-full max-w-[430px] transition-all duration-300">
+
+            <!-- ================= TICKET STYLE (DEFAULT) ================= -->
+            <div id="cardTicket" class="relative bg-[#181a22] border border-amber-500/30 rounded-2xl overflow-hidden shadow-2xl transition-all">
+              <!-- Notch holes -->
+              <div class="ticket-cutout-l border-r border-amber-500/30"></div>
+              <div class="ticket-cutout-r border-l border-amber-500/30"></div>
+
+              <!-- Top Section -->
+              <div class="p-4 bg-gradient-to-br from-[#222733] to-[#171922] border-b border-dashed border-slate-700 relative">
+                <div class="flex items-start justify-between">
+                  <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 font-black text-base">
+                      C
+                    </div>
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <span id="cardPassBadge" class="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-mono-num font-bold">PASS #TK-8942</span>
+                        <span id="cardStatusBadge" class="flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
+                          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>可用
+                        </span>
+                      </div>
+                      <h3 id="cardTitle" class="text-base font-extrabold text-white mt-0.5 tracking-tight">Main Work (主力研发)</h3>
+                    </div>
+                  </div>
+                  <div class="text-right">
+                    <span class="text-[9px] text-slate-400 uppercase font-mono-num block">SUPPLIER</span>
+                    <span class="text-xs font-bold text-amber-200">Anthropic</span>
+                  </div>
+                </div>
+
+                <!-- Meta Specs -->
+                <div id="secPlanRow" class="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-700/60 text-xs">
+                  <div id="fieldPlanSpec">
+                    <span class="text-slate-400 block text-[10px]">套餐规格</span>
+                    <span id="cardPlanText" class="text-white font-semibold text-xs mt-0.5 block truncate">Claude Team Plan</span>
+                  </div>
+                  <div id="fieldSubCycle">
+                    <span class="text-slate-400 block text-[10px]">订阅周期 / 剩余</span>
+                    <span id="cardCycleText" class="text-slate-200 font-mono-num text-[11px] block mt-0.5">余 12 天 (03.15)</span>
+                  </div>
+                </div>
+
+                <!-- Note (Optional) -->
+                <div id="fieldNote" class="mt-2.5 bg-amber-500/10 border border-amber-500/20 rounded-md px-2.5 py-1.5 text-[11px] text-amber-200 flex items-center gap-1.5">
+                  <svg class="w-3 h-3 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  <span id="cardNoteText" class="truncate">部门 Q1 研发专项池，仅限 3.5 调用</span>
+                </div>
+              </div>
+
+              <!-- Tear Line -->
+              <div class="relative py-1.5 bg-[#14161f]">
+                <div class="tear-line-ticket h-[2px] mx-5"></div>
+              </div>
+
+              <!-- Bottom Content Part -->
+              <div class="p-4 bg-[#181a22] space-y-3.5">
+                
+                <!-- Main Quota Gauge (Single line numbers) -->
+                <div id="fieldQuotaGauge" class="bg-slate-900/80 rounded-xl p-3 border border-slate-800">
+                  <div class="flex items-center justify-between text-xs mb-1.5">
+                    <span class="text-slate-300 font-medium text-[11px] flex items-center gap-1.5">
+                      <span class="w-2 h-2 rounded-sm bg-blue-500"></span>
+                      5 小时速率额度 (Rate Quota)
+                    </span>
+                    <span class="text-amber-400 font-mono-num font-bold text-xs">68.4%</span>
+                  </div>
+                  <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                    <div class="bg-gradient-to-r from-blue-500 to-amber-400 h-full rounded-full" style="width: 68.4%"></div>
+                  </div>
+                  <div class="flex items-center justify-between text-[10px] text-slate-400 mt-2 font-mono-num">
+                    <span>已用：<strong class="text-slate-200 font-medium">3,420,000</strong> Tokens</span>
+                    <span>上限：5,000,000 Tokens</span>
+                  </div>
+                  <div id="fieldResetTime" class="flex items-center justify-between text-[10px] pt-1.5 mt-1.5 border-t border-slate-800">
+                    <span class="text-slate-400">剩余：<span class="text-emerald-400 font-medium">1,580,000</span></span>
+                    <span class="text-amber-300 font-mono-num bg-amber-400/10 px-1.5 py-0.2 rounded">1h 24m 后重置 (14:30)</span>
+                  </div>
+                </div>
+
+                <!-- Extra Metrics Grid -->
+                <div class="grid grid-cols-2 gap-2 text-xs font-mono-num">
+                  <div id="fieldTokenRatio" class="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80">
+                    <span class="text-[9px] text-slate-400 font-sans block">Token 占比</span>
+                    <span class="text-xs font-bold text-white mt-0.5 block">Prompt 82% · 18%</span>
+                    <span class="text-[9px] text-slate-400 mt-0.5 block">命中率 64.2%</span>
+                  </div>
+                  <div id="fieldCodexGroup" class="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80">
+                    <span class="text-[9px] text-slate-400 font-sans block">Codex 分组倍率</span>
+                    <span class="text-xs font-bold text-purple-400 mt-0.5 block">Tier-2 · 1.0x</span>
+                    <span class="text-[9px] text-slate-400 mt-0.5 block">并发 20 活跃</span>
+                  </div>
+                </div>
+
+                <!-- Footer (No API Key Guarantee) -->
+                <div id="fieldFooter" class="pt-2.5 border-t border-slate-800 flex items-center justify-between text-[9px] text-slate-400 font-mono-num">
+                  <span class="flex items-center gap-1">
+                    <svg class="w-3 h-3 text-emerald-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                    MyToken 本地快照 · 无凭据
+                  </span>
+                  <span>2025-02-18 13:05</span>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- ================= DARK PRO STYLE (HIDDEN INITIALLY) ================= -->
+            <div id="cardDark" class="hidden bg-[#0f1117] border border-slate-800 rounded-2xl p-4 shadow-2xl relative overflow-hidden">
+              <div class="flex items-start justify-between pb-3 border-b border-slate-800">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-sm">C</div>
+                  <div>
+                    <h3 class="text-sm font-bold text-white tracking-tight" id="cardDarkTitle">Main Work (主力研发)</h3>
+                    <p class="text-[11px] text-slate-400">Anthropic · <span id="cardDarkPlan">Claude Team Plan</span></p>
+                  </div>
+                </div>
+                <span class="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded font-mono-num">可用</span>
+              </div>
+              <div class="mt-3 bg-slate-900 p-3 rounded-lg border border-slate-800">
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-slate-300 text-[11px]">周期速率已用 (5h)</span>
+                  <span class="text-blue-400 font-mono-num font-bold text-xs">68.4%</span>
+                </div>
+                <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                  <div class="bg-blue-500 h-full rounded-full" style="width: 68.4%"></div>
+                </div>
+                <div class="flex justify-between text-[10px] text-slate-400 font-mono-num mt-1.5">
+                  <span>3,420,000 / 5,000,000</span>
+                  <span class="text-amber-400">1h 24m 后重置</span>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2 mt-3 text-[10px] font-mono-num">
+                <div class="bg-slate-900/40 p-2 rounded border border-slate-800">
+                  <span class="text-slate-500 block">Prompt 缓存</span>
+                  <span class="text-emerald-400 font-bold">64.2% (省40%)</span>
+                </div>
+                <div class="bg-slate-900/40 p-2 rounded border border-slate-800">
+                  <span class="text-slate-500 block">Codex 倍率</span>
+                  <span class="text-purple-400 font-bold">Tier-2 · 1.0x</span>
+                </div>
+              </div>
+              <div class="mt-3 pt-2 border-t border-slate-800 flex justify-between text-[9px] text-slate-500 font-mono-num">
+                <span>MyToken 本地快照 · 无私钥</span>
+                <span>2025-02-18 13:05</span>
+              </div>
+            </div>
+
+            <!-- ================= LIGHT STYLE (HIDDEN INITIALLY) ================= -->
+            <div id="cardLight" class="hidden bg-[#fafafa] border border-slate-200 rounded-2xl p-4 shadow-2xl text-slate-800">
+              <div class="flex items-start justify-between pb-3 border-b border-slate-200">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white font-black text-sm">C</div>
+                  <div>
+                    <h3 class="text-sm font-extrabold text-slate-900" id="cardLightTitle">Main Work (主力研发)</h3>
+                    <p class="text-[11px] text-slate-500">Anthropic · <span id="cardLightPlan">Claude Team Plan</span></p>
+                  </div>
+                </div>
+                <span class="text-[10px] text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded font-mono-num">可用</span>
+              </div>
+              <div class="mt-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-slate-700 text-[11px]">5小时速率额度</span>
+                  <span class="text-blue-600 font-mono-num font-bold text-xs">68.4%</span>
+                </div>
+                <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                  <div class="bg-blue-600 h-full rounded-full" style="width: 68.4%"></div>
+                </div>
+                <div class="flex justify-between text-[10px] text-slate-500 font-mono-num mt-1.5">
+                  <span>3,420,000 / 5,000,000</span>
+                  <span class="text-amber-600 font-medium">1h 24m 后重置</span>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2 mt-3 text-[10px] font-mono-num">
+                <div class="bg-white p-2 rounded border border-slate-200">
+                  <span class="text-slate-400 block">Prompt 缓存</span>
+                  <span class="text-blue-600 font-bold">64.2%</span>
+                </div>
+                <div class="bg-white p-2 rounded border border-slate-200">
+                  <span class="text-slate-400 block">到期提示</span>
+                  <span class="text-slate-700 font-medium">余 12 天</span>
+                </div>
+              </div>
+              <div class="mt-3 pt-2 border-t border-slate-200 flex justify-between text-[9px] text-slate-400 font-mono-num">
+                <span>MyToken 本地快照 · 无私钥</span>
+                <span>2025-02-18 13:05</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Bottom Feedback Tip -->
+        <div class="pt-3 border-t border-white/[0.06] flex items-center justify-between text-[11px] text-slate-400">
+          <span class="flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            数字完全来自本地快照，真实用量不可篡改
+          </span>
+          <span class="text-slate-500">双击卡片可在默认看图器中查看</span>
+        </div>
+
+      </div>
+
+
+      <!-- ==================== RIGHT: CONTROLS & FIELD SWITCHES (5 COLS) ==================== -->
+      <div class="lg:col-span-5 bg-[#181b25] p-5 flex flex-col justify-between overflow-y-auto max-h-[640px]">
+
+        <div class="space-y-6">
+
+          <!-- 1. Template Picker Segmented Control -->
+          <div>
+            <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
+              模板风格选择 (实时切换)
+            </label>
+            <div class="grid grid-cols-3 gap-1.5 p-1 bg-[#10121a] rounded-xl border border-white/5 text-xs">
+              <button id="btnTplTicket" class="py-2 px-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-all">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"/></svg>
+                <span>票根 Pass</span>
+              </button>
+              <button id="btnTplDark" class="py-2 px-2 rounded-lg font-medium text-slate-400 hover:text-white flex items-center justify-center gap-1.5 transition-all">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect width="18" height="18" x="3" y="3" rx="2" stroke-width="2"/></svg>
+                <span>暗色极客</span>
+              </button>
+              <button id="btnTplLight" class="py-2 px-2 rounded-lg font-medium text-slate-400 hover:text-white flex items-center justify-center gap-1.5 transition-all">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="4" stroke-width="2"/></svg>
+                <span>雅致浅色</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 2. Text Overrides (User customizable titles & notes, NOT usage values) -->
+          <div class="space-y-3 pt-3 border-t border-white/[0.06]">
+            <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+              自定义文案与备注 (不影响云端账户)
+            </label>
+
+            <!-- Account Display Name -->
+            <div>
+              <div class="flex items-center justify-between text-xs text-slate-300 mb-1">
+                <span>显示名称</span>
+                <span class="text-[10px] text-slate-500">仅用于本次图片展示</span>
+              </div>
+              <input id="inputDisplayName" type="text" value="Main Work (主力研发)" class="w-full bg-[#10121a] border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors">
+            </div>
+
+            <!-- Custom Plan Text -->
+            <div>
+              <div class="flex items-center justify-between text-xs text-slate-300 mb-1">
+                <span>套餐文案</span>
+                <span class="text-[10px] text-slate-500">可补充团队说明</span>
+              </div>
+              <input id="inputPlanText" type="text" value="Claude Team Plan" class="w-full bg-[#10121a] border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors">
+            </div>
+
+            <!-- Optional Note -->
+            <div>
+              <div class="flex items-center justify-between text-xs text-slate-300 mb-1">
+                <span>卡片附注说明 (可选)</span>
+                <span class="text-[10px] text-amber-400">仅出现在分享图</span>
+              </div>
+              <input id="inputNoteText" type="text" value="部门 Q1 研发专项池，仅限 3.5 调用" class="w-full bg-[#10121a] border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors">
+            </div>
+          </div>
+
+          <!-- 3. Dynamic Field Toggles (Strictly show/hide without altering raw numbers) -->
+          <div class="space-y-2.5 pt-3 border-t border-white/[0.06]">
+            <div class="flex items-center justify-between">
+              <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                展示字段开关 (隐藏即不导出)
+              </label>
+              <button id="btnToggleAll" class="text-[11px] text-blue-400 hover:underline">全部显示</button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              
+              <!-- Toggle 1: 套餐信息 -->
+              <label class="flex items-center justify-between p-2 rounded-lg bg-[#11131b] border border-white/5 cursor-pointer hover:bg-white/[0.02]">
+                <span class="text-slate-300 text-[11px]">套餐规格</span>
+                <input id="chkPlan" type="checkbox" checked class="rounded border-slate-700 text-blue-600 focus:ring-0">
+              </label>
+
+              <!-- Toggle 2: 订阅周期 -->
+              <label class="flex items-center justify-between p-2 rounded-lg bg-[#11131b] border border-white/5 cursor-pointer hover:bg-white/[0.02]">
+                <span class="text-slate-300 text-[11px]">订阅周期/到期</span>
+                <input id="chkCycle" type="checkbox" checked class="rounded border-slate-700 text-blue-600 focus:ring-0">
+              </label>
+
+              <!-- Toggle 3: 重置倒计时 -->
+              <label class="flex items-center justify-between p-2 rounded-lg bg-[#11131b] border border-white/5 cursor-pointer hover:bg-white/[0.02]">
+                <span class="text-slate-300 text-[11px]">重置时间与倒计时</span>
+                <input id="chkReset" type="checkbox" checked class="rounded border-slate-700 text-blue-600 focus:ring-0">
+              </label>
+
+              <!-- Toggle 4: Token 占比 -->
+              <label class="flex items-center justify-between p-2 rounded-lg bg-[#11131b] border border-white/5 cursor-pointer hover:bg-white/[0.02]">
+                <span class="text-slate-300 text-[11px]">Token 占比与缓存</span>
+                <input id="chkTokenRatio" type="checkbox" checked class="rounded border-slate-700 text-blue-600 focus:ring-0">
+              </label>
+
+              <!-- Toggle 5: Codex 当前分组 -->
+              <label class="flex items-center justify-between p-2 rounded-lg bg-[#11131b] border border-white/5 cursor-pointer hover:bg-white/[0.02]">
+                <span class="text-slate-300 text-[11px]">Codex 路由分组</span>
+                <input id="chkCodex" type="checkbox" checked class="rounded border-slate-700 text-blue-600 focus:ring-0">
+              </label>
+
+              <!-- Toggle 6: 备注卡片 -->
+              <label class="flex items-center justify-between p-2 rounded-lg bg-[#11131b] border border-white/5 cursor-pointer hover:bg-white/[0.02]">
+                <span class="text-slate-300 text-[11px]">附加备注框</span>
+                <input id="chkNote" type="checkbox" checked class="rounded border-slate-700 text-blue-600 focus:ring-0">
+              </label>
+
+              <!-- Toggle 7: 水印与来源 -->
+              <label class="flex items-center justify-between p-2 rounded-lg bg-[#11131b] border border-white/5 cursor-pointer hover:bg-white/[0.02]">
+                <span class="text-slate-300 text-[11px]">快照水印与防伪</span>
+                <input id="chkFooter" type="checkbox" checked class="rounded border-slate-700 text-blue-600 focus:ring-0">
+              </label>
+
+              <!-- Toggle 8: 状态角标 -->
+              <label class="flex items-center justify-between p-2 rounded-lg bg-[#11131b] border border-white/5 cursor-pointer hover:bg-white/[0.02]">
+                <span class="text-slate-300 text-[11px]">可用状态徽章</span>
+                <input id="chkStatus" type="checkbox" checked class="rounded border-slate-700 text-blue-600 focus:ring-0">
+              </label>
+
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 4. Main Export Actions (Bottom Dock) -->
+        <div class="pt-5 mt-4 border-t border-white/[0.08] space-y-2.5">
+          <div class="flex items-center gap-3">
+            
+            <!-- Primary Action 1: Copy to Clipboard -->
+            <button id="btnCopy" class="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-600/25 transition-all">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect width="14" height="14" x="8" y="8" rx="2" stroke-width="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" stroke-width="2"/></svg>
+              <span>复制图片到剪贴板</span>
+            </button>
+
+            <!-- Primary Action 2: Save PNG to Disk -->
+            <button id="btnSave" class="flex-1 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-slate-100 font-semibold text-xs flex items-center justify-center gap-2 border border-white/10 transition-all">
+              <svg class="w-4 h-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              <span>保存 PNG 到本地</span>
+            </button>
+
+          </div>
+
+          <div class="flex items-center justify-between text-[10px] text-slate-500 px-1">
+            <span>快捷键: ⌘C 复制 · ⌘S 保存</span>
+            <span id="exportStatusMsg" class="text-emerald-400 font-medium">就绪 (PNG @2x Retina)</span>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Interactive JavaScript logic for dynamic preview updates -->
+  <script>
+    // Elements
+    const btnTplTicket = document.getElementById('btnTplTicket');
+    const btnTplDark = document.getElementById('btnTplDark');
+    const btnTplLight = document.getElementById('btnTplLight');
+    const previewTag = document.getElementById('previewTag');
+
+    const cardTicket = document.getElementById('cardTicket');
+    const cardDark = document.getElementById('cardDark');
+    const cardLight = document.getElementById('cardLight');
+
+    const inputDisplayName = document.getElementById('inputDisplayName');
+    const inputPlanText = document.getElementById('inputPlanText');
+    const inputNoteText = document.getElementById('inputNoteText');
+
+    const cardTitle = document.getElementById('cardTitle');
+    const cardPlanText = document.getElementById('cardPlanText');
+    const cardNoteText = document.getElementById('cardNoteText');
+
+    const chkPlan = document.getElementById('chkPlan');
+    const fieldPlanSpec = document.getElementById('fieldPlanSpec');
+    const chkCycle = document.getElementById('chkCycle');
+    const fieldSubCycle = document.getElementById('fieldSubCycle');
+    const chkReset = document.getElementById('chkReset');
+    const fieldResetTime = document.getElementById('fieldResetTime');
+    const chkTokenRatio = document.getElementById('chkTokenRatio');
+    const fieldTokenRatio = document.getElementById('fieldTokenRatio');
+    const chkCodex = document.getElementById('chkCodex');
+    const fieldCodexGroup = document.getElementById('fieldCodexGroup');
+    const chkNote = document.getElementById('chkNote');
+    const fieldNote = document.getElementById('fieldNote');
+    const chkFooter = document.getElementById('chkFooter');
+    const fieldFooter = document.getElementById('fieldFooter');
+    const chkStatus = document.getElementById('chkStatus');
+    const cardStatusBadge = document.getElementById('cardStatusBadge');
+
+    const btnCopy = document.getElementById('btnCopy');
+    const btnSave = document.getElementById('btnSave');
+    const exportStatusMsg = document.getElementById('exportStatusMsg');
+
+    // Template Switching
+    function setTemplate(tpl) {
+      // Reset all buttons
+      [btnTplTicket, btnTplDark, btnTplLight].forEach(b => {
+        b.className = 'py-2 px-2 rounded-lg font-medium text-slate-400 hover:text-white flex items-center justify-center gap-1.5 transition-all';
+      });
+      // Hide all cards
+      cardTicket.classList.add('hidden');
+      cardDark.classList.add('hidden');
+      cardLight.classList.add('hidden');
+
+      if (tpl === 'ticket') {
+        btnTplTicket.className = 'py-2 px-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-all';
+        cardTicket.classList.remove('hidden');
+        previewTag.textContent = '票根 Pass 模式';
+        previewTag.className = 'text-[10px] px-2 py-0.5 rounded bg-amber-400/10 text-amber-300 border border-amber-400/20 font-bold';
+      } else if (tpl === 'dark') {
+        btnTplDark.className = 'py-2 px-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 bg-blue-500/20 text-blue-300 border border-blue-500/30 transition-all';
+        cardDark.classList.remove('hidden');
+        previewTag.textContent = '极客暗色模式';
+        previewTag.className = 'text-[10px] px-2 py-0.5 rounded bg-blue-400/10 text-blue-300 border border-blue-400/20 font-bold';
+      } else {
+        btnTplLight.className = 'py-2 px-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 bg-white text-slate-900 border border-white/20 transition-all';
+        cardLight.classList.remove('hidden');
+        previewTag.textContent = '雅致浅色模式';
+        previewTag.className = 'text-[10px] px-2 py-0.5 rounded bg-slate-200 text-slate-800 border border-slate-300 font-bold';
+      }
+    }
+
+    btnTplTicket.addEventListener('click', () => setTemplate('ticket'));
+    btnTplDark.addEventListener('click', () => setTemplate('dark'));
+    btnTplLight.addEventListener('click', () => setTemplate('light'));
+
+    // Text overrides
+    inputDisplayName.addEventListener('input', (e) => {
+      cardTitle.textContent = e.target.value || '未命名账户';
+      document.getElementById('cardDarkTitle').textContent = e.target.value || '未命名账户';
+      document.getElementById('cardLightTitle').textContent = e.target.value || '未命名账户';
+    });
+    inputPlanText.addEventListener('input', (e) => {
+      cardPlanText.textContent = e.target.value || '标准套餐';
+      document.getElementById('cardDarkPlan').textContent = e.target.value || '标准套餐';
+      document.getElementById('cardLightPlan').textContent = e.target.value || '标准套餐';
+    });
+    inputNoteText.addEventListener('input', (e) => {
+      cardNoteText.textContent = e.target.value;
+      fieldNote.style.display = e.target.value.trim() ? 'flex' : 'none';
+    });
+
+    // Checkbox toggles
+    chkPlan.addEventListener('change', (e) => fieldPlanSpec.style.display = e.target.checked ? 'block' : 'none');
+    chkCycle.addEventListener('change', (e) => fieldSubCycle.style.display = e.target.checked ? 'block' : 'none');
+    chkReset.addEventListener('change', (e) => fieldResetTime.style.display = e.target.checked ? 'flex' : 'none');
+    chkTokenRatio.addEventListener('change', (e) => fieldTokenRatio.style.display = e.target.checked ? 'block' : 'none');
+    chkCodex.addEventListener('change', (e) => fieldCodexGroup.style.display = e.target.checked ? 'block' : 'none');
+    chkNote.addEventListener('change', (e) => fieldNote.style.display = e.target.checked ? 'flex' : 'none');
+    chkFooter.addEventListener('change', (e) => fieldFooter.style.display = e.target.checked ? 'flex' : 'none');
+    chkStatus.addEventListener('change', (e) => cardStatusBadge.style.display = e.target.checked ? 'flex' : 'none');
+
+    // Copy & Save Feedback Simulation
+    btnCopy.addEventListener('click', () => {
+      exportStatusMsg.textContent = '已成功复制高清 PNG 到剪贴板！';
+      exportStatusMsg.classList.add('text-blue-400');
+      btnCopy.classList.add('scale-95');
+      setTimeout(() => {
+        btnCopy.classList.remove('scale-95');
+        exportStatusMsg.textContent = '就绪 (PNG @2x Retina)';
+        exportStatusMsg.classList.remove('text-blue-400');
+      }, 2000);
+    });
+
+    btnSave.addEventListener('click', () => {
+      exportStatusMsg.textContent = '已保存到 ~/Downloads/MyToken-Pass.png';
+      exportStatusMsg.classList.add('text-emerald-400');
+      setTimeout(() => {
+        exportStatusMsg.textContent = '就绪 (PNG @2x Retina)';
+      }, 2500);
+    });
+  </script>
+</body>
+</html>
