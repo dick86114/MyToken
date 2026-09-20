@@ -132,6 +132,11 @@ struct CredentialDetailsView: View {
                         metrics: snapshot.normalizedMetrics,
                         now: .now
                     )
+                } else if state.configuration.providerID == .glm {
+                    GLMUsageMetricsView(
+                        metrics: snapshot.normalizedMetrics,
+                        now: .now
+                    )
                 } else {
                     NormalizedUsageMetricGrid(
                         metrics: snapshot.normalizedMetrics,

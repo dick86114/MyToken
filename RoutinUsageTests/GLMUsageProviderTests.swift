@@ -10,6 +10,8 @@ final class GLMUsageProviderTests: XCTestCase {
                 body = #"{"data":{"limits":[{"type":"TIME_LIMIT","unit":5,"number":1,"usage":1000,"currentValue":461,"remaining":539,"percentage":46},{"type":"TOKENS_LIMIT","unit":3,"number":5,"percentage":42},{"type":"TOKENS_LIMIT","unit":6,"number":1,"percentage":12}]}}"#
             } else if path.contains("model-usage") {
                 body = #"{"data":{"totalUsage":{"totalModelCallCount":22}}}"#
+            } else if path.contains("credit-usage/activity") {
+                body = #"{"data":{"summary":{"totalTokens":1890000000,"peakDailyTokens":310000000,"totalUsageDurationMs":322000000,"currentStreakDays":0,"longestStreakDays":19},"series":[]}}"#
             } else if path.contains("/api/coding/paas/v4/models") {
                 body = #"{"data":[{"id":"glm-5.3"},{"id":"glm-5.3-flash"},{"id":""}]}"#
             } else {
@@ -31,8 +33,15 @@ final class GLMUsageProviderTests: XCTestCase {
 
         XCTAssertEqual(snapshot.providerID, .glm)
         XCTAssertEqual(snapshot.allowedModels, ["glm-5.3", "glm-5.3-flash"])
-        XCTAssertEqual(snapshot.metrics.count, 4)
-        XCTAssertEqual(snapshot.metrics.map(\.id), ["five-hour", "weekly", "model-calls", "zcode-mcp"])
+        XCTAssertEqual(snapshot.metrics.count, 9)
+        XCTAssertEqual(
+            snapshot.metrics.map(\.id),
+            [
+                "five-hour", "weekly", "model-calls", "zcode-mcp",
+                "activity-total-tokens", "activity-peak-tokens", "activity-usage-duration",
+                "activity-current-streak", "activity-longest-streak"
+            ]
+        )
         XCTAssertEqual(snapshot.metrics.first?.label, "5 小时用量")
         XCTAssertEqual(snapshot.metrics.first?.used, 42)
         XCTAssertEqual(snapshot.metrics[1].label, "每周用量")
@@ -42,6 +51,11 @@ final class GLMUsageProviderTests: XCTestCase {
         XCTAssertEqual(snapshot.metrics[3].value, 461)
         XCTAssertEqual(snapshot.metrics[3].used, 461)
         XCTAssertEqual(snapshot.metrics[3].limit, 1_000)
+        XCTAssertEqual(snapshot.metrics[4].value, 1_890_000_000)
+        XCTAssertEqual(snapshot.metrics[5].value, 310_000_000)
+        XCTAssertEqual(snapshot.metrics[6].value, 322_000_000)
+        XCTAssertEqual(snapshot.metrics[7].value, 0)
+        XCTAssertEqual(snapshot.metrics[8].value, 19)
     }
 
     func test模型清单接口失败时保留空列表并继续显示用量() async throws {

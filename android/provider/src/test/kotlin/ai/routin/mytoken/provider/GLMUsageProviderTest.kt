@@ -46,6 +46,9 @@ class GLMUsageProviderTest {
     private fun queueSuccess() {
         transport.responses += ok(readFixture("usage/glm-model-usage.json"))
         transport.responses += ok(readFixture("usage/glm-quota-limit.json"))
+        transport.responses += ok(
+            """{"data":{"summary":{"totalTokens":1890000000,"peakDailyTokens":310000000,"totalUsageDurationMs":322000000,"currentStreakDays":0,"longestStreakDays":19},"series":[]}}"""
+        )
         transport.responses += ok("""{"data":[{"id":"glm-5.3"},{"id":"glm-5.3-flash"},{"id":""}]}""")
     }
 
@@ -56,7 +59,7 @@ class GLMUsageProviderTest {
         val result = provider.fetchUsage(credential(), secret)
 
         assertTrue(result.isSuccess)
-        assertEquals(3, transport.requests.size)
+        assertEquals(4, transport.requests.size)
 
         val modelUsage = transport.requests[0]
         assertEquals("GET", modelUsage.method)
@@ -76,7 +79,14 @@ class GLMUsageProviderTest {
             quotaLimit.url
         )
 
-        val models = transport.requests[2]
+        val activity = transport.requests[2]
+        assertEquals(
+            "https://api.z.ai/api/monitor/credit-usage/activity" +
+                "?startTime=2025-09-07%2000:00:00&endTime=2026-09-07%2023:59:59&type=1",
+            activity.url
+        )
+
+        val models = transport.requests[3]
         assertEquals("https://api.z.ai/api/coding/paas/v4/models", models.url)
         assertEquals("glm-secret-key", models.headers["Authorization"])
     }
@@ -101,7 +111,11 @@ class GLMUsageProviderTest {
         assertEquals(fixedClock.instant(), snapshot.fetchedAt)
         assertEquals(listOf("glm-5.3", "glm-5.3-flash"), snapshot.allowedModels)
         assertEquals(
-            listOf("five-hour", "weekly", "model-calls", "zcode-mcp"),
+            listOf(
+                "five-hour", "weekly", "model-calls", "zcode-mcp",
+                "activity-total-tokens", "activity-peak-tokens", "activity-usage-duration",
+                "activity-current-streak", "activity-longest-streak"
+            ),
             snapshot.metrics.map { it.id }
         )
 
@@ -139,18 +153,29 @@ class GLMUsageProviderTest {
         assertEquals(UsageMetricUnit.Request, zcodeMcp.unit)
         assertEquals(UsageMetricPresentation.Value, zcodeMcp.presentation)
         assertEquals(UsageMetricSemantic.UsedQuota, zcodeMcp.semantic)
+
+        val totalTokens = snapshot.metrics[4]
+        assertEquals("累计 Token 数", totalTokens.label)
+        assertEquals(0, totalTokens.value!!.compareTo(BigDecimal("1890000000")))
+        assertEquals(0, snapshot.metrics[5].value!!.compareTo(BigDecimal("310000000")))
+        assertEquals(0, snapshot.metrics[6].value!!.compareTo(BigDecimal("322000000")))
+        assertEquals(0, snapshot.metrics[7].value!!.compareTo(BigDecimal.ZERO))
+        assertEquals(0, snapshot.metrics[8].value!!.compareTo(BigDecimal("19")))
     }
 
     @Test
     fun fetchUsage_keepsEmptyModelsWhenModelRequestFails() = runTest {
         transport.responses += ok(readFixture("usage/glm-model-usage.json"))
         transport.responses += ok(readFixture("usage/glm-quota-limit.json"))
+        transport.responses += ok(
+            """{"data":{"summary":{"totalTokens":1,"peakDailyTokens":1,"totalUsageDurationMs":1,"currentStreakDays":1,"longestStreakDays":1},"series":[]}}"""
+        )
         transport.responses += ProviderHttpResponse(404, "{}".toByteArray())
 
         val snapshot = provider.fetchUsage(credential(), secret).getOrThrow()
 
         assertTrue(snapshot.allowedModels.isEmpty())
-        assertEquals(4, snapshot.metrics.size)
+        assertEquals(9, snapshot.metrics.size)
     }
 
     @Test

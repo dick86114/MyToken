@@ -53,6 +53,56 @@ struct GLMUsageProvider: UsageProvider {
                 menuBarPriority: nil,
                 defaultAlertEnabled: false,
                 defaultAbsoluteAlertThreshold: nil
+            ),
+            UsageMetricCapability(
+                metricID: "activity-total-tokens",
+                label: "累计 Token 数",
+                presentation: .value,
+                semantic: .value,
+                isMenuBarSelectable: false,
+                menuBarPriority: nil,
+                defaultAlertEnabled: false,
+                defaultAbsoluteAlertThreshold: nil
+            ),
+            UsageMetricCapability(
+                metricID: "activity-peak-tokens",
+                label: "峰值 Token 数",
+                presentation: .value,
+                semantic: .value,
+                isMenuBarSelectable: false,
+                menuBarPriority: nil,
+                defaultAlertEnabled: false,
+                defaultAbsoluteAlertThreshold: nil
+            ),
+            UsageMetricCapability(
+                metricID: "activity-usage-duration",
+                label: "累计使用时长",
+                presentation: .value,
+                semantic: .value,
+                isMenuBarSelectable: false,
+                menuBarPriority: nil,
+                defaultAlertEnabled: false,
+                defaultAbsoluteAlertThreshold: nil
+            ),
+            UsageMetricCapability(
+                metricID: "activity-current-streak",
+                label: "当前连续天数",
+                presentation: .value,
+                semantic: .value,
+                isMenuBarSelectable: false,
+                menuBarPriority: nil,
+                defaultAlertEnabled: false,
+                defaultAbsoluteAlertThreshold: nil
+            ),
+            UsageMetricCapability(
+                metricID: "activity-longest-streak",
+                label: "最长连续天数",
+                presentation: .value,
+                semantic: .value,
+                isMenuBarSelectable: false,
+                menuBarPriority: nil,
+                defaultAlertEnabled: false,
+                defaultAbsoluteAlertThreshold: nil
             )
         ]
     }
@@ -71,6 +121,10 @@ struct GLMUsageProvider: UsageProvider {
         let start = Self.format(Self.windowStart(from: now))
         let end = Self.format(Self.windowEnd(from: now))
         let query = "?startTime=\(Self.encode(start))&endTime=\(Self.encode(end))"
+        let activityStart = Self.format(Self.activityWindowStart(from: now))
+        let activityEnd = Self.format(Self.activityWindowEnd(from: now))
+        let activityQuery =
+            "?startTime=\(Self.encode(activityStart))&endTime=\(Self.encode(activityEnd))&type=1"
 
         async let model = request(
             url: root.appendingPathComponent("/api/monitor/usage/model-usage").appending(query: query),
@@ -80,9 +134,21 @@ struct GLMUsageProvider: UsageProvider {
             url: root.appendingPathComponent("/api/monitor/usage/quota/limit"),
             credential: credential
         )
+        async let activity = request(
+            url: root.appendingPathComponent("/api/monitor/credit-usage/activity").appending(query: activityQuery),
+            credential: credential
+        )
         async let allowedModels = fetchAllowedModels(root: root, credential: credential)
 
         let (modelValue, quotaValue) = try await (model, quota)
+        let activityValue: GLMJSONValue?
+        do {
+            activityValue = try await activity
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            activityValue = nil
+        }
         let models: [String]
         do {
             models = try await allowedModels
@@ -99,6 +165,7 @@ struct GLMUsageProvider: UsageProvider {
         if let zcodeMCPMetric = quotaMetrics.first(where: { $0.id == "zcode-mcp" }) {
             metrics.append(zcodeMCPMetric)
         }
+        metrics.append(contentsOf: Self.activityMetrics(from: activityValue))
         guard !metrics.isEmpty else {
             throw UsageProviderError.invalidResponse
         }
@@ -263,6 +330,42 @@ struct GLMUsageProvider: UsageProvider {
         )
     }
 
+    private static func activityMetrics(from value: GLMJSONValue?) -> [NormalizedUsageMetric] {
+        guard let value,
+              case let .object(root) = value,
+              case let .object(data)? = root["data"],
+              case let .object(summary)? = data["summary"]
+        else {
+            return []
+        }
+
+        var metrics: [NormalizedUsageMetric] = []
+        func appendMetric(
+            key: String,
+            id: String,
+            label: String,
+            unit: UsageMetricUnit
+        ) {
+            guard let metricValue = summary[key]?.numberValue() else { return }
+            metrics.append(NormalizedUsageMetric(
+                id: id,
+                label: label,
+                value: metricValue,
+                unit: unit,
+                presentation: .value,
+                semantic: .value,
+                healthState: .normal
+            ))
+        }
+
+        appendMetric(key: "totalTokens", id: "activity-total-tokens", label: "累计 Token 数", unit: .token)
+        appendMetric(key: "peakDailyTokens", id: "activity-peak-tokens", label: "峰值 Token 数", unit: .token)
+        appendMetric(key: "totalUsageDurationMs", id: "activity-usage-duration", label: "累计使用时长", unit: .text)
+        appendMetric(key: "currentStreakDays", id: "activity-current-streak", label: "当前连续天数", unit: .text)
+        appendMetric(key: "longestStreakDays", id: "activity-longest-streak", label: "最长连续天数", unit: .text)
+        return metrics
+    }
+
     private static func percentMetric(
         id: String,
         label: String,
@@ -302,6 +405,18 @@ struct GLMUsageProvider: UsageProvider {
     private static func windowEnd(from date: Date) -> Date {
         Calendar.current.date(bySetting: .minute, value: 59, of: date)
             .flatMap { Calendar.current.date(bySetting: .second, value: 59, of: $0) } ?? date
+    }
+
+    private static func activityWindowStart(from date: Date) -> Date {
+        let calendar = Calendar.current
+        return calendar.date(byAdding: .day, value: -365, to: calendar.startOfDay(for: date)) ?? date
+    }
+
+    private static func activityWindowEnd(from date: Date) -> Date {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: date)
+        let startOfNextDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? date
+        return calendar.date(byAdding: .second, value: -1, to: startOfNextDay) ?? date
     }
 
     private static func format(_ date: Date) -> String {
