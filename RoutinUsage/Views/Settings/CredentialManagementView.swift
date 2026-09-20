@@ -246,6 +246,11 @@ struct CredentialManagementView: View {
                 },
                 retryCredential: {
                     Task { await environment.retryCredential(state.configuration.id) }
+                },
+                onShare: {
+                    if let content = UsageShareContentBuilder.build(state: state) {
+                        UsageSharePanelController.shared.present(content: content)
+                    }
                 }
             )
             .accessibilityElement(children: .contain)

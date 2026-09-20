@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MyToken 用量分享图 - 3款模板方案展示</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    .font-mono-num {
+      font-family: 'JetBrains Mono', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-variant-numeric: tabular-nums;
+    }
+    /* Ticket perforation scalloped notches */
+    .ticket-cutout-left {
+      position: absolute;
+      left: -14px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #0f1115;
+      box-shadow: inset -2px 0 4px rgba(0,0,0,0.3);
+      z-index: 10;
+    }
+    .ticket-cutout-right {
+      position: absolute;
+      right: -14px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #0f1115;
+      box-shadow: inset 2px 0 4px rgba(0,0,0,0.3);
+      z-index: 10;
+    }
+    .tear-line {
+      background-image: linear-gradient(to right, #475569 50%, rgba(255,255,255,0) 0%);
+      background-position: bottom;
+      background-size: 10px 2px;
+      background-repeat: repeat-x;
+    }
+    .tear-line-light {
+      background-image: linear-gradient(to right, #cbd5e1 50%, rgba(255,255,255,0) 0%);
+      background-position: bottom;
+      background-size: 10px 2px;
+      background-repeat: repeat-x;
+    }
+    .bg-grid-pattern {
+      background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+      background-size: 16px 16px;
+    }
+  </style>
+</head>
+<body class="bg-[#0b0d11] text-slate-100 min-h-screen p-6 md:p-10 antialiased selection:bg-blue-600 selection:text-white">
+
+  <!-- Header & Description -->
+  <header class="max-w-7xl mx-auto mb-10">
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-slate-800/80">
+      <div>
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium mb-3">
+          <span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
+          MyToken macOS Native Feature Spec
+        </div>
+        <h1 class="text-3xl font-extrabold tracking-tight text-white flex items-center gap-3">
+          用量分享图 · 3 款核心模板视觉规范
+        </h1>
+        <p class="text-slate-400 text-sm mt-2 max-w-3xl leading-relaxed">
+          本地绘制导出、高保真长数字排版、无泄漏脱敏设计（坚决杜绝 API Key / Token / 邮箱等凭据）。支持动态适配 1~12+ 指标字段，保障真实快照数字不截断。
+        </p>
+      </div>
+      <div class="flex items-center gap-3 text-xs text-slate-400 bg-slate-900/90 px-4 py-2.5 rounded-xl border border-slate-800">
+        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-400"></span>纯本地离线光栅化</span>
+        <span class="text-slate-700">|</span>
+        <span>适合 2x / 3x Retina 导出</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 3 Templates Grid Preview -->
+  <main class="max-w-7xl mx-auto space-y-16">
+
+    <!-- Row 1: 3 Templates Side-by-Side with "Quota & Cycles (Claude Pro / Codex)" -->
+    <section>
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <span class="text-xs font-semibold text-blue-400 tracking-wider uppercase">Case 01 · 周期额度与阶梯消耗卡</span>
+          <h2 class="text-xl font-bold text-white">模板对比：票根 (默认) / 暗色极客 / 浅色极简</h2>
+        </div>
+        <div class="text-xs text-slate-400">数据源：Anthropic Claude 3.5 Sonnet Team (当前周期快照)</div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+
+        <!-- ==================== TEMPLATE 1: TICKET (票根通行证) ==================== -->
+        <div class="flex flex-col">
+          <div class="flex items-center justify-between mb-3 px-1">
+            <span class="inline-flex items-center gap-1.5 text-xs font-bold text-amber-400 bg-amber-400/10 px-2.5 py-0.5 rounded border border-amber-400/20">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>
+              模板 1 · 票根 Pass (默认推荐)
+            </span>
+            <span class="text-xs text-slate-400">登机牌分区 / 易撕孔 / 收藏分享</span>
+          </div>
+
+          <!-- Card Body: Ticket Style -->
+          <div class="relative bg-[#181a20] border border-amber-500/30 rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 hover:border-amber-500/50 hover:shadow-amber-500/10">
+            <!-- Cutout notch on junction -->
+            <div class="ticket-cutout-left border-r border-amber-500/30"></div>
+            <div class="ticket-cutout-right border-l border-amber-500/30"></div>
+
+            <!-- Ticket Header Part -->
+            <div class="p-6 bg-gradient-to-br from-[#20242e] to-[#16181f] border-b border-dashed border-slate-700 relative">
+              <div class="flex items-start justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 font-black text-lg">
+                    C
+                  </div>
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono-num font-bold tracking-wide text-[10px]">PASS #TK-8942</span>
+                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                      <span class="text-[11px] text-emerald-400 font-medium">状态可用</span>
+                    </div>
+                    <h3 class="text-lg font-extrabold text-white mt-0.5 tracking-tight">Main Work (主力研发)</h3>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <div class="text-[11px] text-slate-400 uppercase tracking-widest font-mono-num">SUPPLIER</div>
+                  <div class="text-xs font-bold text-amber-200">Anthropic</div>
+                </div>
+              </div>
+
+              <!-- Meta specs row -->
+              <div class="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-slate-700/60 text-xs">
+                <div>
+                  <span class="text-slate-400 block text-[11px]">套餐规格</span>
+                  <span class="text-white font-semibold flex items-center gap-1.5 mt-0.5">
+                    Claude Team Plan
+                    <span class="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.2 rounded border border-slate-700">5x 弹性</span>
+                  </span>
+                </div>
+                <div>
+                  <span class="text-slate-400 block text-[11px]">订阅周期 / 到期</span>
+                  <span class="text-slate-200 font-mono-num mt-0.5 block text-[11px]">
+                    2025.02.15 ~ 2025.03.15
+                  </span>
+                  <span class="text-amber-400 text-[10px] font-medium">（还有 12 天重置）</span>
+                </div>
+              </div>
+
+              <!-- Note if present -->
+              <div class="mt-3.5 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 text-xs flex items-center gap-2 text-amber-200">
+                <svg class="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <span class="truncate">备注：部门 Q1 研发专项池，仅限 Claude 3.5 Sonnet 调用</span>
+              </div>
+            </div>
+
+            <!-- Dotted Tear Line with Perforation Styling -->
+            <div class="relative py-2 bg-[#14161b]">
+              <div class="tear-line h-[2px] mx-6"></div>
+            </div>
+
+            <!-- Ticket Quota & Metrics Body (Perforated Lower Part) -->
+            <div class="p-6 bg-[#181a20] space-y-5">
+
+              <!-- Primary Quota Progress (长数字单行，不折行) -->
+              <div class="bg-slate-900/80 rounded-xl p-4 border border-slate-800">
+                <div class="flex items-center justify-between text-xs mb-2">
+                  <span class="text-slate-300 font-semibold flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-sm bg-blue-500"></span>
+                    本周期 5 小时速率限制 (Rate Quota)
+                  </span>
+                  <span class="text-amber-400 font-mono-num font-bold text-sm">68.4%</span>
+                </div>
+
+                <!-- Visual Bar -->
+                <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden p-0.5 border border-slate-700/50">
+                  <div class="bg-gradient-to-r from-blue-500 via-amber-400 to-amber-500 h-full rounded-full" style="width: 68.4%"></div>
+                </div>
+
+                <div class="flex items-center justify-between text-[11px] text-slate-400 mt-2 font-mono-num">
+                  <span>已消耗：<strong class="text-slate-200 font-mono-num font-medium">3,420,000</strong> Tokens</span>
+                  <span>上限：<strong class="text-slate-200 font-mono-num font-medium">5,000,000</strong> Tokens</span>
+                </div>
+                <div class="flex items-center justify-between text-[11px] pt-2 mt-2 border-t border-slate-800/80">
+                  <span class="text-slate-400">剩余可用：<span class="text-emerald-400 font-mono-num font-semibold">1,580,000 Tokens</span></span>
+                  <span class="text-amber-300/90 font-mono-num text-[11px] bg-amber-400/10 px-2 py-0.5 rounded">1小时24分后重置 (14:30)</span>
+                </div>
+              </div>
+
+              <!-- Detailed Metric Grid (动态增减自适应) -->
+              <div class="grid grid-cols-2 gap-2.5 text-xs font-mono-num">
+                <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-800/60">
+                  <div class="text-[10px] text-slate-400 uppercase font-sans">Token 占比 / 权重</div>
+                  <div class="text-sm font-bold text-white mt-1">Prompt 82% · Comp 18%</div>
+                  <div class="text-[10px] text-slate-400 mt-0.5">Prompt 缓存命中 64.2%</div>
+                </div>
+                <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-800/60">
+                  <div class="text-[10px] text-slate-400 uppercase font-sans">Codex 分组倍率</div>
+                  <div class="text-sm font-bold text-purple-400 mt-1">Tier-2 · 1.0x 基础</div>
+                  <div class="text-[10px] text-slate-400 mt-0.5">并发通道: 20 活跃中</div>
+                </div>
+              </div>
+
+              <!-- Ticket Bottom Stub / Barcode / Security Seal -->
+              <div class="pt-4 border-t border-slate-800 flex items-center justify-between">
+                <div>
+                  <div class="flex items-center gap-1.5 text-[10px] text-slate-400">
+                    <svg class="w-3 h-3 text-emerald-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                    <span>无密钥安全快照 · 本地生成</span>
+                  </div>
+                  <div class="text-[10px] text-slate-400 font-mono-num mt-0.5">
+                    快照生成: 2025-02-18 13:05:42
+                  </div>
+                </div>
+
+                <!-- Mini Barcode visual decoration -->
+                <div class="flex items-center gap-1 opacity-70">
+                  <div class="w-[2px] h-6 bg-slate-400"></div>
+                  <div class="w-[3px] h-6 bg-slate-300"></div>
+                  <div class="w-[1px] h-6 bg-slate-500"></div>
+                  <div class="w-[4px] h-6 bg-slate-200"></div>
+                  <div class="w-[2px] h-6 bg-slate-400"></div>
+                  <div class="w-[1px] h-6 bg-slate-500"></div>
+                  <div class="w-[3px] h-6 bg-slate-300"></div>
+                  <span class="text-[9px] font-mono-num text-slate-400 ml-1">MYTOKEN</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+
+        <!-- ==================== TEMPLATE 2: DARK PRO (暗色极客) ==================== -->
+        <div class="flex flex-col">
+          <div class="flex items-center justify-between mb-3 px-1">
+            <span class="inline-flex items-center gap-1.5 text-xs font-bold text-blue-400 bg-blue-500/10 px-2.5 py-0.5 rounded border border-blue-500/20">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 8 6 4-6 4Z"/></svg>
+              模板 2 · 极客暗色 Obsidian Dark
+            </span>
+            <span class="text-xs text-slate-400">高对比度 / 深色聊天群 / 终端感</span>
+          </div>
+
+          <!-- Card Body: Dark Pro Style -->
+          <div class="bg-[#0f1117] border border-slate-800 hover:border-blue-500/40 rounded-2xl p-6 shadow-2xl transition-all duration-300 hover:shadow-blue-500/5 relative overflow-hidden">
+            <!-- Subtle glow background -->
+            <div class="absolute -right-16 -top-16 w-44 h-44 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            <!-- Header -->
+            <div class="flex items-start justify-between pb-4 border-b border-slate-800 relative">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-bold text-base shadow-lg shadow-blue-500/20">
+                  C
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <h3 class="text-base font-bold text-white tracking-tight">Main Work (主力研发)</h3>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">可用</span>
+                  </div>
+                  <div class="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
+                    <span>Anthropic</span>
+                    <span class="text-slate-600">•</span>
+                    <span class="text-blue-400 font-medium">Claude Team Plan</span>
+                  </div>
+                </div>
+              </div>
+              <span class="text-[10px] font-mono-num text-slate-400 bg-slate-900 px-2 py-1 rounded border border-slate-800">
+                5x 弹性倍率
+              </span>
+            </div>
+
+            <!-- Note -->
+            <div class="mt-3.5 bg-slate-900/90 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 flex items-center gap-2">
+              <span class="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0"></span>
+              <span class="truncate">部门 Q1 研发专项池，仅限 Claude 3.5 Sonnet 调用</span>
+            </div>
+
+            <!-- Quota Bar -->
+            <div class="mt-5 space-y-2">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-300 font-medium">周期速率已用 (5h)</span>
+                <span class="font-mono-num font-bold text-blue-400 text-sm">68.4%</span>
+              </div>
+              <div class="w-full bg-slate-800/80 rounded-full h-2 overflow-hidden">
+                <div class="bg-blue-500 h-full rounded-full shadow-[0_0_12px_rgba(59,130,246,0.6)]" style="width: 68.4%"></div>
+              </div>
+              <div class="flex items-center justify-between text-[11px] text-slate-400 font-mono-num pt-1">
+                <span>已用 3,420,000 / 5,000,000</span>
+                <span>余 1,580,000 Tokens</span>
+              </div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-2 gap-3 mt-5 pt-5 border-t border-slate-800/80 text-xs font-mono-num">
+              <div class="bg-slate-900/40 p-3 rounded-lg border border-slate-800/50">
+                <span class="text-[10px] text-slate-400 font-sans block">重置周期倒计时</span>
+                <span class="text-amber-400 font-bold text-xs mt-1 block">1h 24m 后重置</span>
+                <span class="text-[10px] text-slate-400 block mt-0.5">重置点: 14:30:00</span>
+              </div>
+              <div class="bg-slate-900/40 p-3 rounded-lg border border-slate-800/50">
+                <span class="text-[10px] text-slate-400 font-sans block">订阅周期</span>
+                <span class="text-slate-200 font-medium text-xs mt-1 block">至 2025.03.15</span>
+                <span class="text-slate-400 text-[10px] block mt-0.5">剩余 12 天</span>
+              </div>
+              <div class="bg-slate-900/40 p-3 rounded-lg border border-slate-800/50">
+                <span class="text-[10px] text-slate-400 font-sans block">Prompt 缓存命中</span>
+                <span class="text-emerald-400 font-bold text-xs mt-1 block">64.2% (节省 40%)</span>
+              </div>
+              <div class="bg-slate-900/40 p-3 rounded-lg border border-slate-800/50">
+                <span class="text-[10px] text-slate-400 font-sans block">Codex 路由倍率</span>
+                <span class="text-purple-400 font-bold text-xs mt-1 block">Tier-2 · 1.0x</span>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-400 font-mono-num">
+              <span class="flex items-center gap-1.5">
+                <svg class="w-3 h-3 text-blue-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944z" clip-rule="evenodd"/></svg>
+                MyToken 本地快照 · 无凭据暴露
+              </span>
+              <span>2025-02-18 13:05</span>
+            </div>
+          </div>
+        </div>
+
+
+        <!-- ==================== TEMPLATE 3: LIGHT MINIMAL (优雅浅色) ==================== -->
+        <div class="flex flex-col">
+          <div class="flex items-center justify-between mb-3 px-1">
+            <span class="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-slate-200/80 px-2.5 py-0.5 rounded border border-slate-300">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+              模板 3 · 雅致浅色 Porcelain Light
+            </span>
+            <span class="text-xs text-slate-400">清爽白底 / 社交分享圈 / 高印刷感</span>
+          </div>
+
+          <!-- Card Body: Light Style -->
+          <div class="bg-[#fcfcfd] border border-slate-200/90 rounded-2xl p-6 shadow-2xl text-slate-800 transition-all duration-300 hover:shadow-xl hover:border-slate-300 relative">
+            <!-- Header -->
+            <div class="flex items-start justify-between pb-4 border-b border-slate-200/80">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white font-black text-lg">
+                  C
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <h3 class="text-base font-extrabold text-slate-900 tracking-tight">Main Work (主力研发)</h3>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">可用</span>
+                  </div>
+                  <div class="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
+                    <span class="font-medium text-slate-700">Anthropic</span>
+                    <span class="text-slate-300">•</span>
+                    <span>Claude Team Plan (5x)</span>
+                  </div>
+                </div>
+              </div>
+              <span class="text-[10px] font-mono-num font-semibold text-slate-600 bg-slate-100 px-2 py-1 rounded">
+                Claude 3.5
+              </span>
+            </div>
+
+            <!-- Note in light mode -->
+            <div class="mt-3.5 bg-slate-50 border border-slate-200/70 rounded-lg px-3 py-2 text-xs text-slate-600 flex items-center gap-2">
+              <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span class="truncate">部门 Q1 研发专项池，仅限 Claude 3.5 Sonnet 调用</span>
+            </div>
+
+            <!-- Quota Bar -->
+            <div class="mt-5 space-y-2">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-700 font-semibold">5 小时速率额度</span>
+                <span class="font-mono-num font-bold text-blue-600 text-sm">68.4%</span>
+              </div>
+              <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden p-0.5 border border-slate-200">
+                <div class="bg-blue-600 h-full rounded-full" style="width: 68.4%"></div>
+              </div>
+              <div class="flex items-center justify-between text-[11px] text-slate-500 font-mono-num pt-1">
+                <span>已消耗 <strong class="text-slate-800 font-medium">3,420,000</strong></span>
+                <span>上限 5,000,000</span>
+              </div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-2 gap-2.5 mt-5 pt-5 border-t border-slate-200 text-xs font-mono-num">
+              <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                <span class="text-[10px] text-slate-400 font-sans block">剩余可用</span>
+                <span class="text-emerald-600 font-bold text-xs mt-0.5 block">1,580,000 Tokens</span>
+              </div>
+              <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                <span class="text-[10px] text-slate-400 font-sans block">重置倒计时</span>
+                <span class="text-amber-600 font-bold text-xs mt-0.5 block">1h 24m 后重置</span>
+              </div>
+              <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                <span class="text-[10px] text-slate-400 font-sans block">到期提醒</span>
+                <span class="text-slate-700 font-medium text-xs mt-0.5 block">余 12 天 (03.15)</span>
+              </div>
+              <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                <span class="text-[10px] text-slate-400 font-sans block">Prompt 命中率</span>
+                <span class="text-blue-600 font-bold text-xs mt-0.5 block">64.2% 缓存命中</span>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-400 font-mono-num">
+              <span class="flex items-center gap-1 text-slate-500">
+                <svg class="w-3 h-3 text-emerald-600" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                MyToken 本地快照 · 无凭据安全
+              </span>
+              <span>2025-02-18 13:05</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Row 2: Verification with Case 02: Multi-metric & Balance Card (DeepSeek / OpenAI 余额与多维度统计) -->
+    <section class="pt-8 border-t border-slate-800">
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <span class="text-xs font-semibold text-emerald-400 tracking-wider uppercase">Case 02 · 纯余额与高密度多统计卡 (验证真实排版鲁棒性)</span>
+          <h2 class="text-xl font-bold text-white">长数字防折行 · 余额不伪造进度条 · 花费附在指标上</h2>
+        </div>
+        <div class="text-xs text-slate-400">数据源：DeepSeek V3 / R1 账户 + 充值余额实测</div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+        <!-- DeepSeek Multi-Metric in Ticket Style (默认票根态极端数据验证) -->
+        <div class="relative bg-[#181a20] border border-amber-500/30 rounded-2xl overflow-hidden shadow-2xl">
+          <div class="ticket-cutout-left border-r border-amber-500/30"></div>
+          <div class="ticket-cutout-right border-l border-amber-500/30"></div>
+
+          <div class="p-6 bg-gradient-to-br from-[#1f232c] to-[#15171d] border-b border-dashed border-slate-700">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-extrabold text-base">
+                  DS
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono-num font-bold text-[10px]">PASS #DS-0921</span>
+                    <span class="text-[11px] text-emerald-400 font-medium">● 状态可用</span>
+                  </div>
+                  <h3 class="text-lg font-bold text-white mt-0.5">DeepSeek-Production-01</h3>
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="text-[10px] text-slate-400 uppercase font-mono-num block">SUPPLIER</span>
+                <span class="text-xs font-bold text-blue-300">DeepSeek (API)</span>
+              </div>
+            </div>
+
+            <!-- Balance Showcase: 严格不伪造进度条，大字清晰单行展现 -->
+            <div class="mt-5 p-4 bg-slate-900/90 rounded-xl border border-slate-800 flex items-center justify-between">
+              <div>
+                <span class="text-[11px] text-slate-400 block">账户可用余额 (实时快照)</span>
+                <div class="text-2xl font-black text-white font-mono-num mt-0.5">
+                  ¥ 1,482.95 <span class="text-xs font-normal text-slate-400 ml-1">CNY</span>
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="text-[11px] text-slate-400 block">累计已充值</span>
+                <span class="text-xs font-mono-num text-slate-300 font-semibold mt-1 block">¥ 5,000.00</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tear Line -->
+          <div class="relative py-2 bg-[#14161b]">
+            <div class="tear-line h-[2px] mx-6"></div>
+          </div>
+
+          <!-- Ticket Lower: Multi-metrics grid (长数字单行、不换行、附带花费) -->
+          <div class="p-6 space-y-4">
+            <div class="text-xs font-semibold text-slate-300 flex items-center justify-between">
+              <span>本月统计类指标 (8项动态聚合)</span>
+              <span class="text-[10px] text-slate-400 font-mono-num">无伪造进度条</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 text-xs font-mono-num">
+              <!-- Token Metric with attached cost -->
+              <div class="col-span-2 bg-slate-900/60 p-3 rounded-lg border border-slate-800 flex items-center justify-between">
+                <div>
+                  <span class="text-[11px] text-slate-400 font-sans block">DeepSeek-R1 思考总 Token</span>
+                  <span class="text-base font-bold text-white mt-0.5 block">142,895,400 Tokens</span>
+                </div>
+                <div class="text-right">
+                  <span class="text-[10px] text-slate-400 font-sans block">折合花费</span>
+                  <span class="text-xs font-bold text-amber-400 mt-0.5 block">¥ 571.58</span>
+                </div>
+              </div>
+
+              <!-- Metric 2 -->
+              <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+                <span class="text-[10px] text-slate-400 font-sans block">Prompt 缓存命中 Token</span>
+                <span class="text-sm font-bold text-emerald-400 mt-1 block">98,204,110</span>
+                <span class="text-[10px] text-slate-400 mt-0.5 block font-sans">命中率 68.7% · 节约 ¥196.4</span>
+              </div>
+
+              <!-- Metric 3 -->
+              <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+                <span class="text-[10px] text-slate-400 font-sans block">API 请求总调用量</span>
+                <span class="text-sm font-bold text-white mt-1 block">89,420 次</span>
+                <span class="text-[10px] text-slate-400 mt-0.5 block font-sans">成功率 99.98%</span>
+              </div>
+
+              <!-- Metric 4 -->
+              <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+                <span class="text-[10px] text-slate-400 font-sans block">平均响应时长 (TTFT)</span>
+                <span class="text-sm font-bold text-white mt-1 block">482 ms</span>
+                <span class="text-[10px] text-slate-400 mt-0.5 block font-sans">连续稳定 42 天</span>
+              </div>
+
+              <!-- Metric 5 -->
+              <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+                <span class="text-[10px] text-slate-400 font-sans block">当前并发数 / 限制</span>
+                <span class="text-sm font-bold text-blue-400 mt-1 block">18 / 64 TPS</span>
+                <span class="text-[10px] text-slate-400 mt-0.5 block font-sans">无频控触发</span>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="pt-4 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-400 font-mono-num">
+              <span class="flex items-center gap-1">
+                <svg class="w-3 h-3 text-emerald-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                快照来源: 本地已脱敏 · 不含 API 密钥
+              </span>
+              <span>2025-02-18 13:05</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Design Spec Summary Card -->
+        <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2 mb-4">
+              <svg class="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+              分享图硬约束落地原则
+            </h3>
+
+            <div class="space-y-3.5 text-xs text-slate-300">
+              <div class="flex items-start gap-2.5 p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">1</span>
+                <div>
+                  <strong class="text-white block font-medium">长数字绝不从中间折断</strong>
+                  <p class="text-slate-400 mt-0.5">如 <code class="text-amber-300 font-mono-num">142,895,400 Tokens</code> 采用独立行单行容器，大数值与单位不拆行，保障可读性与专业感。</p>
+                </div>
+              </div>
+
+              <div class="flex items-start gap-2.5 p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">2</span>
+                <div>
+                  <strong class="text-white block font-medium">余额类拒绝伪造进度条</strong>
+                  <p class="text-slate-400 mt-0.5">对于 DeepSeek / OpenAI 等纯余额或预充值卡片，以清晰大字展示余额与货币符号；如供应商本身无金额（如 GLM 免费卡），绝不臆造空金额。</p>
+                </div>
+              </div>
+
+              <div class="flex items-start gap-2.5 p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">3</span>
+                <div>
+                  <strong class="text-white block font-medium">花费附在对应指标内</strong>
+                  <p class="text-slate-400 mt-0.5">如调用量或 Token 旁直接附折合花费（¥571.58），避免碎片化拆成无效孤立格子，信息紧凑聚焦。</p>
+                </div>
+              </div>
+
+              <div class="flex items-start gap-2.5 p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">4</span>
+                <div>
+                  <strong class="text-white block font-medium">不可篡改真实用量 vs 自由定制展示项</strong>
+                  <p class="text-slate-400 mt-0.5">用户在右侧面板可隐藏任何敏感或冗余字段，但无法修改真实数值，保证凭证快照的客观真实性。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-6 pt-4 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
+            <span>支持按 1~12+ 动态项弹性自适应拉伸</span>
+            <span class="text-blue-400 font-medium">下一步：进入 macOS 弹窗工作台 ➔</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+</body>
+</html>
