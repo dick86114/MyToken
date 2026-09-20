@@ -12,6 +12,7 @@ import ai.routin.mytoken.domain.model.UsageSnapshot
 import ai.routin.mytoken.domain.usage.RefreshStatus
 import java.math.BigDecimal
 import java.time.Instant
+import java.time.ZoneId
 import java.util.UUID
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -101,7 +102,10 @@ class UsageShareContentBuilderTest {
             avatarLetter = "T",
             isAvailable = true,
         )
-        assertEquals("MyToken-Test-A-ccount-20260920-1630.png", UsageShareContentBuilder.fileName(card, now))
+        assertEquals(
+            "MyToken-Test-A-ccount-20260920-1630.png",
+            UsageShareContentBuilder.fileName(card, now, ZoneId.of("Asia/Shanghai")),
+        )
     }
 
     private fun testCard(credential: Credential, snapshot: UsageSnapshot) = CredentialCardUi(

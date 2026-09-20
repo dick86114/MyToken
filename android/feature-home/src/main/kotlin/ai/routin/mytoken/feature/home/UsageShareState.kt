@@ -213,7 +213,9 @@ object UsageShareContentBuilder {
     }
 
     fun fileName(card: UsageShareRenderedCard, capturedAt: Instant, zone: ZoneId = ZoneId.systemDefault()): String {
-        val safe = card.displayName.replace(Regex("[/\\\\:?*\"<>|]"), "-").trim().ifEmpty { "账户" }
+        val safe = card.displayName.replace(Regex("[/\\\\:?*\"<>|]"), "-")
+            .trim()
+            .ifEmpty { "账户" }
         val stamp = DateTimeFormatter.ofPattern("yyyyMMdd-HHmm").withZone(zone).format(capturedAt)
         return "MyToken-$safe-$stamp.png"
     }
