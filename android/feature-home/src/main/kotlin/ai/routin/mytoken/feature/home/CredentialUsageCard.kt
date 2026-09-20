@@ -1,6 +1,7 @@
 package ai.routin.mytoken.feature.home
 
 import ai.routin.mytoken.domain.usage.RefreshStatus
+import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -72,6 +73,7 @@ fun CredentialUsageCard(
     onRetry: () -> Unit,
     onRefresh: () -> Unit = onRetry,
     modifier: Modifier = Modifier,
+    layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
 ) {
     val accent = ProviderCatalog.accentColor(card.credential.providerId)
     val providerName = ProviderCatalog.displayName(card.credential.providerId)
@@ -228,11 +230,9 @@ fun CredentialUsageCard(
     }
     if (showsShareDialog) {
         UsageShareDialog(
-            displayName = card.credential.name,
-            providerName = ProviderCatalog.displayName(card.credential.providerId),
-            planName = card.snapshot?.planName.orEmpty(),
-            snapshot = card.snapshot,
+            card = card,
             onDismiss = { showsShareDialog = false },
+            layoutMode = layoutMode,
         )
     }
 }
