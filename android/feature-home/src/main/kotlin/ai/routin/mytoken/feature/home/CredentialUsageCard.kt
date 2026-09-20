@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -76,6 +77,7 @@ fun CredentialUsageCard(
     val providerName = ProviderCatalog.displayName(card.credential.providerId)
     val plan = card.snapshot?.planName.orEmpty()
     var showsFailureDetails by remember(card.credential.id) { mutableStateOf(false) }
+    var showsShareDialog by remember(card.credential.id) { mutableStateOf(false) }
     Card(
         onClick = onOpen,
         modifier = modifier.fillMaxWidth(),
@@ -152,6 +154,19 @@ fun CredentialUsageCard(
                         }
                     }
                     IconButton(
+                        onClick = { showsShareDialog = true },
+                        enabled = card.snapshot != null && card.credential.isEnabled,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .testTag("credential_share_${card.credential.id}"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Share,
+                            contentDescription = "分享 ${card.credential.name}",
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    IconButton(
                         onClick = onRefresh,
                         enabled = card.status != RefreshStatus.Loading && card.credential.isEnabled,
                         modifier = Modifier
@@ -209,6 +224,15 @@ fun CredentialUsageCard(
                 showsFailureDetails = false
                 onRetry()
             },
+        )
+    }
+    if (showsShareDialog) {
+        UsageShareDialog(
+            displayName = card.credential.name,
+            providerName = ProviderCatalog.displayName(card.credential.providerId),
+            planName = card.snapshot?.planName.orEmpty(),
+            snapshot = card.snapshot,
+            onDismiss = { showsShareDialog = false },
         )
     }
 }
