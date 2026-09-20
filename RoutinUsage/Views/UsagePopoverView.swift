@@ -278,6 +278,14 @@ private extension UsagePopoverView {
                             },
                             retryCredential: {
                                 Task { await retryCredential(id) }
+                            },
+                            onShare: {
+                                if let content = UsageShareContentBuilder.build(
+                                    state: state,
+                                    detectionRecord: codexGroupDetection.record(for: id)
+                                ) {
+                                    UsageSharePanelController.shared.present(content: content)
+                                }
                             }
                         )
                     }
