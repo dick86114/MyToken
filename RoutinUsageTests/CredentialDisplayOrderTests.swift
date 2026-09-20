@@ -23,6 +23,13 @@ final class CredentialDisplayOrderTests: XCTestCase {
         XCTAssertEqual(visibility.menuBarCandidateIDs, [four])
     }
 
+    func test清理禁用凭证会同步移除两个排序序列() {
+        let result = order.removingDisabledCredentials(enabledIDs: [one, four])
+
+        XCTAssertEqual(result.menuBarCredentialIDs, [one])
+        XCTAssertEqual(result.popoverCredentialIDs, [one, four])
+    }
+
     func test菜单栏排序不影响弹窗排序() {
         let result = order.moving(.menuBar, id: one, toIndex: 0)
 

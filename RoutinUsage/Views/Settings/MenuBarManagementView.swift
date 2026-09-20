@@ -39,12 +39,8 @@ struct MenuBarManagementView: View {
         displayOrder.visible(enabledIDs: enabledIDs)
     }
 
-    private var displayOrderWithoutDisabledMenuBarIDs: CredentialDisplayOrder {
-        var order = displayOrder
-        order.menuBarCredentialIDs = order.menuBarCredentialIDs.filter {
-            enabledIDs.contains($0)
-        }
-        return order
+    private var displayOrderWithoutDisabledIDs: CredentialDisplayOrder {
+        displayOrder.removingDisabledCredentials(enabledIDs: enabledIDs)
     }
 
     private var unifiedStates: [KeyUsageState] {
@@ -67,6 +63,10 @@ struct MenuBarManagementView: View {
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .onAppear(perform: pruneDisabledDisplayOrder)
+        .onChange(of: enabledIDs) { _, _ in
+            pruneDisabledDisplayOrder()
         }
     }
 
@@ -433,8 +433,14 @@ struct MenuBarManagementView: View {
         }
     }
 
+    private func pruneDisabledDisplayOrder() {
+        let updated = displayOrderWithoutDisabledIDs
+        guard updated != displayOrder else { return }
+        environment.settings.displayOrder = updated
+    }
+
     private func moveDisplay(_ draggedID: UUID, to targetIndex: Int) -> Bool {
-        let updated = displayOrderWithoutDisabledMenuBarIDs.reorderingDisplay(
+        let updated = displayOrderWithoutDisabledIDs.reorderingDisplay(
             id: draggedID,
             toIndex: targetIndex
         )
@@ -457,7 +463,7 @@ struct MenuBarManagementView: View {
     }
 
     private func setMenuBarMembership(isInMenuBar: Bool, id: UUID) {
-        var updated = displayOrderWithoutDisabledMenuBarIDs
+        var updated = displayOrderWithoutDisabledIDs
         if isInMenuBar {
             let index = visibility.popoverIDs.firstIndex(of: id) ?? visibility.popoverIDs.count
             updated = updated.addingToMenuBar(id, toIndex: index)
