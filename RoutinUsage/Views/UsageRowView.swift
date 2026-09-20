@@ -10,6 +10,7 @@ struct UsageRowView: View {
     var actions: AnyView?
     var refreshCredential: () -> Void = {}
     var retryCredential: () -> Void = {}
+    var onShare: (() -> Void)? = nil
 
     @State private var showsFailureDetails = false
 
@@ -200,10 +201,27 @@ private extension UsageRowView {
                     if state.error != nil {
                         refreshFailureIndicator
                     }
+                    if onShare != nil {
+                        shareButton
+                    }
                     headerRefreshButton
                 }
             }
         }
+    }
+
+    var shareButton: some View {
+        Button {
+            onShare?()
+        } label: {
+            Image(systemName: "square.and.arrow.up")
+                .font(.system(size: 12, weight: .semibold))
+                .frame(width: 20, height: 20)
+        }
+        .buttonStyle(.borderless)
+        .disabled(state.snapshot == nil)
+        .help("分享 \(state.configuration.displayName) 当前用量")
+        .accessibilityLabel("分享 \(state.configuration.displayName) 当前用量")
     }
 
     var headerRefreshButton: some View {
