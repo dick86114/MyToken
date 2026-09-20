@@ -139,7 +139,7 @@ final class CredentialManagementViewTests: XCTestCase {
         )
     }
 
-    func test启停凭证保留两个独立顺序数组() throws {
+    func test停用凭证会从菜单栏和排序列表移除() throws {
         let context = CredentialManagementTestContext()
         defer { context.cleanUp() }
         let first = try context.addCredential(name: "主账号", providerID: .routin)
@@ -155,8 +155,8 @@ final class CredentialManagementViewTests: XCTestCase {
             false
         )
         XCTAssertTrue(context.settings.displayOrder.menuBarCredentialIDs.isEmpty)
-        XCTAssertEqual(context.settings.displayOrder.popoverCredentialIDs, [first.id, second.id])
-        XCTAssertEqual(model.allStates.map(\.configuration.id), [first.id, second.id])
+        XCTAssertEqual(context.settings.displayOrder.popoverCredentialIDs, [second.id])
+        XCTAssertEqual(model.allStates.map(\.configuration.id), [second.id, first.id])
         model.filter.status = .enabled
         XCTAssertEqual(model.visibleStates.map(\.configuration.id), [second.id])
     }

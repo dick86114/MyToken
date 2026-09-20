@@ -845,6 +845,14 @@ private extension AppEnvironment {
             refreshMinutes: settings.refreshMinutes,
             notificationsEnabled: settings.notificationsEnabled
         )
+        pruneDisabledDisplayOrder()
+    }
+
+    private func pruneDisabledDisplayOrder() {
+        let enabledIDs = Set(store.visibleKeyIDs)
+        let updated = settings.displayOrder.removingDisabledCredentials(enabledIDs: enabledIDs)
+        guard updated != settings.displayOrder else { return }
+        settings.displayOrder = updated
     }
 
     func observeApplicationTermination() {
