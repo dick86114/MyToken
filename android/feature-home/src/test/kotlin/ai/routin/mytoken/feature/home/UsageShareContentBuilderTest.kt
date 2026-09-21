@@ -81,7 +81,8 @@ class UsageShareContentBuilderTest {
 
     @Test
     fun `templates and file names mirror macOS labels`() {
-        assertEquals("票根 Pass", UsageShareTemplate.Ticket.title)
+        assertEquals("深色票根", UsageShareTemplate.Ticket.title)
+        assertEquals("浅色票根", UsageShareTemplate.TicketLight.title)
         assertEquals("暗色极客", UsageShareTemplate.Dark.title)
         assertEquals("雅致浅色", UsageShareTemplate.Light.title)
         val card = UsageShareRenderedCard(
@@ -105,6 +106,74 @@ class UsageShareContentBuilderTest {
         assertEquals(
             "MyToken-Test-A-ccount-20260920-1630.png",
             UsageShareContentBuilder.fileName(card, now, ZoneId.of("Asia/Shanghai")),
+        )
+    }
+
+    @Test
+    fun `field toggles follow ticket reading order`() {
+        val content = UsageShareContent(
+            displayName = "Main",
+            providerName = "Routin",
+            planName = "Pro",
+            subtitle = "Routin · Pro",
+            subscriptionStartText = "2026-09-01",
+            subscriptionEndText = "2026-10-01",
+            cycleRemainingText = "10天",
+            groupMultiplierText = "default ×1",
+            metrics = listOf(
+                UsageShareMetricItem(
+                    id = "fiveHour",
+                    title = "5 小时",
+                    headline = "25%",
+                    percent = 25.0,
+                    amountDetails = emptyList(),
+                    timeDetails = listOf("剩余 1小时"),
+                    usedText = null,
+                    limitText = null,
+                    remainingAmountText = null,
+                    resetBadgeText = null,
+                    companionText = null,
+                    healthStateIsAvailable = true,
+                    spansFullWidth = false,
+                ),
+                UsageShareMetricItem(
+                    id = "requests",
+                    title = "请求数",
+                    headline = "120",
+                    percent = null,
+                    amountDetails = emptyList(),
+                    timeDetails = emptyList(),
+                    usedText = null,
+                    limitText = null,
+                    remainingAmountText = null,
+                    resetBadgeText = null,
+                    companionText = null,
+                    healthStateIsAvailable = true,
+                    spansFullWidth = false,
+                ),
+            ),
+            capturedAt = now,
+            capturedAtText = "2026.09.20 16:30",
+            providerId = ProviderId.Routin,
+            passCode = "PASS #TK-1234",
+            avatarLetter = "M",
+            isAvailable = true,
+        )
+
+        assertEquals(
+            listOf(
+                "可用状态徽章",
+                "套餐规格",
+                "订阅周期/到期",
+                "周期剩余",
+                "附加备注框",
+                "重置时间与倒计时",
+                "5 小时",
+                "请求数",
+                "分组倍率",
+                "快照水印与防伪",
+            ),
+            visibleToggles(content).map { it.title },
         )
     }
 

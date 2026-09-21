@@ -1,24 +1,30 @@
 package ai.routin.mytoken.feature.home
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.ConfirmationNumber
 import androidx.compose.material.icons.outlined.SaveAlt
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -34,6 +40,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -44,7 +51,6 @@ import ai.routin.mytoken.core.ui.GlassSwitch
 import ai.routin.mytoken.core.ui.GlassTextField
 import ai.routin.mytoken.core.ui.LiquidGlassSurface
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
-import ai.routin.mytoken.core.ui.SettingRow
 import ai.routin.mytoken.core.ui.glassFilterChipBorder
 import ai.routin.mytoken.core.ui.glassFilterChipColors
 import kotlinx.coroutines.launch
@@ -146,6 +152,20 @@ internal fun UsageShareDialog(
                         selected = draft.template == template,
                         onClick = { draft = draft.copy(template = template) },
                         label = { Text(text = template.title) },
+                        leadingIcon = if (template == UsageShareTemplate.Ticket || template == UsageShareTemplate.TicketLight) {
+                            {
+                                Icon(
+                                    imageVector = if (template == UsageShareTemplate.Ticket) {
+                                        Icons.Filled.ConfirmationNumber
+                                    } else {
+                                        Icons.Outlined.ConfirmationNumber
+                                    },
+                                    contentDescription = null,
+                                )
+                            }
+                        } else {
+                            null
+                        },
                         colors = glassFilterChipColors(selected = draft.template == template),
                         border = glassFilterChipBorder(selected = draft.template == template),
                     )
@@ -158,23 +178,26 @@ internal fun UsageShareDialog(
             onValueChange = { draft = draft.copy(displayName = it) },
             label = "显示名称",
             supportingText = "仅用于本次图片展示",
+            contentPadding = 8.dp,
         )
         GlassTextField(
             value = draft.subtitle,
             onValueChange = { draft = draft.copy(subtitle = it) },
             label = "套餐文案",
             supportingText = "可补充团队说明",
+            contentPadding = 8.dp,
         )
         GlassTextField(
             value = draft.note,
             onValueChange = { draft = draft.copy(note = it) },
             label = "卡片附注说明（可选）",
             supportingText = "仅出现在分享图",
+            contentPadding = 8.dp,
         )
 
         ShareControlSection(
             title = "展示字段开关",
-            supportingText = "隐藏即不导出",
+            supportingText = "按票面顺序排列，隐藏即不导出",
             action = {
                 TextButton(onClick = { draft = draft.showAll() }) {
                     Text(text = "全部显示")
@@ -182,14 +205,10 @@ internal fun UsageShareDialog(
             },
         ) {
             visibleToggles(content).forEach { item ->
-                SettingRow(
+                ShareToggleRow(
                     title = item.title,
-                    trailing = {
-                        GlassSwitch(
-                            checked = item.isChecked(draft),
-                            onCheckedChange = { draft = item.toggle(draft) },
-                        )
-                    },
+                    checked = item.isChecked(draft),
+                    onToggle = { draft = item.toggle(draft) },
                 )
             }
         }
@@ -217,7 +236,7 @@ internal fun UsageShareDialog(
             card = rendered,
             modifier = Modifier
                 .fillMaxWidth()
-                .widthIn(max = 560.dp)
+                .widthIn(max = 680.dp)
                 .testTag("share_preview_pane"),
         )
     }
@@ -251,7 +270,7 @@ internal fun UsageShareDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 560.dp, max = 760.dp)
+                    .fillMaxHeight()
                     .padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
@@ -263,12 +282,13 @@ internal fun UsageShareDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 660.dp),
+                        .weight(1f),
                     horizontalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
                     Column(
                         modifier = Modifier
-                            .weight(1f)
+                            .weight(1.6f)
+                            .fillMaxHeight()
                             .verticalScroll(rememberScrollState())
                             .testTag("share_wide_preview"),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -277,7 +297,8 @@ internal fun UsageShareDialog(
                     }
                     Column(
                         modifier = Modifier
-                            .width(400.dp)
+                            .width(340.dp)
+                            .fillMaxHeight()
                             .verticalScroll(rememberScrollState())
                             .testTag("share_settings_pane"),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -332,13 +353,49 @@ private fun ShareControlSection(
     }
 }
 
-private data class ShareToggle(
+internal data class ShareToggle(
     val title: String,
     val isChecked: (UsageShareDraft) -> Boolean,
     val toggle: (UsageShareDraft) -> UsageShareDraft,
 )
 
-private fun visibleToggles(content: UsageShareContent): List<ShareToggle> = buildList {
+@Composable
+private fun ShareToggleRow(
+    title: String,
+    checked: Boolean,
+    onToggle: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            text = title,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        GlassSwitch(
+            checked = checked,
+            onCheckedChange = null,
+            contentDescription = title,
+        )
+    }
+}
+
+internal fun visibleToggles(content: UsageShareContent): List<ShareToggle> = buildList {
+    add(
+        ShareToggle(
+            "可用状态徽章",
+            { it.showsStatus },
+            { draft -> draft.copy(showsStatus = !draft.showsStatus) },
+        ),
+    )
     if (content.planName.isNotEmpty() || content.subtitle.isNotEmpty()) {
         add(
             ShareToggle(
@@ -366,12 +423,24 @@ private fun visibleToggles(content: UsageShareContent): List<ShareToggle> = buil
             ),
         )
     }
+    add(ShareToggle("附加备注框", { it.showsNote }, { draft -> draft.copy(showsNote = !draft.showsNote) }))
     if (content.metrics.any { it.resetBadgeText != null || it.timeDetails.isNotEmpty() }) {
         add(
             ShareToggle(
                 "重置时间与倒计时",
                 { it.showsResetTimes },
                 { draft -> draft.copy(showsResetTimes = !draft.showsResetTimes) },
+            ),
+        )
+    }
+    val progressMetrics = content.metrics.filter { it.percent != null }
+    val valueMetrics = content.metrics.filter { it.percent == null }
+    (progressMetrics + valueMetrics).forEach { item ->
+        add(
+            ShareToggle(
+                item.title,
+                { draft -> draft.isMetricVisible(item.id) },
+                { draft -> draft.setMetricVisible(item.id, !draft.isMetricVisible(item.id)) },
             ),
         )
     }
@@ -384,16 +453,5 @@ private fun visibleToggles(content: UsageShareContent): List<ShareToggle> = buil
             ),
         )
     }
-    add(ShareToggle("附加备注框", { it.showsNote }, { draft -> draft.copy(showsNote = !draft.showsNote) }))
     add(ShareToggle("快照水印与防伪", { it.showsWatermark }, { draft -> draft.copy(showsWatermark = !draft.showsWatermark) }))
-    add(ShareToggle("可用状态徽章", { it.showsStatus }, { draft -> draft.copy(showsStatus = !draft.showsStatus) }))
-    content.metrics.forEach { item ->
-        add(
-            ShareToggle(
-                item.title,
-                { draft -> draft.isMetricVisible(item.id) },
-                { draft -> draft.setMetricVisible(item.id, !draft.isMetricVisible(item.id)) },
-            ),
-        )
-    }
 }

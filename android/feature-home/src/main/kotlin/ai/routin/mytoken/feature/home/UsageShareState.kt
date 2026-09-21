@@ -13,9 +13,10 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/** 与 macOS UsageShareTemplate 一一对应的三套分享模板。 */
+/** 与 macOS UsageShareTemplate 一一对应的四套分享模板。 */
 enum class UsageShareTemplate(val title: String, val previewTag: String) {
-    Ticket("票根 Pass", "票根 Pass 模式"),
+    Ticket("深色票根", "深色票根模式"),
+    TicketLight("浅色票根", "浅色票根模式"),
     Dark("暗色极客", "极客暗色模式"),
     Light("雅致浅色", "雅致浅色模式");
 }
