@@ -192,7 +192,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(statusBarController.contains("environment.store.selectKey(id)"))
         XCTAssertFalse(statusBarController.contains("selectedKeyID"))
         XCTAssertTrue(statusBarController.contains("设置"))
-        XCTAssertTrue(statusBarController.contains("Notification.Name.showSettingsWindow"))
+        XCTAssertTrue(statusBarController.contains("private var settingsWindow: NSWindow?"))
         XCTAssertTrue(statusBarController.contains("检查更新"))
         XCTAssertTrue(statusBarController.contains("NSApplication.shared.terminate(nil)"))
     }
@@ -222,6 +222,26 @@ final class ProjectBootstrapTests: XCTestCase {
 
         XCTAssertTrue(source.contains("NSApp.activate(ignoringOtherApps: true)"))
         XCTAssertTrue(source.contains("window.makeKeyAndOrderFront(nil)"))
+    }
+
+    func test空配置点击菜单栏直接打开设置且不嵌套引导() throws {
+        let source = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
+
+        XCTAssertTrue(source.contains("guard !environment.store.orderedKeyIDs.isEmpty else {"))
+        XCTAssertTrue(source.contains("openSettingsWindow()"))
+        XCTAssertTrue(source.contains("window.makeKeyAndOrderFront(nil)"))
+        XCTAssertFalse(source.contains(".sheet(isPresented: $environment.showsOnboarding)"))
+    }
+
+    @MainActor
+    func test未配置菜单栏使用新品牌模板图标() throws {
+        let source = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
+        let logo = NSImage(named: "MenuBarBrandLogo")
+
+        XCTAssertTrue(source.contains("MenuBarBrandLogo"))
+        XCTAssertEqual(logo?.size.width, 18)
+        XCTAssertEqual(logo?.size.height, 18)
+        XCTAssertTrue(logo?.isTemplate ?? false)
     }
 
     func test更新完成提示不会阻塞首次启动检查() throws {
@@ -263,12 +283,14 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(row.contains("当前账户"))
     }
 
-    func test设置使用独立可缩放窗口场景而不是系统固定设置场景() throws {
-        let source = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
+    func test设置使用状态栏控制器直管的可缩放窗口() throws {
+        let source = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
 
-        XCTAssertTrue(source.contains("Window(\"设置\", id: \"settings\")"))
-        XCTAssertFalse(source.contains("Settings {"))
-        XCTAssertTrue(source.contains(".windowResizability(.contentMinSize)"))
+        XCTAssertTrue(source.contains("private var settingsWindow: NSWindow?"))
+        XCTAssertTrue(source.contains("styleMask: [.titled, .closable, .miniaturizable, .resizable]"))
+        XCTAssertTrue(source.contains("window.styleMask.remove(.fullSizeContentView)"))
+        XCTAssertTrue(source.contains("WindowFramePersistence.loadSize()"))
+        XCTAssertTrue(source.contains("window.minSize = WindowFramePersistence.minimumSize"))
     }
 
     func test引导页统一使用五小时产品文案且设置页不再硬编码维度() throws {
@@ -357,7 +379,8 @@ final class ProjectBootstrapTests: XCTestCase {
         let settings = try sourceText(at: "RoutinUsage/Views/Settings/SettingsWindowView.swift")
         let credentials = try sourceText(at: "RoutinUsage/Views/Settings/CredentialManagementView.swift")
 
-        XCTAssertTrue(settings.contains("NavigationSplitView"))
+        XCTAssertTrue(settings.contains("HStack(spacing: 0)"))
+        XCTAssertFalse(settings.contains("NavigationSplitView"))
         XCTAssertTrue(settings.contains("SettingsSection"))
         XCTAssertTrue(settings.contains(".liquidGlassWindowBackground()"))
         XCTAssertTrue(settings.contains("List(SettingsSection.allCases"))
@@ -681,6 +704,16 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(popover.contains("startRoutinCheckIn"))
         XCTAssertFalse(popover.contains("Routin 签到："))
         XCTAssertFalse(settings.contains("Routin 签到"))
+    }
+
+    func test启动时不自动弹出Routin签到窗口() throws {
+        let app = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
+
+        let routinScene = try XCTUnwrap(app.range(of: "Window(\"Routin 签到\", id: \"routin-check-in\")"))
+
+        XCTAssertFalse(app.contains("Settings {"))
+        XCTAssertTrue(app.contains("closeLegacySuppressedLaunchWindows()"))
+        XCTAssertFalse(app.contains("defaultLaunchBehavior(.suppressed)"))
     }
 
     func testCodex分组检测可打开Routin登录窗口() throws {

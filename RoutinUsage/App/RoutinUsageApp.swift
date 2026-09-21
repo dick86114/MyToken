@@ -7,6 +7,7 @@ final class RoutinUsageAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        Self.closeLegacySuppressedLaunchWindows()
         // 旧版本曾保存状态项位置；移除旧缓存，避免升级后状态项落到不可见位置。
         UserDefaults.standard.removeObject(forKey: Self.statusItemPositionCacheKey)
         UserDefaults.standard.removeObject(forKey: "NSStatusItem VisibleCC MyRoutinStatusBar")
@@ -22,6 +23,14 @@ final class RoutinUsageAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return false
+    }
+
+    @MainActor
+    static func closeLegacySuppressedLaunchWindows() {
+        // SwiftUI 会把唯一窗口场景当作启动场景；状态栏应用只在检测需要登录时展示它。
+        NSApp.windows
+            .filter { $0.isVisible && $0.title == "Routin 签到" }
+            .forEach { $0.close() }
     }
 }
 
@@ -69,15 +78,6 @@ struct RoutinUsageApp: App {
     }
 
     var body: some Scene {
-        Window("设置", id: "settings") {
-            SettingsWindowView(environment: environment)
-        }
-        .defaultSize(
-            width: WindowFramePersistence.defaultSize.width,
-            height: WindowFramePersistence.defaultSize.height
-        )
-        .windowResizability(.contentMinSize)
-
         Window("Routin 签到", id: "routin-check-in") {
             if let session = environment.routinWebSession {
                 RoutinCheckInWindow(service: environment.routinCheckIn, session: session)
