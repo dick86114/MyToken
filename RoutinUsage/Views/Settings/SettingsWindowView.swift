@@ -48,21 +48,22 @@ struct SettingsWindowView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
+        HStack(spacing: 0) {
             List(SettingsSection.allCases, selection: $selectedSection) { section in
                 Label(section.title, systemImage: section.symbol)
                     .tag(section)
             }
             .listStyle(.sidebar)
-            .navigationTitle("MyToken")
-        } detail: {
+            .frame(width: 220)
+
+            Divider()
+
             detail
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .liquidGlassWindowBackground()
-                .background(WindowFramePersistence())
-                .background(SettingsWindowDockIconAnchor())
         }
-        .navigationSplitViewStyle(.balanced)
+        .liquidGlassWindowBackground()
+        .background(WindowFramePersistence())
+        .background(SettingsWindowDockIconAnchor())
         .frame(minWidth: 820, idealWidth: 880, minHeight: 560, idealHeight: 640)
     }
 

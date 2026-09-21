@@ -2,15 +2,12 @@ import AppKit
 import Observation
 import SwiftUI
 
-extension Notification.Name {
-    static let showSettingsWindow = Notification.Name("showSettingsWindow")
-}
-
 @MainActor
 final class StatusBarController: NSObject {
     private let environment: AppEnvironment
     private var statusItem: NSStatusItem?
     private let popover = NSPopover()
+    private var settingsWindow: NSWindow?
     private var refreshMinutes: Int
     private var notificationsEnabled: Bool
     private var appearanceObservation: NSKeyValueObservation?
@@ -241,7 +238,8 @@ final class StatusBarController: NSObject {
         let text = "尚未配置 Key"
         statusItem.length = 24
         button.title = ""
-        button.image = NSImage(named: "MenuBarLogoMask")
+        button.image = NSImage(named: "MenuBarBrandLogo")
+        button.image?.isTemplate = true
         button.imagePosition = .imageOnly
         button.imageScaling = .scaleProportionallyDown
         lastDrawnMenuBarDark = isDark
@@ -276,12 +274,17 @@ final class StatusBarController: NSObject {
     private func togglePopover(from button: NSStatusBarButton) {
         if popover.isShown {
             popover.performClose(nil)
-        } else {
-            let contentSize = popoverContentSize(for: button)
-            popover.contentSize = contentSize
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            configurePopoverWindow(contentSize: contentSize, anchoredTo: button)
+            return
         }
+        guard !environment.store.orderedKeyIDs.isEmpty else {
+            // 空配置不能在 NSPopover 中嵌套引导 sheet，否则会形成双层窗口并阻塞 key 状态。
+            openSettingsWindow()
+            return
+        }
+        let contentSize = popoverContentSize(for: button)
+        popover.contentSize = contentSize
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        configurePopoverWindow(contentSize: contentSize, anchoredTo: button)
     }
 
     private func configurePopoverWindow(contentSize: NSSize, anchoredTo button: NSStatusBarButton) {
@@ -416,7 +419,32 @@ final class StatusBarController: NSObject {
     @objc private func openSettingsWindow() {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
-        NotificationCenter.default.post(name: Notification.Name.showSettingsWindow, object: nil)
+        let window = settingsWindow ?? makeSettingsWindow()
+        settingsWindow = window
+        SettingsWindowActivationPolicy.register(window)
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    private func makeSettingsWindow() -> NSWindow {
+        let window = NSWindow(
+            contentRect: NSRect(
+                origin: .zero,
+                size: WindowFramePersistence.loadSize()
+            ),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "设置"
+        window.isReleasedWhenClosed = false
+        window.minSize = WindowFramePersistence.minimumSize
+        window.styleMask.remove(.fullSizeContentView)
+        let hostingController = NSHostingController(
+            rootView: SettingsWindowView(environment: environment)
+        )
+        window.contentViewController = hostingController
+        window.center()
+        return window
     }
 
     @objc private func quitApplication() {
@@ -445,8 +473,6 @@ private struct StatusPopoverContent: View {
     @Bindable var environment: AppEnvironment
     let openSettings: @MainActor () -> Void
 
-    @Environment(\.openWindow) private var openWindow
-
     var body: some View {
         UsagePopoverView(
             store: environment.store,
@@ -459,14 +485,6 @@ private struct StatusPopoverContent: View {
             retryCredential: environment.retryCredential(_:),
             openSettings: openSettings
         )
-        .sheet(isPresented: $environment.showsOnboarding) {
-            OnboardingView(store: environment.store) {
-                environment.dismissOnboarding()
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name.showSettingsWindow)) { _ in
-            openWindow(id: "settings")
-        }
         .sheet(item: $environment.xiaomiLoginRequest) { request in
             XiaomiRetryLoginSheet(
                 request: request,
