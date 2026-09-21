@@ -4,6 +4,7 @@ enum KeyRepositoryError: LocalizedError, Equatable, Sendable {
     case invalidName
     case invalidSecret
     case configurationNotFound
+    case invalidConfiguration
 
     var errorDescription: String? {
         switch self {
@@ -13,6 +14,8 @@ enum KeyRepositoryError: LocalizedError, Equatable, Sendable {
             return "plan Key 内容至少需要 4 位"
         case .configurationNotFound:
             return "未找到 Key 配置"
+        case .invalidConfiguration:
+            return "配置数据无效"
         }
     }
 }
@@ -154,23 +157,71 @@ final class KeyRepository {
         persist(normalized(configurations))
     }
 
-    private func validate(name: String, secret: String, providerID: ProviderID = .routin) throws -> String {
-        let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalizedName.isEmpty else {
-            throw KeyRepositoryError.invalidName
+    struct CredentialImport {
+        let configuration: KeyConfiguration
+        let secret: String
+    }
+
+    func replaceAll(with imports: [CredentialImport]) throws {
+        var configurations: [KeyConfiguration] = []
+        configurations.reserveCapacity(imports.count)
+        for (index, credentialImport) in imports.enumerated() {
+            let normalizedName = try Self.validateConfiguration(
+                name: credentialImport.configuration.name,
+                secret: credentialImport.secret,
+                providerID: credentialImport.configuration.providerID
+            )
+            configurations.append(
+                KeyConfiguration(
+                    id: credentialImport.configuration.id,
+                    name: normalizedName,
+                    keySuffix: KeyCredentialPolicy.metadataSuffix(for: credentialImport.secret),
+                    sortOrder: index,
+                    isEnabled: credentialImport.configuration.isEnabled,
+                    providerID: credentialImport.configuration.providerID,
+                    credentialKind: credentialImport.configuration.credentialKind,
+                    metadata: credentialImport.configuration.metadata
+                )
+            )
         }
-        guard KeyCredentialPolicy.isSafeDisplayName(normalizedName) else {
+        let ids = configurations.map(\.id)
+        guard Set(ids).count == ids.count else {
+            throw KeyRepositoryError.invalidConfiguration
+        }
+
+        for credentialImport in imports {
+            try localStore.save(credentialImport.secret, for: credentialImport.configuration.id)
+        }
+        let importedIDs = Set(ids)
+        for configuration in list() where !importedIDs.contains(configuration.id) {
+            try? localStore.delete(for: configuration.id)
+        }
+        persist(normalized(configurations))
+    }
+
+    private func validate(name: String, secret: String, providerID: ProviderID = .routin) throws -> String {
+        try Self.validateConfiguration(name: name, secret: secret, providerID: providerID)
+    }
+
+    static func validateConfiguration(
+        name: String,
+        secret: String,
+        providerID: ProviderID
+    ) throws -> String {
+        let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedName.isEmpty, KeyCredentialPolicy.isSafeDisplayName(normalizedName) else {
             throw KeyRepositoryError.invalidName
         }
         if providerID == .routin {
-            guard
-                KeyCredentialPolicy.hasValidPrefix(secret),
-                KeyCredentialPolicy.hasSufficientSecretPayload(secret)
+            guard KeyCredentialPolicy.hasValidPrefix(secret),
+                  KeyCredentialPolicy.hasSufficientSecretPayload(secret)
             else {
                 throw KeyRepositoryError.invalidSecret
             }
-        } else if secret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            throw KeyRepositoryError.invalidSecret
+        } else {
+            guard !secret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw KeyRepositoryError.invalidSecret
+            }
         }
         return normalizedName
     }

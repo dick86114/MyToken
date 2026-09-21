@@ -72,11 +72,70 @@ struct UsageShareCardView: View {
     let card: UsageShareRenderedCard
     var notchFill: Color = Color(rgb: 0x14171F)
 
+    private struct TicketPalette {
+        let backgroundTop: Color
+        let backgroundBottom: Color
+        let tear: Color
+        let tearLine: Color
+        let border: Color
+        let title: Color
+        let label: Color
+        let accent: Color
+        let accentSoft: Color
+        let bodyText: Color
+        let panel: Color
+        let panelBorder: Color
+        let gaugeTrack: Color
+        let success: Color
+
+        static func make(isLight: Bool) -> Self {
+            isLight
+                ? TicketPalette(
+                    backgroundTop: Color(rgb: 0xFFFFFF),
+                    backgroundBottom: Color(rgb: 0xF8FAFC),
+                    tear: Color(rgb: 0xF1F5F9),
+                    tearLine: Color(rgb: 0xCBD5E1),
+                    border: Color(rgb: 0xD97706).opacity(0.25),
+                    title: Color(rgb: 0x0F172A),
+                    label: Color(rgb: 0x64748B),
+                    accent: Color(rgb: 0xB45309),
+                    accentSoft: Color(rgb: 0xD97706),
+                    bodyText: Color(rgb: 0x1E293B),
+                    panel: Color.white,
+                    panelBorder: Color(rgb: 0xE2E8F0),
+                    gaugeTrack: Color(rgb: 0xE2E8F0),
+                    success: Color(rgb: 0x059669)
+                )
+                : TicketPalette(
+                    backgroundTop: Color(rgb: 0x222733),
+                    backgroundBottom: Color(rgb: 0x171922),
+                    tear: Color(rgb: 0x14161F),
+                    tearLine: Color(rgb: 0x475569),
+                    border: Color(rgb: 0xF59E0B).opacity(0.30),
+                    title: .white,
+                    label: Color(rgb: 0x94A3B8),
+                    accent: Color(rgb: 0xFBBF24),
+                    accentSoft: Color(rgb: 0xFCD34D),
+                    bodyText: Color(rgb: 0xE2E8F0),
+                    panel: Color(rgb: 0x0F172A).opacity(0.80),
+                    panelBorder: Color(rgb: 0x1E293B),
+                    gaugeTrack: Color(rgb: 0x1E293B),
+                    success: Color(rgb: 0x34D399)
+                )
+        }
+    }
+
+    private var ticketPalette: TicketPalette {
+        TicketPalette.make(isLight: card.template == .ticketLight)
+    }
+
     static let canvasWidth: CGFloat = 430
 
     var body: some View {
         switch card.template {
         case .ticket:
+            ticketCard
+        case .ticketLight:
             ticketCard
         case .dark:
             compactCard(isLight: false)
@@ -85,9 +144,10 @@ struct UsageShareCardView: View {
         }
     }
 
+    @ViewBuilder
     private var ticketCard: some View {
         ZStack {
-            notchFill
+            card.template == .ticketLight ? Color(rgb: 0xF4F6FA) : notchFill
             ticketBody
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
@@ -101,10 +161,10 @@ struct UsageShareCardView: View {
             ticketTear
             ticketMetrics
         }
-        .background(Color(rgb: 0x181A22))
+        .background(ticketPalette.backgroundBottom)
         .overlay {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color(rgb: 0xF59E0B).opacity(0.30), lineWidth: 1)
+                .strokeBorder(ticketPalette.border, lineWidth: 1)
         }
         .overlay { ticketCutouts }
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -125,35 +185,42 @@ struct UsageShareCardView: View {
     }
 
     private func cutoutCircle(insetX: CGFloat) -> some View {
-        Circle()
-            .fill(notchFill)
+            Circle()
+                .fill(card.template == .ticketLight ? Color(rgb: 0xF4F6FA) : notchFill)
             .frame(width: 24, height: 24)
             .overlay {
-                Circle()
-                    .stroke(Color(rgb: 0xF59E0B).opacity(0.30), lineWidth: 1)
+                    Circle()
+                        .stroke(ticketPalette.border, lineWidth: 1)
             }
             .shadow(color: Color.black.opacity(0.5), radius: 1.5, x: insetX, y: 0)
     }
 
+    @ViewBuilder
     private var ticketHeader: some View {
+        let palette = ticketPalette
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
-                avatar(size: 36, fill: Color(rgb: 0xF59E0B).opacity(0.15), stroke: Color(rgb: 0xF59E0B).opacity(0.30), text: Color(rgb: 0xFBBF24))
+                avatar(
+                    size: 36,
+                    fill: palette.accentSoft.opacity(isTicketLight ? 0.10 : 0.15),
+                    stroke: palette.border,
+                    text: palette.accent
+                )
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Text(card.passCode)
                             .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundStyle(Color(rgb: 0xFCD34D))
+                            .foregroundStyle(palette.accent)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color(rgb: 0xF59E0B).opacity(0.20), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+                            .background(palette.accentSoft.opacity(isTicketLight ? 0.12 : 0.20), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
                         if card.showsStatus {
-                            statusBadge(light: false)
+                            statusBadge(light: isTicketLight)
                         }
                     }
                     Text(card.displayName)
                         .font(.system(size: 16, weight: .heavy))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(palette.title)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -161,10 +228,10 @@ struct UsageShareCardView: View {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text("SUPPLIER")
                         .font(.system(size: 9, weight: .medium, design: .monospaced))
-                        .foregroundStyle(Color(rgb: 0x94A3B8))
+                        .foregroundStyle(palette.label)
                     Text(card.providerName)
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color(rgb: 0xFDE68A))
+                        .foregroundStyle(palette.accent)
                         .lineLimit(1)
                 }
             }
@@ -175,10 +242,10 @@ struct UsageShareCardView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("套餐规格")
                                 .font(.system(size: 10))
-                                .foregroundStyle(Color(rgb: 0x94A3B8))
+                                .foregroundStyle(palette.label)
                             Text(card.subtitle)
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(palette.title)
                                 .lineLimit(2)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
@@ -188,10 +255,10 @@ struct UsageShareCardView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("订阅周期 / 剩余")
                                 .font(.system(size: 10))
-                                .foregroundStyle(Color(rgb: 0x94A3B8))
+                                .foregroundStyle(palette.label)
                             Text(cycle)
                                 .font(.system(size: 11, design: .monospaced))
-                                .foregroundStyle(Color(rgb: 0xE2E8F0))
+                                .foregroundStyle(palette.bodyText)
                                 .lineLimit(2)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -208,26 +275,26 @@ struct UsageShareCardView: View {
                 HStack(alignment: .top, spacing: 6) {
                     Image(systemName: "info.circle")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color(rgb: 0xFBBF24))
+                        .foregroundStyle(palette.accent)
                     Text(note)
                         .font(.system(size: 11))
-                        .foregroundStyle(Color(rgb: 0xFDE68A))
+                        .foregroundStyle(palette.accent)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(rgb: 0xF59E0B).opacity(0.10), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .background(palette.accentSoft.opacity(isTicketLight ? 0.08 : 0.10), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .strokeBorder(Color(rgb: 0xF59E0B).opacity(0.20), lineWidth: 1)
+                        .strokeBorder(palette.border.opacity(isTicketLight ? 0.8 : 1), lineWidth: 1)
                 }
             }
         }
         .padding(16)
         .background(
             LinearGradient(
-                colors: [Color(rgb: 0x222733), Color(rgb: 0x171922)],
+                colors: [ticketPalette.backgroundTop, ticketPalette.backgroundBottom],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -235,11 +302,11 @@ struct UsageShareCardView: View {
     }
 
     private var ticketTear: some View {
-        Color(rgb: 0x14161F)
+        ticketPalette.tear
             .frame(height: 12)
             .overlay(alignment: .center) {
                 Rectangle()
-                    .fill(Color(rgb: 0x475569))
+                    .fill(ticketPalette.tearLine)
                     .frame(height: 1.5)
                     .mask(
                         Rectangle()
@@ -249,6 +316,7 @@ struct UsageShareCardView: View {
             }
     }
 
+    @ViewBuilder
     private var ticketMetrics: some View {
         VStack(alignment: .leading, spacing: 12) {
             ForEach(progressMetrics) { item in
@@ -303,25 +371,27 @@ struct UsageShareCardView: View {
                 HStack {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(Color(rgb: 0x34D399))
+                            .foregroundStyle(ticketPalette.success)
                         Text("MyToken 本地快照 · 无凭据")
-                            .foregroundStyle(Color(rgb: 0x94A3B8))
+                            .foregroundStyle(ticketPalette.label)
                     }
                     .font(.system(size: 9, design: .monospaced))
                     Spacer()
                     Text(card.capturedAtText.replacingOccurrences(of: ".", with: "-"))
                         .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(Color(rgb: 0x94A3B8))
+                        .foregroundStyle(ticketPalette.label)
                 }
                 .padding(.top, 4)
             }
             brandFooter
         }
         .padding(16)
-        .background(Color(rgb: 0x181A22))
+        .background(ticketPalette.backgroundBottom)
     }
 
+    @ViewBuilder
     private func ticketGauge(_ item: UsageShareMetricItem) -> some View {
+        let palette = ticketPalette
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 HStack(spacing: 6) {
@@ -330,24 +400,24 @@ struct UsageShareCardView: View {
                         .frame(width: 8, height: 8)
                     Text(item.title)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Color(rgb: 0xCBD5E1))
+                        .foregroundStyle(isTicketLight ? Color(rgb: 0x334155) : palette.label)
                         .lineLimit(2)
                 }
                 Spacer()
-                Text(item.headline)
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .foregroundStyle(Color(rgb: 0xFBBF24))
+                    Text(item.headline)
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .foregroundStyle(palette.accent)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
             }
             if let percent = item.percent {
-                gaugeBar(percent: percent, gradient: true, track: Color(rgb: 0x1E293B))
+                gaugeBar(percent: percent, gradient: true, track: palette.gaugeTrack)
             }
             if item.usedText != nil || item.limitText != nil {
                 HStack {
                     if let used = item.usedText {
                         Text("已用：\(used)")
-                            .foregroundStyle(Color(rgb: 0xE2E8F0))
+                            .foregroundStyle(palette.bodyText)
                     }
                     Spacer()
                     if let limit = item.limitText {
@@ -355,21 +425,21 @@ struct UsageShareCardView: View {
                     }
                 }
                 .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(Color(rgb: 0x94A3B8))
+                .foregroundStyle(palette.label)
             }
             if item.remainingAmountText != nil || item.resetBadgeText != nil {
                 HStack {
                     if let remaining = item.remainingAmountText {
                         Text("剩余：\(remaining)")
-                            .foregroundStyle(Color(rgb: 0x34D399))
+                            .foregroundStyle(palette.success)
                     }
                     Spacer()
                     if let badge = item.resetBadgeText {
                         Text(badge)
-                            .foregroundStyle(Color(rgb: 0xFCD34D))
+                            .foregroundStyle(palette.accentSoft)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color(rgb: 0xF59E0B).opacity(0.12), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+                            .background(palette.accentSoft.opacity(isTicketLight ? 0.12 : 0.20), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
                     }
                 }
                 .font(.system(size: 10, design: .monospaced))
@@ -377,41 +447,59 @@ struct UsageShareCardView: View {
             if let companion = item.companionText {
                 Text(companion)
                     .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(Color(rgb: 0x94A3B8))
+                    .foregroundStyle(palette.label)
             }
         }
         .padding(12)
-        .background(Color(rgb: 0x0F172A).opacity(0.80), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(palette.panel, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color(rgb: 0x1E293B), lineWidth: 1)
+                .strokeBorder(palette.panelBorder, lineWidth: 1)
         }
     }
 
+    @ViewBuilder
     private func ticketTile(_ item: UsageShareMetricItem) -> some View {
+        let palette = ticketPalette
         VStack(alignment: .leading, spacing: 4) {
             Text(item.title)
                 .font(.system(size: 9))
-                .foregroundStyle(Color(rgb: 0x94A3B8))
+                .foregroundStyle(palette.label)
             Text(item.headline)
                 .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .foregroundStyle(tileHeadlineColor(item))
+                .foregroundStyle(ticketTileHeadlineColor(item))
                 .lineLimit(2)
                 .minimumScaleFactor(0.55)
                 .fixedSize(horizontal: false, vertical: true)
             if let companion = item.companionText ?? item.amountDetails.first {
                 Text(companion)
                     .font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(Color(rgb: 0x94A3B8))
+                    .foregroundStyle(palette.label)
                     .lineLimit(2)
             }
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(rgb: 0x0F172A).opacity(0.60), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(palette.panel.opacity(isTicketLight ? 1 : 0.60), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.06), lineWidth: 1)
+                .strokeBorder(palette.panelBorder, lineWidth: 1)
+        }
+    }
+
+    private var isTicketLight: Bool {
+        card.template == .ticketLight
+    }
+
+    private func ticketTileHeadlineColor(_ item: UsageShareMetricItem) -> Color {
+        guard isTicketLight else { return tileHeadlineColor(item) }
+        switch item.health {
+        case .critical, .stale:
+            return Color(rgb: 0xDC2626)
+        case .warning:
+            return Color(rgb: 0xD97706)
+        default:
+            return Color(rgb: 0x0F172A)
         }
     }
 
@@ -783,7 +871,7 @@ struct UsageShareCardView: View {
     private var brandFooterBg: Color {
         switch card.template {
         case .ticket, .dark: return Color(rgb: 0x14171F)
-        case .light: return Color(rgb: 0xF1F3F7)
+        case .ticketLight, .light: return Color(rgb: 0xF1F3F7)
         }
     }
 
@@ -794,14 +882,14 @@ struct UsageShareCardView: View {
     private var brandText: Color {
         switch card.template {
         case .ticket, .dark: return .white
-        case .light: return Color(rgb: 0x1B1F2B)
+        case .ticketLight, .light: return Color(rgb: 0x1B1F2B)
         }
     }
 
     private var brandSubtext: Color {
         switch card.template {
         case .ticket, .dark: return Color(rgb: 0x94A3B8)
-        case .light: return Color(rgb: 0x64748B)
+        case .ticketLight, .light: return Color(rgb: 0x64748B)
         }
     }
 

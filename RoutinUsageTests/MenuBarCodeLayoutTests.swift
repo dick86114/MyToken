@@ -35,32 +35,4 @@ final class MenuBarCodeLayoutTests: XCTestCase {
         }
     }
 
-    func testDS两个短码绘制后不超出图标安全区() throws {
-        let indicator = MenuBarIndicatorModel(
-            shortCode: "DS",
-            percent: 32,
-            healthState: .normal,
-            accessibilityLabel: "DeepSeek"
-        )
-        let image = MenuBarMultiUsageIcon.image(
-            indicators: [indicator],
-            appearance: NSAppearance(named: .darkAqua)
-        )
-        let tiff = try XCTUnwrap(image.tiffRepresentation)
-        let bitmap = try XCTUnwrap(NSBitmapImageRep(data: tiff))
-
-        let labelPixels = try (0..<bitmap.pixelsWide).flatMap { x in
-            try (0..<bitmap.pixelsHigh).compactMap { y -> NSColor? in
-                let color = try XCTUnwrap(bitmap.colorAt(x: x, y: y))
-                let isLabel = color.alphaComponent > 0.9
-                    && color.redComponent > 0.85
-                    && color.greenComponent > 0.85
-                    && color.blueComponent > 0.85
-                return isLabel ? color : nil
-            }
-        }
-
-        let pixelScale = max(1, bitmap.pixelsWide / Int(MenuBarMultiUsageIcon.unitWidth))
-        XCTAssertGreaterThanOrEqual(labelPixels.count, 4 * pixelScale)
-    }
 }

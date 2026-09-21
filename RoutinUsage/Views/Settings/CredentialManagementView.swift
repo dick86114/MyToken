@@ -62,18 +62,6 @@ struct CredentialManagementView: View {
                 showsTransferToAndroid = false
             }
         }
-        .sheet(item: $environment.xiaomiLoginRequest) { request in
-            XiaomiRetryLoginSheet(
-                request: request,
-                session: environment.xiaomiWebSession,
-                onCaptured: { cookie in
-                    await environment.completeXiaomiLogin(request, cookie: cookie)
-                },
-                onClose: {
-                    environment.cancelXiaomiLogin(request)
-                }
-            )
-        }
         .confirmationDialog(
             "确定删除这个凭证？",
             isPresented: Binding(

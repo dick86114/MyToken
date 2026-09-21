@@ -447,17 +447,21 @@ struct CredentialEditorView: View {
                 isSecretVisible = false
             }
         }
-        .sheet(isPresented: $showsXiaomiLogin) {
-            if let xiaomiWebSession {
-                XiaomiLoginWindow(
+        .onChange(of: showsXiaomiLogin) { _, isShown in
+            guard isShown, let xiaomiWebSession else { return }
+            XiaomiLoginPanelController.shared.present(
+                content: XiaomiLoginWindow(
                     session: xiaomiWebSession,
+                    resetSession: false,
                     onCaptured: { cookie in
                         apiKey = cookie
                         showsXiaomiLogin = false
+                        XiaomiLoginPanelController.shared.close()
                     },
-                    onClose: { showsXiaomiLogin = false }
-                )
-            }
+                    onClose: { XiaomiLoginPanelController.shared.close() }
+                ),
+                onWindowClose: { showsXiaomiLogin = false }
+            )
         }
     }
 

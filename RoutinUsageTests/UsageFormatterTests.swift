@@ -307,6 +307,17 @@ final class UsageFormatterTests: XCTestCase {
         XCTAssertEqual(MenuBarUsageRisk.level(for: 80), .critical)
     }
 
+    func test菜单栏进度颜色阈值按用户规则分界() {
+        var rules = MenuBarColorRules.standard
+        rules.warningThreshold = 30
+        rules.criticalThreshold = 70
+
+        XCTAssertEqual(MenuBarUsageRisk.level(for: 29.9, rules: rules), .normal)
+        XCTAssertEqual(MenuBarUsageRisk.level(for: 30, rules: rules), .warning)
+        XCTAssertEqual(MenuBarUsageRisk.level(for: 69.9, rules: rules), .warning)
+        XCTAssertEqual(MenuBarUsageRisk.level(for: 70, rules: rules), .critical)
+    }
+
     func test菜单栏为竖条和Logo进度样式提供有效周期指标() throws {
         let periodicState = makeState(snapshot: makePeriodicSnapshot(fiveHourPercent: 67.5))
 

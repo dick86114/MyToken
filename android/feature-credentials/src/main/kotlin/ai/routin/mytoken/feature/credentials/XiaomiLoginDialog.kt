@@ -2,6 +2,7 @@ package ai.routin.mytoken.feature.credentials
 
 import android.annotation.SuppressLint
 import android.webkit.CookieManager
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
@@ -34,6 +35,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import ai.routin.mytoken.core.ui.GlassButton
 import ai.routin.mytoken.core.ui.GlassButtonTone
 
@@ -68,7 +70,13 @@ fun XiaomiLoginDialog(
         onDispose { webView?.destroy() }
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
+    ) {
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
@@ -106,11 +114,14 @@ fun XiaomiLoginDialog(
                             WebView(context).apply {
                                 settings.javaScriptEnabled = true
                                 settings.domStorageEnabled = true
-                                if (resetSession) {
-                                    settings.cacheMode = WebSettings.LOAD_NO_CACHE
-                                }
+                                settings.javaScriptCanOpenWindowsAutomatically = true
+                                settings.setSupportMultipleWindows(false)
+                                settings.cacheMode = WebSettings.LOAD_NO_CACHE
+                                isFocusable = true
+                                isFocusableInTouchMode = true
                                 CookieManager.getInstance().setAcceptCookie(true)
                                 CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+                                webChromeClient = WebChromeClient()
                                 webViewClient = object : WebViewClient() {
                                     override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                                         isLoading = true
@@ -119,6 +130,17 @@ fun XiaomiLoginDialog(
 
                                     override fun onPageFinished(view: WebView?, url: String?) {
                                         isLoading = false
+                                    }
+
+                                    override fun onReceivedError(
+                                        view: WebView?,
+                                        request: WebResourceRequest?,
+                                        error: android.webkit.WebResourceError?,
+                                    ) {
+                                        if (request?.isForMainFrame == true) {
+                                            isLoading = false
+                                            errorMessage = "登录页加载失败，请检查网络后重试"
+                                        }
                                     }
 
                                     override fun onReceivedHttpError(
@@ -132,27 +154,31 @@ fun XiaomiLoginDialog(
                                         if (!isUnauthorizedProfile || authRecoveryAttempted) return
 
                                         authRecoveryAttempted = true
-                                        CookieManager.getInstance().removeAllCookies {
-                                            view?.loadUrl(
-                                                XiaomiConsoleUrl,
-                                                mapOf("Cache-Control" to "no-cache"),
-                                            )
-                                        }
+                                        CookieManager.getInstance().removeAllCookies(null)
+                                        CookieManager.getInstance().flush()
+                                        view?.loadUrl(
+                                            XiaomiConsoleUrl,
+                                            mapOf("Cache-Control" to "no-cache"),
+                                        )
                                     }
                                 }
                                 if (resetSession) {
                                     clearCache(true)
                                     clearHistory()
                                     WebStorage.getInstance().deleteAllData()
-                                    CookieManager.getInstance().removeAllCookies {
-                                        loadUrl(
-                                            XiaomiConsoleUrl,
-                                            mapOf("Cache-Control" to "no-cache"),
-                                        )
-                                    }
+                                    CookieManager.getInstance().removeAllCookies(null)
+                                    CookieManager.getInstance().flush()
+                                    loadUrl(
+                                        XiaomiConsoleUrl,
+                                        mapOf("Cache-Control" to "no-cache"),
+                                    )
                                 } else {
-                                    loadUrl(XiaomiConsoleUrl)
+                                    loadUrl(
+                                        XiaomiConsoleUrl,
+                                        mapOf("Cache-Control" to "no-cache"),
+                                    )
                                 }
+                                requestFocus()
                             }.also { webView = it }
                         },
                         update = {},

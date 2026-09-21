@@ -27,9 +27,9 @@ final class RoutinUsageAppDelegate: NSObject, NSApplicationDelegate {
 
     @MainActor
     static func closeLegacySuppressedLaunchWindows() {
-        // SwiftUI 会把唯一窗口场景当作启动场景；状态栏应用只在检测需要登录时展示它。
+        // SwiftUI 会把唯一窗口场景当作启动场景；登录窗口只能由用户明确重试触发。
         NSApp.windows
-            .filter { $0.isVisible && $0.title == "Routin 签到" }
+            .filter { $0.isVisible && ["Routin 签到", "登录小米 MiMo"].contains($0.title) }
             .forEach { $0.close() }
     }
 }

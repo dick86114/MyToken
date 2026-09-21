@@ -5,11 +5,13 @@ struct MenuBarIndicatorPreview: View, Equatable {
     let state: KeyUsageState
     let descriptor: ProviderDescriptor
     let metric: NormalizedUsageMetric?
+    let colorRules: MenuBarColorRules
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.state == rhs.state
             && lhs.descriptor == rhs.descriptor
             && lhs.metric == rhs.metric
+            && lhs.colorRules == rhs.colorRules
     }
 
     var body: some View {
@@ -20,7 +22,7 @@ struct MenuBarIndicatorPreview: View, Equatable {
         )
         let image = MenuBarMultiUsageIcon.image(
             indicators: [indicator],
-            appearance: NSApp.effectiveAppearance
+            colorRules: colorRules
         )
 
         Image(nsImage: image)
