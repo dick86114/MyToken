@@ -194,6 +194,38 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(settings.thresholds, AlertThresholds(low: 80, high: 95))
     }
 
+    func test菜单栏颜色阈值可持久化并重新载入() throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let settings = AppSettings(defaults: context.defaults)
+        var rules = settings.menuBarColorRules
+        rules.warningThreshold = 25
+        rules.criticalThreshold = 68
+        rules.normalColor = .init(red: 0.1, green: 0.8, blue: 0.4)
+        rules.warningColor = .init(red: 0.9, green: 0.6, blue: 0.1)
+        rules.criticalColor = .init(red: 0.8, green: 0.1, blue: 0.3)
+
+        settings.menuBarColorRules = rules
+
+        XCTAssertEqual(AppSettings(defaults: context.defaults).menuBarColorRules, rules)
+    }
+
+    func test无效菜单栏颜色阈值恢复安全默认值() throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let invalid = MenuBarColorRules(
+            warningThreshold: 80,
+            criticalThreshold: 20,
+            normalColor: .init(red: 1, green: 0, blue: 0),
+            warningColor: .init(red: 0, green: 1, blue: 0),
+            criticalColor: .init(red: 0, green: 0, blue: 1)
+        )
+        let data = try JSONEncoder().encode(invalid)
+        context.defaults.set(data, forKey: "menuBarColorRules")
+
+        XCTAssertEqual(AppSettings(defaults: context.defaults).menuBarColorRules, .standard)
+    }
+
     func test用户设置以基础值持久化并可重新载入() throws {
         let context = try makeContext()
         defer { context.cleanUp() }
@@ -209,6 +241,43 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertFalse(reloaded.notificationsEnabled)
         XCTAssertEqual(reloaded.thresholds, AlertThresholds(low: 70, high: 90))
         XCTAssertTrue(reloaded.launchAtLogin)
+    }
+
+    func test更新通道和CDN源以备份往返() throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let settings = AppSettings(defaults: context.defaults)
+        settings.updateChannel = .cdn
+        settings.updateCDNBase = AppSettings.cdnBases[1]
+
+        let backup = settings.backupSettings
+        let restored = AppSettings(defaults: context.defaults)
+        restored.applyBackup(backup)
+
+        XCTAssertEqual(restored.updateChannel, .cdn)
+        XCTAssertEqual(restored.updateCDNBase, AppSettings.cdnBases[1])
+        XCTAssertEqual(restored.updateMirrorBase, AppSettings.cdnBases[1])
+    }
+
+    func test旧备份缺少更新设置时使用安全默认值() throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let settings = AppSettings(defaults: context.defaults)
+        var backup = settings.backupSettings
+        let data = try JSONEncoder().encode(backup)
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object.removeValue(forKey: "updateChannel")
+        object.removeValue(forKey: "updateCDNBase")
+        let legacyData = try JSONSerialization.data(withJSONObject: object)
+
+        backup = try JSONDecoder().decode(
+            ConfigurationBackupSettings.self,
+            from: legacyData
+        )
+        settings.applyBackup(backup)
+
+        XCTAssertEqual(settings.updateChannel, .direct)
+        XCTAssertEqual(settings.updateMirrorBase, nil)
     }
 
     func test独立展示顺序可持久化并迁移旧配置() throws {

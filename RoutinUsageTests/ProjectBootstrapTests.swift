@@ -182,6 +182,16 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(source.contains("return false"))
     }
 
+    func test启动阶段会关闭旧登录和签到窗口() throws {
+        let app = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
+        let environment = try sourceText(at: "RoutinUsage/App/AppEnvironment.swift")
+
+        XCTAssertTrue(app.contains("closeLegacySuppressedLaunchWindows()"))
+        XCTAssertTrue(app.contains("\"Routin 签到\", \"登录小米 MiMo\""))
+        XCTAssertTrue(environment.contains("isStartupRefreshActive"))
+        XCTAssertTrue(environment.contains("guard !isStartupRefreshActive else { return }"))
+    }
+
     func test菜单栏标签提供应用操作菜单但不提供账号选择() throws {
         let statusBarController = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
 
@@ -421,7 +431,8 @@ final class ProjectBootstrapTests: XCTestCase {
         let statusBarController = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
 
         XCTAssertTrue(statusBarController.contains("MenuBarMultiUsageIcon.image("))
-        XCTAssertTrue(statusBarController.contains("appearance: button.effectiveAppearance"))
+        XCTAssertTrue(statusBarController.contains("indicators: selectedIndicators"))
+        XCTAssertFalse(statusBarController.contains("appearance: button.effectiveAppearance"))
         XCTAssertTrue(statusBarController.contains("button.setAccessibilityLabel"))
     }
 

@@ -175,7 +175,8 @@ struct MenuBarManagementView: View {
                         MenuBarIndicatorPreview(
                             state: state,
                             descriptor: descriptor,
-                            metric: menuBarMetric(for: state)
+                            metric: menuBarMetric(for: state),
+                            colorRules: environment.settings.menuBarColorRules
                         )
                         .equatable()
                     }
@@ -365,7 +366,8 @@ struct MenuBarManagementView: View {
                 MenuBarIndicatorPreview(
                     state: state,
                     descriptor: descriptor,
-                    metric: menuBarMetric(for: state)
+                    metric: menuBarMetric(for: state),
+                    colorRules: environment.settings.menuBarColorRules
                 )
                 .equatable()
                 .frame(width: 42, height: 32)

@@ -5,7 +5,7 @@ import WebKit
 struct XiaomiLoginWindow: View {
     let session: XiaomiWebSession
     var resetSession = false
-    let onCaptured: (String) -> Void
+    let onCaptured: (String) async -> Void
     let onClose: () -> Void
 
     @State private var isCapturing = false
@@ -55,7 +55,7 @@ struct XiaomiLoginWindow: View {
                         errorMessage = nil
                         if let cookie = await session.captureCookieHeader() {
                             isCapturing = false
-                            onCaptured(cookie)
+                            await onCaptured(cookie)
                         } else {
                             isCapturing = false
                             errorMessage = "未读取到有效登录态，请确认已登录控制台"
@@ -91,7 +91,8 @@ struct XiaomiRetryLoginSheet: View {
                     session: session,
                     resetSession: request.resetsWebSession,
                     onCaptured: { cookie in
-                        Task { await onCaptured(cookie) }
+                        await onCaptured(cookie)
+                        onClose()
                     },
                     onClose: onClose
                 )
@@ -109,8 +110,91 @@ struct XiaomiRetryLoginSheet: View {
                     }
             }
         }
-        .onDisappear(perform: onClose)
     }
+}
+
+/// 小米登录必须是独立标题栏窗口。WKWebView 嵌在 sheet/popover 中时
+/// 容易丢掉 key window 状态，导致窗口无法拖动、输入框无法响应键盘。
+@MainActor
+final class XiaomiLoginPanelController: NSObject, NSWindowDelegate {
+    static let shared = XiaomiLoginPanelController()
+
+    private var window: NSWindow?
+    private var onClose: (() -> Void)?
+
+    func present(
+        request: XiaomiLoginRequest,
+        session: XiaomiWebSession?,
+        onCaptured: @escaping @MainActor (String) async -> Void,
+        onClose: @escaping @MainActor () -> Void
+    ) {
+        let sheet = XiaomiRetryLoginSheet(
+            request: request,
+            session: session,
+            onCaptured: onCaptured,
+            onClose: { [weak self] in
+                self?.close()
+                onClose()
+            }
+        )
+        present(content: sheet, onWindowClose: onClose)
+    }
+
+    func present(content: some View, onWindowClose: @escaping () -> Void = {}) {
+        let hostingController = NSHostingController(rootView: content)
+        hostingController.sizingOptions = []
+        onClose = onWindowClose
+
+        if let window {
+            window.contentViewController = hostingController
+            makeKey(window)
+            return
+        }
+
+        let window = XiaomiLoginPanelWindow(
+            contentRect: NSRect(origin: .zero, size: CGSize(width: 620, height: 720)),
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "登录小米 MiMo"
+        window.isReleasedWhenClosed = false
+        window.isRestorable = false
+        window.tabbingMode = .disallowed
+        window.minSize = CGSize(width: 620, height: 720)
+        window.styleMask.remove(.fullSizeContentView)
+        window.delegate = self
+        window.contentViewController = hostingController
+        window.center()
+        self.window = window
+        makeKey(window)
+    }
+
+    func close() {
+        window?.performClose(nil)
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        let closeAction = onClose
+        onClose = nil
+        if let window = notification.object as? NSWindow {
+            SettingsWindowActivationPolicy.unregister(window)
+        }
+        closeAction?()
+    }
+
+    private func makeKey(_ window: NSWindow) {
+        SettingsWindowActivationPolicy.register(window)
+        window.makeKeyAndOrderFront(nil)
+        window.makeFirstResponder(window.contentView)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
+@MainActor
+private final class XiaomiLoginPanelWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
 }
 
 @MainActor

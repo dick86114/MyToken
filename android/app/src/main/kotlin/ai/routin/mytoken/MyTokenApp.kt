@@ -443,7 +443,7 @@ fun MyTokenApp(
                 }
             },
             onDismiss = { xiaomiLoginCredential = null },
-            resetSession = true,
+            resetSession = false,
         )
     }
 }

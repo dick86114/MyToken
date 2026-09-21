@@ -78,10 +78,15 @@ enum MenuBarUsageRisk: Equatable {
     case critical
 
     static func level(for percent: Double) -> Self {
-        if percent >= 80 {
+        level(for: percent, rules: .standard)
+    }
+
+    static func level(for percent: Double, rules: MenuBarColorRules) -> Self {
+        let clampedPercent = percent.isFinite ? min(max(percent, 0), 100) : 0
+        if clampedPercent >= Double(rules.criticalThreshold) {
             return .critical
         }
-        if percent >= 50 {
+        if clampedPercent >= Double(rules.warningThreshold) {
             return .warning
         }
         return .normal
@@ -112,26 +117,22 @@ enum MenuBarMultiUsageIcon {
 
     static func image(
         indicators: [MenuBarIndicatorModel],
-        appearance: NSAppearance? = nil
+        colorRules: MenuBarColorRules = .standard
     ) -> NSImage {
         let count = max(1, min(indicators.count, maximumCount))
-        let image = NSImage(size: NSSize(width: imageWidth(for: count), height: size.height))
-        let labelColor = foregroundColor(for: appearance ?? NSApp?.effectiveAppearance)
-        let resolvedAppearance = appearance ?? NSApp?.effectiveAppearance
-        // 系统外观传播中测量字体会让 CoreText 崩溃；锁定绘制外观保证稳定。
-        resolvedAppearance?.performAsCurrentDrawingAppearance {
-            image.lockFocus()
-            defer { image.unlockFocus() }
+        let imageSize = NSSize(width: imageWidth(for: count), height: size.height)
+        let image = NSImage(size: imageSize, flipped: false) { _ in
             for (index, indicator) in indicators.prefix(maximumCount).enumerated() {
                 let x = outerPadding + CGFloat(index) * (unitWidth + gap)
                 draw(
                     indicator: indicator,
-                    in: NSRect(x: x, y: 0, width: unitWidth, height: size.height),
-                    foregroundColor: labelColor
+                    colorRules: colorRules,
+                    in: NSRect(x: x, y: 0, width: unitWidth, height: size.height)
                 )
             }
+            return true
         }
-        // 模板图会丢弃颜色；这里保留风险色，同时手动根据菜单栏深浅绘制文字。
+        // 延迟绘制让 labelColor 在每块屏幕的菜单栏外观里解析，彩色填充不会被模板化抹掉。
         image.isTemplate = false
         return image
     }
@@ -160,15 +161,15 @@ enum MenuBarMultiUsageIcon {
 
     private static func draw(
         indicator: MenuBarIndicatorModel,
-        in rect: NSRect,
-        foregroundColor: NSColor
+        colorRules: MenuBarColorRules,
+        in rect: NSRect
     ) {
         let text = indicator.shortCode
         let characters = Array(text.prefix(3))
         let font = codeFont(for: characters.count)
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
-            .foregroundColor: foregroundColor
+            .foregroundColor: NSColor.labelColor
         ]
         let textCenter = rect.minX + 4.5
 
@@ -190,18 +191,10 @@ enum MenuBarMultiUsageIcon {
         let trackRect = NSRect(x: rect.minX + 9.5, y: 4, width: 7.5, height: rect.height - 8)
         let track = NSBezierPath(roundedRect: trackRect, xRadius: 2.5, yRadius: 2.5)
         track.lineWidth = 1
-        foregroundColor.setStroke()
-        foregroundColor.withAlphaComponent(0.28).setFill()
+        NSColor.labelColor.withAlphaComponent(0.34).setStroke()
+        NSColor.secondaryLabelColor.withAlphaComponent(0.22).setFill()
         track.fill()
 
-        let color: NSColor
-        switch indicator.healthState {
-        case .normal: color = .systemGreen
-        case .warning: color = .systemOrange
-        case .critical, .unavailable: color = .systemRed
-        case .stale: color = .systemGray
-        case .unknown: color = .secondaryLabelColor
-        }
         let fillHeight: CGFloat
         if let percent = indicator.percent {
             fillHeight = (trackRect.height - track.lineWidth) * CGFloat(min(max(percent, 0), 100)) / 100
@@ -211,7 +204,7 @@ enum MenuBarMultiUsageIcon {
         if fillHeight > 0 {
             NSGraphicsContext.saveGraphicsState()
             track.addClip()
-            color.setFill()
+            progressColor(for: indicator, rules: colorRules).setFill()
             NSBezierPath(
                 rect: NSRect(
                     x: trackRect.minX + track.lineWidth / 2,
@@ -225,12 +218,26 @@ enum MenuBarMultiUsageIcon {
         track.stroke()
     }
 
-    private static func foregroundColor(for appearance: NSAppearance?) -> NSColor {
-        guard let appearance,
-              appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua else {
-            return .black
+    private static func progressColor(
+        for indicator: MenuBarIndicatorModel,
+        rules: MenuBarColorRules
+    ) -> NSColor {
+        if let percent = indicator.percent {
+            return rules.color(for: MenuBarUsageRisk.level(for: percent, rules: rules))
         }
-        return .white
+
+        switch indicator.healthState {
+        case .normal:
+            return rules.color(for: .normal)
+        case .warning:
+            return rules.color(for: .warning)
+        case .critical, .unavailable:
+            return rules.color(for: .critical)
+        case .stale:
+            return rules.color(for: .warning)
+        case .unknown:
+            return rules.color(for: .normal)
+        }
     }
 }
 

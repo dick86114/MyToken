@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-struct AlertThresholds: Equatable, Sendable {
+struct AlertThresholds: Codable, Equatable, Sendable {
     let low: Int
     let high: Int
 
@@ -16,7 +16,7 @@ struct AlertThresholds: Equatable, Sendable {
     }
 }
 
-enum UpdateChannel: String, Equatable, Sendable, CaseIterable {
+enum UpdateChannel: String, Codable, Equatable, Sendable, CaseIterable {
     case direct
     case cdn
 }
@@ -68,6 +68,16 @@ final class AppSettings {
         didSet {
             defaults.set(thresholds.low, forKey: Keys.lowThreshold)
             defaults.set(thresholds.high, forKey: Keys.highThreshold)
+        }
+    }
+
+    var menuBarColorRules: MenuBarColorRules {
+        didSet {
+            guard menuBarColorRules.isValid else {
+                menuBarColorRules = oldValue
+                return
+            }
+            persistMenuBarColorRules()
         }
     }
 
@@ -151,6 +161,44 @@ final class AppSettings {
         credentialUsagePreferences[id.uuidString]
     }
 
+    var backupSettings: ConfigurationBackupSettings {
+        ConfigurationBackupSettings(
+            refreshMinutes: refreshMinutes,
+            displayDimension: displayDimension,
+            menuBarStyle: menuBarStyle,
+            notificationsEnabled: notificationsEnabled,
+            thresholds: thresholds,
+            menuBarColorRules: menuBarColorRules,
+            launchAtLogin: launchAtLogin,
+            updateChannel: updateChannel,
+            updateCDNBase: updateCDNBase,
+            displayOrder: displayOrder,
+            credentialUsagePreferences: credentialUsagePreferences
+        )
+    }
+
+    func applyBackup(_ backup: ConfigurationBackupSettings) {
+        refreshMinutes = AppSettings.allowedRefreshMinutes.contains(backup.refreshMinutes)
+            ? backup.refreshMinutes
+            : refreshMinutes
+        displayDimension = backup.displayDimension
+        menuBarStyle = backup.menuBarStyle
+        notificationsEnabled = backup.notificationsEnabled
+        thresholds = backup.thresholds
+        if backup.menuBarColorRules.isValid {
+            menuBarColorRules = backup.menuBarColorRules
+        }
+        launchAtLogin = backup.launchAtLogin
+        updateChannel = backup.updateChannel
+        updateCDNBase = backup.updateChannel == .cdn
+            && AppSettings.cdnBases.contains(backup.updateCDNBase)
+            ? backup.updateCDNBase
+            : updateCDNBase
+        displayOrder = backup.displayOrder
+        credentialUsagePreferences = backup.credentialUsagePreferences
+        persistCredentialUsagePreferences()
+    }
+
     func setUsagePreferences(_ preferences: CredentialUsagePreferences, for id: UUID) {
         let key = id.uuidString
         guard credentialUsagePreferences[key] != preferences else { return }
@@ -224,6 +272,14 @@ final class AppSettings {
             thresholds = AlertThresholds()
         }
 
+        if let data = defaults.data(forKey: Keys.menuBarColorRules),
+           let decoded = try? JSONDecoder().decode(MenuBarColorRules.self, from: data),
+           decoded.isValid {
+            menuBarColorRules = decoded
+        } else {
+            menuBarColorRules = .standard
+        }
+
         launchAtLogin = defaults.bool(forKey: Keys.launchAtLogin)
 
         updateChannel = defaults.string(forKey: Keys.updateChannel)
@@ -261,6 +317,7 @@ private extension AppSettings {
         static let notificationsEnabled = "notificationsEnabled"
         static let lowThreshold = "notificationLowThreshold"
         static let highThreshold = "notificationHighThreshold"
+        static let menuBarColorRules = "menuBarColorRules"
         static let launchAtLogin = "launchAtLogin"
         static let updateChannel = "updateChannel"
         static let updateCDNBase = "updateCDNBase"
@@ -281,6 +338,12 @@ private extension AppSettings {
     func persistCredentialUsagePreferences() {
         if let data = try? JSONEncoder().encode(credentialUsagePreferences) {
             defaults.set(data, forKey: Self.credentialUsagePreferencesKey)
+        }
+    }
+
+    func persistMenuBarColorRules() {
+        if let data = try? JSONEncoder().encode(menuBarColorRules) {
+            defaults.set(data, forKey: Keys.menuBarColorRules)
         }
     }
 

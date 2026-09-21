@@ -2,6 +2,7 @@ import Foundation
 
 enum UsageShareTemplate: String, CaseIterable, Identifiable, Equatable, Sendable {
     case ticket
+    case ticketLight
     case dark
     case light
 
@@ -10,6 +11,7 @@ enum UsageShareTemplate: String, CaseIterable, Identifiable, Equatable, Sendable
     var title: String {
         switch self {
         case .ticket: return "票根 Pass"
+        case .ticketLight: return "浅色票根"
         case .dark: return "暗色极客"
         case .light: return "雅致浅色"
         }
@@ -18,6 +20,7 @@ enum UsageShareTemplate: String, CaseIterable, Identifiable, Equatable, Sendable
     var previewTag: String {
         switch self {
         case .ticket: return "票根 Pass 模式"
+        case .ticketLight: return "浅色票根模式"
         case .dark: return "极客暗色模式"
         case .light: return "雅致浅色模式"
         }

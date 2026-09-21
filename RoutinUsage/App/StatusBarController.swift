@@ -10,12 +10,6 @@ final class StatusBarController: NSObject {
     private var settingsWindow: NSWindow?
     private var refreshMinutes: Int
     private var notificationsEnabled: Bool
-    private var appearanceObservation: NSKeyValueObservation?
-    private var appearanceUpdateScheduled = false
-    /// 上一次绘制时菜单栏按钮的深浅状态；nil 表示还没画过。
-    /// 相邻状态项频繁刷新会让 AppKit 反复重设按钮 appearance 并触发 KVO，
-    /// 深浅没变时必须跳过重绘，否则高频文字测量会撞上 CoreText 的 nil-insert 竞态。
-    private var lastDrawnMenuBarDark: Bool?
     private var popoverWindowResignObserver: NSObjectProtocol?
     private var applicationDidBecomeActiveObserver: NSObjectProtocol?
 
@@ -53,11 +47,9 @@ final class StatusBarController: NSObject {
 
     private func registerStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        lastDrawnMenuBarDark = nil
         logStatusItem("创建")
         configurePopover()
         configureStatusButton()
-        observeStatusBarAppearance()
         updateStatusButton()
     }
 
@@ -124,44 +116,10 @@ final class StatusBarController: NSObject {
         button.imageScaling = .scaleProportionallyDown
     }
 
-    private func observeStatusBarAppearance() {
-        guard let button = statusItem?.button else {
-            appearanceObservation = NSApp.observe(\NSApplication.effectiveAppearance, options: [.new]) {
-            [weak self] _, _ in
-                Task { @MainActor [weak self] in
-                    self?.updateStatusButton()
-                }
-            }
-            return
-        }
-        // 监听状态栏按钮的 appearance（由系统根据壁纸实时调整），
-        // 而不是 NSApp.effectiveAppearance（跟随系统设置），确保反色和其他 app 一致。
-        // 注意：外观切换传播期间直接重画图标会让 CoreText 抛异常（SIGABRT），
-        // 必须推迟到下一个 runloop，等 AppKit 完成传播后再绘制。
-        appearanceObservation = button.observe(\.effectiveAppearance, options: [.new]) {
-            [weak self] _, _ in
-            Task { @MainActor [weak self] in
-                guard let self, let button = self.statusItem?.button else { return }
-                let isDark = button.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-                guard isDark != self.lastDrawnMenuBarDark else { return }
-                self.scheduleStatusButtonUpdate()
-            }
-        }
-    }
-
-    private func scheduleStatusButtonUpdate() {
-        guard !appearanceUpdateScheduled else { return }
-        appearanceUpdateScheduled = true
-        DispatchQueue.main.async { [weak self] in
-            guard let self, self.statusItem != nil else { return }
-            self.appearanceUpdateScheduled = false
-            self.updateStatusButton()
-        }
-    }
-
     private func observeEnvironment() {
         withObservationTracking {
             _ = environment.settings.menuBarStyle
+            _ = environment.settings.menuBarColorRules
             _ = environment.settings.refreshMinutes
             _ = environment.settings.notificationsEnabled
             _ = environment.settings.displayOrder
@@ -197,7 +155,6 @@ final class StatusBarController: NSObject {
         guard let statusItem, let button = statusItem.button else {
             return
         }
-        let isDark = button.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
         let enabledIDs = Set(environment.store.visibleKeyIDs)
         let visibility = environment.settings.displayOrder.visible(enabledIDs: enabledIDs)
         let selectedIndicators = visibility.menuBarIDs.compactMap { id -> MenuBarIndicatorModel? in
@@ -224,14 +181,13 @@ final class StatusBarController: NSObject {
             button.title = ""
             button.image = MenuBarMultiUsageIcon.image(
                 indicators: selectedIndicators,
-                appearance: button.effectiveAppearance
+                colorRules: environment.settings.menuBarColorRules
             )
             button.imagePosition = .imageOnly
             button.imageScaling = .scaleProportionallyDown
             let hoverSummary = MenuBarIndicatorModel.hoverSummary(for: selectedIndicators)
             button.setAccessibilityLabel(hoverSummary)
             button.toolTip = hoverSummary
-            lastDrawnMenuBarDark = isDark
             return
         }
         let state: KeyUsageState? = nil
@@ -242,7 +198,6 @@ final class StatusBarController: NSObject {
         button.image?.isTemplate = true
         button.imagePosition = .imageOnly
         button.imageScaling = .scaleProportionallyDown
-        lastDrawnMenuBarDark = isDark
         button.setAccessibilityLabel(text)
         button.toolTip = helpText(for: state)
     }
@@ -485,17 +440,5 @@ private struct StatusPopoverContent: View {
             retryCredential: environment.retryCredential(_:),
             openSettings: openSettings
         )
-        .sheet(item: $environment.xiaomiLoginRequest) { request in
-            XiaomiRetryLoginSheet(
-                request: request,
-                session: environment.xiaomiWebSession,
-                onCaptured: { cookie in
-                    await environment.completeXiaomiLogin(request, cookie: cookie)
-                },
-                onClose: {
-                    environment.cancelXiaomiLogin(request)
-                }
-            )
-        }
     }
 }

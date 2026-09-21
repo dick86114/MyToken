@@ -296,6 +296,7 @@ struct UsageShareEditorView: View {
     private func templateIcon(_ template: UsageShareTemplate) -> String {
         switch template {
         case .ticket: return "ticket"
+        case .ticketLight: return "ticket"
         case .dark: return "square"
         case .light: return "sun.max"
         }
@@ -382,8 +383,9 @@ enum UsageShareWindowFrame {
     }
 
     static func estimatedCardHeight(for card: UsageShareRenderedCard) -> CGFloat {
-        let header: CGFloat = card.template == .ticket ? 176 : 148
-        let stub: CGFloat = card.template == .ticket ? 128 : 32
+        let isTicket = card.template == .ticket || card.template == .ticketLight
+        let header: CGFloat = isTicket ? 176 : 148
+        let stub: CGFloat = isTicket ? 128 : 32
         let note: CGFloat = card.note == nil ? 0 : 56
         let subscription: CGFloat = (card.subscriptionStartText != nil || card.subscriptionEndText != nil) ? 24 : 0
         var height: CGFloat = header + stub + note + subscription

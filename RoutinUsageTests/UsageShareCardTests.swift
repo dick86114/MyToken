@@ -384,6 +384,33 @@ final class UsageShareCardTests: XCTestCase {
         XCTAssertGreaterThan(png.count, 100)
     }
 
+    @MainActor
+    func test浅色票根模板可渲染() throws {
+        let now = date(2026, 9, 20, 21, 40)
+        let state = makeState(
+            name: "工作机",
+            snapshot: UsageSnapshot(
+                planName: "Plus",
+                kind: .periodic,
+                fiveHour: UsageMetric(used: 7.60, limit: 20, remaining: 12.40, percent: 38, unit: .usd, windowEnd: nil),
+                weekly: nil,
+                token: nil,
+                allowedModels: [],
+                fetchedAt: now
+            )
+        )
+        let content = try XCTUnwrap(
+            UsageShareContentBuilder.build(state: state, now: now, timeZone: timeZone)
+        )
+        var draft = UsageShareDraft.make(from: content)
+        draft.template = .ticketLight
+        let card = UsageShareContentBuilder.render(content: content, draft: draft)
+        XCTAssertEqual(card.template, .ticketLight)
+        let image = try XCTUnwrap(UsageShareExport.image(for: card))
+        XCTAssertGreaterThan(image.size.width, 0)
+        XCTAssertGreaterThan(image.size.height, image.size.width * 0.8)
+    }
+
     func test分享功能已接入弹窗和凭证页() throws {
         let popover = try TestSourceReader.read(["RoutinUsage", "Views", "UsagePopoverView.swift"])
         let row = try TestSourceReader.read(["RoutinUsage", "Views", "UsageRowView.swift"])

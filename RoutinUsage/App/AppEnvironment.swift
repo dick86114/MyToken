@@ -90,6 +90,7 @@ final class AppEnvironment {
     @ObservationIgnored private let xiaomiCookieReader: @MainActor () async -> String?
     @ObservationIgnored private var terminationObservation: ApplicationTerminationObservation?
     @ObservationIgnored private var isStarted = false
+    @ObservationIgnored private var isStartupRefreshActive = false
     @ObservationIgnored private var hasRequestedNotificationAuthorization = false
     @ObservationIgnored private var notificationAuthorizationTask: Task<Void, Never>?
     @ObservationIgnored private var updateCheckTask: Task<Void, Never>?
@@ -272,6 +273,7 @@ final class AppEnvironment {
         _ = beginUpdateCheckIfNeeded(requiresStarted: true)
 
         await store.refreshAll()
+        isStartupRefreshActive = false
         guard isStarted else {
             return
         }
@@ -566,6 +568,54 @@ final class AppEnvironment {
         try? keyRepository.read(id: id)
     }
 
+    func configurationBackupData() throws -> Data {
+        let configurations = store.orderedKeyIDs.compactMap {
+            store.state(for: $0)?.configuration
+        }
+        let backup = try ConfigurationBackupService.makeBackup(
+            settings: settings,
+            credentials: configurations,
+            secretReader: { [store] keyID in
+                store.secretForExport(for: keyID)
+            }
+        )
+        return try ConfigurationBackupService.data(for: backup)
+    }
+
+    func importConfigurationBackup(from data: Data) throws {
+        let backup = try ConfigurationBackupService.backup(from: data)
+        guard !backup.credentials.isEmpty else {
+            throw ConfigurationBackupError.noCredentials
+        }
+
+        let oldIDs = store.orderedKeyIDs
+        for keyID in oldIDs {
+            codexGroupDetection.clearRecord(for: keyID)
+            try? store.deleteKey(keyID)
+        }
+
+        try keyRepository.replaceAll(with: backup.credentials.map { credential in
+            KeyRepository.CredentialImport(
+                configuration: credential.configuration,
+                secret: credential.secret
+            )
+        })
+        settings.applyBackup(backup.settings)
+
+        let requestedLoginEnabled = backup.settings.launchAtLogin
+        if requestedLoginEnabled != loginItemManager.isEnabled {
+            try? LoginItemSettingSynchronizer.setEnabled(
+                requestedLoginEnabled,
+                settings: settings,
+                manager: loginItemManager
+            )
+        }
+
+        store.reloadConfigurations()
+        synchronizeStoreSettings()
+        refreshIntervalDidChange(to: settings.refreshMinutes)
+    }
+
     func refreshCredential(_ keyID: UUID) async {
         await store.refresh(keyID: keyID)
     }
@@ -577,9 +627,11 @@ final class AppEnvironment {
         }
 
         guard let cookie = await xiaomiCookieReader(), !cookie.isEmpty else {
-            xiaomiLoginRequest = XiaomiLoginRequest(
-                credentialID: keyID,
-                resetsWebSession: true
+            presentXiaomiLogin(
+                XiaomiLoginRequest(
+                    credentialID: keyID,
+                    resetsWebSession: true
+                )
             )
             return
         }
@@ -591,9 +643,26 @@ final class AppEnvironment {
         guard store.state(for: keyID)?.failureIsAuthentication == true else {
             return
         }
-        xiaomiLoginRequest = XiaomiLoginRequest(
-            credentialID: keyID,
-            resetsWebSession: true
+        presentXiaomiLogin(
+            XiaomiLoginRequest(
+                credentialID: keyID,
+                resetsWebSession: true
+            )
+        )
+    }
+
+    private func presentXiaomiLogin(_ request: XiaomiLoginRequest) {
+        guard !isStartupRefreshActive else { return }
+        xiaomiLoginRequest = request
+        XiaomiLoginPanelController.shared.present(
+            request: request,
+            session: xiaomiWebSession ?? XiaomiWebSession(),
+            onCaptured: { [weak self] cookie in
+                await self?.completeXiaomiLogin(request, cookie: cookie)
+            },
+            onClose: { [weak self] in
+                self?.cancelXiaomiLogin(request)
+            }
         )
     }
 

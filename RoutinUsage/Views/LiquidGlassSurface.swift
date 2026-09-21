@@ -37,6 +37,25 @@ private struct LiquidGlassWindowBackgroundModifier: ViewModifier {
     }
 }
 
+private struct LiquidGlassInteractiveControlModifier: ViewModifier {
+    let cornerRadius: CGFloat
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        if #available(macOS 26.0, *) {
+            content
+                .glassEffect(.regular.interactive(), in: shape)
+        } else {
+            content
+                .background(.regularMaterial, in: shape)
+                .overlay {
+                    shape.stroke(.white.opacity(0.32), lineWidth: 0.6)
+                }
+        }
+    }
+}
+
 /// 以居中弹层承载编辑、提醒等临时操作，并支持点击焦外背景关闭。
 private struct LiquidGlassOverlay<OverlayContent: View>: View {
     let onDismiss: () -> Void
@@ -80,6 +99,10 @@ extension View {
 
     func liquidGlassWindowBackground() -> some View {
         modifier(LiquidGlassWindowBackgroundModifier())
+    }
+
+    func liquidGlassInteractiveControl(cornerRadius: CGFloat) -> some View {
+        modifier(LiquidGlassInteractiveControlModifier(cornerRadius: cornerRadius))
     }
 
     func liquidGlassOverlay<Item: Identifiable, OverlayContent: View>(
