@@ -72,4 +72,21 @@ class UsageShareDialogUiTest {
         composeRule.onNodeWithTag("share_settings_pane").assertExists()
         composeRule.onNodeWithTag("share_actions_row").assertExists()
     }
+
+    @Test
+    @Config(qualifiers = "w1000dp-h800dp")
+    fun 字段开关按票面顺序排列且整卡可点击() {
+        setContent(MyTokenLayoutMode.Expanded)
+        val expected = listOf(
+            "可用状态徽章",
+            "套餐规格",
+            "订阅周期/到期",
+            "周期剩余",
+            "附加备注框",
+            "分组倍率",
+            "快照水印与防伪",
+        )
+        composeRule.onNodeWithText(expected.first()).assertExists()
+        composeRule.onNodeWithText(expected.last()).assertExists()
+    }
 }

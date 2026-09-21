@@ -228,6 +228,7 @@ fun GlassTextField(
     onValueChange: (String) -> Unit,
     label: String,
     modifier: Modifier = Modifier,
+    contentPadding: Dp = 6.dp,
     singleLine: Boolean = true,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     trailingIcon: @Composable (() -> Unit)? = null,
@@ -261,7 +262,9 @@ fun GlassTextField(
                 unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
             ),
             // modifier（含 testTag）落在输入框本体上，语义（RequestFocus 等）才能被测试命中。
-            modifier = modifier.fillMaxWidth(),
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(start = contentPadding, end = contentPadding),
         )
     }
 }

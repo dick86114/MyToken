@@ -54,7 +54,7 @@ struct UsageShareEditorView: View {
                     .foregroundStyle(chrome.textTertiary)
             }
             ScrollView(.vertical, showsIndicators: false) {
-                UsageShareCardView(card: rendered, notchFill: chrome.previewPane)
+                UsageShareCardView(card: rendered)
                     .frame(maxWidth: .infinity)
                     .accessibilityLabel("用量分享图预览")
             }
@@ -160,7 +160,7 @@ struct UsageShareEditorView: View {
         let cells = visibleFieldToggles
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("展示字段开关 (隐藏即不导出)")
+            Text("展示字段开关 (按票面顺序，隐藏即不导出)")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(chrome.textSecondary)
                 Spacer()
@@ -171,7 +171,7 @@ struct UsageShareEditorView: View {
                 .foregroundStyle(chrome.blue)
                 .buttonStyle(.plain)
             }
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+            LazyVStack(alignment: .leading, spacing: 8) {
                 ForEach(Array(cells.enumerated()), id: \.offset) { _, cell in
                     toggleCell(cell.title, isOn: cell.binding)
                 }
@@ -184,15 +184,26 @@ struct UsageShareEditorView: View {
 
     private var visibleFieldToggles: [(title: String, binding: Binding<Bool>)] {
         var cells: [(title: String, binding: Binding<Bool>)] = []
+
+        cells.append(("可用状态徽章", $draft.showsStatus))
         if !content.planName.isEmpty || !content.subtitle.isEmpty {
             cells.append(("套餐规格", $draft.showsSubtitle))
         }
         if content.cycleRemainingText != nil || content.subscriptionStartText != nil || content.subscriptionEndText != nil {
             cells.append(("订阅周期/到期", $draft.showsSubscriptionDates))
         }
+        cells.append(("附加备注框", $draft.showsNote))
         if content.metrics.contains(where: { $0.resetBadgeText != nil || !$0.timeDetails.isEmpty }) {
             cells.append(("重置时间与倒计时", $draft.showsResetTimes))
         }
+
+        let progressMetrics = content.metrics.filter { $0.percent != nil }
+        let tileMetrics = content.metrics.filter { $0.percent == nil }
+        for item in progressMetrics + tileMetrics {
+            let id = item.id
+            cells.append((item.title, metricVisibleBinding(id)))
+        }
+
         if content.tokenPercentText != nil {
             cells.append(("Token 占比与缓存", $draft.showsTokenPercent))
         }
@@ -205,13 +216,8 @@ struct UsageShareEditorView: View {
                 }
             )))
         }
-        cells.append(("附加备注框", $draft.showsNote))
+
         cells.append(("快照水印与防伪", $draft.showsWatermark))
-        cells.append(("可用状态徽章", $draft.showsStatus))
-        for item in content.metrics {
-            let id = item.id
-            cells.append((item.title, metricVisibleBinding(id)))
-        }
         return cells
     }
 
@@ -221,27 +227,25 @@ struct UsageShareEditorView: View {
                 Button(action: copyImage) {
                     Label("复制图片到剪贴板", systemImage: "doc.on.doc")
                         .font(.system(size: 12, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity, minHeight: 46)
+                        .background(chrome.blue, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .foregroundStyle(.white)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.white)
-                .background(chrome.blue, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 Button(action: saveImage) {
                     Label("保存 PNG 到本地", systemImage: "square.and.arrow.down")
                         .font(.system(size: 12, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity, minHeight: 46)
+                        .background(chrome.fieldFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(chrome.inputBorder, lineWidth: 1)
+                        }
+                        .foregroundStyle(chrome.textPrimary)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(chrome.textPrimary)
-                .background(chrome.fieldFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(chrome.inputBorder, lineWidth: 1)
-                }
-                .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             Text("快捷键: ⌘C 复制 · ⌘S 保存")
                 .font(.system(size: 10, design: .monospaced))
@@ -277,6 +281,36 @@ struct UsageShareEditorView: View {
     }
 
     private func toggleCell(_ title: String, isOn: Binding<Bool>) -> some View {
+        Button {
+            isOn.wrappedValue.toggle()
+        } label: {
+            HStack(spacing: 9) {
+                Image(systemName: isOn.wrappedValue ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(isOn.wrappedValue ? chrome.blue : chrome.textTertiary)
+                Text(title)
+                    .font(.system(size: 11))
+                    .foregroundStyle(chrome.textPrimary)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 12)
+            .background(chrome.fieldFill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(chrome.inputBorder.opacity(0.7), lineWidth: 1)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(isOn.wrappedValue ? "已显示" : "已隐藏")
+        .accessibilityAddTraits(.isButton)
+    }
+
+    private func legacyToggleCell(_ title: String, isOn: Binding<Bool>) -> some View {
         Toggle(isOn: isOn) {
             Text(title)
                 .font(.system(size: 11))
@@ -295,7 +329,7 @@ struct UsageShareEditorView: View {
 
     private func templateIcon(_ template: UsageShareTemplate) -> String {
         switch template {
-        case .ticket: return "ticket"
+        case .ticket: return "ticket.fill"
         case .ticketLight: return "ticket"
         case .dark: return "square"
         case .light: return "sun.max"

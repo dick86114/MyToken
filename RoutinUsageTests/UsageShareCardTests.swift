@@ -4,6 +4,30 @@ import XCTest
 final class UsageShareCardTests: XCTestCase {
     private let timeZone = TimeZone(identifier: "Asia/Shanghai")!
 
+    func test深浅票根使用不同标题和图标() {
+        XCTAssertEqual(UsageShareTemplate.ticket.title, "深色票根")
+        XCTAssertEqual(UsageShareTemplate.ticketLight.title, "浅色票根")
+
+        let source = try? TestSourceReader.read([
+            "RoutinUsage", "Views", "UsageShareEditorView.swift"
+        ])
+        XCTAssertNotNil(source)
+        XCTAssertTrue(source?.contains("case .ticket: return \"ticket.fill\"") == true)
+        XCTAssertTrue(source?.contains("case .ticketLight: return \"ticket\"") == true)
+    }
+
+    func test票根使用真实镂空遮罩() throws {
+        let source = try TestSourceReader.read([
+            "RoutinUsage", "Views", "UsageShareCardView.swift"
+        ])
+
+        XCTAssertTrue(source.contains("ticketCutoutMask"))
+        XCTAssertTrue(source.contains("private static let perforationY: CGFloat = 170"))
+        XCTAssertFalse(source.contains("@State private var perforationY"))
+        XCTAssertTrue(source.contains("perforationY: Self.perforationY"))
+        XCTAssertFalse(source.contains("private func cutoutCircle"))
+    }
+
     func test周期卡片把全部用量字段带入分享内容() throws {
         let now = date(2026, 9, 20, 21, 40)
         let start = date(2026, 9, 1, 0, 0)
@@ -417,6 +441,20 @@ final class UsageShareCardTests: XCTestCase {
         XCTAssertTrue(row.contains("square.and.arrow.up"))
         XCTAssertTrue(row.contains("onShare"))
         XCTAssertTrue(popover.contains("UsageSharePanelController"))
+    }
+
+    func test字段开关按票面顺序单列展示() throws {
+        let source = try TestSourceReader.read([
+            "RoutinUsage", "Views", "UsageShareEditorView.swift"
+        ])
+
+        XCTAssertTrue(source.contains("展示字段开关 (按票面顺序，隐藏即不导出)"))
+        XCTAssertTrue(source.contains("LazyVStack(alignment: .leading, spacing: 8)"))
+        let statusIndex = try XCTUnwrap(source.range(of: "可用状态徽章")?.lowerBound)
+        let planIndex = try XCTUnwrap(source.range(of: "套餐规格")?.lowerBound)
+        let watermarkIndex = try XCTUnwrap(source.range(of: "快照水印与防伪")?.lowerBound)
+        XCTAssertLessThan(statusIndex, planIndex)
+        XCTAssertLessThan(planIndex, watermarkIndex)
     }
 
     private func makeState(

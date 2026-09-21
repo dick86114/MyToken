@@ -18,10 +18,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items as gridItems
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items as staggeredItems
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Refresh
@@ -165,20 +165,20 @@ fun HomeScreen(
                             spacing = 12.dp,
                         )
                         val metricColumns = 2
-                        LazyVerticalGrid(
-                            state = rememberLazyGridState(),
+                        LazyVerticalStaggeredGrid(
+                            state = rememberLazyStaggeredGridState(),
                             modifier = Modifier
                                 .fillMaxSize()
                                 .testTag("home_grid_${columns}_columns"),
-                            columns = GridCells.Fixed(columns),
+                            columns = StaggeredGridCells.Fixed(columns),
                             contentPadding = PaddingValues(
                                 top = 4.dp,
                                 bottom = if (layoutMode == MyTokenLayoutMode.Compact) 96.dp else 24.dp,
                             ),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalItemSpacing = 12.dp,
                         ) {
-                            gridItems(
+                            staggeredItems(
                                 visibleCards,
                                 key = { it.credential.id },
                                 contentType = { "credential-usage-card" },

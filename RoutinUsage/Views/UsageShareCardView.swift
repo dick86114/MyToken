@@ -70,7 +70,8 @@ struct UsageShareChrome {
 
 struct UsageShareCardView: View {
     let card: UsageShareRenderedCard
-    var notchFill: Color = Color(rgb: 0x14171F)
+
+    private static let perforationY: CGFloat = 170
 
     private struct TicketPalette {
         let backgroundTop: Color
@@ -146,12 +147,9 @@ struct UsageShareCardView: View {
 
     @ViewBuilder
     private var ticketCard: some View {
-        ZStack {
-            card.template == .ticketLight ? Color(rgb: 0xF4F6FA) : notchFill
-            ticketBody
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-        }
+        ticketBody
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
         .frame(width: Self.canvasWidth)
     }
 
@@ -161,38 +159,56 @@ struct UsageShareCardView: View {
             ticketTear
             ticketMetrics
         }
-        .background(ticketPalette.backgroundBottom)
+        .background {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [ticketPalette.backgroundTop, ticketPalette.backgroundBottom],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        }
         .overlay {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(ticketPalette.border, lineWidth: 1)
         }
-        .overlay { ticketCutouts }
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: Color.black.opacity(0.45), radius: 18, y: 10)
+        .overlay(alignment: .top) {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [.white.opacity(isTicketLight ? 0.52 : 0.14), .clear],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(height: 72)
+                .allowsHitTesting(false)
+        }
+        .mask {
+            ticketCutoutMask
+        }
+        .compositingGroup()
+        .shadow(
+            color: Color.black.opacity(isTicketLight ? 0.24 : 0.48),
+            radius: isTicketLight ? 26 : 22,
+            y: isTicketLight ? 16 : 12
+        )
     }
 
-    private var ticketCutouts: some View {
+    private var ticketCutoutMask: some View {
         GeometryReader { geo in
-            let y = geo.size.height / 2
-            ZStack {
-                cutoutCircle(insetX: -2)
-                    .position(x: 0, y: y)
-                cutoutCircle(insetX: 2)
-                    .position(x: geo.size.width, y: y)
-            }
+            TicketCutoutShape(
+                cornerRadius: 16,
+                perforationY: Self.perforationY
+            )
+            .fill(
+                .white,
+                style: FillStyle(eoFill: true, antialiased: true)
+            )
+            .frame(width: geo.size.width, height: geo.size.height)
         }
         .allowsHitTesting(false)
-    }
-
-    private func cutoutCircle(insetX: CGFloat) -> some View {
-            Circle()
-                .fill(card.template == .ticketLight ? Color(rgb: 0xF4F6FA) : notchFill)
-            .frame(width: 24, height: 24)
-            .overlay {
-                    Circle()
-                        .stroke(ticketPalette.border, lineWidth: 1)
-            }
-            .shadow(color: Color.black.opacity(0.5), radius: 1.5, x: insetX, y: 0)
     }
 
     @ViewBuilder
@@ -200,12 +216,6 @@ struct UsageShareCardView: View {
         let palette = ticketPalette
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
-                avatar(
-                    size: 36,
-                    fill: palette.accentSoft.opacity(isTicketLight ? 0.10 : 0.15),
-                    stroke: palette.border,
-                    text: palette.accent
-                )
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Text(card.passCode)
@@ -235,6 +245,20 @@ struct UsageShareCardView: View {
                         .lineLimit(1)
                 }
             }
+
+            HStack {
+                HStack(spacing: 4) {
+                    Image(systemName: "ticket")
+                        .font(.system(size: 8, weight: .semibold))
+                    Text("USAGE PASS")
+                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                }
+                Spacer()
+                Text("ISSUED \(card.capturedAtText.replacingOccurrences(of: ".", with: "-"))")
+                    .font(.system(size: 8, design: .monospaced))
+            }
+            .foregroundStyle(palette.label.opacity(0.80))
+            .padding(.top, 2)
 
             if !card.subtitle.isEmpty || card.cycleRemainingText != nil {
                 HStack(alignment: .top, spacing: 12) {
@@ -271,27 +295,9 @@ struct UsageShareCardView: View {
                 .padding(.top, 8)
             }
 
-            if let note = card.note {
-                HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: "info.circle")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(palette.accent)
-                    Text(note)
-                        .font(.system(size: 11))
-                        .foregroundStyle(palette.accent)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(palette.accentSoft.opacity(isTicketLight ? 0.08 : 0.10), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .strokeBorder(palette.border.opacity(isTicketLight ? 0.8 : 1), lineWidth: 1)
-                }
-            }
         }
         .padding(16)
+        .frame(height: 170, alignment: .topLeading)
         .background(
             LinearGradient(
                 colors: [ticketPalette.backgroundTop, ticketPalette.backgroundBottom],
@@ -302,23 +308,36 @@ struct UsageShareCardView: View {
     }
 
     private var ticketTear: some View {
-        ticketPalette.tear
-            .frame(height: 12)
-            .overlay(alignment: .center) {
-                Rectangle()
-                    .fill(ticketPalette.tearLine)
-                    .frame(height: 1.5)
-                    .mask(
-                        Rectangle()
-                            .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
-                    )
-                    .padding(.horizontal, 20)
-            }
+        ZStack(alignment: .leading) {
+            ticketPalette.tear
+            Rectangle()
+                .fill(ticketPalette.tearLine)
+                .frame(height: 1.5)
+                .mask(
+                    Rectangle()
+                        .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
+                )
+                .padding(.horizontal, 18)
+        }
+        .frame(height: 20)
     }
 
     @ViewBuilder
     private var ticketMetrics: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if let note = card.note {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(ticketPalette.accent)
+                    Text(note)
+                        .font(.system(size: 11))
+                        .foregroundStyle(ticketPalette.accent)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
             ForEach(progressMetrics) { item in
                 ticketGauge(item)
             }
@@ -383,6 +402,7 @@ struct UsageShareCardView: View {
                 }
                 .padding(.top, 4)
             }
+            ticketStubStrip
             brandFooter
         }
         .padding(16)
@@ -451,10 +471,25 @@ struct UsageShareCardView: View {
             }
         }
         .padding(12)
-        .background(palette.panel, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(palette.panelBorder, lineWidth: 1)
+        .background {
+            if isTicketLight {
+                Color.white.opacity(0.16)
+            } else {
+                palette.panel
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if isTicketLight {
+                Rectangle()
+                    .fill(Color(rgb: 0xE2E8F0).opacity(0.55))
+                    .frame(height: 1)
+                    .mask(
+                        Rectangle().stroke(style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
+                    )
+            } else {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(palette.panelBorder, lineWidth: 1)
+            }
         }
     }
 
@@ -478,12 +513,51 @@ struct UsageShareCardView: View {
                     .lineLimit(2)
             }
         }
-        .padding(10)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(palette.panel.opacity(isTicketLight ? 1 : 0.60), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(palette.panelBorder, lineWidth: 1)
+        .background {
+            if isTicketLight {
+                Color.white.opacity(0.10)
+            } else {
+                palette.panel.opacity(0.60)
+            }
+        }
+        .overlay(alignment: .top) {
+            if isTicketLight {
+                Rectangle()
+                    .fill(Color(rgb: 0xE2E8F0).opacity(0.55))
+                    .frame(height: 1)
+            } else {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(palette.panelBorder, lineWidth: 1)
+            }
+        }
+    }
+
+    private var ticketStubStrip: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "ticket")
+                .font(.system(size: 11, weight: .semibold))
+            VStack(alignment: .leading, spacing: 1) {
+                Text("ADMIT ONE")
+                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                Text("SN \(card.passCode)")
+                    .font(.system(size: 9, design: .monospaced))
+            }
+            Spacer(minLength: 12)
+            Image(systemName: "barcode")
+                .font(.system(size: 26))
+        }
+        .foregroundStyle(ticketPalette.label)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(ticketPalette.tearLine.opacity(0.55))
+                .frame(height: 1)
+                .mask(
+                    Rectangle().stroke(style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
+                )
         }
     }
 
@@ -906,6 +980,39 @@ struct UsageShareCardView: View {
     }
 }
 
+
+private struct TicketCutoutShape: Shape {
+    let cornerRadius: CGFloat
+    let perforationY: CGFloat?
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path(
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .path(in: rect)
+                .cgPath
+        )
+
+        if let perforationY {
+            let radius: CGFloat = 12
+            path.addPath(
+                Path(
+                    Circle()
+                        .path(in: CGRect(x: -radius, y: perforationY - radius, width: radius * 2, height: radius * 2))
+                        .cgPath
+                )
+            )
+            path.addPath(
+                Path(
+                    Circle()
+                        .path(in: CGRect(x: rect.width - radius, y: perforationY - radius, width: radius * 2, height: radius * 2))
+                        .cgPath
+                )
+            )
+        }
+
+        return path
+    }
+}
 
 enum UsageShareExport {
 
