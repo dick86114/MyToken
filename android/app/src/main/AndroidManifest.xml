@@ -23,6 +23,12 @@
         android:dataExtractionRules="@xml/data_extraction_rules">
 
         <activity
+            android:name=".credentials.XiaomiLoginActivity"
+            android:exported="false"
+            android:label="登录小米 MiMo"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"

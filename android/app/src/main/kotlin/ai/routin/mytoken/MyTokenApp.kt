@@ -7,7 +7,7 @@ import ai.routin.mytoken.feature.credentials.CredentialEditorViewModel
 import ai.routin.mytoken.feature.credentials.CredentialListScreen
 import ai.routin.mytoken.feature.credentials.CredentialListViewModel
 import ai.routin.mytoken.feature.credentials.XiaomiCookieReader
-import ai.routin.mytoken.feature.credentials.XiaomiLoginDialog
+import ai.routin.mytoken.feature.credentials.XiaomiLoginActivity
 import ai.routin.mytoken.feature.credentials.pruneCredential
 import ai.routin.mytoken.feature.home.CredentialRetryResult
 import ai.routin.mytoken.feature.home.HomeScreen
@@ -22,6 +22,7 @@ import ai.routin.mytoken.feature.transfer.TransferScannerScreen
 import ai.routin.mytoken.feature.transfer.TransferUiState
 import ai.routin.mytoken.feature.transfer.TransferViewModel
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -438,17 +439,26 @@ fun MyTokenApp(
         }
     }
 
-    xiaomiLoginCredential?.let { credential ->
-        XiaomiLoginDialog(
-            onCaptured = { cookie ->
-                xiaomiLoginCredential = null
-                scope.launch {
-                    homeViewModel.completeXiaomiLoginAndAwait(credential, cookie)
-                }
-            },
-            onDismiss = { xiaomiLoginCredential = null },
-            resetSession = false,
-        )
+    val xiaomiLoginLauncher = rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        val credential = xiaomiLoginCredential
+        xiaomiLoginCredential = null
+        val cookie = result.data?.getStringExtra(XiaomiLoginActivity.RESULT_COOKIE)
+        if (result.resultCode == android.app.Activity.RESULT_OK && credential != null && cookie != null) {
+            scope.launch {
+                homeViewModel.completeXiaomiLoginAndAwait(credential, cookie)
+            }
+        }
+    }
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(xiaomiLoginCredential) {
+        if (xiaomiLoginCredential != null) {
+            xiaomiLoginLauncher.launch(
+                android.content.Intent(context, XiaomiLoginActivity::class.java)
+            )
+        }
     }
 }
 }
