@@ -236,6 +236,7 @@ private extension UsagePopoverView {
                     if let state = store.state(for: id) {
                         UsageRowView(
                             state: state,
+                            density: settings.usageCardDensity,
                             actions: nil,
                             refreshCredential: {
                                 Task { await refreshCredential(id) }

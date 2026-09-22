@@ -3,6 +3,7 @@ import SwiftUI
 @MainActor
 struct UsageRowView: View {
     let state: KeyUsageState
+    var density: UsageCardDensity = .full
     var actions: AnyView?
     var refreshCredential: () -> Void = {}
     var retryCredential: () -> Void = {}
@@ -123,9 +124,6 @@ enum UsageRowAccessibility {
             details.append("5 小时剩余 \(remainingDuration(for: snapshot.fiveHour, now: now))")
             details.append("周剩余 \(remainingDuration(for: snapshot.weekly, now: now))")
         }
-        if !snapshot.groupMultipliers.isEmpty {
-            details.append(UsageFormatter.groupMultiplierText(snapshot.groupMultipliers))
-        }
         return ([summary] + details).joined(separator: "，")
     }
 
@@ -167,7 +165,7 @@ private extension UsageRowView {
 
                 Spacer(minLength: 8)
 
-                if validMetric(state.snapshot?.token) != nil || hasGroupMultipliers || state.snapshot?.metrics.isEmpty == false {
+                if validMetric(state.snapshot?.token) != nil || state.snapshot?.metrics.isEmpty == false {
                     VStack(alignment: .trailing, spacing: 3) {
                         if let metric = validMetric(state.snapshot?.token),
                            metric.percent.isFinite {
@@ -185,11 +183,6 @@ private extension UsageRowView {
                             normalizedHeaderMetric(metric)
                         }
 
-                        if let currentGroupMultiplier {
-                            groupMultiplierText(currentGroupMultiplier)
-                                .font(.caption2)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
                     }
                 }
 
@@ -240,38 +233,26 @@ private extension UsageRowView {
     }
 
     @ViewBuilder
-    func groupMultiplierText(_ group: UsageGroupMultiplier) -> some View {
-        Text(UsageFormatter.groupMultiplierText([group]))
-            .foregroundStyle(Color.green)
-            .accessibilityElement(children: .combine)
-        .accessibilityLabel(groupMultiplierAccessibilityLabel(group: group))
-    }
-
-
-    @ViewBuilder
     var subscriptionPeriodDetails: some View {
-        if let snapshot = state.snapshot,
-           snapshot.kind == .periodic,
-           snapshot.subscriptionStartAt != nil || snapshot.subscriptionEndAt != nil {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("开始 " + UsageFormatter.subscriptionDateText(snapshot.subscriptionStartAt))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text("结束 " + UsageFormatter.subscriptionDateText(snapshot.subscriptionEndAt))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .multilineTextAlignment(.trailing)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
+        if density == .full {
+            if let snapshot = state.snapshot,
+               snapshot.kind == .periodic,
+               snapshot.subscriptionStartAt != nil || snapshot.subscriptionEndAt != nil {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("开始 " + UsageFormatter.subscriptionDateText(snapshot.subscriptionStartAt))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text("结束 " + UsageFormatter.subscriptionDateText(snapshot.subscriptionEndAt))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .multilineTextAlignment(.trailing)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-            .monospacedDigit()
         }
-    }
-
-    func groupMultiplierAccessibilityLabel(group: UsageGroupMultiplier) -> String {
-        let label = "当前分组：\(UsageFormatter.groupMultiplierText([group]))"
-        return label
     }
 
     @ViewBuilder
@@ -440,19 +421,23 @@ private extension UsageRowView {
 
                 UsageMetricProgressBar(metric: metric)
 
-                Text(UsageFormatter.amount(metric))
-                    .help(UsageFormatter.fullAmount(metric))
-                Text("剩余 \(UsageFormatter.remaining(metric))")
+                if density == .full {
+                    Text(UsageFormatter.amount(metric))
+                        .help(UsageFormatter.fullAmount(metric))
+                    Text("剩余 \(UsageFormatter.remaining(metric))")
+                }
                 if metric.windowEnd != nil {
                     Text("重置 \(UsageFormatter.resetTime(metric))")
-                    Text("剩余 \(remainingDuration(for: metric, now: now))")
-                        .foregroundStyle(
-                            UsageFormatter.shouldHighlightRemainingDuration(
-                                for: metric,
-                                dimension: dimension,
-                                now: now
-                            ) ? Color.green : Color.secondary
-                        )
+                    if density == .full {
+                        Text("剩余 \(remainingDuration(for: metric, now: now))")
+                            .foregroundStyle(
+                                UsageFormatter.shouldHighlightRemainingDuration(
+                                    for: metric,
+                                    dimension: dimension,
+                                    now: now
+                                ) ? Color.green : Color.secondary
+                            )
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -572,16 +557,6 @@ private extension UsageRowView {
             providerID: state.configuration.providerID,
             planName: snapshot.planName
         )
-    }
-
-    var currentGroupMultiplier: UsageGroupMultiplier? {
-        UsageFormatter.currentGroupMultiplier(
-            in: state.snapshot?.groupMultipliers ?? []
-        )
-    }
-
-    var hasGroupMultipliers: Bool {
-        !(state.snapshot?.groupMultipliers.isEmpty ?? true)
     }
 
     func validMetric(_ metric: UsageMetric?) -> UsageMetric? {
