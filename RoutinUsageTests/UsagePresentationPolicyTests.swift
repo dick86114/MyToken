@@ -267,6 +267,23 @@ final class UsagePresentationPolicyTests: XCTestCase {
         XCTAssertTrue(
             source.contains("? Color.green : Color.secondary")
         )
+        XCTAssertTrue(source.contains("case .relativeDuration"))
+        XCTAssertTrue(
+            source.contains("UsageFormatter.remainingDurationText(until: windowEnd, now: now)")
+        )
+    }
+
+    func test简洁进度格只渲染重置时刻() throws {
+        let source = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/NormalizedUsageMetricGrid.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(source.contains("case .resetTimeOnly"))
+        XCTAssertTrue(source.contains("UsageFormatter.resetTime(windowEnd, now: now)"))
     }
 
     func test弹窗通用卡片按Routin逻辑显示重置剩余时长() throws {
