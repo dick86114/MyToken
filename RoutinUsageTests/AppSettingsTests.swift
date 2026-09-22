@@ -90,6 +90,35 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(AppSettings(defaults: context.defaults).usageCardDensity, .full)
     }
 
+    func test配置备份往返保留卡片密度() throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let settings = AppSettings(defaults: context.defaults)
+        settings.usageCardDensity = .full
+
+        let restored = AppSettings(defaults: context.defaults)
+        restored.applyBackup(settings.backupSettings)
+
+        XCTAssertEqual(restored.usageCardDensity, .full)
+    }
+
+    func test旧备份缺少卡片密度时导入为完整() throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let settings = AppSettings(defaults: context.defaults)
+        var backup = settings.backupSettings
+        let data = try JSONEncoder().encode(backup)
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object.removeValue(forKey: "usageCardDensity")
+        let legacyData = try JSONSerialization.data(withJSONObject: object)
+
+        backup = try JSONDecoder().decode(ConfigurationBackupSettings.self, from: legacyData)
+        settings.applyBackup(backup)
+
+        XCTAssertEqual(backup.usageCardDensity, .full)
+        XCTAssertEqual(settings.usageCardDensity, .full)
+    }
+
     func test新凭证用量偏好默认自动且提醒开启() throws {
         let context = try makeContext()
         defer { context.cleanUp() }

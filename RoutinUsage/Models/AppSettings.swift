@@ -171,6 +171,7 @@ final class AppSettings {
         ConfigurationBackupSettings(
             refreshMinutes: refreshMinutes,
             displayDimension: displayDimension,
+            usageCardDensity: usageCardDensity,
             menuBarStyle: menuBarStyle,
             notificationsEnabled: notificationsEnabled,
             thresholds: thresholds,
@@ -188,6 +189,7 @@ final class AppSettings {
             ? backup.refreshMinutes
             : refreshMinutes
         displayDimension = backup.displayDimension
+        usageCardDensity = backup.usageCardDensity
         menuBarStyle = backup.menuBarStyle
         notificationsEnabled = backup.notificationsEnabled
         thresholds = backup.thresholds
