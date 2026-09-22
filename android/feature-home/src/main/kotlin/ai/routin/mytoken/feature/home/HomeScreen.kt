@@ -182,7 +182,8 @@ fun HomeScreen(
                         val columns = adaptiveGridColumns(
                             availableWidth = maxWidth,
                             maxColumns = layoutMode.maxColumns(1, 2, 3),
-                            minItemWidth = if (usageCardDensity.isCompact()) 170.dp else 260.dp,
+                            // 220dp 让展开折叠屏（~600dp）保持 2 列，只有大平板（~840dp+）才到 3 列。
+                            minItemWidth = if (usageCardDensity.isCompact()) 220.dp else 260.dp,
                             spacing = if (usageCardDensity.isCompact()) 8.dp else 12.dp,
                         )
                         val metricColumns = 2

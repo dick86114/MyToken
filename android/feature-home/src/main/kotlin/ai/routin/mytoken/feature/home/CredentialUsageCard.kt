@@ -13,6 +13,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -581,8 +583,19 @@ private fun CompactUsageCardBody(card: CredentialCardUi, isDark: Boolean) {
                 }
             }
         }
-        CompactUsageArrangement.ValueTiles -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            metrics.forEach { metric -> CompactMetricRow(metric = metric) }
+        CompactUsageArrangement.ValueTiles -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            metrics.chunked(2).forEach { rowMetrics ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    rowMetrics.forEach { metric ->
+                        Box(modifier = Modifier.weight(1f)) {
+                            CompactMetricRow(metric = metric)
+                        }
+                    }
+                    if (rowMetrics.size == 1) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
         }
     }
 }
@@ -616,9 +629,50 @@ private fun BalanceStrip(metric: UsageMetric, isDark: Boolean) {
         else -> "充足"
     }
 
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                if (isDark) CardPalette.darkSurface else MaterialTheme.colorScheme.surface,
+                RoundedCornerShape(12.dp),
+            )
+            .border(
+                1.dp,
+                if (isDark) CardPalette.darkSurfaceBorder else statusColor.copy(alpha = 0.18f),
+                RoundedCornerShape(12.dp),
+            ),
+    ) {
+        // 底部渐隐波浪装饰
+        Canvas(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .height(36.dp),
+        ) {
+            val waveColor = CardPalette.emerald(isDark).copy(alpha = 0.08f)
+            val path = androidx.compose.ui.graphics.Path()
+            path.moveTo(0f, size.height * 0.7f)
+            path.quadraticBezierTo(
+                size.width * 0.25f, size.height * 0.2f,
+                size.width * 0.5f, size.height * 0.5f,
+            )
+            path.quadraticBezierTo(
+                size.width * 0.75f, size.height * 0.8f,
+                size.width, size.height * 0.3f,
+            )
+            path.lineTo(size.width, size.height)
+            path.lineTo(0f, size.height)
+            path.close()
+            drawPath(path, waveColor)
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = metric.label,
                     style = MaterialTheme.typography.labelSmall,
@@ -626,13 +680,13 @@ private fun BalanceStrip(metric: UsageMetric, isDark: Boolean) {
                 )
                 Text(
                     text = formatCurrency(metric.value, metric.currencyCode),
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = CardPalette.emerald(isDark),
                 )
             }
+            StatusPill(text = statusText, color = statusColor, isDark = isDark)
         }
-        StatusPill(text = statusText, color = statusColor, isDark = isDark)
     }
 }
 

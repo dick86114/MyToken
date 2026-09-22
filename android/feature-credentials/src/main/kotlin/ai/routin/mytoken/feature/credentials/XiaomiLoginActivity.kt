@@ -1,6 +1,8 @@
 package ai.routin.mytoken.feature.credentials
 
 import android.annotation.SuppressLint
+import android.content.Intent
+import android.os.Bundle
 import android.webkit.CookieManager
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
@@ -10,7 +12,9 @@ import android.webkit.WebSettings
 import android.webkit.WebStorage
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,17 +23,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -42,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.WindowCompat
 import ai.routin.mytoken.core.ui.GlassButton
 import ai.routin.mytoken.core.ui.GlassButtonTone
 
@@ -50,29 +57,54 @@ private const val CHROME_MOBILE_UA =
     "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 " +
         "(KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
 
-/** Reads the current Xiaomi MiMo web session cookie without exposing it to logs. */
-object XiaomiCookieReader {
-    fun readCookieHeader(): String? {
-        val cookie = CookieManager.getInstance().getCookie(XiaomiConsoleUrl).orEmpty()
-        return cookie
-            .takeIf { it.contains("api-platform_serviceToken") }
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
+/**
+ * 独立 Activity 承载小米登录 WebView：脱离主窗口的 Dialog/Overlay，
+ * 拥有自己的 Window、Insets 和返回栈，彻底解决白屏与系统栏遮挡。
+ */
+class XiaomiLoginActivity : ComponentActivity() {
+
+    companion object {
+        const val EXTRA_RESET_SESSION = "reset_session"
+        const val RESULT_COOKIE = "cookie"
+        val XiaomiConsoleUrlForLogin get() = "https://platform.xiaomimimo.com/console/balance"
+        private const val CHROME_MOBILE_UA =
+            "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 " +
+                "(KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, true)
+        val resetSession = intent?.getBooleanExtra(EXTRA_RESET_SESSION, false) ?: false
+
+        setContent {
+            MaterialTheme {
+                XiaomiLoginScreen(
+                    resetSession = resetSession,
+                    onCaptured = { cookie ->
+                        setResult(
+                            RESULT_OK,
+                            Intent().putExtra(RESULT_COOKIE, cookie),
+                        )
+                        finish()
+                    },
+                    onDismiss = {
+                        setResult(RESULT_CANCELED)
+                        finish()
+                    },
+                )
+            }
+        }
     }
 }
 
-/**
- * Full-screen Xiaomi MiMo login surface.
- *
- * Uses a main-window overlay instead of Compose Dialog: WebView inside a Dialog
- * window is flaky on Android (hardware accel / insets) and is the main cause of
- * the persistent blank-page issue on retry.
- */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun XiaomiLoginDialog(
+private fun XiaomiLoginScreen(
+    resetSession: Boolean,
     onCaptured: (String) -> Unit,
     onDismiss: () -> Unit,
-    resetSession: Boolean = false,
 ) {
     var webView by remember { mutableStateOf<WebView?>(null) }
     var isLoading by remember { mutableStateOf(true) }
@@ -86,58 +118,48 @@ fun XiaomiLoginDialog(
         onDispose { webView?.destroy() }
     }
 
-    Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag("xiaomi_login_dialog"),
-        color = MaterialTheme.colorScheme.background,
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 8.dp),
-                ) {
-                    Text(
-                        text = "登录小米 MiMo",
-                        style = MaterialTheme.typography.titleLarge,
-                    )
-                    Text(
-                        text = "登录完成后点击“使用当前登录状态”读取 Cookie。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-
-                IconButton(
-                    onClick = {
-                        blankRecoveryAttempts = 0
-                        reloadKey += 1
-                    },
-                    modifier = Modifier.testTag("xiaomi_login_reload"),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Refresh,
-                        contentDescription = "重新加载登录页",
-                    )
-                }
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.testTag("xiaomi_login_close"),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Close,
-                        contentDescription = "关闭",
-                    )
-                }
-            }
-
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text(text = "登录小米 MiMo")
+                        Text(
+                            text = "登录后点击“使用当前登录状态”",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "关闭",
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = {
+                            blankRecoveryAttempts = 0
+                            reloadKey += 1
+                        },
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Refresh,
+                            contentDescription = "重新加载登录页",
+                        )
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        ) {
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 key(reloadKey) {
                     AndroidView(
@@ -145,7 +167,6 @@ fun XiaomiLoginDialog(
                             var authRecoveryAttempted = false
                             @SuppressLint("SetJavaScriptEnabled")
                             WebView(context).apply {
-                                // 小米控制台是重 JS SPA；使用移动版 Chrome UA + 宽视口。
                                 settings.userAgentString = CHROME_MOBILE_UA
                                 settings.javaScriptEnabled = true
                                 settings.domStorageEnabled = true
@@ -165,8 +186,7 @@ fun XiaomiLoginDialog(
                                 isFocusable = true
                                 isFocusableInTouchMode = true
                                 CookieManager.getInstance().setAcceptCookie(true)
-                                CookieManager.getInstance()
-                                    .setAcceptThirdPartyCookies(this, true)
+                                CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
                                 webChromeClient = WebChromeClient()
                                 webViewClient = object : WebViewClient() {
                                     override fun onPageStarted(
@@ -180,10 +200,7 @@ fun XiaomiLoginDialog(
 
                                     override fun onPageFinished(view: WebView?, url: String?) {
                                         isLoading = false
-                                        // SPA 渲染后内容高度为 0 时说明页面实际空白；
-                                        // 自动换一个全新 WebView 实例重载一次。
-                                        val blank = view?.contentHeight == 0
-                                        if (blank && blankRecoveryAttempts < 1) {
+                                        if (view?.contentHeight == 0 && blankRecoveryAttempts < 1) {
                                             blankRecoveryAttempts += 1
                                             reloadKey += 1
                                         }
@@ -193,7 +210,7 @@ fun XiaomiLoginDialog(
                                         view: WebView?,
                                         detail: RenderProcessGoneDetail?,
                                     ): Boolean {
-                                        errorMessage = "网页渲染进程异常退出，请点击右上角刷新重试"
+                                        errorMessage = "渲染进程异常退出，请点击右上角刷新重试"
                                         view?.destroy()
                                         if (webView === view) webView = null
                                         return true
@@ -215,17 +232,16 @@ fun XiaomiLoginDialog(
                                         request: WebResourceRequest?,
                                         errorResponse: WebResourceResponse?,
                                     ) {
-                                        val isUnauthorizedProfile =
+                                        val isUnauthorized =
                                             request?.url?.toString()
                                                 ?.contains("/api/v1/userProfile") == true &&
                                                 errorResponse?.statusCode == 401
-                                        if (!isUnauthorizedProfile || authRecoveryAttempted) return
-
+                                        if (!isUnauthorized || authRecoveryAttempted) return
                                         authRecoveryAttempted = true
                                         CookieManager.getInstance().removeAllCookies(null)
                                         CookieManager.getInstance().flush()
                                         view?.loadUrl(
-                                            XiaomiConsoleUrl,
+                                            "https://platform.xiaomimimo.com/console/balance",
                                             mapOf("Cache-Control" to "no-cache"),
                                         )
                                     }
@@ -266,14 +282,6 @@ fun XiaomiLoginDialog(
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
                     )
-                }
-                TextButton(
-                    onClick = {
-                        blankRecoveryAttempts = 0
-                        reloadKey += 1
-                    },
-                ) {
-                    Text(text = "页面空白？点此重新加载")
                 }
                 GlassButton(
                     onClick = {

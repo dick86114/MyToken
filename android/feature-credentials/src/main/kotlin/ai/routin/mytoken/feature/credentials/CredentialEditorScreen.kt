@@ -318,14 +318,23 @@ fun CredentialEditorScreen(
         }
     }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val xiaomiLoginLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        val cookie = result.data?.getStringExtra(XiaomiLoginActivity.RESULT_COOKIE)
+        if (result.resultCode == android.app.Activity.RESULT_OK && cookie != null) {
+            onApiKeyChange(cookie)
+        }
+        showsXiaomiLogin = false
+    }
+
     if (showsXiaomiLogin) {
-        XiaomiLoginDialog(
-            onCaptured = { cookie ->
-                onApiKeyChange(cookie)
-                showsXiaomiLogin = false
-            },
-            onDismiss = { showsXiaomiLogin = false },
-        )
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            xiaomiLoginLauncher.launch(
+                android.content.Intent(context, XiaomiLoginActivity::class.java)
+            )
+        }
     }
 }
 
