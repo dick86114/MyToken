@@ -90,7 +90,7 @@ final class UsagePopoverLayoutTests: XCTestCase {
 
         XCTAssertTrue(popover.contains("LazyVGrid(columns: cardColumns, spacing: 8)"))
         XCTAssertTrue(popover.contains("usageCardDensity == .compact"))
-        XCTAssertTrue(popover.contains(".animation(.spring(response: 0.35, dampingFraction: 0.8), value: settings.usageCardDensity)"))
+        XCTAssertTrue(popover.contains(".id(settings.usageCardDensity)"))
         XCTAssertTrue(segmented.contains("withAnimation(.spring(response: 0.35, dampingFraction: 0.8))"))
     }
 

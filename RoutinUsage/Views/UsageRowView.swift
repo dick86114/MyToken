@@ -19,7 +19,6 @@ struct UsageRowView: View {
                 fullCard(now: timeline.date)
             }
         }
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: density)
     }
 
     private func fullCard(now: Date) -> some View {
