@@ -133,12 +133,12 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git commit --allow-empty -m "chore(release): Android v${RELEASE_VERSION}"
           git push origin HEAD:master
-      - name: 创建 Android Release
+      - name: 创建 / 追加 Android 资产到 vX Release
         uses: softprops/action-gh-release@v2
         with:
           target_commitish: master
-          tag_name: android-v${{ inputs.version }}
-          name: MyToken Android v${{ inputs.version }}
+          tag_name: v${{ inputs.version }}
+          name: MyToken v${{ inputs.version }}
           body: ${{ inputs.release_notes }}
           generate_release_notes: false
           make_latest: true
