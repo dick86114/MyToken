@@ -37,6 +37,57 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(settings.thresholds, AlertThresholds(low: 80, high: 95))
         XCTAssertFalse(settings.launchAtLogin)
         XCTAssertEqual(settings.menuBarStyle, .aliasLogoProgress)
+        XCTAssertEqual(settings.usageCardDensity, .compact)
+    }
+
+    func test全新安装默认简洁并写回密度键() throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+
+        let settings = AppSettings(defaults: context.defaults)
+
+        XCTAssertEqual(settings.usageCardDensity, .compact)
+        XCTAssertEqual(
+            context.defaults.string(forKey: "usageCardDensity"),
+            UsageCardDensity.compact.rawValue
+        )
+        XCTAssertEqual(
+            AppSettings(defaults: context.defaults).usageCardDensity,
+            .compact
+        )
+    }
+
+    func test升级用户缺少密度键时维持完整() throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        context.defaults.set(5, forKey: "refreshMinutes")
+
+        let settings = AppSettings(defaults: context.defaults)
+
+        XCTAssertEqual(settings.usageCardDensity, .full)
+        XCTAssertEqual(
+            context.defaults.string(forKey: "usageCardDensity"),
+            UsageCardDensity.full.rawValue
+        )
+    }
+
+    func test非法密度键且已有旧设置时回落完整() throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        context.defaults.set(5, forKey: "refreshMinutes")
+        context.defaults.set("dense", forKey: "usageCardDensity")
+
+        XCTAssertEqual(AppSettings(defaults: context.defaults).usageCardDensity, .full)
+    }
+
+    func test卡片密度可持久化并重新载入() throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let settings = AppSettings(defaults: context.defaults)
+
+        settings.usageCardDensity = .full
+
+        XCTAssertEqual(AppSettings(defaults: context.defaults).usageCardDensity, .full)
     }
 
     func test新凭证用量偏好默认自动且提醒开启() throws {
