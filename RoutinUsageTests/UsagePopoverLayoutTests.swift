@@ -49,6 +49,29 @@ final class UsagePopoverLayoutTests: XCTestCase {
         XCTAssertTrue(controller.contains("min(max(idealSize.height, 1), maximumHeight)"))
     }
 
+    func test弹窗顶栏设置左侧有简洁完整分段() throws {
+        let source = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/UsagePopoverView.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(source.contains("UsageCardDensitySegmentedControl"))
+        XCTAssertTrue(source.contains("openSettings()"))
+        let toolbar = try XCTUnwrap(source.range(of: "var toolbar: some View"))
+        let toolbarSlice = source[toolbar.lowerBound...]
+        let segmentedIndex = try XCTUnwrap(
+            toolbarSlice.range(of: "UsageCardDensitySegmentedControl")
+        ).lowerBound
+        let gearIndex = try XCTUnwrap(
+            toolbarSlice.range(of: "openSettings()")
+        ).lowerBound
+
+        XCTAssertTrue(segmentedIndex < gearIndex)
+    }
+
     func test弹窗设置按钮复用右键菜单激活逻辑() throws {
         let popover = try TestSourceReader.read([
             "RoutinUsage",

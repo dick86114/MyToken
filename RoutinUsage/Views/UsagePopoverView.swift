@@ -166,15 +166,21 @@ private extension UsagePopoverView {
 
             Spacer()
 
-            GlassIconButton(
-                action: { openSettings() },
-                help: "设置"
-            ) {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 13, weight: .medium))
+            HStack(spacing: 8) {
+                UsageCardDensitySegmentedControl(
+                    selection: $settings.usageCardDensity
+                )
+
+                GlassIconButton(
+                    action: { openSettings() },
+                    help: "设置"
+                ) {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .keyboardShortcut(",")
+                .accessibilityLabel("打开设置")
             }
-            .keyboardShortcut(",")
-            .accessibilityLabel("打开设置")
         }
         .overlay(alignment: .center) {
             Link(destination: RoutinUsageApp.websiteURL) {
