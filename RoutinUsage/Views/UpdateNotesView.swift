@@ -38,7 +38,7 @@ enum UpdateNotesRenderer {
 
     private static func htmlAttributedText(notes: String) -> NSAttributedString? {
         guard notes.contains("<"), notes.contains(">"),
-              let data = notes.data(using: .utf8) else {
+              let data = compactListHTML(notes).data(using: .utf8) else {
             return nil
         }
         return try? NSAttributedString(
@@ -49,6 +49,19 @@ enum UpdateNotesRenderer {
             ],
             documentAttributes: nil
         )
+    }
+
+    /// GitHub Release 有时返回 HTML 列表；系统默认 `<ul>` 缩进很大，
+    /// 注入样式压平边距，让弹窗里的日志保持紧凑。
+    private static func compactListHTML(_ body: String) -> String {
+        """
+        <html><head><meta charset="utf-8"><style>
+        body { margin: 0; }
+        p { margin: 0; }
+        ul, ol { margin: 0; padding-left: 16px; }
+        li { margin: 0; }
+        </style></head><body>\(body)</body></html>
+        """
     }
 
     private static func markdownAttributedText(notes: String) -> AttributedString {
