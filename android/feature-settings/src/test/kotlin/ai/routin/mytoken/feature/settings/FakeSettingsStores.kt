@@ -1,5 +1,6 @@
 package ai.routin.mytoken.feature.settings
 
+import ai.routin.mytoken.domain.model.UsageCardDensity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -21,6 +22,9 @@ class FakeDisplaySettingsStore(initial: DisplaySettings = DisplaySettings()) : D
 
     override suspend fun setThemeMode(mode: AppThemeMode) =
         state.update { it.copy(themeMode = mode) }
+
+    override suspend fun setUsageCardDensity(density: UsageCardDensity) =
+        state.update { it.copy(usageCardDensity = density) }
 
     override suspend fun setShowDisabledCredentials(enabled: Boolean) =
         state.update { it.copy(showDisabledCredentials = enabled) }

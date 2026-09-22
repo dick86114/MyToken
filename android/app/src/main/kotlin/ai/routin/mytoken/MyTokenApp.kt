@@ -1,6 +1,7 @@
 package ai.routin.mytoken
 
 import ai.routin.mytoken.domain.model.Credential
+import ai.routin.mytoken.domain.model.UsageCardDensity
 import ai.routin.mytoken.feature.credentials.CredentialEditorScreen
 import ai.routin.mytoken.feature.credentials.CredentialEditorViewModel
 import ai.routin.mytoken.feature.credentials.CredentialListScreen
@@ -63,6 +64,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import java.util.UUID
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.map
 
 /** Lightweight screen stack; Task 11 owns the full navigation layer. */
 sealed interface AppScreen {
@@ -109,6 +111,11 @@ fun MyTokenApp(
                 repository = graph.credentialRepository,
                 refreshUseCase = graph.refreshUseCase,
                 credentialOrderIds = graph.credentialOrderStore.order,
+                usageCardDensityFlow = graph.displaySettingsStore.settings
+                    .map { it.usageCardDensity },
+                onUsageCardDensityChange = { density ->
+                    graph.displaySettingsStore.setUsageCardDensity(density)
+                },
                 refreshOnStart = false,
             )
     }
@@ -144,6 +151,7 @@ fun MyTokenApp(
     }
 
     val homeState by homeViewModel.state.collectAsStateWithLifecycle()
+    val usageCardDensity by homeViewModel.usageCardDensity.collectAsStateWithLifecycle()
     val listState by credentialListViewModel.state.collectAsStateWithLifecycle()
     val settingsState by settingsViewModel.state.collectAsStateWithLifecycle()
     val updateState by settingsViewModel.updateState.collectAsStateWithLifecycle()
@@ -227,6 +235,16 @@ fun MyTokenApp(
                             HomeScreen(
                                 state = homeState,
                                 layoutMode = layoutMode,
+                                usageCardDensity = usageCardDensity,
+                                onToggleUsageCardDensity = {
+                                    homeViewModel.setUsageCardDensity(
+                                        if (usageCardDensity == UsageCardDensity.COMPACT) {
+                                            UsageCardDensity.FULL
+                                        } else {
+                                            UsageCardDensity.COMPACT
+                                        }
+                                    )
+                                },
                                 onRefreshAll = {
                                     homeViewModel.refreshAll(settingsState.refresh.retryOnFailure)
                                 },

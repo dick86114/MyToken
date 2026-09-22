@@ -2,6 +2,10 @@ package ai.routin.mytoken.feature.home
 
 import ai.routin.mytoken.domain.usage.RefreshStatus
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
+import ai.routin.mytoken.domain.model.UsageCardDensity
+import ai.routin.mytoken.domain.model.UsageMetric
+import ai.routin.mytoken.domain.model.UsageMetricHealthState
+import ai.routin.mytoken.domain.model.UsageMetricUnit
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -74,6 +78,7 @@ fun CredentialUsageCard(
     onRefresh: () -> Unit = onRetry,
     modifier: Modifier = Modifier,
     layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
+    usageCardDensity: UsageCardDensity = UsageCardDensity.FULL,
 ) {
     val accent = ProviderCatalog.accentColor(card.credential.providerId)
     val providerName = ProviderCatalog.displayName(card.credential.providerId)
@@ -92,6 +97,16 @@ fun CredentialUsageCard(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (usageCardDensity == UsageCardDensity.COMPACT) {
+                CompactUsageCardBody(
+                    card = card,
+                    providerName = providerName,
+                    plan = plan,
+                    layoutMode = layoutMode,
+                    onRefresh = onRefresh,
+                    onRetry = onRetry,
+                )
+            } else {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top,
@@ -215,6 +230,7 @@ fun CredentialUsageCard(
             if (card.status == RefreshStatus.Loading) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(3.dp))
             }
+            }
         }
     }
 
@@ -235,6 +251,182 @@ fun CredentialUsageCard(
             layoutMode = layoutMode,
         )
     }
+}
+
+@Composable
+private fun CompactUsageCardBody(
+    card: CredentialCardUi,
+    providerName: String,
+    plan: String,
+    layoutMode: MyTokenLayoutMode,
+    onRefresh: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    var showsFailureDetails by remember(card.credential.id) { mutableStateOf(false) }
+    var showsShareDialog by remember(card.credential.id) { mutableStateOf(false) }
+    val metrics = UsageCardCompactSpec.orderedMetrics(
+        providerId = card.credential.providerId,
+        metadata = card.credential.metadata,
+        metrics = card.snapshot?.metrics.orEmpty(),
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Text(
+                text = card.credential.name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Row(modifier = Modifier.padding(start = 4.dp)) {
+                if (card.status == RefreshStatus.Failed) {
+                    IconButton(
+                        onClick = { showsFailureDetails = true },
+                        modifier = Modifier
+                            .size(28.dp)
+                            .testTag("credential_failure_${card.credential.id}"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Warning,
+                            contentDescription = "查看刷新失败详情",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+                IconButton(
+                    onClick = { showsShareDialog = true },
+                    enabled = card.snapshot != null && card.credential.isEnabled,
+                    modifier = Modifier
+                        .size(28.dp)
+                        .testTag("credential_share_${card.credential.id}"),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Share,
+                        contentDescription = "分享 ${card.credential.name}",
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+                IconButton(
+                    onClick = onRefresh,
+                    enabled = card.status != RefreshStatus.Loading && card.credential.isEnabled,
+                    modifier = Modifier
+                        .size(30.dp)
+                        .testTag("credential_refresh_${card.credential.id}"),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Refresh,
+                        contentDescription = "刷新 ${card.credential.name}",
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+        }
+
+        Text(
+            text = if (plan.isEmpty()) providerName else "$providerName · $plan",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+        )
+
+        if (metrics.isEmpty()) {
+            Text(
+                text = "暂无用量数据",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                metrics.forEach { metric -> CompactMetricRow(metric = metric) }
+            }
+        }
+
+        if (card.status == RefreshStatus.Loading) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(3.dp))
+        }
+    }
+
+    if (showsFailureDetails) {
+        RefreshFailureDialog(
+            card = card,
+            onDismiss = { showsFailureDetails = false },
+            onRetry = onRetry,
+        )
+    }
+    if (showsShareDialog) {
+        UsageShareDialog(
+            card = card,
+            onDismiss = { showsShareDialog = false },
+            layoutMode = layoutMode,
+        )
+    }
+}
+
+@Composable
+private fun CompactMetricRow(metric: UsageMetric) {
+    val colors = statusColors()
+    val percent = progressPercent(metric)
+    val isProgress = metric.presentation == ai.routin.mytoken.domain.model.UsageMetricPresentation.Progress
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = metric.label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (isProgress && percent != null) {
+                Text(
+                    text = formatPercent(percent),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = progressColor(percent, colors),
+                )
+            }
+        }
+
+        if (isProgress) {
+            UsageProgressBar(
+                percent = percent,
+                color = progressColor(percent, colors),
+            )
+            metric.windowEnd?.let { end ->
+                Text(
+                    text = "重置 ${formatResetTime(end)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            Text(
+                text = compactValueText(metric),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = statusColor(metric, percent, colors),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+private fun compactValueText(metric: UsageMetric): String = when {
+    metric.presentation == ai.routin.mytoken.domain.model.UsageMetricPresentation.Balance ->
+        formatCurrency(metric.value, metric.currencyCode)
+    metric.presentation == ai.routin.mytoken.domain.model.UsageMetricPresentation.Status ->
+        if (metric.healthState == UsageMetricHealthState.Unavailable) "不可用" else "可用"
+    metric.unit == UsageMetricUnit.Token -> formatGrouped(metric.value)
+    else -> formatDecimal(metric.value)
 }
 
 @Composable

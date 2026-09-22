@@ -6,6 +6,7 @@ import ai.routin.mytoken.core.ui.adaptiveGridColumns
 import ai.routin.mytoken.core.ui.maxColumns
 
 import ai.routin.mytoken.domain.model.ProviderId
+import ai.routin.mytoken.domain.model.UsageCardDensity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -62,6 +63,8 @@ fun HomeScreen(
     onImportFromMac: () -> Unit,
     onAddManually: () -> Unit,
     layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
+    usageCardDensity: UsageCardDensity = UsageCardDensity.FULL,
+    onToggleUsageCardDensity: () -> Unit = {},
 ) {
     var selectedProvider by remember { mutableStateOf<ProviderId?>(null) }
     val allCards = remember(state.cards) {
@@ -117,6 +120,15 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    TextButton(
+                        onClick = onToggleUsageCardDensity,
+                        modifier = Modifier.testTag("usage_density_toggle"),
+                    ) {
+                        Text(
+                            text = if (usageCardDensity.isCompact()) "完整" else "简洁",
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
                     ProviderFilterMenu(
                         selectedProvider = selectedProvider,
                         options = filterOptions,
@@ -160,9 +172,13 @@ fun HomeScreen(
                     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                         val columns = adaptiveGridColumns(
                             availableWidth = maxWidth,
-                            maxColumns = layoutMode.maxColumns(1, 2, 3),
-                            minItemWidth = 260.dp,
-                            spacing = 12.dp,
+                            maxColumns = if (usageCardDensity.isCompact()) {
+                                layoutMode.maxColumns(2, 3, 4)
+                            } else {
+                                layoutMode.maxColumns(1, 2, 3)
+                            },
+                            minItemWidth = if (usageCardDensity.isCompact()) 170.dp else 260.dp,
+                            spacing = if (usageCardDensity.isCompact()) 8.dp else 12.dp,
                         )
                         val metricColumns = 2
                         LazyVerticalStaggeredGrid(
@@ -176,7 +192,7 @@ fun HomeScreen(
                                 bottom = if (layoutMode == MyTokenLayoutMode.Compact) 96.dp else 24.dp,
                             ),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalItemSpacing = 12.dp,
+                            verticalItemSpacing = if (usageCardDensity.isCompact()) 8.dp else 12.dp,
                         ) {
                             staggeredItems(
                                 visibleCards,
@@ -187,6 +203,7 @@ fun HomeScreen(
                                     card = card,
                                     metricColumns = metricColumns,
                                     layoutMode = layoutMode,
+                                    usageCardDensity = usageCardDensity,
                                     onOpen = { onOpenCredential(card.credential.id) },
                                     onRefresh = { onRefreshCredential(card.credential.id) },
                                     onRetry = { onRetryCredential(card.credential.id) },
