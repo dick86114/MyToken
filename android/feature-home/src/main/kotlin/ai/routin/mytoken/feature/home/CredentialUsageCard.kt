@@ -118,20 +118,10 @@ fun CredentialUsageCard(
     var showsFailureDetails by remember(card.credential.id) { mutableStateOf(false) }
     var showsShareDialog by remember(card.credential.id) { mutableStateOf(false) }
 
-    val cometPhase = rememberInfiniteTransition(label = "comet").animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(2400, easing = LinearEasing)),
-        label = "cometPhase",
+    val cometModifier = Modifier.refreshCometBorder(
+        isLoading = card.status == RefreshStatus.Loading,
+        color = accent,
     )
-    val cometModifier = if (card.status == RefreshStatus.Loading) {
-        Modifier.drawWithContent {
-            drawContent()
-            drawCometBorder(cornerRadiusPx = 14.dp.toPx(), phase = cometPhase.value, color = accent)
-        }
-    } else {
-        Modifier
-    }
 
     Card(
         onClick = onOpen,
@@ -222,6 +212,22 @@ fun CredentialUsageCard(
             onDismiss = { showsShareDialog = false },
             layoutMode = layoutMode,
         )
+    }
+}
+
+/** 仅在刷新中创建无限动画，非 Loading 卡片不再常驻空转动画。 */
+@Composable
+private fun Modifier.refreshCometBorder(isLoading: Boolean, color: Color): Modifier {
+    if (!isLoading) return this
+    val phase by rememberInfiniteTransition(label = "comet").animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(2400, easing = LinearEasing)),
+        label = "cometPhase",
+    )
+    return drawWithContent {
+        drawContent()
+        drawCometBorder(cornerRadiusPx = 14.dp.toPx(), phase = phase, color = color)
     }
 }
 
