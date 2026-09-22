@@ -485,11 +485,13 @@ final class ProjectBootstrapTests: XCTestCase {
     func test发布工作流使用MyToken作为版本展示名称() throws {
         let releaseWorkflow = try sourceText(at: ".github/workflows/release-macos.yml")
 
-        XCTAssertTrue(releaseWorkflow.contains("name: MyToken macOS v${{ inputs.version }}"))
+        XCTAssertTrue(releaseWorkflow.contains("name: MyToken v${{ inputs.version }}"))
         XCTAssertTrue(releaseWorkflow.contains("RELEASE_VERSION: ${{ inputs.version }}"))
         XCTAssertTrue(releaseWorkflow.contains("cp \"build/dist/MyToken.dmg\" \"build/dist/${dmg_name}\""))
         XCTAssertTrue(releaseWorkflow.contains("uname -m"))
-        XCTAssertTrue(releaseWorkflow.contains("tag_name: macos-v${{ inputs.version }}"))
+        XCTAssertTrue(releaseWorkflow.contains("tag_name: v${{ inputs.version }}"))
+        XCTAssertTrue(releaseWorkflow.contains("make_latest: true"))
+        XCTAssertFalse(releaseWorkflow.contains("macos-v${{ inputs.version }}"))
         XCTAssertFalse(releaseWorkflow.contains("MyRoutin.dmg"))
         XCTAssertFalse(releaseWorkflow.contains("Routin Usage"))
     }
