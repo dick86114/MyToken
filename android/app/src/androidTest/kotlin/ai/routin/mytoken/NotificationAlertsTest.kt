@@ -16,7 +16,6 @@ import ai.routin.mytoken.domain.model.UsageMetricUnit
 import ai.routin.mytoken.domain.model.UsageSnapshot
 import ai.routin.mytoken.domain.usage.CredentialUsageState
 import ai.routin.mytoken.domain.usage.RefreshStatus
-import ai.routin.mytoken.feature.credentials.RoutinCheckInLauncher
 import android.app.NotificationManager
 import android.content.Context
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -32,11 +31,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Instrumentation layer for the Task 10 notification and check-in flows, mirroring
+ * Instrumentation layer for notification alert flows, mirroring
  * the JVM/Robolectric coverage at the device layer:
  *  - the three notification channels exist after ensureChannels()
  *  - the evaluator produces redacted notification content (no secret material)
- *  - the check-in launcher URL construction (official page / websiteURL metadata)
  *
  * NOTE: this file cannot execute in this environment — there is no emulator or
  * device available (see task-10-report). It is compile-verified via
@@ -44,7 +42,7 @@ import org.junit.runner.RunWith
  * runs.
  */
 @RunWith(AndroidJUnit4::class)
-class NotificationAndCheckInTest {
+class NotificationAlertsTest {
 
     private val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
 
@@ -127,23 +125,4 @@ class NotificationAndCheckInTest {
         assertEquals("Routin 主号", evaluation.invalidCredentialAlerts.single().credentialName)
     }
 
-    @Test
-    fun checkInUrlUsesWebsiteUrlMetadataOrOfficialPage() {
-        assertEquals(
-            "https://routin.ai/dashboard/lottery",
-            RoutinCheckInLauncher.checkInUrl(credential()),
-        )
-        assertEquals(
-            "https://custom.example.com/dashboard/lottery",
-            RoutinCheckInLauncher.checkInUrl(
-                credential(mapOf(CredentialMetadataKey.WebsiteURL to "https://custom.example.com/dashboard/lottery")),
-            ),
-        )
-        assertEquals(
-            "https://routin.ai/dashboard/lottery",
-            RoutinCheckInLauncher.checkInUrl(
-                credential(mapOf(CredentialMetadataKey.WebsiteURL to "http://insecure.example.com")),
-            ),
-        )
-    }
 }

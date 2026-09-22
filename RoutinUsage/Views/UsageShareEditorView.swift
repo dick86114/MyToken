@@ -207,11 +207,10 @@ struct UsageShareEditorView: View {
         if content.tokenPercentText != nil {
             cells.append(("Token 占比与缓存", $draft.showsTokenPercent))
         }
-        if content.groupMultiplierText != nil || content.detectionText != nil {
+        if content.groupMultiplierText != nil {
             cells.append(("Codex 路由分组", Binding(
-                get: { draft.showsDetection || draft.showsGroupMultiplier },
+                get: { draft.showsGroupMultiplier },
                 set: {
-                    draft.showsDetection = $0
                     draft.showsGroupMultiplier = $0
                 }
             )))

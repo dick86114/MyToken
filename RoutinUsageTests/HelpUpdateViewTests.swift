@@ -23,13 +23,13 @@ final class HelpUpdateViewTests: XCTestCase {
         XCTAssertTrue(source.contains("installAvailableUpdate"))
     }
 
-    func test真实弹窗移除签到状态但保留分组检测入口() throws {
+    func test真实弹窗移除签到状态和分组检测入口() throws {
         let source = try TestSourceReader.read([
             "RoutinUsage", "Views", "UsagePopoverView.swift"
         ])
 
         XCTAssertFalse(source.contains("Routin 签到"))
         XCTAssertFalse(source.contains("startRoutinCheckIn"))
-        XCTAssertTrue(source.contains("startCodexGroupDetection"))
+        XCTAssertFalse(source.contains("startCodexGroupDetection"))
     }
 }

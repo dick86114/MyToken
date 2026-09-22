@@ -69,7 +69,6 @@ fun CredentialDetailScreen(
     onRefresh: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onCheckIn: (() -> Unit)? = null,
 ) {
     Scaffold(
         topBar = {
@@ -107,13 +106,6 @@ fun CredentialDetailScreen(
                         tone = GlassButtonTone.Primary,
                         text = "刷新",
                     )
-                    if (onCheckIn != null) {
-                        GlassButton(
-                            onClick = onCheckIn,
-                            modifier = Modifier.weight(1f),
-                            text = "签到",
-                        )
-                    }
                     GlassButton(
                         onClick = onEdit,
                         modifier = Modifier.weight(1f),

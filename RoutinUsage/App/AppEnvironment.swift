@@ -66,10 +66,7 @@ final class AppEnvironment {
     let settings: AppSettings
     let store: UsageStore
     let loginItemManager: any LoginItemManaging
-    let routinCheckIn: RoutinCheckInService
-    let codexGroupDetection: CodexGroupDetectionService
     let providerRegistry: ProviderRegistry?
-    let routinWebSession: RoutinWebSession?
     let xiaomiWebSession: XiaomiWebSession?
     var showsOnboarding = false
     var xiaomiLoginRequest: XiaomiLoginRequest?
@@ -84,7 +81,6 @@ final class AppEnvironment {
     @ObservationIgnored private let updateService: any UpdateChecking
     @ObservationIgnored private let logWriter: any AppLogWriting
     @ObservationIgnored private let updateCheckScheduler: any UpdateCheckScheduling
-    @ObservationIgnored private let codexGroupDetectionScheduler: any UpdateCheckScheduling
     @ObservationIgnored private let notificationTaskYield: @Sendable () async -> Void
     @ObservationIgnored private let applicationNotificationCenter: NotificationCenter
     @ObservationIgnored private let xiaomiCookieReader: @MainActor () async -> String?
@@ -109,12 +105,8 @@ final class AppEnvironment {
         applicationNotificationCenter: NotificationCenter = .default,
         updateService: any UpdateChecking = NoUpdateService(),
         updateCheckScheduler: (any UpdateCheckScheduling)? = nil,
-        codexGroupDetectionScheduler: (any UpdateCheckScheduling)? = nil,
         notificationTaskYield: @escaping @Sendable () async -> Void = { await Task.yield() },
         logWriter: any AppLogWriting = NoopAppLogWriter(),
-        routinCheckIn: RoutinCheckInService? = nil,
-        codexGroupDetection: CodexGroupDetectionService? = nil,
-        routinWebSession: RoutinWebSession? = nil,
         xiaomiWebSession: XiaomiWebSession? = nil,
         xiaomiCookieReader: (@MainActor () async -> String?)? = nil,
         providerRegistry: ProviderRegistry? = nil
@@ -131,21 +123,12 @@ final class AppEnvironment {
         self.updateService = updateService
         self.logWriter = logWriter
         self.updateCheckScheduler = updateCheckScheduler ?? UpdateCheckScheduler()
-        self.codexGroupDetectionScheduler = codexGroupDetectionScheduler
-            ?? UpdateCheckScheduler(interval: 3_600)
         self.notificationTaskYield = notificationTaskYield
-        self.routinWebSession = routinWebSession
         self.xiaomiWebSession = xiaomiWebSession
         self.xiaomiCookieReader = xiaomiCookieReader ?? {
             await xiaomiWebSession?.captureCookieHeader()
         }
         self.providerRegistry = providerRegistry
-        self.routinCheckIn = routinCheckIn ?? RoutinCheckInService(session: UnavailableRoutinWebSession())
-        self.codexGroupDetection = codexGroupDetection ?? CodexGroupDetectionService(
-            webSession: UnavailableRoutinGroupDetectionWebSession(),
-            probeClient: UnavailableCodexGroupProbeClient(),
-            repository: CodexGroupDetectionRepository(defaults: UserDefaults())
-        )
         updateCompletionNotice = UpdateCompletionNotice.consume()
     }
 
@@ -178,14 +161,7 @@ final class AppEnvironment {
         let notificationSender = AuthorizationCachingNotificationSender(
             sender: UserNotificationSender()
         )
-        let routinWebSession = RoutinWebSession()
         let xiaomiWebSession = XiaomiWebSession()
-        let routinCheckIn = RoutinCheckInService(session: routinWebSession)
-        let codexGroupDetection = CodexGroupDetectionService(
-            webSession: RoutinGroupDetectionWebSession(session: routinWebSession),
-            probeClient: CodexGroupProbeClient(session: .shared, logWriter: logWriter),
-            repository: CodexGroupDetectionRepository(defaults: defaults)
-        )
         let providerRegistry = ProviderRegistry(providers: [
             RoutinUsageProvider(client: apiClient),
             DeepSeekUsageProvider(session: .shared),
@@ -195,12 +171,6 @@ final class AppEnvironment {
             CommandCodeUsageProvider(session: .shared),
             XiaomiMiMoUsageProvider(session: .shared)
         ])
-        routinWebSession.onLoginCompleted = {
-            Task { @MainActor in
-                await routinCheckIn.didFinishLogin()
-                await codexGroupDetection.didFinishLogin()
-            }
-        }
         let store = UsageStore(
             keyRepository: keyRepository,
             localStore: localStore,
@@ -241,11 +211,7 @@ final class AppEnvironment {
             notificationSender: notificationSender,
             updateService: GitHubUpdateService(logWriter: logWriter),
             updateCheckScheduler: UpdateCheckScheduler(),
-            codexGroupDetectionScheduler: UpdateCheckScheduler(interval: 3_600),
             logWriter: logWriter,
-            routinCheckIn: routinCheckIn,
-            codexGroupDetection: codexGroupDetection,
-            routinWebSession: routinWebSession,
             xiaomiWebSession: xiaomiWebSession,
             providerRegistry: providerRegistry
         )
@@ -280,11 +246,6 @@ final class AppEnvironment {
         refreshScheduler.start(minutes: settings.refreshMinutes) { [weak self] in
             Task { @MainActor [weak self] in
                 await self?.store.refreshAll()
-            }
-        }
-        codexGroupDetectionScheduler.start { [weak self] in
-            Task { @MainActor [weak self] in
-                await self?.refreshSavedCodexGroups()
             }
         }
         await notificationsDidChange(enabled: settings.notificationsEnabled)
@@ -492,9 +453,6 @@ final class AppEnvironment {
         do {
             let previousSecret = try keyRepository.read(id: id)
             _ = try keyRepository.update(id: id, name: input.name, secret: input.secret)
-            if previousSecret != input.secret {
-                codexGroupDetection.clearRecord(for: id)
-            }
         } catch {
             throw UsageStoreError.persistence
         }
@@ -548,9 +506,6 @@ final class AppEnvironment {
             credentialKind: input.credentialKind,
             metadata: input.metadata
         )
-        if input.providerID == .routin, previousSecret != input.secret {
-            codexGroupDetection.clearRecord(for: id)
-        }
         await store.applyValidatedSnapshot(snapshot, for: id, validatedAt: validationTime)
         return snapshot == nil ? .savedWithoutSubscription : .saved
     }
@@ -590,7 +545,6 @@ final class AppEnvironment {
 
         let oldIDs = store.orderedKeyIDs
         for keyID in oldIDs {
-            codexGroupDetection.clearRecord(for: keyID)
             try? store.deleteKey(keyID)
         }
 
@@ -681,44 +635,10 @@ final class AppEnvironment {
         xiaomiLoginRequest = nil
     }
 
-    func startCodexGroupDetection(for keyID: UUID) async {
-        guard let secret = try? keyRepository.read(id: keyID) else {
-            codexGroupDetection.clearRecord(for: keyID)
-            return
-        }
-        await codexGroupDetection.start(keyID: keyID, secret: secret)
-    }
-
-    func clearCodexGroupDetection(for keyID: UUID) {
-        codexGroupDetection.clearRecord(for: keyID)
-    }
-
     func deleteKey(_ keyID: UUID) throws {
         do {
             try store.deleteKey(keyID)
-        } catch UsageStoreError.cacheCleanupFailed {
-            codexGroupDetection.clearRecord(for: keyID)
-            throw UsageStoreError.cacheCleanupFailed
         }
-        codexGroupDetection.clearRecord(for: keyID)
-    }
-
-    func startRoutinCheckIn() async {
-        await routinCheckIn.startCheckIn()
-        if routinCheckIn.state == .needsLogin {
-            await beginRoutinLogin()
-        }
-    }
-
-    func beginRoutinLogin() async {
-        guard routinWebSession != nil else {
-            return
-        }
-        await routinCheckIn.beginLogin()
-    }
-
-    func signOutRoutin() async {
-        await routinCheckIn.signOut()
     }
 
     func stop() {
@@ -733,7 +653,6 @@ final class AppEnvironment {
         updateCheckScheduler.stop()
         releaseHistoryTask?.cancel()
         releaseHistoryTask = nil
-        codexGroupDetectionScheduler.stop()
         cancelActiveUpdateCheck()
     }
 
@@ -764,44 +683,7 @@ final class AppEnvironment {
     }
 }
 
-private actor UnavailableRoutinWebSession: RoutinWebSessionManaging {
-    func hasAuthenticatedSession() async -> Bool { false }
-    func prepareLogin() async {}
-    func performCheckIn() async throws -> RoutinCheckInOutcome { .needsLogin }
-    func clearRoutinWebsiteData() async {}
-}
-
-private actor UnavailableRoutinGroupDetectionWebSession: RoutinGroupDetectionWebSessionManaging {
-    func hasAuthenticatedSession() async -> Bool { false }
-    func prepareLogin() async {}
-    func readCurrentAccountIdentity() async throws -> RoutinAccountIdentity {
-        throw RoutinGroupDetectionWebError.accountUnavailable
-    }
-    func findGroupName(marker _: CodexGroupProbeRequestMarker) async throws -> String {
-        throw RoutinGroupDetectionWebError.pageChanged
-    }
-}
-
-private actor UnavailableCodexGroupProbeClient: CodexGroupProbing {
-    func probe(apiKey _: String, marker _: CodexGroupProbeRequestMarker) async throws {
-        throw CodexGroupProbeError.network
-    }
-}
-
 private extension AppEnvironment {
-    func refreshSavedCodexGroups() async {
-        guard isStarted else {
-            return
-        }
-        let requests = store.visibleKeyIDs.compactMap { keyID -> CodexGroupDetectionRefreshRequest? in
-            guard let secret = try? keyRepository.read(id: keyID) else {
-                return nil
-            }
-            return CodexGroupDetectionRefreshRequest(keyID: keyID, secret: secret)
-        }
-        await codexGroupDetection.refreshSavedRecords(requests)
-    }
-
     enum UpdateCheckOutcome {
         case success(AppUpdate?)
         case cancelled
@@ -856,7 +738,7 @@ private extension AppEnvironment {
         return task
     }
 
-    func finishUpdateCheck(
+    private func finishUpdateCheck(
         _ outcome: UpdateCheckOutcome,
         generation: Int,
         requiresStarted: Bool

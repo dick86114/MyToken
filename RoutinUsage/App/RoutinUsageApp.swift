@@ -29,7 +29,7 @@ final class RoutinUsageAppDelegate: NSObject, NSApplicationDelegate {
     static func closeLegacySuppressedLaunchWindows() {
         // SwiftUI 会把唯一窗口场景当作启动场景；登录窗口只能由用户明确重试触发。
         NSApp.windows
-            .filter { $0.isVisible && ["Routin 签到", "登录小米 MiMo"].contains($0.title) }
+            .filter { $0.isVisible && $0.title == "登录小米 MiMo" }
             .forEach { $0.close() }
     }
 }
@@ -78,14 +78,6 @@ struct RoutinUsageApp: App {
     }
 
     var body: some Scene {
-        Window("Routin 签到", id: "routin-check-in") {
-            if let session = environment.routinWebSession {
-                RoutinCheckInWindow(service: environment.routinCheckIn, session: session)
-            } else {
-                ContentUnavailableView("Routin 签到暂不可用", systemImage: "wifi.exclamationmark")
-            }
-        }
-        .defaultSize(width: 720, height: 760)
-        .windowResizability(.contentMinSize)
+        Settings { }
     }
 }

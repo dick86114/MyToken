@@ -187,7 +187,7 @@ final class ProjectBootstrapTests: XCTestCase {
         let environment = try sourceText(at: "RoutinUsage/App/AppEnvironment.swift")
 
         XCTAssertTrue(app.contains("closeLegacySuppressedLaunchWindows()"))
-        XCTAssertTrue(app.contains("\"Routin 签到\", \"登录小米 MiMo\""))
+        XCTAssertTrue(app.contains("登录小米 MiMo"))
         XCTAssertTrue(environment.contains("isStartupRefreshActive"))
         XCTAssertTrue(environment.contains("guard !isStartupRefreshActive else { return }"))
     }
@@ -698,43 +698,37 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(usagePopoverView.contains("SettingsLink"))
     }
 
-    func test保留受控签到登录流程但设置和弹窗不展示签到状态() throws {
+    func testRoutin登录和签到功能已移除() throws {
         let app = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
         let environment = try sourceText(at: "RoutinUsage/App/AppEnvironment.swift")
         let statusBarController = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
         let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
-        let settings = try sourceText(at: "RoutinUsage/Views/Settings/HelpUpdateView.swift")
 
-        XCTAssertTrue(app.contains("Window(\"Routin 签到\", id: \"routin-check-in\")"))
-        XCTAssertTrue(app.contains("RoutinCheckInWindow"))
-        XCTAssertTrue(environment.contains("let routinCheckIn: RoutinCheckInService"))
-        XCTAssertTrue(environment.contains("func startRoutinCheckIn() async"))
-        XCTAssertTrue(environment.contains("func beginRoutinLogin() async"))
-        XCTAssertTrue(environment.contains("func signOutRoutin() async"))
-        XCTAssertTrue(statusBarController.contains("environment.routinCheckIn.state"))
-        XCTAssertFalse(popover.contains("startRoutinCheckIn"))
+        XCTAssertFalse(app.contains("RoutinCheckInWindow"))
+        XCTAssertFalse(app.contains("id: \"routin-check-in\""))
+        XCTAssertFalse(environment.contains("RoutinCheckInService"))
+        XCTAssertFalse(environment.contains("RoutinWebSession"))
+        XCTAssertFalse(statusBarController.contains("routinCheckIn"))
         XCTAssertFalse(popover.contains("Routin 签到："))
-        XCTAssertFalse(settings.contains("Routin 签到"))
     }
 
-    func test启动时不自动弹出Routin签到窗口() throws {
+    func test启动时不会创建Routin签到场景() throws {
         let app = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
 
-        let routinScene = try XCTUnwrap(app.range(of: "Window(\"Routin 签到\", id: \"routin-check-in\")"))
-
-        XCTAssertFalse(app.contains("Settings {"))
+        XCTAssertFalse(app.contains("Window(\"Routin 签到\", id: \"routin-check-in\")"))
         XCTAssertTrue(app.contains("closeLegacySuppressedLaunchWindows()"))
-        XCTAssertFalse(app.contains("defaultLaunchBehavior(.suppressed)"))
     }
 
-    func testCodex分组检测可打开Routin登录窗口() throws {
+    func testCodex分组检测功能已移除() throws {
         let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
         let environment = try sourceText(at: "RoutinUsage/App/AppEnvironment.swift")
         let statusBarController = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
 
-        XCTAssertTrue(popover.contains("openWindow(id: \"routin-check-in\")"))
-        XCTAssertFalse(environment.contains("showRoutinCheckInWindow"))
-        XCTAssertFalse(statusBarController.contains("showRoutinCheckInWindow"))
+        XCTAssertFalse(popover.contains("startCodexGroupDetection"))
+        XCTAssertFalse(popover.contains("获取 Codex 当前分组？"))
+        XCTAssertFalse(environment.contains("CodexGroupDetectionService"))
+        XCTAssertFalse(environment.contains("startCodexGroupDetection"))
+        XCTAssertFalse(statusBarController.contains("CodexGroupDetection"))
     }
 
     func test新设置页面不保存Routin账号密码或Cookie() throws {
@@ -756,7 +750,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(help.contains("Cookie"))
     }
 
-    func test菜单栏弹窗不提供签到状态但保留分组检测状态() throws {
+    func test菜单栏弹窗不提供签到状态和分组检测状态() throws {
         let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
 
         XCTAssertFalse(popover.contains("openWindow(id: \"routin-check-in\")\n                    Task { await startRoutinCheckIn() }"))
@@ -764,38 +758,20 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(popover.contains("checkInHelpText"))
         XCTAssertFalse(popover.contains("checkInState.statusText"))
         XCTAssertFalse(popover.contains("Routin 签到："))
-        XCTAssertTrue(popover.contains("codexGroupDetectionStatus"))
     }
 
-    func testCodex当前分组检测已接入真实展示层和Key生命周期() throws {
+    func testCodex分组检测展示层已移除() throws {
         let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
         let row = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
         let environment = try sourceText(at: "RoutinUsage/App/AppEnvironment.swift")
         let statusBarController = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
 
-        XCTAssertTrue(popover.contains("获取 Codex 当前分组？"))
-        XCTAssertTrue(popover.contains("真实 Codex 请求"))
-        XCTAssertTrue(popover.contains("openWindow(id: \"routin-check-in\")"))
-        XCTAssertTrue(popover.contains("codexGroupDetectionStatus"))
-        XCTAssertTrue(popover.contains("ProgressView()"))
-        XCTAssertFalse(row.contains("location.magnifyingglass"))
-        XCTAssertTrue(row.contains("Color.green"))
-        XCTAssertTrue(row.contains("Codex 分组检测"))
-        XCTAssertFalse(row.contains(".isButton"))
-        XCTAssertTrue(environment.contains("previousSecret != input.secret"))
-        XCTAssertTrue(environment.contains("func deleteKey(_ keyID: UUID)"))
-        XCTAssertTrue(statusBarController.contains("codexGroupDetection: environment.codexGroupDetection"))
-    }
-
-    func testCodex账号关联只依赖邮箱摘要而不要求昵称() throws {
-        let webSession = try sourceText(at: "RoutinUsage/GroupDetection/RoutinGroupDetectionWebSession.swift")
-
-        XCTAssertTrue(webSession.contains("displayName: String?"))
-        XCTAssertTrue(webSession.contains("displayName: displayName?.isEmpty == false ? displayName! : \"Routin 账号\""))
-        XCTAssertTrue(webSession.contains("window.localStorage.getItem('meteor_user')"))
-        XCTAssertFalse(webSession.contains("window.localStorage.getItem('meteor_access_token')"))
-        XCTAssertFalse(webSession.contains("window.localStorage.getItem('meteor_refresh_token')"))
-        XCTAssertTrue(webSession.contains("for _ in 0..<20"))
+        XCTAssertFalse(popover.contains("startCodexGroupDetection"))
+        XCTAssertFalse(popover.contains("codexGroupDetectionStatus"))
+        XCTAssertFalse(row.contains("detectionRecord"))
+        XCTAssertFalse(row.contains("Codex 分组检测"))
+        XCTAssertFalse(environment.contains("codexGroupDetection"))
+        XCTAssertFalse(statusBarController.contains("codexGroupDetection"))
     }
 
     private func sourceText(at relativePath: String) throws -> String {
@@ -852,8 +828,6 @@ final class ProjectBootstrapTests: XCTestCase {
             resource = ("UsagePopoverView.swift", "txt")
         case "RoutinUsage/Views/LiquidGlassSurface.swift":
             resource = ("LiquidGlassSurface.swift", "txt")
-        case "RoutinUsage/GroupDetection/RoutinGroupDetectionWebSession.swift":
-            resource = ("RoutinGroupDetectionWebSession.swift", "txt")
         default:
             throw CocoaError(.fileNoSuchFile)
         }

@@ -4,20 +4,15 @@ import SwiftUI
 @MainActor
 struct UsagePopoverView: View {
     typealias InstallAvailableUpdate = @MainActor () async -> Void
-    typealias StartCodexGroupDetection = @MainActor (UUID) async -> Void
 
     @Bindable var store: UsageStore
     @Bindable var settings: AppSettings
-    @Bindable var codexGroupDetection: CodexGroupDetectionService
     let updateStatus: AppUpdateStatus
     let installAvailableUpdate: InstallAvailableUpdate
-    let startCodexGroupDetection: StartCodexGroupDetection
     let refreshCredential: @MainActor (UUID) async -> Void
     let retryCredential: @MainActor (UUID) async -> Void
     let openSettings: @MainActor () -> Void
 
-    @Environment(\.openWindow) private var openWindow
-    @State private var pendingDetectionKeyID: UUID?
     @State private var providerFilter: ProviderID?
     @State private var selectedUpdate: AppUpdate?
     @State private var isUpdateIndicatorVisible = true
@@ -29,20 +24,16 @@ struct UsagePopoverView: View {
     init(
         store: UsageStore,
         settings: AppSettings,
-        codexGroupDetection: CodexGroupDetectionService,
         updateStatus: AppUpdateStatus = .idle,
         installAvailableUpdate: @escaping InstallAvailableUpdate = {},
-        startCodexGroupDetection: @escaping StartCodexGroupDetection = { _ in },
         refreshCredential: @escaping @MainActor (UUID) async -> Void = { _ in },
         retryCredential: @escaping @MainActor (UUID) async -> Void = { _ in },
         openSettings: @escaping @MainActor () -> Void = {}
     ) {
         self.store = store
         self.settings = settings
-        self.codexGroupDetection = codexGroupDetection
         self.updateStatus = updateStatus
         self.installAvailableUpdate = installAvailableUpdate
-        self.startCodexGroupDetection = startCodexGroupDetection
         self.refreshCredential = refreshCredential
         self.retryCredential = retryCredential
         self.openSettings = openSettings
@@ -105,28 +96,6 @@ struct UsagePopoverView: View {
         .liquidGlassWindowBackground()
         .overlay {
             updateReleaseOverlay
-        }
-        .confirmationDialog(
-            "获取 Codex 当前分组？",
-            isPresented: Binding(
-                get: { pendingDetectionKeyID != nil },
-                set: { if !$0 { pendingDetectionKeyID = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("继续") {
-                guard let keyID = pendingDetectionKeyID else { return }
-                pendingDetectionKeyID = nil
-                Task {
-                    await startCodexGroupDetection(keyID)
-                    if codexGroupDetection.state(for: keyID) == .needsLogin {
-                        openWindow(id: "routin-check-in")
-                    }
-                }
-            }
-            Button("取消", role: .cancel) { pendingDetectionKeyID = nil }
-        } message: {
-            Text("将发送一次真实 Codex 请求并产生极少量额度消耗。")
         }
     }
 }
@@ -267,11 +236,6 @@ private extension UsagePopoverView {
                     if let state = store.state(for: id) {
                         UsageRowView(
                             state: state,
-                            detectionState: codexGroupDetection.state(for: id),
-                            detectionRecord: codexGroupDetection.record(for: id),
-                            isAnotherDetectionActive: codexGroupDetection.activeKeyID != nil
-                                && codexGroupDetection.activeKeyID != id,
-                            requestDetection: { pendingDetectionKeyID = id },
                             actions: nil,
                             refreshCredential: {
                                 Task { await refreshCredential(id) }
@@ -280,10 +244,7 @@ private extension UsagePopoverView {
                                 Task { await retryCredential(id) }
                             },
                             onShare: {
-                                if let content = UsageShareContentBuilder.build(
-                                    state: state,
-                                    detectionRecord: codexGroupDetection.record(for: id)
-                                ) {
+                                if let content = UsageShareContentBuilder.build(state: state) {
                                     UsageSharePanelController.shared.present(content: content)
                                 }
                             }
@@ -405,8 +366,6 @@ private extension UsagePopoverView {
                     .foregroundStyle(.green)
                     .accessibilityElement(children: .combine)
             }
-
-            codexGroupDetectionStatus
         }
     }
 
@@ -478,78 +437,6 @@ private extension UsagePopoverView {
             .keyboardShortcut("q")
             .accessibilityLabel("退出 MyToken")
         }
-    }
-
-    @ViewBuilder
-    var codexGroupDetectionStatus: some View {
-        let activeStates = store.visibleKeyIDs.compactMap { keyID -> (KeyUsageState, CodexGroupDetectionState)? in
-            guard let keyState = store.state(for: keyID) else {
-                return nil
-            }
-            let detectionState = codexGroupDetection.state(for: keyID)
-            guard detectionState != .idle else {
-                return nil
-            }
-            return (keyState, detectionState)
-        }
-
-        if let (keyState, detectionState) = activeStates.first(where: { $0.1.isBusy || $0.1 == .needsLogin })
-            ?? activeStates.first {
-            HStack(alignment: .top, spacing: 6) {
-                codexGroupDetectionStatusIcon(for: detectionState)
-                Text("Codex 分组：\(keyState.configuration.displayName)，\(codexGroupDetectionText(for: keyState, state: detectionState))")
-                    .lineLimit(2)
-                Spacer(minLength: 4)
-            }
-            .font(.caption)
-            .foregroundStyle(codexGroupDetectionColor(for: detectionState))
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Codex 分组检测：\(keyState.configuration.displayName)，\(codexGroupDetectionText(for: keyState, state: detectionState))")
-        }
-    }
-
-    @ViewBuilder
-    func codexGroupDetectionStatusIcon(for state: CodexGroupDetectionState) -> some View {
-        if state.isBusy {
-            ProgressView()
-                .controlSize(.small)
-                .frame(width: 14, height: 14)
-                .accessibilityHidden(true)
-        } else {
-            Image(systemName: codexGroupDetectionSymbol(for: state))
-                .accessibilityHidden(true)
-        }
-    }
-
-    func codexGroupDetectionText(
-        for keyState: KeyUsageState,
-        state: CodexGroupDetectionState
-    ) -> String {
-        if state == .succeeded,
-           let groupName = codexGroupDetection.record(for: keyState.configuration.id)?.groupName {
-            return "已获取当前分组：\(groupName)"
-        }
-        return state.statusText
-    }
-
-    func codexGroupDetectionSymbol(for state: CodexGroupDetectionState) -> String {
-        if state.isBusy {
-            return "arrow.triangle.2.circlepath"
-        }
-        if state == .succeeded {
-            return "checkmark.circle.fill"
-        }
-        if state == .needsLogin {
-            return "person.crop.circle.badge.exclamationmark"
-        }
-        return state.isFailure ? "exclamationmark.triangle.fill" : "info.circle"
-    }
-
-    func codexGroupDetectionColor(for state: CodexGroupDetectionState) -> Color {
-        if state == .succeeded {
-            return .green
-        }
-        return state.isFailure ? .orange : .secondary
     }
 
     @ViewBuilder

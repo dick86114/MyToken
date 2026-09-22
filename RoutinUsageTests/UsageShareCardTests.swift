@@ -49,17 +49,8 @@ final class UsageShareCardTests: XCTestCase {
                 subscriptionEndAt: end
             )
         )
-        let detection = CodexGroupDetectionRecord(
-            keyID: state.configuration.id,
-            accountFingerprint: "abc",
-            accountDisplayName: "工作机",
-            groupName: "default",
-            detectedAt: now
-        )
-
         let content = UsageShareContentBuilder.build(
             state: state,
-            detectionRecord: detection,
             now: now,
             timeZone: timeZone
         )
@@ -71,7 +62,6 @@ final class UsageShareCardTests: XCTestCase {
         XCTAssertEqual(built.subscriptionEndText, "2026-10-01 00:00")
         XCTAssertEqual(built.tokenPercentText, "40%")
         XCTAssertEqual(built.groupMultiplierText, "default ×1")
-        XCTAssertEqual(built.detectionText, "Codex 当前分组：default")
         XCTAssertEqual(built.metrics.map(\.id), ["fiveHour", "weekly", "token"])
         XCTAssertEqual(built.metrics[0].title, "5 小时")
         XCTAssertEqual(built.metrics[0].headline, "38%")

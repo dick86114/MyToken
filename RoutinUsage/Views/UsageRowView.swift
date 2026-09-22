@@ -3,10 +3,6 @@ import SwiftUI
 @MainActor
 struct UsageRowView: View {
     let state: KeyUsageState
-    let detectionState: CodexGroupDetectionState
-    let detectionRecord: CodexGroupDetectionRecord?
-    let isAnotherDetectionActive: Bool
-    let requestDetection: () -> Void
     var actions: AnyView?
     var refreshCredential: () -> Void = {}
     var retryCredential: () -> Void = {}
@@ -274,10 +270,7 @@ private extension UsageRowView {
     }
 
     func groupMultiplierAccessibilityLabel(group: UsageGroupMultiplier) -> String {
-        var label = "Codex 当前分组：\(UsageFormatter.groupMultiplierText([group]))"
-        if let detectedAt = detectionRecord?.detectedAt {
-            label += "，检测于 \(detectedAt.formatted(date: .omitted, time: .shortened))"
-        }
+        let label = "当前分组：\(UsageFormatter.groupMultiplierText([group]))"
         return label
     }
 
@@ -341,65 +334,10 @@ private extension UsageRowView {
                     }
                 }
 
-                if state.configuration.providerID == .routin {
-                    codexGroupDetectionStatus
-                }
-
             }
         } else {
             statusLabel
         }
-    }
-
-    @ViewBuilder
-    var codexGroupDetectionStatus: some View {
-        if detectionState == .idle {
-            EmptyView()
-        } else {
-            HStack(spacing: 5) {
-                if detectionState.isBusy {
-                    ProgressView()
-                        .controlSize(.small)
-                        .frame(width: 12, height: 12)
-                        .accessibilityHidden(true)
-                } else {
-                    Image(systemName: codexGroupDetectionSymbol)
-                        .accessibilityHidden(true)
-                }
-                Text(codexGroupDetectionStatusText)
-            }
-            .font(.caption)
-            .foregroundStyle(codexGroupDetectionColor)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Codex 分组检测：\(codexGroupDetectionStatusText)")
-        }
-    }
-
-    var codexGroupDetectionStatusText: String {
-        if detectionState == .succeeded, let groupName = detectionRecord?.groupName {
-            return "Codex 当前分组：\(groupName)"
-        }
-        return detectionState.statusText
-    }
-
-    var codexGroupDetectionSymbol: String {
-        if detectionState.isBusy {
-            return "arrow.triangle.2.circlepath"
-        }
-        if detectionState == .succeeded {
-            return "checkmark.circle.fill"
-        }
-        if detectionState == .needsLogin {
-            return "person.crop.circle.badge.exclamationmark"
-        }
-        return detectionState.isFailure ? "exclamationmark.triangle.fill" : "info.circle"
-    }
-
-    var codexGroupDetectionColor: Color {
-        if detectionState == .succeeded {
-            return .green
-        }
-        return detectionState.isFailure ? .orange : .secondary
     }
 
     @ViewBuilder
@@ -638,8 +576,7 @@ private extension UsageRowView {
 
     var currentGroupMultiplier: UsageGroupMultiplier? {
         UsageFormatter.currentGroupMultiplier(
-            in: state.snapshot?.groupMultipliers ?? [],
-            matching: detectionRecord?.groupName
+            in: state.snapshot?.groupMultipliers ?? []
         )
     }
 
