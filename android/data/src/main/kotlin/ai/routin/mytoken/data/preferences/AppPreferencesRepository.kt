@@ -113,6 +113,14 @@ class AppPreferencesRepository(private val context: Context) {
         }
     }
 
+    val releaseNotesCache: Flow<String> = context.preferencesDataStore.data.map { prefs ->
+        prefs[RELEASE_NOTES_CACHE].orEmpty()
+    }
+
+    suspend fun setReleaseNotesCache(json: String) {
+        context.preferencesDataStore.edit { it[RELEASE_NOTES_CACHE] = json }
+    }
+
     private companion object {
         val AUTO_REFRESH_ENABLED = booleanPreferencesKey("autoRefreshEnabled")
         val REFRESH_INTERVAL_MINUTES = intPreferencesKey("refreshIntervalMinutes")
@@ -124,5 +132,6 @@ class AppPreferencesRepository(private val context: Context) {
         val ALERT_HIGH_THRESHOLD_PERCENT = intPreferencesKey("alertHighThresholdPercent")
         val CREDENTIAL_FAILURE_ALERTS_ENABLED = booleanPreferencesKey("credentialFailureAlertsEnabled")
         val UPDATE_MIRROR_BASE = stringPreferencesKey("updateMirrorBase")
+        val RELEASE_NOTES_CACHE = stringPreferencesKey("releaseNotesCache")
     }
 }

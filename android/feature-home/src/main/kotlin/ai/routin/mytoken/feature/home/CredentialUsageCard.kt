@@ -372,49 +372,56 @@ private fun AvatarWithFailureBadge(
 ) {
     val accent = ProviderCatalog.accentColor(card.credential.providerId)
     val letter = card.credential.name.trim().firstOrNull()?.uppercase() ?: "M"
-    val avatar = Box(
+    val failed = card.status == RefreshStatus.Failed
+
+    // 44dp 触摸区承载 30dp 头像，失败时整块点击弹失败详情，不再落入卡片详情。
+    Box(
         modifier = Modifier
-            .size(30.dp)
-            .background(accent.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-            .border(1.dp, accent.copy(alpha = 0.30f), RoundedCornerShape(12.dp)),
+            .size(44.dp)
+            .then(
+                if (failed) {
+                    Modifier
+                        .testTag("credential_failure_${card.credential.id}")
+                        .semantics { contentDescription = "查看刷新失败详情" }
+                        .clickable(onClick = onClick)
+                } else {
+                    Modifier
+                }
+            ),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = letter,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
-            color = accent,
-        )
-    }
-
-    if (card.status == RefreshStatus.Failed) {
         Box(
             modifier = Modifier
                 .size(30.dp)
-                .testTag("credential_failure_${card.credential.id}")
-                .semantics { contentDescription = "查看刷新失败详情" }
-                .clickable(onClick = onClick),
+                .background(accent.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                .border(1.dp, accent.copy(alpha = 0.30f), RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center,
         ) {
-            avatar
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .offset(x = 4.dp, y = (-4).dp)
-                    .size(12.dp)
-                    .background(CardPalette.coral, CircleShape)
-                    .border(1.dp, Color.White.copy(alpha = 0.85f), CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "!",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Black,
-                    color = Color.White,
-                )
+            Text(
+                text = letter,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = accent,
+            )
+            if (failed) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 5.dp, y = (-5).dp)
+                        .size(13.dp)
+                        .background(CardPalette.coral, CircleShape)
+                        .border(1.dp, Color.White.copy(alpha = 0.85f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "!",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White,
+                    )
+                }
             }
         }
-    } else {
-        avatar
     }
 }
 

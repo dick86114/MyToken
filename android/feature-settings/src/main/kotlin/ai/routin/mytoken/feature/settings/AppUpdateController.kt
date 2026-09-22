@@ -50,6 +50,8 @@ interface AppUpdateController {
 
     fun loadReleaseHistory()
 
+    fun loadCachedReleaseHistory()
+
     fun downloadAndInstall(version: String, downloadUrl: String)
 
     fun openInstallPermissionSettings()

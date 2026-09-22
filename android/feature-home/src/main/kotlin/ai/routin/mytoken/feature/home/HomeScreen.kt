@@ -24,7 +24,9 @@ import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items as staggeredItems
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -120,14 +122,21 @@ fun HomeScreen(
                     }
                 },
                 actions = {
-                    TextButton(
+                    IconButton(
                         onClick = onToggleUsageCardDensity,
                         modifier = Modifier.testTag("usage_density_toggle"),
                     ) {
-                        Text(
-                            text = if (usageCardDensity.isCompact()) "完整" else "简洁",
-                            style = MaterialTheme.typography.labelLarge,
-                        )
+                        if (usageCardDensity.isCompact()) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ViewList,
+                                contentDescription = "切换到完整模式",
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Filled.Dashboard,
+                                contentDescription = "切换到简洁模式",
+                            )
+                        }
                     }
                     ProviderFilterMenu(
                         selectedProvider = selectedProvider,
@@ -172,11 +181,7 @@ fun HomeScreen(
                     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                         val columns = adaptiveGridColumns(
                             availableWidth = maxWidth,
-                            maxColumns = if (usageCardDensity.isCompact()) {
-                                layoutMode.maxColumns(2, 3, 4)
-                            } else {
-                                layoutMode.maxColumns(1, 2, 3)
-                            },
+                            maxColumns = layoutMode.maxColumns(1, 2, 3),
                             minItemWidth = if (usageCardDensity.isCompact()) 170.dp else 260.dp,
                             spacing = if (usageCardDensity.isCompact()) 8.dp else 12.dp,
                         )

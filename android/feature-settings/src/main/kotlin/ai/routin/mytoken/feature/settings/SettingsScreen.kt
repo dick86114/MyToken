@@ -84,6 +84,7 @@ fun SettingsScreen(
     onRequestNotificationPermission: () -> Unit = {},
     onCheckForUpdates: () -> Unit = {},
     onLoadReleaseHistory: () -> Unit = {},
+    onLoadCachedReleaseHistory: () -> Unit = {},
     onDownloadAndInstall: (String, String) -> Unit = { _, _ -> },
     onOpenInstallPermissionSettings: () -> Unit = {},
     onInstallDownloadedUpdate: () -> Unit = {},
@@ -96,8 +97,9 @@ fun SettingsScreen(
         ?.releases
         ?.firstOrNull { it.version == appVersion }
 
+    // 打开设置页只读本地缓存；用户点击“获取”后才请求网络并回写缓存。
     LaunchedEffect(Unit) {
-        onLoadReleaseHistory()
+        onLoadCachedReleaseHistory()
     }
 
     Scaffold(
@@ -267,12 +269,19 @@ private fun CurrentReleaseNotesSection(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         when (state) {
-            AppReleaseHistoryUiState.Idle,
+            AppReleaseHistoryUiState.Idle -> {
+                Text(
+                    text = "暂未获取更新日志",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                GlassButton(onClick = onRetry, text = "获取更新日志")
+            }
             AppReleaseHistoryUiState.Loading -> {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                     Text(
-                        text = "正在加载更新日志...",
+                        text = "正在获取更新日志...",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

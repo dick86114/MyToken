@@ -96,6 +96,9 @@ class AppGraph(context: Context) {
         GitHubAppUpdateController(
             context = appContext,
             currentVersionName = versionName,
+            cacheStore = ai.routin.mytoken.feature.settings.AppPreferencesReleaseNotesCacheStore(
+                AppPreferencesRepository(appContext)
+            ),
             mirrorBaseProvider = {
                 AppPreferencesRepository(appContext)
                     .updatePreferences
