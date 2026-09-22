@@ -7,14 +7,9 @@ import {
   Settings,
   Power,
   ExternalLink,
-  Search,
-  Check,
-  Zap,
-  Key,
-  Flame,
+  Share,
   ChevronDown,
-  Info,
-  SlidersHorizontal,
+  Check,
 } from 'lucide-react';
 
 interface MenuBarSimulatorProps {
@@ -104,6 +99,7 @@ interface RealAccountCard {
     cacheMissTokens: string;
   };
 }
+
 
 const REAL_ACCOUNTS: RealAccountCard[] = [
   {
@@ -408,70 +404,184 @@ const REAL_ACCOUNTS: RealAccountCard[] = [
   },
 ];
 
+/** 与 macOS 端一致的简洁卡片语义：>=80% 告急，>=50% 预警。 */
+const parsePct = (value?: string): number => {
+  const parsed = parseFloat((value || '').replace('%', ''));
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+type Tone = 'normal' | 'warning' | 'critical';
+const toneOf = (percent: number): Tone =>
+  percent >= 80 ? 'critical' : percent >= 50 ? 'warning' : 'normal';
+
+const ProviderName: Record<string, string> = {
+  GLM: 'GLM',
+  ROU: 'Routin',
+  DS: 'DeepSeek',
+  VOL: '火山方舟',
+  NEW: 'New API',
+  CMD: 'Command Code',
+  MIMO: '小米 MiMo',
+};
+
+const ProviderAccent: Record<string, string> = {
+  GLM: '#10b981',
+  ROU: '#3b82f6',
+  DS: '#6366f1',
+  VOL: '#f97316',
+  NEW: '#a855f7',
+  CMD: '#22d3ee',
+  MIMO: '#ec4899',
+};
+
+const metricTones = (card: RealAccountCard): Tone[] => {
+  if (card.metricsType === 'dual_progress')
+    return [parsePct(card.metric1?.percent), parsePct(card.metric2?.percent)].map(toneOf);
+  if (card.metricsType === 'triple_progress')
+    return [
+      parsePct(card.metric1?.percent),
+      parsePct(card.metric2?.percent),
+      parsePct(card.metric3?.percent),
+    ].map(toneOf);
+  return [];
+};
+
+const nearlyExhausted = (card: RealAccountCard) =>
+  metricTones(card).some((tone) => tone === 'critical');
+
+const tileSurface = (tone: Tone): string =>
+  tone === 'critical'
+    ? 'bg-[#ef4444]/[0.12] border border-[#ef4444]/40'
+    : tone === 'warning'
+      ? 'bg-[#f59e0b]/[0.12] border border-[#f59e0b]/40'
+      : '';
+
+const Ring: React.FC<{
+  percent: number;
+  size: number;
+  color: string;
+  numberSize: number;
+  percentSize: number;
+}> = ({ percent, size, color, numberSize, percentSize }) => {
+  const stroke = size * 0.1;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const clamped = Math.min(Math.max(percent, 0), 100);
+
+  return (
+    <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="rgba(255,255,255,0.08)"
+          strokeWidth={stroke}
+          fill="none"
+        />
+        {clamped > 0 && (
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke={color}
+            strokeWidth={stroke}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={circumference * (1 - clamped / 100)}
+          />
+        )}
+      </svg>
+      <div className="absolute inset-0 flex items-baseline justify-center">
+        <span
+          className="font-mono font-bold text-white leading-none"
+          style={{ fontSize: numberSize }}
+        >
+          {Math.round(clamped)}
+        </span>
+        <span
+          className="font-mono font-semibold text-white/70 leading-none"
+          style={{ fontSize: percentSize }}
+        >
+          %
+        </span>
+      </div>
+    </div>
+  );
+};
+
+const CircleButton: React.FC<{
+  title: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+}> = ({ title, onClick, disabled, children }) => (
+  <button
+    title={title}
+    onClick={onClick}
+    disabled={disabled}
+    className="w-[28px] h-[28px] rounded-full bg-white/[0.06] border border-white/[0.12] flex items-center justify-center text-[#94a3b8] hover:text-white hover:bg-white/[0.10] transition-colors cursor-pointer disabled:opacity-40"
+  >
+    {children}
+  </button>
+);
+
 export const MenuBarSimulator: React.FC<MenuBarSimulatorProps> = ({
+  providers,
   onOpenSettings,
   onTriggerNotification,
 }) => {
-  const downloads = useLatestDownloads();
+  const { macos } = useLatestDownloads();
   const [activeFilter, setActiveFilter] = useState<string>('ALL');
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastRefreshedTime, setLastRefreshedTime] = useState('2026-09-03 20:45:53');
+  const [lastRefreshedTime, setLastRefreshedTime] = useState('2026-09-22 20:45:53');
   const [currentTime, setCurrentTime] = useState('20:45');
   const [powerActive, setPowerActive] = useState(true);
 
-  // Live real clock updater for the menu bar
   useEffect(() => {
-    const updateClock = () => {
+    const interval = setInterval(() => {
       const now = new Date();
-      const h = String(now.getHours()).padStart(2, '0');
-      const m = String(now.getMinutes()).padStart(2, '0');
-      setCurrentTime(`${h}:${m}`);
-    };
-    updateClock();
-    const interval = setInterval(updateClock, 10000);
+      setCurrentTime(
+        `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+      );
+    }, 15000);
     return () => clearInterval(interval);
   }, []);
 
   const handleRefresh = () => {
     if (isRefreshing) return;
     setIsRefreshing(true);
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
     setTimeout(() => {
-      const now = new Date();
-      const y = now.getFullYear();
-      const mo = String(now.getMonth() + 1).padStart(2, '0');
-      const d = String(now.getDate()).padStart(2, '0');
-      const h = String(now.getHours()).padStart(2, '0');
-      const m = String(now.getMinutes()).padStart(2, '0');
-      const s = String(now.getSeconds()).padStart(2, '0');
-      setLastRefreshedTime(`${y}-${mo}-${d} ${h}:${m}:${s}`);
+      setLastRefreshedTime(
+        `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(
+          now.getHours()
+        )}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
+      );
       setIsRefreshing(false);
-      onTriggerNotification('已完成最新快照拉取', `全量 ${REAL_ACCOUNTS.length} 个 Key 指标与周期重置倒计时已即时同步。`);
-    }, 650);
+      onTriggerNotification('用量已刷新', '所有已启用凭证的用量快照已更新。');
+    }, 900);
   };
 
-  const filteredCards =
-    activeFilter === 'ALL'
-      ? REAL_ACCOUNTS
-      : REAL_ACCOUNTS.filter((c) => c.providerCode === activeFilter);
+  const filteredCards = REAL_ACCOUNTS.filter(
+    (card) => activeFilter === 'ALL' || card.providerCode === activeFilter
+  );
 
   return (
     <div className="w-full max-w-4xl relative flex flex-col items-center">
       {/* Ambient radial glow behind the whole simulator */}
       <div className="absolute inset-0 bg-[#007aff]/10 blur-3xl -z-10 rounded-full pointer-events-none" />
 
-      {/* ============================================================== */}
-      {/* 1. macOS Menu Bar (Image 3: Actual macOS status capsule bar) */}
-      {/* ============================================================== */}
+      {/* 1. macOS Menu Bar */}
       <div
         id="macos-menubar"
         className="w-full h-10 rounded-t-2xl bg-[#090b10]/95 backdrop-blur-2xl flex items-center justify-between px-3 sm:px-5 border-t border-x border-white/[0.1] shadow-2xl select-none text-xs"
       >
-        {/* Left: System Menu items */}
         <div className="flex items-center gap-3 sm:gap-4 text-[#8f96a3]">
-          <span className="text-white text-sm font-semibold hover:opacity-80 transition-opacity cursor-default">
-            
-          </span>
+          <span className="text-white text-sm font-semibold"></span>
           <span className="font-semibold text-white tracking-tight">MyToken</span>
           <span className="hover:text-white cursor-default hidden sm:inline transition-colors">文件</span>
           <span
@@ -484,7 +594,6 @@ export const MenuBarSimulator: React.FC<MenuBarSimulatorProps> = ({
           <span className="hover:text-white cursor-default hidden md:inline transition-colors">帮助</span>
         </div>
 
-        {/* Right: The Actual Menu Bar Status Bar Capsule Widget (Image 3) */}
         <div className="flex items-center gap-2 sm:gap-3">
           <div
             id="menubar-status-items"
@@ -516,17 +625,8 @@ export const MenuBarSimulator: React.FC<MenuBarSimulatorProps> = ({
             ))}
           </div>
 
-          {/* Additional macOS status items (Image 3 right side) */}
           <div className="hidden sm:flex items-center gap-2 text-[#94a3b8]">
-            <Key className="w-3.5 h-3.5 hover:text-white transition-colors" />
-            <Clock className="w-3.5 h-3.5 hover:text-white transition-colors" />
-            <div className="w-3.5 h-3.5 rounded-full border border-white/40 flex items-center justify-center text-[8px] font-bold text-white">
-              R
-            </div>
-            <div className="flex items-center gap-1 text-[10px] font-mono font-medium text-[#cbd5e1]">
-              <span className="text-[9px] text-[#64748b]">PWR</span>
-              <span>25W</span>
-            </div>
+            <Clock className="w-3.5 h-3.5" />
             <span className="font-mono text-white text-xs ml-1">{currentTime}</span>
           </div>
         </div>
@@ -535,25 +635,19 @@ export const MenuBarSimulator: React.FC<MenuBarSimulatorProps> = ({
       {/* Popover Triangle Anchor Notch */}
       <div className="w-0 h-0 border-l-[9px] border-l-transparent border-r-[9px] border-r-transparent border-b-[9px] border-b-[#1c2024]/95 self-end mr-12 sm:mr-32 -mt-[1px] z-20" />
 
-      {/* ============================================================== */}
-      {/* 2. Popover Window Showcase (Images 1 & 2: Authentic Real UI)    */}
-      {/* ============================================================== */}
+      {/* 2. Popover Window（新版简洁卡片） */}
       <div
         id="macos-popover-window"
-        className="w-full max-w-[490px] bg-[#1a1e24]/95 backdrop-blur-3xl rounded-[22px] border border-white/[0.12] shadow-[0_25px_65px_rgba(0,0,0,0.85)] p-3.5 sm:p-4 text-left flex flex-col gap-3 z-10 -mt-1"
+        className="w-full max-w-[490px] bg-[#0a0d14]/95 backdrop-blur-3xl rounded-[22px] border border-white/[0.10] shadow-[0_25px_65px_rgba(0,0,0,0.85)] p-3.5 sm:p-4 text-left flex flex-col gap-3 z-10 -mt-1"
       >
-        {/* Top Header of Popover: 当前版本、Logo 与操作按钮 */}
+        {/* Top Toolbar */}
         <div className="flex items-center justify-between pb-1">
-          {/* Left: Version badge */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#272b32] border border-white/10 text-xs text-[#cbd5e1] font-mono">
-            <span className="text-[#94a3b8]">🏷️</span>
-            <span>{downloads.macos.version}</span>
-            <ExternalLink className="w-3 h-3 text-[#64748b]" />
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.07] border border-white/[0.12] text-[11px] font-mono font-semibold text-[#cbd5e1]">
+            {macos.version}
           </div>
 
-          {/* Center: MyToken Official App Icon */}
           <div className="flex items-center justify-center">
-            <div className="relative w-8 h-8 rounded-xl overflow-hidden border border-white/15 flex items-center justify-center shadow-[0_0_15px_rgba(56,189,248,0.25)] hover:scale-105 transition-transform">
+            <div className="relative w-9 h-9 rounded-[14px] overflow-hidden border border-white/15 shadow-[0_4px_14px_rgba(0,0,0,0.45)]">
               <img
                 src="/app-icon.png"
                 alt="MyToken Official Icon"
@@ -562,18 +656,17 @@ export const MenuBarSimulator: React.FC<MenuBarSimulatorProps> = ({
             </div>
           </div>
 
-          {/* Right: Refresh & Checkmark */}
           <div className="flex items-center gap-1.5">
             <button
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="p-1.5 rounded-lg bg-[#272b32] hover:bg-[#333842] border border-white/10 text-[#cbd5e1] hover:text-white transition-colors cursor-pointer"
-              title="即刻拉取最新快照"
+              title="刷新全部 Key"
+              className="w-[28px] h-[28px] rounded-full bg-white/[0.05] border border-white/[0.14] flex items-center justify-center text-[#cbd5e1] hover:bg-white/[0.10] transition-colors cursor-pointer disabled:opacity-40"
             >
               <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-[#38bdf8]' : ''}`} />
             </button>
             <div
-              className="p-1.5 rounded-lg bg-[#272b32] border border-white/10 text-[#22c55e]"
+              className="w-[28px] h-[28px] rounded-full bg-white/[0.05] border border-white/[0.14] flex items-center justify-center text-[#22c55e]"
               title="官方接口服务探活正常"
             >
               <Check className="w-3.5 h-3.5" />
@@ -581,385 +674,290 @@ export const MenuBarSimulator: React.FC<MenuBarSimulatorProps> = ({
           </div>
         </div>
 
-        {/* Subtitle & Quick Filter Bar */}
-        <div className="flex items-end justify-between pt-0.5 pb-1 border-b border-white/[0.06]">
-          <div>
-            <h3 className="text-base sm:text-lg font-bold text-white tracking-tight leading-none">
+        {/* Title & Provider Filter */}
+        <div className="flex items-center justify-between pt-0.5">
+          <div className="flex items-center gap-2">
+            <h3 className="text-[23px] leading-none font-bold text-white tracking-tight">
               账户用量
             </h3>
-            <span className="text-xs text-[#94a3b8] font-mono mt-1 block">
+            <span className="text-[11px] font-medium text-[#34d399] bg-[#10f49c]/10 border border-[#10f49c]/30 rounded-full px-2 py-0.5">
               {REAL_ACCOUNTS.length} 个 Key
             </span>
           </div>
 
-          {/* Filter Pills */}
-          <div className="flex items-center gap-1 overflow-x-auto text-[11px] font-medium">
-            {[
-              { label: '全部', code: 'ALL' },
-              { label: 'GLM', code: 'GLM' },
-              { label: '火山', code: 'VOL' },
-              { label: 'Routin', code: 'ROU' },
-              { label: 'DeepSeek', code: 'DS' },
-              { label: 'New API', code: 'NEW' },
-              { label: 'Command Code', code: 'CMD' },
-              { label: '小米 MiMo', code: 'MIMO' },
-            ].map((tab) => (
-              <button
-                key={tab.code}
-                onClick={() => setActiveFilter(tab.code)}
-                className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer whitespace-nowrap ${
-                  activeFilter === tab.code
-                    ? 'bg-[#38bdf8]/20 text-[#7bd0ff] font-semibold border border-[#38bdf8]/40'
-                    : 'text-[#8c9ba5] hover:text-white hover:bg-white/[0.05]'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+          <button
+            onClick={() => setActiveFilter('ALL')}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[9px] bg-white/[0.08] border border-white/[0.14] text-[11px] font-medium text-white/90 hover:bg-white/[0.12] transition-colors cursor-pointer"
+          >
+            <ChevronDown className="w-3 h-3 text-white/50" />
+            供应商：全部
+          </button>
         </div>
 
-        {/* Scrollable Cards Container (Faithful to Images 1 & 2) */}
-        <div className="flex flex-col gap-3 max-h-[460px] overflow-y-auto pr-1 select-none custom-scroll">
+        {/* Filter Pills */}
+        <div className="flex items-center gap-1 overflow-x-auto text-[11px] font-medium">
+          {[
+            { label: '全部', code: 'ALL' },
+            { label: 'GLM', code: 'GLM' },
+            { label: '火山', code: 'VOL' },
+            { label: 'Routin', code: 'ROU' },
+            { label: 'DeepSeek', code: 'DS' },
+            { label: 'New API', code: 'NEW' },
+            { label: 'Command Code', code: 'CMD' },
+            { label: '小米 MiMo', code: 'MIMO' },
+          ].map((tab) => (
+            <button
+              key={tab.code}
+              onClick={() => setActiveFilter(tab.code)}
+              className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+                activeFilter === tab.code
+                  ? 'bg-white/10 text-white font-semibold border border-white/20'
+                  : 'text-[#8c9ba5] hover:text-white hover:bg-white/[0.05] border border-transparent'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Cards */}
+        <div className="flex flex-col gap-3.5 max-h-[460px] overflow-y-auto pr-1 select-none custom-scroll">
           {filteredCards.map((card) => {
             const isSelected = selectedAccountId === card.id;
+            const tones = metricTones(card);
+            const isBalanceCard = card.metricsType === 'balance_grid' || card.metricsType === 'xiaomi_grid';
+            const nearly = nearlyExhausted(card);
+            const accent = ProviderAccent[card.providerCode] || '#10b981';
 
             return (
               <div
                 key={card.id}
                 onClick={() => setSelectedAccountId(isSelected ? null : card.id)}
-                className={`p-3.5 rounded-2xl border transition-all duration-200 cursor-pointer ${card.cardTheme.bg} ${card.cardTheme.border} ${card.cardTheme.glow} ${
-                  isSelected ? 'ring-1 ring-[#38bdf8]/50' : 'hover:brightness-105'
+                className={`relative overflow-hidden p-[14px] rounded-[16px] border transition-all duration-200 cursor-pointer bg-[#121722]/90 ${
+                  isSelected ? 'border-white/25' : 'border-white/10 hover:border-white/20'
                 }`}
               >
-                {/* 1. Card Top Header */}
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-start gap-2.5">
-                    {/* Big Chinese Avatar character */}
-                    <span className="text-xl sm:text-2xl font-bold text-white leading-none">
-                      {card.avatarChar}
-                    </span>
+                {nearly && (
+                  <div className="absolute -top-10 -right-10 w-28 h-28 bg-[#ef4444]/15 rounded-full blur-2xl pointer-events-none" />
+                )}
+                {isBalanceCard && (
+                  <svg
+                    className="absolute bottom-0 left-0 w-full h-10 text-[#10b981]/10 pointer-events-none"
+                    viewBox="0 0 100 40"
+                    preserveAspectRatio="none"
+                    fill="currentColor"
+                  >
+                    <path d="M0,35 Q25,12 55,26 T100,10 L100,40 L0,40 Z" />
+                  </svg>
+                )}
 
+                {/* Card Header */}
+                <div className="relative z-10 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className="w-[30px] h-[30px] rounded-[12px] flex items-center justify-center text-[12px] font-bold"
+                      style={{
+                        color: accent,
+                        backgroundColor: `${accent}26`,
+                        border: `1px solid ${accent}4D`,
+                      }}
+                    >
+                      {card.avatarChar}
+                    </div>
                     <div>
-                      <div className="text-xs sm:text-sm font-semibold text-white flex items-center gap-1.5">
-                        <span>{card.name}</span>
-                        <span className="text-[#64748b]">·</span>
-                        <span className="text-[#cbd5e1]">{card.plan}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[13.5px] font-semibold text-white leading-none">
+                          {card.name}
+                        </span>
+                        {nearly && (
+                          <span className="text-[10px] font-medium text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/25 rounded px-1.5 leading-4">
+                            即将耗尽
+                          </span>
+                        )}
                       </div>
-                      <div className="text-[11px] font-mono text-[#8c9ba5] mt-0.5">
-                        <span>开始 {card.startDate}</span>
-                        <span className="ml-3">结束 {card.endDate}</span>
+                      <div className="text-[10.5px] font-medium text-[#94a3b8] mt-[3px]">
+                        {card.plan
+                          ? `${ProviderName[card.providerCode] || card.providerCode} · ${card.plan}`
+                          : ProviderName[card.providerCode] || card.providerCode}
                       </div>
                     </div>
                   </div>
 
-                  {/* Top Right Percentage / Balance */}
-                  <div className="flex items-center gap-1">
-                    <span
-                      className="text-sm sm:text-base font-bold font-mono"
-                      style={{ color: card.overallStatusColor }}
+                  <div className="flex items-center gap-1.5">
+                    <CircleButton
+                      title={`分享 ${card.name}`}
+                      onClick={() => setSelectedAccountId(card.id)}
                     >
-                      {card.overallStatus}
-                    </span>
-                    {card.providerCode === 'ROU' && (
-                      <Search className="w-3.5 h-3.5 text-[#64748b] hover:text-white transition-colors" />
-                    )}
+                      <Share className="w-3.5 h-3.5" />
+                    </CircleButton>
+                    <CircleButton title={`刷新 ${card.name}`} onClick={handleRefresh}>
+                      <RotateCw
+                        className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`}
+                      />
+                    </CircleButton>
                   </div>
                 </div>
 
-                {/* 2. DUAL PROGRESS METRICS (GLM & Routin) */}
-                {card.metricsType === 'dual_progress' && card.metric1 && card.metric2 && (
-                  <div>
-                    <div className="grid grid-cols-2 gap-3 sm:gap-4 my-1">
-                      {/* Metric 1 */}
-                      <div className="flex flex-col gap-1 text-[11px] font-mono">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[#cbd5e1]">{card.metric1.title}</span>
-                          <span
-                            className="font-bold"
-                            style={{ color: card.metric1.barColor }}
-                          >
-                            {card.metric1.percent}
-                          </span>
-                        </div>
-                        {/* Horizontal Progress Bar */}
-                        <div className="w-full h-1.5 rounded-full bg-[#272b32] overflow-hidden my-0.5">
-                          <div
-                            className="h-full rounded-full transition-all duration-500"
-                            style={{
-                              width: `${card.metric1.barPercent}%`,
-                              backgroundColor: card.metric1.barColor,
-                            }}
-                          />
-                        </div>
-                        <div className="text-[#cbd5e1]">{card.metric1.usedText}</div>
-                        <div className="text-[#cbd5e1]">{card.metric1.remainText}</div>
-                        <div className="text-[#cbd5e1]">{card.metric1.resetTime}</div>
-                        <div
-                          className={`font-medium ${
-                            card.metric1.countdownHighlight
-                              ? 'text-[#22c55e]'
-                              : 'text-[#8c9ba5]'
-                          }`}
+                {/* Metrics Body */}
+                <div className="relative z-10 mt-2.5">
+                  {isBalanceCard && (
+                    <div className="flex items-center justify-between py-1">
+                      <div className="w-2" />
+                      <div className="flex flex-col items-center">
+                        <span className="text-[10px] font-medium text-[#94a3b8]">
+                          {card.metricsType === 'xiaomi_grid' ? '账户余额' : '余额'}
+                        </span>
+                        <span
+                          className="text-[20px] font-bold leading-tight"
+                          style={{ color: '#10F49C' }}
                         >
-                          {card.metric1.countdownText}
-                        </div>
-                      </div>
-
-                      {/* Metric 2 */}
-                      <div className="flex flex-col gap-1 text-[11px] font-mono">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[#cbd5e1]">{card.metric2.title}</span>
-                          <span
-                            className="font-bold"
-                            style={{ color: card.metric2.barColor }}
-                          >
-                            {card.metric2.percent}
-                          </span>
-                        </div>
-                        {/* Horizontal Progress Bar */}
-                        <div className="w-full h-1.5 rounded-full bg-[#272b32] overflow-hidden my-0.5">
-                          <div
-                            className="h-full rounded-full transition-all duration-500"
-                            style={{
-                              width: `${card.metric2.barPercent}%`,
-                              backgroundColor: card.metric2.barColor,
-                            }}
-                          />
-                        </div>
-                        <div className="text-[#cbd5e1]">{card.metric2.usedText}</div>
-                        <div className="text-[#cbd5e1]">{card.metric2.remainText}</div>
-                        <div className="text-[#cbd5e1]">{card.metric2.resetTime}</div>
-                        <div
-                          className={`font-medium ${
-                            card.metric2.countdownHighlight
-                              ? 'text-[#22c55e]'
-                              : 'text-[#8c9ba5]'
-                          }`}
-                        >
-                          {card.metric2.countdownText}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Footer Row (GLM calls count) */}
-                    {card.callsText && (
-                      <div className="flex items-center justify-between pt-2 mt-1 border-t border-white/[0.05] text-[11px] text-[#8c9ba5]">
-                        <div className="flex items-center gap-2">
-                          <span>调用量</span>
-                          <span className="text-white font-mono font-bold text-sm">
-                            {card.callsText}
-                          </span>
-                        </div>
-                        <span className="text-[#cbd5e1] hover:text-white transition-colors cursor-pointer">
-                          账户信息
+                          {card.metricsType === 'xiaomi_grid'
+                            ? card.xiaomiData?.accountBalance
+                            : card.balanceData?.balance}
                         </span>
                       </div>
-                    )}
-                  </div>
-                )}
-
-                {/* 3. TRIPLE PROGRESS METRICS (火山方舟) */}
-                {card.metricsType === 'triple_progress' &&
-                  card.metric1 &&
-                  card.metric2 &&
-                  card.metric3 && (
-                    <div className="flex flex-col gap-2.5 my-1 text-[11px] font-mono">
-                      <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                        {/* 5小时 */}
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[#cbd5e1]">{card.metric1.title}</span>
-                            <span className="text-[#22c55e] font-bold">
-                              {card.metric1.percent}
-                            </span>
-                          </div>
-                          <div className="w-full h-1.5 rounded-full bg-[#272b32] overflow-hidden my-0.5">
-                            <div
-                              className="h-full rounded-full bg-[#22c55e]"
-                              style={{ width: `${card.metric1.barPercent}%` }}
-                            />
-                          </div>
-                          <div className="text-[#cbd5e1] truncate">{card.metric1.usedText}</div>
-                          <div className="text-[#cbd5e1]">{card.metric1.remainText}</div>
-                          <div className="text-[#cbd5e1]">{card.metric1.resetTime}</div>
-                          <div className="text-[#22c55e]">{card.metric1.countdownText}</div>
-                        </div>
-
-                        {/* 一周 */}
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[#cbd5e1]">{card.metric2.title}</span>
-                            <span className="text-[#22c55e] font-bold">
-                              {card.metric2.percent}
-                            </span>
-                          </div>
-                          <div className="w-full h-1.5 rounded-full bg-[#272b32] overflow-hidden my-0.5">
-                            <div
-                              className="h-full rounded-full bg-[#22c55e]"
-                              style={{ width: `${card.metric2.barPercent}%` }}
-                            />
-                          </div>
-                          <div className="text-[#cbd5e1] truncate">{card.metric2.usedText}</div>
-                          <div className="text-[#cbd5e1]">{card.metric2.remainText}</div>
-                          <div className="text-[#cbd5e1]">{card.metric2.resetTime}</div>
-                          <div className="text-[#22c55e]">{card.metric2.countdownText}</div>
-                        </div>
-                      </div>
-
-                      {/* 一月 */}
-                      <div className="flex flex-col gap-1 pt-1.5 border-t border-white/[0.05]">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[#cbd5e1]">{card.metric3.title}</span>
-                          <span className="text-[#22c55e] font-bold">
-                            {card.metric3.percent}
-                          </span>
-                        </div>
-                        <div className="w-full h-1.5 rounded-full bg-[#272b32] overflow-hidden my-0.5">
-                          <div
-                            className="h-full rounded-full bg-[#22c55e]"
-                            style={{ width: `${card.metric3.barPercent}%` }}
-                          />
-                        </div>
-                        <div className="flex justify-between items-center text-[#cbd5e1]">
-                          <span>{card.metric3.usedText}</span>
-                          <span>{card.metric3.remainText}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-[#8c9ba5]">
-                          <span>{card.metric3.resetTime}</span>
-                          <span className="text-[#22c55e]">{card.metric3.countdownText}</span>
-                        </div>
-                      </div>
+                      <span className="text-[10px] font-mono font-medium text-[#34d399] bg-[#10b981]/10 border border-[#10b981]/25 rounded-full px-2 py-0.5">
+                        充足
+                      </span>
                     </div>
                   )}
 
-                {/* 4. BALANCE GRID (DeepSeek) */}
-                {card.metricsType === 'balance_grid' && card.balanceData && (
-                  <div className="grid grid-cols-2 gap-3.5 my-1 text-[11px] font-mono">
-                    {/* Left: 总余额 */}
-                    <div className="flex flex-col gap-0.5">
-                      <div className="text-base sm:text-lg font-bold text-[#10b981]">
-                        {card.balanceData.balance}
-                      </div>
-                      <div className="text-[#8c9ba5]">{card.providerCode === 'CMD' ? '月度剩余' : '账户余额'}</div>
-                      <div className="mt-2 text-white font-semibold">
-                        {card.balanceData.rechargeBalance}
-                      </div>
-                      <div className="text-[#8c9ba5]">{card.providerCode === 'CMD' ? '购买剩余' : '充值余额'}</div>
+                  {card.metricsType === 'dual_progress' && card.metric1 && card.metric2 && (
+                    <div className="flex gap-2.5">
+                      {[card.metric1, card.metric2].map((metric) => {
+                        const percent = parsePct(metric.percent);
+                        const tone = toneOf(percent);
+                        return (
+                          <div
+                            key={metric.title}
+                            className={`flex-1 rounded-[12px] p-2.5 flex items-center gap-3 ${tileSurface(tone)}`}
+                          >
+                            <Ring
+                              percent={percent}
+                              size={44}
+                              color={metric.barColor}
+                              numberSize={13.5}
+                              percentSize={9.5}
+                            />
+                            <div className="min-w-0">
+                              <div className="text-[11px] font-medium text-white/80 leading-tight">
+                                {metric.title}
+                              </div>
+                              <div className="text-[10px] font-mono text-[#94a3b8] mt-1 truncate">
+                                {metric.resetTime}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
+                  )}
 
-                    {/* Right: 赠金 & 可用状态 */}
-                    <div className="flex flex-col gap-0.5">
-                      <div className="text-base sm:text-lg font-bold text-white">
-                        {card.balanceData.grantBalance}
+                  {card.metricsType === 'triple_progress' &&
+                    card.metric1 &&
+                    card.metric2 &&
+                    card.metric3 && (
+                      <div className="flex gap-2">
+                        {[card.metric1, card.metric2, card.metric3].map((metric) => {
+                          const percent = parsePct(metric.percent);
+                          const tone = toneOf(percent);
+                          const toneColor =
+                            tone === 'critical'
+                              ? '#ef4444'
+                              : tone === 'warning'
+                                ? '#f59e0b'
+                                : null;
+                          const subtitle =
+                            tone === 'critical'
+                              ? '即将耗尽'
+                              : tone === 'warning'
+                                ? '用量偏高'
+                                : metric.resetTime;
+                          return (
+                            <div
+                              key={metric.title}
+                              className={`flex-1 rounded-[12px] p-2 flex flex-col items-center text-center gap-1.5 ${tileSurface(tone)}`}
+                            >
+                              <Ring
+                                percent={percent}
+                                size={40}
+                                color={tone === 'normal' ? '#22c55e' : toneColor!}
+                                numberSize={11.5}
+                                percentSize={8}
+                              />
+                              <div
+                                className={`text-[10px] font-medium leading-tight ${
+                                  toneColor ? '' : 'text-white/80'
+                                }`}
+                                style={toneColor ? { color: toneColor } : undefined}
+                              >
+                                {metric.title}
+                              </div>
+                              <div
+                                className={`text-[9px] font-mono truncate w-full ${
+                                  toneColor ? '' : 'text-[#94a3b8]'
+                                }`}
+                                style={toneColor ? { color: toneColor, opacity: 0.85 } : undefined}
+                              >
+                                {subtitle}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                      <div className="text-[#8c9ba5]">{card.providerCode === 'CMD' ? '赠送剩余' : '赠金余额'}</div>
-                      <div className="mt-2 text-[#10b981] font-semibold">
-                        {card.balanceData.accountStatus}
-                      </div>
-                      <div className="text-[#8c9ba5]">{card.providerCode === 'CMD' ? '累计请求' : '账户状态'}</div>
-                    </div>
-                  </div>
-                )}
+                    )}
 
-                {/* 5. STAT GRID (New API) */}
-                {/* 小米 MiMo API 指标：字段在上、数值在下的四列布局 */}
-                {card.metricsType === 'xiaomi_grid' && card.xiaomiData && (
-                  <div className="my-1 flex flex-col gap-3 text-[11px] font-mono">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {card.metricsType === 'stat_grid' && card.newApiData && (
+                    <div className="grid grid-cols-2 gap-2">
                       {[
-                        ['账户余额', card.xiaomiData.accountBalance],
-                        ['累计消费', card.xiaomiData.totalConsumption],
-                        ['现金余额', card.xiaomiData.cashBalance],
-                        ['赠送余额', card.xiaomiData.giftBalance],
-                      ].map(([label, value]) => (
-                        <div key={label} className="flex flex-col gap-0.5">
-                          <span className="text-[#8c9ba5]">{label}</span>
-                          <span className="font-semibold text-[#00856f]">{value}</span>
+                        { label: '剩余额度', value: card.newApiData.remain, color: '#ef4444' },
+                        { label: '总额度', value: card.newApiData.total, color: undefined },
+                        { label: '已用额度', value: card.newApiData.used, color: undefined },
+                        { label: '今日消费', value: card.newApiData.todayCost, color: undefined },
+                      ].map((cell) => (
+                        <div key={cell.label} className="rounded-[12px] p-2.5">
+                          <div className="text-[10px] font-medium text-[#94a3b8]">
+                            {cell.label}
+                          </div>
+                          <div
+                            className="text-[12px] font-semibold text-white mt-0.5"
+                            style={cell.color ? { color: cell.color } : undefined}
+                          >
+                            {cell.value}
+                          </div>
                         </div>
                       ))}
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <span className="text-[10px] font-semibold text-[#8c9ba5]">Token</span>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        {[
-                          ['历史消耗', card.xiaomiData.historyTokens],
-                          ['输出', card.xiaomiData.outputTokens],
-                          ['命中缓存', card.xiaomiData.cacheHitTokens],
-                          ['未命中缓存', card.xiaomiData.cacheMissTokens],
-                        ].map(([label, value]) => (
-                          <div key={label} className="flex flex-col gap-0.5">
-                            <span className="text-[#8c9ba5]">{label}</span>
-                            <span className="font-semibold text-white">{value}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {card.metricsType === 'stat_grid' && card.newApiData && (
-                  <div className="grid grid-cols-2 gap-2 my-1 text-[11px] font-mono">
-                    <div>
-                      <div className="text-[#ef4444] font-bold">
-                        {card.newApiData.remain}
-                      </div>
-                      <div className="text-[#8c9ba5]">剩余额度</div>
-                    </div>
-                    <div>
-                      <div className="text-white font-bold">
-                        {card.newApiData.total}
-                      </div>
-                      <div className="text-[#8c9ba5]">总额度</div>
-                    </div>
-                    <div>
-                      <div className="text-white">
-                        {card.newApiData.used}
-                      </div>
-                      <div className="text-[#8c9ba5]">已用额度</div>
-                    </div>
-                    <div>
-                      <div className="text-white">
-                        {card.newApiData.todayCost}
-                      </div>
-                      <div className="text-[#8c9ba5]">今日消费</div>
-                    </div>
-                    <div>
-                      <div className="text-white">
-                        {card.newApiData.weekCost}
-                      </div>
-                      <div className="text-[#8c9ba5]">近 7 天消费</div>
-                    </div>
-                    <div>
-                      <div className="text-white">
-                        {card.newApiData.monthCost}
-                      </div>
-                      <div className="text-[#8c9ba5]">近 30 天消费</div>
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             );
           })}
         </div>
 
-        {/* Window Bottom Footer Bar (Images 1 & 2 bottom bar) */}
-        <div className="flex items-center justify-between pt-2 border-t border-white/[0.08] text-xs text-[#8c9ba5]">
-          {/* Left: Last refreshed time */}
-          <div className="flex items-center gap-1.5 font-mono text-[11px]">
-            <Clock className="w-3.5 h-3.5 text-[#8c9ba5]" />
-            <span>最后刷新 {lastRefreshedTime}</span>
-          </div>
+        {/* Floating Bottom Bar */}
+        <div className="relative z-10 mx-auto w-full max-w-[420px] -mb-5 rounded-full bg-[#121722]/95 border border-white/[0.14] shadow-[0_12px_32px_rgba(0,0,0,0.45)] px-3 py-2 flex items-center justify-between">
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            title="刷新全部 Key"
+            className="w-[28px] h-[28px] rounded-full bg-white/[0.05] border border-white/[0.14] flex items-center justify-center text-[#cbd5e1] hover:bg-white/[0.10] transition-colors cursor-pointer disabled:opacity-40"
+          >
+            <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </button>
 
-          {/* Right: Settings and Power button */}
-          <div className="flex items-center gap-2">
+          <span className="text-[11px] font-mono text-[#94a3b8] absolute left-1/2 -translate-x-1/2">
+            最后刷新 {lastRefreshedTime}
+          </span>
+
+          <div className="flex items-center gap-1.5">
             <button
               onClick={onOpenSettings}
-              className="p-1.5 rounded-lg bg-[#272b32] hover:bg-[#353942] border border-white/10 text-[#cbd5e1] hover:text-white transition-colors cursor-pointer"
               title="偏好设置与密钥管理"
+              className="w-[28px] h-[28px] rounded-full bg-white/[0.05] border border-white/[0.14] flex items-center justify-center text-[#cbd5e1] hover:bg-white/[0.10] transition-colors cursor-pointer"
             >
-              <Settings className="w-4 h-4" />
+              <Settings className="w-3.5 h-3.5" />
             </button>
-
             <button
               onClick={() => {
                 setPowerActive(!powerActive);
@@ -968,14 +966,10 @@ export const MenuBarSimulator: React.FC<MenuBarSimulatorProps> = ({
                   powerActive ? '菜单栏与后台静默轮询已挂起。' : '正在恢复菜单栏指标与本机凭证连接。'
                 );
               }}
-              className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-                powerActive
-                  ? 'bg-[#272b32] hover:bg-[#353942] border-white/10 text-[#cbd5e1] hover:text-[#ef4444]'
-                  : 'bg-[#ef4444]/20 border-[#ef4444]/40 text-[#ef4444]'
-              }`}
-              title={powerActive ? '挂起 / 退出监控' : '唤醒监控'}
+              title={powerActive ? '退出 MyToken' : '唤醒监控'}
+              className="w-[28px] h-[28px] rounded-full bg-white/[0.05] border border-white/[0.14] flex items-center justify-center text-[#cbd5e1] hover:text-[#ef4444] hover:bg-white/[0.10] transition-colors cursor-pointer"
             >
-              <Power className="w-4 h-4" />
+              <Power className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
