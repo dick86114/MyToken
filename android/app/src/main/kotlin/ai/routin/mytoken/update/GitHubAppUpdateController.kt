@@ -243,19 +243,40 @@ class GitHubAppUpdateController(
             val releases = org.json.JSONArray(body)
             for (index in 0 until releases.length()) {
                 val release = releases.getJSONObject(index)
-                val match = ANDROID_RELEASE_TAG_REGEX.matchEntire(release.optString("tag_name")) ?: continue
-                val version = match.groupValues[1]
-                if (!seenVersions.add(version)) continue
-                val releaseUrl = release.optString("html_url")
-                    .takeIf { it.isNotBlank() }
-                    ?.let { applyMirror(it, mirror) }
-                    ?: continue
-                result += AppReleaseHistoryItem(
-                    version = version,
-                    releaseNotes = release.optString("body"),
-                    releaseUrl = releaseUrl,
-                    publishedAt = release.optString("published_at").takeIf { it.isNotBlank() },
-                )
+                val tagName = release.optString("tag_name")
+                val match = ANDROID_RELEASE_TAG_REGEX.matchEntire(tagName)
+                if (match != null) {
+                    val version = match.groupValues[1]
+                    if (!seenVersions.add(version)) continue
+                    val releaseUrl = release.optString("html_url")
+                        .takeIf { it.isNotBlank() }
+                        ?.let { applyMirror(it, mirror) }
+                        ?: continue
+                    result += AppReleaseHistoryItem(
+                        version = version,
+                        releaseNotes = release.optString("body"),
+                        releaseUrl = releaseUrl,
+                        publishedAt = release.optString("published_at").takeIf { it.isNotBlank() },
+                    )
+                    continue
+                }
+                // 合并后的 vX Release：带 APK 资产才计入安卓历史。
+                if (RELEASE_TAG_REGEX.matchEntire(tagName) != null &&
+                    release.hasApkAsset()
+                ) {
+                    val version = tagName.removePrefix("v")
+                    if (!seenVersions.add(version)) continue
+                    val releaseUrl = release.optString("html_url")
+                        .takeIf { it.isNotBlank() }
+                        ?.let { applyMirror(it, mirror) }
+                        ?: continue
+                    result += AppReleaseHistoryItem(
+                        version = version,
+                        releaseNotes = release.optString("body"),
+                        releaseUrl = releaseUrl,
+                        publishedAt = release.optString("published_at").takeIf { it.isNotBlank() },
+                    )
+                }
             }
             if (releases.length() < 100) break
             page += 1
@@ -331,10 +352,13 @@ class GitHubAppUpdateController(
             ),
         ).body
         val releases = org.json.JSONArray(body)
+        // v5.5.1 起双端合并进同一条 vX Release（DMG + APK），
+        // 历史上的 android-vX 继续兼容，两种 tag 都参与版本比较。
         val json = (0 until releases.length())
             .asSequence()
             .map { releases.getJSONObject(it) }
-            .filter { it.optString("tag_name").startsWith("android-v") }
+            .filter { RELEASE_TAG_REGEX.matchEntire(it.optString("tag_name")) != null }
+            .filter { release -> release.hasApkAsset() }
             .maxWithOrNull(Comparator { left, right ->
                     compareVersions(
                         left.optString("tag_name").removePrefix("android-").removePrefix("v"),
@@ -345,24 +369,7 @@ class GitHubAppUpdateController(
         val tag = json.optString("tag_name").removePrefix("android-")
         val version = tag.removePrefix("v").takeIf { it.isNotEmpty() }
             ?: throw IOException("发布版本号无效")
-        val asset = json.optJSONArray("assets")
-            ?.let { assets ->
-                buildList {
-                    for (index in 0 until assets.length()) {
-                        add(assets.getJSONObject(index))
-                    }
-                }
-            }
-            ?.mapNotNull { asset ->
-                val name = asset.optString("name")
-                val url = asset.optString("browser_download_url")
-                APK_ASSET_REGEX.matchEntire(name)?.let { match ->
-                    val isDebug = match.groupValues[2].isNotEmpty()
-                    ReleaseAsset(name = name, url = url, version = match.groupValues[1], isDebug = isDebug)
-                }
-            }
-            ?.sortedWith(compareBy({ it.isDebug }, { it.version }))
-            ?.firstOrNull()
+        val asset = json.apkAssets().firstOrNull()
             ?: throw IOException("最新发布没有 Android 安装包")
 
         return AvailableRelease(
@@ -380,32 +387,31 @@ class GitHubAppUpdateController(
             applyMirror("https://github.com/$repository/releases.atom", mirror),
             mapOf("Accept" to "application/atom+xml"),
         ).body
-        val tag = parseLatestAndroidTag(body)
-            ?: throw IOException("暂无 Android 发布版本")
-        val version = tag.removePrefix("android-").removePrefix("v").takeIf { it.isNotEmpty() }
-            ?: throw IOException("发布版本号无效")
-        val assetName = probeAtomAssetName(version, mirror)
-            ?: throw IOException("最新发布没有 Android 安装包")
-        val downloadUrl = "https://github.com/$repository/releases/download/$tag/$assetName"
-        return AvailableRelease(
-            version = version,
-            notes = "",
-            downloadUrl = downloadUrl,
-        )
+        val candidates = parseAndroidAtomReleases(body, includeMergedVTag = true)
+            .sortedByDescending { compareVersions(it.version, "0") }
+        for (candidate in candidates) {
+            val downloadUrl = probeAtomDownloadUrl(candidate.version, mirror) ?: continue
+            return AvailableRelease(
+                version = candidate.version,
+                notes = "",
+                downloadUrl = downloadUrl,
+            )
+        }
+        throw IOException("暂无 Android 发布版本")
     }
 
-    private suspend fun probeAtomAssetName(version: String, mirror: String): String? {
-        val candidates = listOf(
+    /** Atom 不含资产列表：按版本号在 v / android-v 两种 tag 下探测 APK 下载地址。 */
+    private suspend fun probeAtomDownloadUrl(version: String, mirror: String): String? {
+        val names = listOf(
             "MyToken-$version-android.apk",
             "MyToken-$version-android-debug.apk",
         )
-        for (name in candidates) {
-            val url = applyMirror(
-                "https://github.com/$repository/releases/download/android-v$version/$name",
-                mirror,
-            )
-            val status = runCatching { probe(url) }.getOrNull() ?: continue
-            if (status in 200..299) return name
+        for (tag in listOf("v$version", "android-v$version")) {
+            for (name in names) {
+                val url = "https://github.com/$repository/releases/download/$tag/$name"
+                val status = runCatching { probe(applyMirror(url, mirror)) }.getOrNull() ?: continue
+                if (status in 200..299) return applyMirror(url, mirror)
+            }
         }
         return null
     }
@@ -474,11 +480,10 @@ class GitHubAppUpdateController(
         return null
     }
 
-    /** 解析 Atom feed 里最新的 android-vX.Y.Z 条目，返回 tag（如 android-v0.0.4）。 */
-    private fun parseLatestAndroidTag(body: String): String? =
-        parseAndroidAtomReleases(body).firstOrNull()?.let { "android-v${it.version}" }
-
-    private fun parseAndroidAtomReleases(body: String): List<AndroidAtomRelease> {
+    private fun parseAndroidAtomReleases(
+        body: String,
+        includeMergedVTag: Boolean = false,
+    ): List<AndroidAtomRelease> {
         val parser = Xml.newPullParser()
         parser.setFeature(org.xmlpull.v1.XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
         parser.setInput(body.reader())
@@ -512,12 +517,22 @@ class GitHubAppUpdateController(
                 org.xmlpull.v1.XmlPullParser.END_TAG -> when (parser.name) {
                     "id" -> if (inEntry && version == null) {
                         version = androidVersion(currentText.toString().trim().substringAfterLast('/'))
+                            ?: if (includeMergedVTag) {
+                                mergedVTagVersion(currentText.toString().trim().substringAfterLast('/'))
+                            } else {
+                                null
+                            }
                     }
                     "title" -> if (inEntry && version == null) {
                         version = Regex("android-v\\d+(?:\\.\\d+)+")
                             .find(currentText.toString().trim())
                             ?.value
                             ?.let(::androidVersion)
+                            ?: if (includeMergedVTag) {
+                                mergedVTagVersion(currentText.toString().trim())
+                            } else {
+                                null
+                            }
                     }
                     "content" -> if (inEntry) notes = currentText.toString().trim()
                     "published", "updated" -> if (inEntry && publishedAt == null) {
@@ -545,6 +560,11 @@ class GitHubAppUpdateController(
 
     private fun androidVersion(tag: String?): String? =
         tag?.takeIf { ANDROID_RELEASE_TAG_REGEX.matches(it) }?.removePrefix("android-v")
+
+    private fun mergedVTagVersion(text: String): String? {
+        val match = Regex("v(\\d+(?:\\.\\d+)+)").find(text) ?: return null
+        return match.groupValues[1]
+    }
 
     private fun install(update: DownloadedUpdate) {
         val uri = FileProvider.getUriForFile(
@@ -598,7 +618,39 @@ class GitHubAppUpdateController(
             option = RegexOption.IGNORE_CASE,
         )
         private val ANDROID_RELEASE_TAG_REGEX = Regex("^android-v(\\d+(?:\\.\\d+)+)$")
+        private val RELEASE_TAG_REGEX = Regex("^(?:android-)?v(\\d+(?:\\.\\d+)+)$")
         private const val APK_MIME = "application/vnd.android.package-archive"
+
+        private fun org.json.JSONObject.hasApkAsset(): Boolean {
+            val assets = optJSONArray("assets") ?: return false
+            for (index in 0 until assets.length()) {
+                if (APK_ASSET_REGEX.matchEntire(assets.getJSONObject(index).optString("name")) != null) {
+                    return true
+                }
+            }
+            return false
+        }
+
+        private fun org.json.JSONObject.apkAssets(): List<ReleaseAsset> {
+            val assets = optJSONArray("assets") ?: return emptyList()
+            return buildList {
+                for (index in 0 until assets.length()) {
+                    val asset = assets.getJSONObject(index)
+                    val name = asset.optString("name")
+                    val url = asset.optString("browser_download_url")
+                    APK_ASSET_REGEX.matchEntire(name)?.let { match ->
+                        add(
+                            ReleaseAsset(
+                                name = name,
+                                url = url,
+                                version = match.groupValues[1],
+                                isDebug = match.groupValues[2].isNotEmpty(),
+                            )
+                        )
+                    }
+                }
+            }.sortedBy { it.isDebug }
+        }
 
         internal fun compareVersions(left: String, right: String): Int {
             val leftParts = left.split('.').map { it.filter(Char::isDigit).toIntOrNull() ?: 0 }

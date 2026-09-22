@@ -69,6 +69,65 @@ class GitHubAppUpdateControllerTest {
     }
 
     @Test
+    fun 合并Release下vTag携带APK时可检测更新() = runBlocking {
+        val body = """
+        [
+          {"tag_name":"v5.5.1","assets":[
+            {"name":"MyToken.dmg","browser_download_url":"https://example.com/MyToken.dmg"},
+            {"name":"MyToken-5.5.1-android.apk","browser_download_url":"https://example.com/MyToken-5.5.1-android.apk"}
+          ],"body":"双端合并"},
+          {"tag_name":"v5.5.0","assets":[{"name":"MyToken.dmg","browser_download_url":"https://example.com/MyToken.dmg"}],"body":"仅 macOS"}
+        ]
+        """.trimIndent()
+        val controller = GitHubAppUpdateController(
+            context = ApplicationProvider.getApplicationContext<Context>(),
+            currentVersionName = "5.5.0",
+            network = { _, _ -> UpdateResponse(body) },
+        )
+
+        controller.checkForUpdates()
+        val state = withTimeout(5_000) {
+            controller.state.first {
+                it is AppUpdateUiState.Available ||
+                    it is AppUpdateUiState.Error ||
+                    it is AppUpdateUiState.UpToDate
+            }
+        }
+
+        assertTrue(state is AppUpdateUiState.Available)
+        val available = state as AppUpdateUiState.Available
+        assertEquals("5.5.1", available.version)
+        assertEquals("https://example.com/MyToken-5.5.1-android.apk", available.downloadUrl)
+    }
+
+    @Test
+    fun 历史版本纳入带APK的vTag并排除仅macOS的vTag() = runBlocking {
+        val body = """
+        [
+          {"tag_name":"v5.5.1","html_url":"https://github.com/dick86114/MyToken/releases/tag/v5.5.1","body":"双端合并","published_at":"2026-09-22T15:59:44Z","assets":[
+            {"name":"MyToken-5.5.1-android.apk","browser_download_url":"https://example.com/MyToken-5.5.1-android.apk"}
+          ]},
+          {"tag_name":"v5.5.0","html_url":"https://github.com/dick86114/MyToken/releases/tag/v5.5.0","body":"仅 macOS","published_at":"2026-09-22T14:19:39Z","assets":[
+            {"name":"MyToken.dmg","browser_download_url":"https://example.com/MyToken.dmg"}
+          ]},
+          {"tag_name":"android-v5.4.4","html_url":"https://github.com/dick86114/MyToken/releases/tag/android-v5.4.4","body":"旧版","published_at":"2026-09-22T09:01:02Z"}
+        ]
+        """.trimIndent()
+        val controller = GitHubAppUpdateController(
+            context = ApplicationProvider.getApplicationContext<Context>(),
+            currentVersionName = "5.4.4",
+            network = { _, _ -> UpdateResponse(body) },
+        )
+
+        controller.loadReleaseHistory()
+        val state = withTimeout(5_000) {
+            controller.releaseHistoryState.first { it is AppReleaseHistoryUiState.Loaded }
+        } as AppReleaseHistoryUiState.Loaded
+
+        assertEquals(listOf("5.5.1", "5.4.4"), state.releases.map { it.version })
+    }
+
+    @Test
     fun 历史版本只保留Android发布并按版本倒序去重() = runBlocking {
         val body = """
         [
