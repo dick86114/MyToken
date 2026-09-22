@@ -9,6 +9,7 @@ struct UsageMetricGridLayout: Equatable {
 enum NormalizedUsageMetricResetStyle {
     case fullDateTime
     case relativeDuration
+    case resetTimeOnly
 }
 
 enum UsageMetricGridPolicy {
@@ -167,6 +168,13 @@ private struct NormalizedUsageMetricCell: View {
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                         .fixedSize(horizontal: false, vertical: true)
+                case .resetTimeOnly:
+                    Text("重置 \(UsageFormatter.resetTime(windowEnd, now: now))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                        .fixedSize(horizontal: false, vertical: true)
+                        .help("重置 \(UsageFormatter.fullDateTime(windowEnd))")
                 case .relativeDuration:
                     if usesFullWidthDetails {
                         HStack(alignment: .firstTextBaseline, spacing: 12) {

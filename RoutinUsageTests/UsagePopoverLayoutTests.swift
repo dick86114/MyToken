@@ -49,6 +49,61 @@ final class UsagePopoverLayoutTests: XCTestCase {
         XCTAssertTrue(controller.contains("min(max(idealSize.height, 1), maximumHeight)"))
     }
 
+    func test弹窗顶栏设置左侧有简洁完整分段() throws {
+        let source = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/UsagePopoverView.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(source.contains("UsageCardDensitySegmentedControl"))
+        XCTAssertTrue(source.contains("openSettings()"))
+        let toolbar = try XCTUnwrap(source.range(of: "var toolbar: some View"))
+        let toolbarSlice = source[toolbar.lowerBound...]
+        let segmentedIndex = try XCTUnwrap(
+            toolbarSlice.range(of: "UsageCardDensitySegmentedControl")
+        ).lowerBound
+        let gearIndex = try XCTUnwrap(
+            toolbarSlice.range(of: "openSettings()")
+        ).lowerBound
+
+        XCTAssertTrue(segmentedIndex < gearIndex)
+    }
+
+    func test弹窗简洁模式两列排布并带切换动画() throws {
+        let popover = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/UsagePopoverView.swift"),
+            encoding: .utf8
+        )
+        let segmented = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/UsageCardDensitySegmentedControl.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(popover.contains("WaterfallLayout(columns: 2, spacing: 8)"))
+        XCTAssertTrue(popover.contains("usageCardDensity == .compact"))
+        XCTAssertTrue(popover.contains("LazyVGrid(columns: [GridItem(.flexible())], spacing: 8)"))
+        XCTAssertTrue(popover.contains(".id(settings.usageCardDensity)"))
+        XCTAssertTrue(segmented.contains("withAnimation(.spring(response: 0.35, dampingFraction: 0.8))"))
+    }
+
+    func test瀑布流布局按最短列放置卡片() {
+        let layout = WaterfallLayout(columns: 2, spacing: 8)
+
+        XCTAssertEqual(layout.columnWidth(forTotalWidth: 416), 204)
+        XCTAssertEqual(layout.shortestColumnIndex(in: [120, 80]), 1)
+        XCTAssertEqual(layout.shortestColumnIndex(in: [80, 120]), 0)
+        XCTAssertEqual(layout.shortestColumnIndex(in: [60, 60]), 0)
+    }
+
     func test弹窗设置按钮复用右键菜单激活逻辑() throws {
         let popover = try TestSourceReader.read([
             "RoutinUsage",

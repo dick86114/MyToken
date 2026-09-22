@@ -166,15 +166,21 @@ private extension UsagePopoverView {
 
             Spacer()
 
-            GlassIconButton(
-                action: { openSettings() },
-                help: "设置"
-            ) {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 13, weight: .medium))
+            HStack(spacing: 8) {
+                UsageCardDensitySegmentedControl(
+                    selection: $settings.usageCardDensity
+                )
+
+                GlassIconButton(
+                    action: { openSettings() },
+                    help: "设置"
+                ) {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .keyboardShortcut(",")
+                .accessibilityLabel("打开设置")
             }
-            .keyboardShortcut(",")
-            .accessibilityLabel("打开设置")
         }
         .overlay(alignment: .center) {
             Link(destination: RoutinUsageApp.websiteURL) {
@@ -231,28 +237,46 @@ private extension UsagePopoverView {
             .accessibilityElement(children: .combine)
             .accessibilityLabel("空配置，尚未配置 Key")
         } else {
-            VStack(spacing: 8) {
-                ForEach(filteredPopoverKeyIDs, id: \.self) { id in
-                    if let state = store.state(for: id) {
-                        UsageRowView(
-                            state: state,
-                            actions: nil,
-                            refreshCredential: {
-                                Task { await refreshCredential(id) }
-                            },
-                            retryCredential: {
-                                Task { await retryCredential(id) }
-                            },
-                            onShare: {
-                                if let content = UsageShareContentBuilder.build(state: state) {
-                                    UsageSharePanelController.shared.present(content: content)
-                                }
-                            }
-                        )
-                    }
-                }
-            }
+            densityListContent
+            .id(settings.usageCardDensity)
             .padding(.horizontal, 12)
+        }
+    }
+
+    @ViewBuilder
+    private var densityListContent: some View {
+        if settings.usageCardDensity == .compact {
+            WaterfallLayout(columns: 2, spacing: 8) {
+                cardViews
+            }
+        } else {
+            LazyVGrid(columns: [GridItem(.flexible())], spacing: 8) {
+                cardViews
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var cardViews: some View {
+        ForEach(filteredPopoverKeyIDs, id: \.self) { id in
+            if let state = store.state(for: id) {
+                UsageRowView(
+                    state: state,
+                    density: settings.usageCardDensity,
+                    actions: nil,
+                    refreshCredential: {
+                        Task { await refreshCredential(id) }
+                    },
+                    retryCredential: {
+                        Task { await retryCredential(id) }
+                    },
+                    onShare: {
+                        if let content = UsageShareContentBuilder.build(state: state) {
+                            UsageSharePanelController.shared.present(content: content)
+                        }
+                    }
+                )
+            }
         }
     }
 

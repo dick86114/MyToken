@@ -441,8 +441,8 @@ final class ProjectBootstrapTests: XCTestCase {
 
         XCTAssertTrue(usageRowView.contains("TimelineView(.periodic(from: .now, by: 60))"))
         XCTAssertTrue(usageRowView.contains("now: timeline.date"))
-        XCTAssertTrue(usageRowView.contains("UsageFormatter.groupMultiplierText"))
         XCTAssertFalse(usageRowView.contains("ForEach(Array(groupMultipliers.enumerated())"))
+        XCTAssertFalse(usageRowView.contains("details.append(UsageFormatter.groupMultiplierText"))
     }
 
     func test弹窗将分组倍率置于百分比下方并右对齐() throws {
@@ -455,8 +455,7 @@ final class ProjectBootstrapTests: XCTestCase {
         let header = usageRowView[headerStart.lowerBound..<progressStart.lowerBound]
 
         XCTAssertTrue(header.contains("VStack(alignment: .trailing"))
-        XCTAssertTrue(header.contains("groupMultiplierText(currentGroupMultiplier)"))
-        XCTAssertTrue(header.contains("hasGroupMultipliers"))
+        XCTAssertFalse(header.contains("groupMultiplierText(currentGroupMultiplier)"))
         XCTAssertTrue(header.contains("Spacer(minLength: 8)"))
         XCTAssertFalse(usageRowView.contains("HStack {\n                    Spacer()\n                    Text(UsageFormatter.groupMultiplierText(groupMultipliers))"))
     }
@@ -546,7 +545,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(usageRowView.contains("title: \"5 小时\""))
         XCTAssertTrue(usageRowView.contains("title: \"周\""))
         XCTAssertTrue(usageRowView.contains("UsageFormatter.remainingDurationText"))
-        XCTAssertTrue(usageRowView.contains("groupMultipliers"))
+        XCTAssertFalse(usageRowView.contains("groupMultipliers"))
         XCTAssertFalse(usageRowView.contains("allowedModels"))
         XCTAssertFalse(usageRowView.contains("允许模型"))
     }
@@ -559,10 +558,10 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(statusBarController.contains("window.level = .statusBar"))
     }
 
-    func test弹窗详情显示全部按Key配对的分组倍率() throws {
+    func test弹窗详情不再拼接配对分组倍率() throws {
         let settings = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
 
-        XCTAssertTrue(settings.contains("UsageFormatter.groupMultiplierText(snapshot.groupMultipliers)"))
+        XCTAssertFalse(settings.contains("UsageFormatter.groupMultiplierText(snapshot.groupMultipliers)"))
     }
 
     func test凭证行不切换菜单栏当前Key并提供启用开关() throws {

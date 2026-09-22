@@ -37,4 +37,14 @@ final class GeneralSettingsViewTests: XCTestCase {
         XCTAssertFalse(menuBar.contains("colorRulesSection"))
         XCTAssertFalse(menuBar.contains("ColorPicker("))
     }
+
+    func test通用页提供卡片简洁完整显示() throws {
+        let source = try TestSourceReader.read([
+            "RoutinUsage", "Views", "Settings", "GeneralSettingsView.swift"
+        ])
+
+        XCTAssertTrue(source.contains("卡片显示"))
+        XCTAssertTrue(source.contains("简洁模式只保留各供应商最常用的用量信息。"))
+        XCTAssertTrue(source.contains("settings.usageCardDensity"))
+    }
 }
