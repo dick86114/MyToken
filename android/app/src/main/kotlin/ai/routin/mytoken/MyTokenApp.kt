@@ -303,6 +303,7 @@ fun MyTokenApp(
                                 onRequestNotificationPermission = onRequestNotificationPermission,
                                 onCheckForUpdates = settingsViewModel::checkForUpdates,
                                 onLoadReleaseHistory = settingsViewModel::loadReleaseHistory,
+                                onLoadCachedReleaseHistory = settingsViewModel::loadCachedReleaseHistory,
                                 onDownloadAndInstall = settingsViewModel::downloadAndInstall,
                                 onOpenInstallPermissionSettings = settingsViewModel::openInstallPermissionSettings,
                                 onInstallDownloadedUpdate = settingsViewModel::installDownloadedUpdate,

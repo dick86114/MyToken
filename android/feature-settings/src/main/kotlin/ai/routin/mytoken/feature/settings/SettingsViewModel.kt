@@ -53,6 +53,8 @@ class SettingsViewModel(
 
     fun loadReleaseHistory() = updateController.loadReleaseHistory()
 
+    fun loadCachedReleaseHistory() = updateController.loadCachedReleaseHistory()
+
     fun downloadAndInstall(version: String, downloadUrl: String) =
         updateController.downloadAndInstall(version, downloadUrl)
 

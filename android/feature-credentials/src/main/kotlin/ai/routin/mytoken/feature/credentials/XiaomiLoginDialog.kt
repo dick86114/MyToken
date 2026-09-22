@@ -1,7 +1,9 @@
 package ai.routin.mytoken.feature.credentials
 
 import android.annotation.SuppressLint
+import android.graphics.RenderEffect
 import android.webkit.CookieManager
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -40,6 +42,9 @@ import ai.routin.mytoken.core.ui.GlassButton
 import ai.routin.mytoken.core.ui.GlassButtonTone
 
 private const val XiaomiConsoleUrl = "https://platform.xiaomimimo.com/console/balance"
+private const val CHROME_MOBILE_UA =
+    "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 " +
+        "(KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
 
 /** Reads the current Xiaomi MiMo web session cookie without exposing it to logs. */
 object XiaomiCookieReader {
@@ -112,11 +117,19 @@ fun XiaomiLoginDialog(
                             var authRecoveryAttempted = false
                             @SuppressLint("SetJavaScriptEnabled")
                             WebView(context).apply {
+                                // 小米控制台是重 JS SPA，默认 WebView UA 可能被前端拒绝渲染。
+                                // 使用移动版 Chrome UA + 宽视口，显著降低白屏概率。
+                                settings.userAgentString = CHROME_MOBILE_UA
                                 settings.javaScriptEnabled = true
                                 settings.domStorageEnabled = true
+                                settings.databaseEnabled = true
                                 settings.javaScriptCanOpenWindowsAutomatically = true
                                 settings.setSupportMultipleWindows(false)
-                                settings.cacheMode = WebSettings.LOAD_NO_CACHE
+                                settings.useWideViewPort = true
+                                settings.loadWithOverviewMode = true
+                                settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+                                settings.cacheMode =
+                                    if (resetSession) WebSettings.LOAD_NO_CACHE else WebSettings.LOAD_DEFAULT
                                 isFocusable = true
                                 isFocusableInTouchMode = true
                                 CookieManager.getInstance().setAcceptCookie(true)
@@ -130,6 +143,16 @@ fun XiaomiLoginDialog(
 
                                     override fun onPageFinished(view: WebView?, url: String?) {
                                         isLoading = false
+                                    }
+
+                                    override fun onRenderProcessGone(
+                                        view: WebView?,
+                                        detail: RenderProcessGoneDetail?,
+                                    ): Boolean {
+                                        errorMessage = "网页渲染进程异常退出，请重新打开登录窗口"
+                                        view?.destroy()
+                                        webView = null
+                                        return true
                                     }
 
                                     override fun onReceivedError(

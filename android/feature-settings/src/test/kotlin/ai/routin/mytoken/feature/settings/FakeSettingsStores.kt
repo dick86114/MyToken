@@ -72,6 +72,8 @@ class FakeAppUpdateController : AppUpdateController {
         checked += 1
     }
 
+    override fun loadCachedReleaseHistory() = Unit
+
     override fun loadReleaseHistory() {
         releaseHistoryLoaded += 1
     }

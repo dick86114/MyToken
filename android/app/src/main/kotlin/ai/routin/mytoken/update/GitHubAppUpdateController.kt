@@ -21,6 +21,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -36,6 +37,7 @@ class GitHubAppUpdateController(
     private val context: Context,
     private val currentVersionName: String,
     private val repository: String = "dick86114/MyToken",
+    private val cacheStore: ai.routin.mytoken.feature.settings.ReleaseNotesCacheStore? = null,
     /** 返回当前镜像前缀；空值/空白表示 GitHub 直连。由 App 层接 DataStore。 */
     private val mirrorBaseProvider: suspend () -> String? = { null },
     private val network: suspend (String, Map<String, String>) -> UpdateResponse = ::request,
@@ -88,10 +90,21 @@ class GitHubAppUpdateController(
             runCatching {
                 fetchReleaseHistoryWithFallback(mirrorBase())
             }.onSuccess { releases ->
+                cacheStore?.save(releases)
                 _releaseHistoryState.value = AppReleaseHistoryUiState.Loaded(releases)
             }.onFailure {
                 _releaseHistoryState.value = AppReleaseHistoryUiState.Error("更新日志加载失败，请稍后重试")
             }
+        }
+    }
+
+    override fun loadCachedReleaseHistory() {
+        scope.launch {
+            val cached = cacheStore?.cachedReleases?.let { flow ->
+                runCatching { flow.first() }.getOrNull()
+            } ?: return@launch
+            if (_releaseHistoryState.value is AppReleaseHistoryUiState.Loading) return@launch
+            _releaseHistoryState.value = AppReleaseHistoryUiState.Loaded(cached)
         }
     }
 
