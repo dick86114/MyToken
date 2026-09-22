@@ -298,8 +298,7 @@ final class UsagePresentationPolicyTests: XCTestCase {
         )
 
         XCTAssertTrue(source.contains("normalizedMetricsContent(snapshot: snapshot, now: now)"))
-        XCTAssertTrue(source.contains("resetStyle = .resetTimeOnly"))
-        XCTAssertTrue(source.contains("showsResetTime: showsResetTime"))
+        XCTAssertTrue(source.contains("resetTimeStyle: .relativeDuration"))
         XCTAssertTrue(source.contains("now: now"))
     }
 
@@ -324,7 +323,7 @@ final class UsagePresentationPolicyTests: XCTestCase {
         XCTAssertFalse(row.contains("groupMultiplierText(currentGroupMultiplier)"))
     }
 
-    func test供应商简洁视图按策略过滤字段() throws {
+    func test简洁卡片统一纵向排列指标() throws {
         let sections = try String(
             contentsOf: URL(fileURLWithPath: #filePath)
                 .deletingLastPathComponent()
@@ -339,6 +338,13 @@ final class UsagePresentationPolicyTests: XCTestCase {
                 .appendingPathComponent("RoutinUsage/Views/CommandCodeUsageMetricsView.swift"),
             encoding: .utf8
         )
+        let row = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/UsageRowView.swift"),
+            encoding: .utf8
+        )
         let details = try String(
             contentsOf: URL(fileURLWithPath: #filePath)
                 .deletingLastPathComponent()
@@ -347,11 +353,12 @@ final class UsagePresentationPolicyTests: XCTestCase {
             encoding: .utf8
         )
 
-        XCTAssertTrue(sections.contains("var density: UsageCardDensity = .full"))
-        XCTAssertTrue(command.contains("var density: UsageCardDensity = .full"))
-        XCTAssertTrue(sections.contains("UsageCardDensityPolicy.compactSpec("))
+        XCTAssertFalse(sections.contains("var density: UsageCardDensity"))
+        XCTAssertFalse(command.contains("var density: UsageCardDensity"))
+        XCTAssertTrue(row.contains("func compactCard(now: Date)"))
+        XCTAssertTrue(row.contains("func compactMetricRow(_ metric: NormalizedUsageMetric, now: Date)"))
+        XCTAssertTrue(row.contains("UsageCardDensityPolicy.compactSpec("))
         XCTAssertFalse(details.contains("density: .compact"))
-        XCTAssertTrue(command.contains("density == .compact"))
     }
 
     func test弹窗供应商信息显示供应商与套餐() throws {

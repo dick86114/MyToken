@@ -13,39 +13,77 @@ struct UsageRowView: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { timeline in
-            HStack(alignment: .top, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 7) {
-                        headerView(now: timeline.date)
-                        content(now: timeline.date)
-                    }
-                if let actions {
-                    actions
-                        .padding(.top, 2)
-                }
+            if density == .compact {
+                compactCard(now: timeline.date)
+            } else {
+                fullCard(now: timeline.date)
             }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 8)
-            .background {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(ProviderTheme.background(for: state.configuration.providerID))
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(ProviderTheme.borderColor(for: state.configuration.providerID))
-            }
-            .overlay {
-                if state.isRefreshing {
-                    RefreshingCardBorder(
-                        color: ProviderTheme.accentColor(for: state.configuration.providerID)
-                    )
-                }
-            }
-            .saturation(state.configuration.isEnabled ? 1 : 0)
-            .opacity(isSubscriptionExpired(now: timeline.date) ? 0.45 : 1)
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel(accessibilityLabel(now: timeline.date))
-            .accessibilityHint(accessibilityHint)
         }
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: density)
+    }
+
+    private func fullCard(now: Date) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 7) {
+                headerView(now: now)
+                content(now: now)
+            }
+            if let actions {
+                actions
+                    .padding(.top, 2)
+            }
+        }
+        .modifier(UsageCardChrome(state: state, isExpired: isSubscriptionExpired(now: now)))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(accessibilityLabel(now: now))
+        .accessibilityHint(accessibilityHint)
+    }
+
+    private func compactCard(now: Date) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 6) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(state.configuration.displayName)
+                        .font(.headline.weight(.semibold))
+                        .lineLimit(1)
+
+                    Text(UsageRowPresentation.subscriptionDescription(
+                        providerID: state.configuration.providerID,
+                        planName: state.snapshot?.planName ?? ""
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(3)
+                    .multilineTextAlignment(.leading)
+                }
+
+                Spacer(minLength: 4)
+
+                HStack(spacing: 2) {
+                    if state.error != nil {
+                        refreshFailureIndicator
+                    }
+                    if onShare != nil {
+                        shareButton
+                    }
+                    headerRefreshButton
+                }
+            }
+
+            if let snapshot = state.snapshot {
+                compactMetrics(snapshot: snapshot, now: now)
+            } else {
+                statusLabel
+            }
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .modifier(UsageCardChrome(state: state, isExpired: isSubscriptionExpired(now: now)))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(accessibilityLabel(now: now))
+        .accessibilityHint(accessibilityHint)
     }
 }
 
@@ -74,6 +112,32 @@ private struct RefreshingCardBorder: View {
                 .shadow(color: color.opacity(0.35), radius: 2)
         }
         .accessibilityHidden(true)
+    }
+}
+
+private struct UsageCardChrome: ViewModifier {
+    let state: KeyUsageState
+    let isExpired: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(ProviderTheme.background(for: state.configuration.providerID))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(ProviderTheme.borderColor(for: state.configuration.providerID))
+            }
+            .overlay {
+                if state.isRefreshing {
+                    RefreshingCardBorder(
+                        color: ProviderTheme.accentColor(for: state.configuration.providerID)
+                    )
+                }
+            }
+            .saturation(state.configuration.isEnabled ? 1 : 0)
+            .opacity(isExpired ? 0.45 : 1)
     }
 }
 
@@ -322,6 +386,134 @@ private extension UsageRowView {
     }
 
     @ViewBuilder
+    func compactMetrics(snapshot: UsageSnapshot, now: Date) -> some View {
+        let spec = UsageCardDensityPolicy.compactSpec(
+            providerID: state.configuration.providerID,
+            metadata: state.configuration.metadata
+        )
+        let allowed = Set(spec.metricIDs)
+        let metrics = snapshot.normalizedMetrics.filter { allowed.contains($0.id) }
+
+        if !metrics.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(metrics) { metric in
+                    compactMetricRow(metric, now: now)
+                }
+            }
+        } else if snapshot.kind == .periodic {
+            VStack(alignment: .leading, spacing: 10) {
+                compactLegacyMetricRow(title: "5 小时", metric: validMetric(snapshot.fiveHour), now: now)
+                compactLegacyMetricRow(title: "周", metric: validMetric(snapshot.weekly), now: now)
+            }
+        } else if let token = validMetric(snapshot.token) {
+            compactLegacyMetricRow(title: "Token", metric: token, now: now)
+        } else {
+            statusLabel
+        }
+    }
+
+    func compactMetricRow(_ metric: NormalizedUsageMetric, now: Date) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(metric.label)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+
+                Spacer(minLength: 4)
+
+                if metric.presentation == .progress, let percent = metric.displayedPercent {
+                    Text(UsageFormatter.displayPercentText(percent))
+                        .font(.system(.caption, design: .rounded, weight: .semibold))
+                        .foregroundStyle(normalizedMetricColor(metric.healthState))
+                        .monospacedDigit()
+                }
+            }
+
+            if metric.presentation == .progress {
+                UsageMetricProgressBar(percent: metric.displayedPercent ?? 0)
+
+                if let windowEnd = metric.windowEnd {
+                    Text("重置 \(UsageFormatter.resetTime(windowEnd, now: now))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                        .help("重置 \(UsageFormatter.fullDateTime(windowEnd))")
+                }
+            } else {
+                Text(compactValueText(for: metric))
+                    .font(.system(.caption, design: .rounded, weight: .semibold))
+                    .foregroundStyle(normalizedMetricColor(metric.healthState))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(compactAccessibilityText(for: metric, now: now))
+    }
+
+    func compactLegacyMetricRow(
+        title: String,
+        metric: UsageMetric?,
+        now: Date
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Spacer(minLength: 4)
+
+                if let metric {
+                    Text(UsageFormatter.displayPercentText(metric.percent))
+                        .font(.system(.caption, design: .rounded, weight: .semibold))
+                        .foregroundStyle(progressColor(for: metric))
+                        .monospacedDigit()
+                }
+            }
+
+            if let metric {
+                UsageMetricProgressBar(percent: metric.percent)
+
+                if metric.windowEnd != nil {
+                    Text("重置 \(UsageFormatter.resetTime(metric, now: now))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+            }
+        }
+    }
+
+    func compactValueText(for metric: NormalizedUsageMetric) -> String {
+        switch metric.presentation {
+        case .balance:
+            return UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode)
+        case .value:
+            return metric.unit == .token
+                ? UsageFormatter.exactTokenText(metric.value)
+                : UsageFormatter.numberText(metric.value, grouping: true)
+        case .status:
+            return metric.healthState == .unavailable ? "不可用" : "可用"
+        case .progress:
+            return ""
+        }
+    }
+
+    func compactAccessibilityText(for metric: NormalizedUsageMetric, now: Date) -> String {
+        if metric.presentation == .progress {
+            let percent = UsageFormatter.displayPercentText(metric.displayedPercent)
+            let reset = metric.windowEnd.map {
+                "，重置 \(UsageFormatter.resetTime($0, now: now))"
+            } ?? ""
+            return "\(metric.label)，已使用 \(percent)\(reset)"
+        }
+        return "\(metric.label)，\(compactValueText(for: metric))"
+    }
+
+    @ViewBuilder
     func periodicContent(snapshot: UsageSnapshot, now: Date) -> some View {
         HStack(alignment: .top, spacing: 16) {
             metricContent(
@@ -343,10 +535,7 @@ private extension UsageRowView {
         if state.configuration.providerID == .xiaomi,
            state.configuration.metadata["usageKind"] != "plan" {
             return AnyView(
-                XiaomiAPIMetricsView(
-                    metrics: snapshot.normalizedMetrics,
-                    density: density
-                )
+                XiaomiAPIMetricsView(metrics: snapshot.normalizedMetrics)
             )
         }
         if state.configuration.providerID == .commandCode {
@@ -354,7 +543,6 @@ private extension UsageRowView {
                 CommandCodeUsageMetricsView(
                     metrics: snapshot.normalizedMetrics,
                     now: now,
-                    density: density,
                     displayMode: .card
                 )
             )
@@ -362,21 +550,13 @@ private extension UsageRowView {
 
         if state.configuration.providerID == .glm {
             return AnyView(
-                GLMUsageMetricsView(
-                    metrics: snapshot.normalizedMetrics,
-                    density: density,
-                    now: now
-                )
+                GLMUsageMetricsView(metrics: snapshot.normalizedMetrics, now: now)
             )
         }
 
         if state.configuration.providerID == .newAPI {
             return AnyView(
-                NewAPIUsageMetricsView(
-                    metrics: snapshot.normalizedMetrics,
-                    density: density,
-                    now: now
-                )
+                NewAPIUsageMetricsView(metrics: snapshot.normalizedMetrics, now: now)
             )
         }
 
@@ -385,7 +565,6 @@ private extension UsageRowView {
                 return AnyView(
                     VolcengineCodingPlanMetricsView(
                         metrics: snapshot.normalizedMetrics,
-                        density: density,
                         now: now
                     )
                 )
@@ -393,39 +572,21 @@ private extension UsageRowView {
             return AnyView(
                 VolcenginePlanUsageMetricsView(
                     metrics: snapshot.normalizedMetrics,
-                    density: density,
                     now: now
                 )
             )
         }
 
-        var metrics = snapshot.normalizedMetrics
-        var resetStyle = NormalizedUsageMetricResetStyle.relativeDuration
-        var showsAmountDetails = true
-        var showsResetTime = true
-        if density == .compact {
-            let spec = UsageCardDensityPolicy.compactSpec(
-                providerID: state.configuration.providerID,
-                metadata: state.configuration.metadata
-            )
-            let allowed = Set(spec.metricIDs)
-            metrics = metrics.filter { allowed.contains($0.id) }
-            resetStyle = .resetTimeOnly
-            showsAmountDetails = false
-            showsResetTime = spec.showsResetTime
-        }
         let layout = UsageMetricGridPolicy.layout(
             providerID: state.configuration.providerID,
-            metrics: metrics
+            metrics: snapshot.normalizedMetrics
         )
         return AnyView(
             NormalizedUsageMetricGrid(
                 metrics: layout.metrics,
                 columns: layout.columns,
-                resetTimeStyle: resetStyle,
-                now: now,
-                showsAmountDetails: showsAmountDetails,
-                showsResetTime: showsResetTime
+                resetTimeStyle: .relativeDuration,
+                now: now
             )
         )
     }

@@ -25,7 +25,9 @@ struct UsageCardDensitySegmentedControl: View {
         let isSelected = selection == density
 
         return Button {
-            selection = density
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                selection = density
+            }
         } label: {
             Text(density.title)
                 .font(.system(size: 11, weight: .medium))

@@ -117,18 +117,15 @@ enum CommandCodeUsageMetricsDisplayMode: Equatable {
 struct CommandCodeUsageMetricsView: View {
     let metrics: [NormalizedUsageMetric]
     let now: Date
-    var density: UsageCardDensity = .full
     let displayMode: CommandCodeUsageMetricsDisplayMode
 
     init(
         metrics: [NormalizedUsageMetric],
         now: Date,
-        density: UsageCardDensity = .full,
         displayMode: CommandCodeUsageMetricsDisplayMode = .details
     ) {
         self.metrics = metrics
         self.now = now
-        self.density = density
         self.displayMode = displayMode
     }
 
@@ -137,34 +134,23 @@ struct CommandCodeUsageMetricsView: View {
     }
 
     var body: some View {
-        if density == .compact {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 16) {
-                    progressCell(layout.fiveHour, fallbackLabel: "5 小时")
-                    progressCell(layout.weekly, fallbackLabel: "周")
-                }
-                progressCell(layout.monthly, fallbackLabel: "月")
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 16) {
+                progressCell(layout.fiveHour, fallbackLabel: "5 小时")
+                progressCell(layout.weekly, fallbackLabel: "周")
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        } else {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 16) {
-                    progressCell(layout.fiveHour, fallbackLabel: "5 小时")
-                    progressCell(layout.weekly, fallbackLabel: "周")
-                }
 
-                HStack(alignment: .top, spacing: 16) {
-                    monthlyCell(layout.monthly)
-                    switch displayMode {
-                    case .card:
-                        requestCountSummaryCell(layout.requestCount)
-                    case .details:
-                        summaryMetricsCell
-                    }
+            HStack(alignment: .top, spacing: 16) {
+                monthlyCell(layout.monthly)
+                switch displayMode {
+                case .card:
+                    requestCountSummaryCell(layout.requestCount)
+                case .details:
+                    summaryMetricsCell
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -218,12 +204,7 @@ struct CommandCodeUsageMetricsView: View {
                 cellHeader(metric, fallbackLabel: fallbackLabel)
                 UsageMetricProgressBar(percent: metric.displayedPercent ?? 0)
                 VStack(alignment: .leading, spacing: 2) {
-                    let lines = density == .compact
-                        ? [CommandCodeMetricLayoutPolicy.ProgressDetailLine(
-                            text: "重置 \(UsageFormatter.resetTime(metric.windowEnd, now: now))"
-                        )]
-                        : CommandCodeMetricLayoutPolicy.progressDetailLines(for: metric, now: now)
-                    ForEach(lines, id: \.text) { line in
+                    ForEach(CommandCodeMetricLayoutPolicy.progressDetailLines(for: metric, now: now), id: \.text) { line in
                         Text(line.text)
                             .foregroundStyle(line.highlights ? Color.green : Color.secondary)
                     }
@@ -243,21 +224,14 @@ struct CommandCodeUsageMetricsView: View {
             VStack(alignment: .leading, spacing: 5) {
                 cellHeader(metric, fallbackLabel: "月")
                 UsageMetricProgressBar(percent: metric.displayedPercent ?? 0)
-                if density == .full {
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        Text("已用 \(UsageFormatter.currencyText(metric.used, currencyCode: metric.currencyCode))")
-                        Spacer(minLength: 12)
-                        Text("剩余 \(UsageFormatter.currencyText(metric.remaining, currencyCode: metric.currencyCode))")
-                    }
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-                } else if let windowEnd = metric.windowEnd {
-                    Text("重置 \(UsageFormatter.resetTime(windowEnd, now: now))")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text("已用 \(UsageFormatter.currencyText(metric.used, currencyCode: metric.currencyCode))")
+                    Spacer(minLength: 12)
+                    Text("剩余 \(UsageFormatter.currencyText(metric.remaining, currencyCode: metric.currencyCode))")
                 }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         } else {
