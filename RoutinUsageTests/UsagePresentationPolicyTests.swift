@@ -39,6 +39,56 @@ final class UsagePresentationPolicyTests: XCTestCase {
         XCTAssertEqual(UsageMetricGridPolicy.layout(providerID: .newAPI, metrics: metrics).columns, 2)
     }
 
+    func test简洁模式按供应商返回写死字段() {
+        XCTAssertEqual(
+            UsageCardDensityPolicy.compactSpec(providerID: .routin, metadata: [:]).metricIDs,
+            ["fiveHour", "weekly"]
+        )
+        XCTAssertEqual(
+            UsageCardDensityPolicy.compactSpec(
+                providerID: .routin,
+                metadata: ["usageKind": "tokenPack"]
+            ).metricIDs,
+            ["token"]
+        )
+        XCTAssertEqual(
+            UsageCardDensityPolicy.compactSpec(providerID: .deepseek, metadata: [:]).metricIDs,
+            ["balance"]
+        )
+        XCTAssertEqual(
+            UsageCardDensityPolicy.compactSpec(
+                providerID: .xiaomi,
+                metadata: ["usageKind": "api"]
+            ).metricIDs,
+            ["account-balance"]
+        )
+        let xiaomiPlan = UsageCardDensityPolicy.compactSpec(
+            providerID: .xiaomi,
+            metadata: ["usageKind": "plan"]
+        )
+        XCTAssertEqual(xiaomiPlan.metricIDs, ["plan-total"])
+        XCTAssertFalse(xiaomiPlan.showsResetTime)
+        XCTAssertEqual(
+            UsageCardDensityPolicy.compactSpec(providerID: .glm, metadata: [:]).metricIDs,
+            ["five-hour", "weekly"]
+        )
+        XCTAssertEqual(
+            UsageCardDensityPolicy.compactSpec(providerID: .volcengine, metadata: [:]).metricIDs,
+            ["fiveHour", "weekly", "monthly"]
+        )
+        XCTAssertEqual(
+            UsageCardDensityPolicy.compactSpec(providerID: .newAPI, metadata: [:]).metricIDs,
+            ["today-token", "one-day-token", "seven-day-token", "thirty-day-token"]
+        )
+        XCTAssertEqual(
+            UsageCardDensityPolicy.compactSpec(providerID: .commandCode, metadata: [:]).metricIDs,
+            ["five-hour", "weekly", "credit-progress"]
+        )
+        XCTAssertTrue(
+            UsageCardDensityPolicy.compactSpec(providerID: .glm, metadata: [:]).showsResetTime
+        )
+    }
+
     func test弹窗为CommandCode接入专用指标视图() throws {
         let source = try String(
             contentsOf: URL(fileURLWithPath: #filePath)
