@@ -822,7 +822,7 @@ final class UsageFormatterTests: XCTestCase {
         XCTAssertFalse(label.contains("周剩余"))
     }
 
-    func test周期套餐可访问性标签包含两个倒计时与分组倍率() throws {
+    func test周期套餐可访问性标签包含两个倒计时且不含分组倍率() throws {
         let now = Date(timeIntervalSince1970: 1_786_320_000)
         let snapshot = UsageSnapshot(
             planName: "Pro",
@@ -860,11 +860,11 @@ final class UsageFormatterTests: XCTestCase {
                 dimension: .fiveHour,
                 now: now
             ),
-            "主账号，已使用 68%，$6.80 / $10.00，5 小时剩余 3小时 45分钟，周剩余 2天 15分钟，Codex ×1、Codex Pro ×2"
+            "主账号，已使用 68%，$6.80 / $10.00，5 小时剩余 3小时 45分钟，周剩余 2天 15分钟"
         )
     }
 
-    func testToken资源包可访问性标签朗读倍率但省略周期倒计时() throws {
+    func testToken资源包可访问性标签省略倍率和周期倒计时() throws {
         let snapshot = UsageSnapshot(
             planName: "资源包",
             kind: .tokenPack,
@@ -890,7 +890,7 @@ final class UsageFormatterTests: XCTestCase {
             dimension: .fiveHour,
         )
 
-        XCTAssertTrue(label.contains("Fast ×1.5"))
+        XCTAssertFalse(label.contains("Fast ×1.5"))
         XCTAssertFalse(label.contains("5 小时剩余"))
         XCTAssertFalse(label.contains("周剩余"))
     }

@@ -26,6 +26,7 @@ struct GeneralSettingsView: View {
                 refreshSection
                 launchSection
                 notificationSection
+                displaySection
                 colorRulesSection
                 backupSection
             }
@@ -137,6 +138,24 @@ struct GeneralSettingsView: View {
                     .toggleStyle(.switch)
                     .labelsHidden()
                     .accessibilityLabel("启用通知")
+            }
+        }
+    }
+
+    private var displaySection: some View {
+        settingSection {
+            HStack(alignment: .center, spacing: 16) {
+                settingLabel(
+                    title: "卡片显示",
+                    message: "简洁模式只保留各供应商最常用的用量信息。"
+                )
+
+                Spacer(minLength: 16)
+
+                UsageCardDensitySegmentedControl(
+                    selection: $settings.usageCardDensity
+                )
+                .accessibilityLabel("卡片显示")
             }
         }
     }
