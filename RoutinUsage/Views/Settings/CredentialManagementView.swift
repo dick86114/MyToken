@@ -224,10 +224,6 @@ struct CredentialManagementView: View {
 
             UsageRowView(
                 state: state,
-                detectionState: .idle,
-                detectionRecord: nil,
-                isAnotherDetectionActive: false,
-                requestDetection: {},
                 actions: nil,
                 refreshCredential: {
                     Task { await environment.refreshCredential(state.configuration.id) }

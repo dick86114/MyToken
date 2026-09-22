@@ -94,13 +94,6 @@ final class CredentialOrderingControllerTests: XCTestCase {
             notificationSender: NotificationSenderFake(),
             defaults: defaults
         )
-        let codexRepository = CodexGroupDetectionRepository(defaults: defaults)
-        try codexRepository.save(Self.makeDetectionRecord(keyID: key.id))
-        let codexDetection = CodexGroupDetectionService(
-            webSession: NoopRoutinGroupDetectionWebSession(),
-            probeClient: NoopCodexGroupProbeClient(),
-            repository: codexRepository
-        )
         let environment = AppEnvironment(
             settings: settings,
             store: store,
@@ -109,7 +102,6 @@ final class CredentialOrderingControllerTests: XCTestCase {
             keyRepository: repository,
             apiClient: ScriptedUsageFetcher(responses: [:]),
             notificationSender: NotificationSenderFake(),
-            codexGroupDetection: codexDetection
         )
         let controller = CredentialOrderingController(
             settings: settings,
@@ -124,35 +116,7 @@ final class CredentialOrderingControllerTests: XCTestCase {
 
         XCTAssertEqual(outcome, .cacheCleanupFailed)
         XCTAssertNil(store.state(for: key.id))
-        XCTAssertNil(codexDetection.record(for: key.id))
         XCTAssertFalse(settings.displayOrder.menuBarCredentialIDs.contains(key.id))
         XCTAssertFalse(settings.displayOrder.popoverCredentialIDs.contains(key.id))
-    }
-
-    private static func makeDetectionRecord(keyID: UUID) -> CodexGroupDetectionRecord {
-        CodexGroupDetectionRecord(
-            keyID: keyID,
-            accountFingerprint: "fingerprint",
-            accountDisplayName: "测试账号",
-            groupName: "测试分组",
-            detectedAt: Date(timeIntervalSince1970: 10_000)
-        )
-    }
-}
-
-private actor NoopRoutinGroupDetectionWebSession: RoutinGroupDetectionWebSessionManaging {
-    func hasAuthenticatedSession() async -> Bool { false }
-    func prepareLogin() async {}
-    func readCurrentAccountIdentity() async throws -> RoutinAccountIdentity {
-        throw RoutinGroupDetectionWebError.accountUnavailable
-    }
-    func findGroupName(marker _: CodexGroupProbeRequestMarker) async throws -> String {
-        throw RoutinGroupDetectionWebError.pageChanged
-    }
-}
-
-private actor NoopCodexGroupProbeClient: CodexGroupProbing {
-    func probe(apiKey _: String, marker _: CodexGroupProbeRequestMarker) async throws {
-        throw CodexGroupProbeError.network
     }
 }

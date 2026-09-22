@@ -60,32 +60,20 @@ final class UsageFormatterTests: XCTestCase {
         XCTAssertEqual(UsageFormatter.exactTokenText(nil), "—")
     }
 
-    func test分组倍率分段仅精确匹配检测分组() {
-        let segments = UsageFormatter.groupMultiplierSegments(
-            [
-                UsageGroupMultiplier(name: "Codex", multiplier: 1.5),
-                UsageGroupMultiplier(name: "Codex Pro", multiplier: 2)
-            ],
-            highlightedGroupName: "Codex"
-        )
-
-        XCTAssertEqual(segments.map(\.text), ["Codex ×1.5", "Codex Pro ×2"])
-        XCTAssertEqual(segments.map(\.isHighlighted), [true, false])
-    }
-
-    func test仅返回检测到的当前分组倍率() {
+    func test分组倍率分段返回全部来源分组() {
         let groups = [
-            UsageGroupMultiplier(name: "XAI 低价", multiplier: 0.5),
-            UsageGroupMultiplier(name: "Codex", multiplier: 1),
+            UsageGroupMultiplier(name: "Codex", multiplier: 1.5),
             UsageGroupMultiplier(name: "Codex Pro", multiplier: 2)
         ]
 
+        let segments = UsageFormatter.groupMultiplierSegments(groups)
+        XCTAssertEqual(segments.map(\.text), ["Codex ×1.5", "Codex Pro ×2"])
+        XCTAssertEqual(segments.map(\.isHighlighted), [false, false])
+
         XCTAssertEqual(
-            UsageFormatter.currentGroupMultiplier(in: groups, matching: "Codex"),
-            UsageGroupMultiplier(name: "Codex", multiplier: 1)
+            UsageFormatter.currentGroupMultiplier(in: groups),
+            UsageGroupMultiplier(name: "Codex", multiplier: 1.5)
         )
-        XCTAssertNil(UsageFormatter.currentGroupMultiplier(in: groups, matching: nil))
-        XCTAssertNil(UsageFormatter.currentGroupMultiplier(in: groups, matching: "不存在"))
     }
 
     func test临近重置的窗口将剩余时间标为绿色() {

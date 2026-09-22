@@ -1,12 +1,10 @@
 package ai.routin.mytoken
 
 import ai.routin.mytoken.domain.model.Credential
-import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.feature.credentials.CredentialEditorScreen
 import ai.routin.mytoken.feature.credentials.CredentialEditorViewModel
 import ai.routin.mytoken.feature.credentials.CredentialListScreen
 import ai.routin.mytoken.feature.credentials.CredentialListViewModel
-import ai.routin.mytoken.feature.credentials.RoutinCheckInLauncher
 import ai.routin.mytoken.feature.credentials.XiaomiCookieReader
 import ai.routin.mytoken.feature.credentials.XiaomiLoginDialog
 import ai.routin.mytoken.feature.credentials.pruneCredential
@@ -60,7 +58,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -306,17 +303,6 @@ fun MyTokenApp(
                     var deletionTarget by remember(current.credentialId) {
                         mutableStateOf<Credential?>(null)
                     }
-                    // Routin credentials get a check-in entry that opens the official
-                    // page in a Custom Tab (no DOM/cookie/password access, no logging).
-                    val context = LocalContext.current
-                    val onCheckIn = card?.credential
-                        ?.takeIf { it.providerId == ProviderId.Routin }
-                        ?.let { credential ->
-                            {
-                                RoutinCheckInLauncher.launch(context, credential)
-                                Unit
-                            }
-                        }
                     CredentialDetailScreen(
                         card = card,
                         lowThresholdPercent = settingsState.notifications.lowThresholdPercent,
@@ -324,7 +310,6 @@ fun MyTokenApp(
                         onRefresh = { card?.let { homeViewModel.refreshCredential(it.credential) } },
                         onEdit = { navigate(AppScreen.Editor(current.credentialId)) },
                         onDelete = { deletionTarget = card?.credential },
-                        onCheckIn = onCheckIn,
                     )
                     deletionTarget?.let { target ->
                         AlertDialog(

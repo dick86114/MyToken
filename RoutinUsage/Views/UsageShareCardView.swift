@@ -367,20 +367,20 @@ struct UsageShareCardView: View {
                     )
                 )
             }
-            if card.groupMultiplierText != nil || card.detectionText != nil {
+            if card.groupMultiplierText != nil {
                 ticketTile(
                     UsageShareMetricItem(
                         id: "codex-group",
                         title: "Codex 分组倍率",
-                        headline: card.groupMultiplierText ?? card.detectionText ?? "—",
+                        headline: card.groupMultiplierText ?? "—",
                         percent: nil,
-                        amountDetails: card.detectionText.map { [$0] } ?? [],
+                        amountDetails: [],
                         timeDetails: [],
                         usedText: nil,
                         limitText: nil,
                         remainingAmountText: nil,
                         resetBadgeText: nil,
-                        companionText: card.detectionText,
+                        companionText: nil,
                         health: .normal,
                         spansFullWidth: false
                     )
@@ -821,12 +821,12 @@ struct UsageShareCardView: View {
                 )
             )
         }
-        if card.groupMultiplierText != nil || card.detectionText != nil {
+        if card.groupMultiplierText != nil {
             items.append(
                 UsageShareMetricItem(
                     id: "codex-group",
                     title: "Codex 分组倍率",
-                    headline: card.groupMultiplierText ?? card.detectionText ?? "—",
+                    headline: card.groupMultiplierText ?? "—",
                     percent: nil,
                     amountDetails: [],
                     timeDetails: [],
@@ -834,7 +834,7 @@ struct UsageShareCardView: View {
                     limitText: nil,
                     remainingAmountText: nil,
                     resetBadgeText: nil,
-                    companionText: card.detectionText,
+                    companionText: nil,
                     health: .normal,
                     spansFullWidth: false
                 )

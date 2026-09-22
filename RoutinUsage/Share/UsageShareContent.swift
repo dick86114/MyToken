@@ -54,7 +54,6 @@ struct UsageShareContent: Equatable, Sendable {
     let cycleRemainingText: String?
     let tokenPercentText: String?
     let groupMultiplierText: String?
-    let detectionText: String?
     let metrics: [UsageShareMetricItem]
     let capturedAt: Date
     let capturedAtText: String
@@ -73,7 +72,6 @@ struct UsageShareDraft: Equatable, Sendable {
     var showsExpiry: Bool
     var showsTokenPercent: Bool
     var showsGroupMultiplier: Bool
-    var showsDetection: Bool
     var showsAmounts: Bool
     var showsResetTimes: Bool
     var showsWatermark: Bool
@@ -92,7 +90,6 @@ struct UsageShareDraft: Equatable, Sendable {
             showsExpiry: content.expiryText != nil || content.cycleRemainingText != nil,
             showsTokenPercent: content.tokenPercentText != nil,
             showsGroupMultiplier: content.groupMultiplierText != nil,
-            showsDetection: content.detectionText != nil,
             showsAmounts: true,
             showsResetTimes: true,
             showsWatermark: true,
@@ -121,7 +118,6 @@ struct UsageShareDraft: Equatable, Sendable {
         showsExpiry = true
         showsTokenPercent = true
         showsGroupMultiplier = true
-        showsDetection = true
         showsAmounts = true
         showsResetTimes = true
         showsWatermark = true
@@ -142,7 +138,6 @@ struct UsageShareRenderedCard: Equatable, Sendable {
     let cycleRemainingText: String?
     let tokenPercentText: String?
     let groupMultiplierText: String?
-    let detectionText: String?
     let metrics: [UsageShareMetricItem]
     let capturedAtText: String
     let showsWatermark: Bool
@@ -156,7 +151,6 @@ struct UsageShareRenderedCard: Equatable, Sendable {
 enum UsageShareContentBuilder {
     static func build(
         state: KeyUsageState,
-        detectionRecord: CodexGroupDetectionRecord? = nil,
         now: Date = .now,
         timeZone: TimeZone = .current
     ) -> UsageShareContent? {
@@ -174,21 +168,13 @@ enum UsageShareContentBuilder {
         let hasSubscriptionDates = snapshot.kind == .periodic
             && (snapshot.subscriptionStartAt != nil || snapshot.subscriptionEndAt != nil)
         let currentGroup = UsageFormatter.currentGroupMultiplier(
-            in: snapshot.groupMultipliers,
-            matching: detectionRecord?.groupName
+            in: snapshot.groupMultipliers
         )
         let tokenPercent: String?
         if let token = snapshot.token, token.percent.isFinite {
             tokenPercent = UsageFormatter.displayPercentText(token.percent)
         } else {
             tokenPercent = nil
-        }
-
-        let detectionText: String?
-        if let groupName = detectionRecord?.groupName, !groupName.isEmpty {
-            detectionText = "Codex 当前分组：\(groupName)"
-        } else {
-            detectionText = nil
         }
 
         let credentialID = state.configuration.id
@@ -208,7 +194,6 @@ enum UsageShareContentBuilder {
             cycleRemainingText: cycleRemainingText(until: snapshot.subscriptionEndAt, now: now, timeZone: timeZone),
             tokenPercentText: tokenPercent,
             groupMultiplierText: currentGroup.map { UsageFormatter.groupMultiplierText([$0]) },
-            detectionText: detectionText,
             metrics: metricItems(
                 snapshot: snapshot,
                 providerID: providerID,
@@ -257,7 +242,6 @@ enum UsageShareContentBuilder {
             cycleRemainingText: (draft.showsSubscriptionDates || draft.showsExpiry) ? content.cycleRemainingText : nil,
             tokenPercentText: draft.showsTokenPercent ? content.tokenPercentText : nil,
             groupMultiplierText: draft.showsGroupMultiplier ? content.groupMultiplierText : nil,
-            detectionText: draft.showsDetection ? content.detectionText : nil,
             metrics: metrics,
             capturedAtText: content.capturedAtText,
             showsWatermark: draft.showsWatermark,
@@ -523,7 +507,6 @@ enum UsageShareContentBuilder {
 
 struct UsageSharePresentation: Identifiable, Equatable {
     let state: KeyUsageState
-    let detectionRecord: CodexGroupDetectionRecord?
 
     var id: UUID { state.configuration.id }
 }

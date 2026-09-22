@@ -128,8 +128,6 @@ final class StatusBarController: NSObject {
             }
             _ = environment.store.states
             _ = environment.updateStatus
-            _ = environment.routinCheckIn.state
-            _ = environment.codexGroupDetection.states
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 self?.synchronizeEnvironmentChanges()
@@ -429,14 +427,12 @@ private struct StatusPopoverContent: View {
     let openSettings: @MainActor () -> Void
 
     var body: some View {
-        UsagePopoverView(
-            store: environment.store,
-            settings: environment.settings,
-            codexGroupDetection: environment.codexGroupDetection,
-            updateStatus: environment.updateStatus,
-            installAvailableUpdate: environment.installAvailableUpdate,
-            startCodexGroupDetection: environment.startCodexGroupDetection(for:),
-            refreshCredential: environment.refreshCredential(_:),
+            UsagePopoverView(
+                store: environment.store,
+                settings: environment.settings,
+                updateStatus: environment.updateStatus,
+                installAvailableUpdate: environment.installAvailableUpdate,
+                refreshCredential: environment.refreshCredential(_:),
             retryCredential: environment.retryCredential(_:),
             openSettings: openSettings
         )

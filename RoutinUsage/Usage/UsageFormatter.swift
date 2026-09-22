@@ -261,23 +261,18 @@ enum UsageFormatter {
     }
 
     static func currentGroupMultiplier(
-        in groups: [UsageGroupMultiplier],
-        matching groupName: String?
+        in groups: [UsageGroupMultiplier]
     ) -> UsageGroupMultiplier? {
-        guard let groupName else {
-            return nil
-        }
-        return groups.first { $0.name == groupName }
+        return groups.first
     }
 
     static func groupMultiplierSegments(
-        _ groups: [UsageGroupMultiplier],
-        highlightedGroupName: String?
+        _ groups: [UsageGroupMultiplier]
     ) -> [GroupMultiplierSegment] {
         groups.map { group in
             GroupMultiplierSegment(
                 text: "\(group.name) ×\(numberText(group.multiplier))",
-                isHighlighted: group.name == highlightedGroupName
+                isHighlighted: false
             )
         }
     }
