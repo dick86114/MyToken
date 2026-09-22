@@ -88,10 +88,20 @@ final class UsagePopoverLayoutTests: XCTestCase {
             encoding: .utf8
         )
 
-        XCTAssertTrue(popover.contains("LazyVGrid(columns: cardColumns, spacing: 8)"))
+        XCTAssertTrue(popover.contains("WaterfallLayout(columns: 2, spacing: 8)"))
         XCTAssertTrue(popover.contains("usageCardDensity == .compact"))
+        XCTAssertTrue(popover.contains("LazyVGrid(columns: [GridItem(.flexible())], spacing: 8)"))
         XCTAssertTrue(popover.contains(".id(settings.usageCardDensity)"))
         XCTAssertTrue(segmented.contains("withAnimation(.spring(response: 0.35, dampingFraction: 0.8))"))
+    }
+
+    func test瀑布流布局按最短列放置卡片() {
+        let layout = WaterfallLayout(columns: 2, spacing: 8)
+
+        XCTAssertEqual(layout.columnWidth(forTotalWidth: 416), 204)
+        XCTAssertEqual(layout.shortestColumnIndex(in: [120, 80]), 1)
+        XCTAssertEqual(layout.shortestColumnIndex(in: [80, 120]), 0)
+        XCTAssertEqual(layout.shortestColumnIndex(in: [60, 60]), 0)
     }
 
     func test弹窗设置按钮复用右键菜单激活逻辑() throws {
