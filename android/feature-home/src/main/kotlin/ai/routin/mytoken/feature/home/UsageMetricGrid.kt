@@ -85,7 +85,8 @@ internal fun formatCompact(value: BigDecimal?): String {
 
 internal fun formatPercent(value: Double?): String {
     if (value == null || !value.isFinite()) return "-"
-    return formatDecimal(BigDecimal.valueOf(value)) + "%"
+    // 与 macOS 端一致：卡片百分比统一四舍五入到整数。
+    return BigDecimal.valueOf(value).setScale(0, RoundingMode.HALF_UP).toPlainString() + "%"
 }
 
 internal fun progressPercent(metric: UsageMetric): Double? {

@@ -23,16 +23,31 @@ private struct LiquidGlassSurfaceModifier: ViewModifier {
 
 /// 为整个窗口提供透亮底层，窗口内的卡片继续使用独立玻璃表面。
 private struct LiquidGlassWindowBackgroundModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+
     @ViewBuilder
     func body(content: Content) -> some View {
+        let isDark = colorScheme == .dark
         if #available(macOS 26.0, *) {
             content.background {
                 Rectangle()
                     .fill(.clear)
-                    .glassEffect(.regular.tint(.white.opacity(0.10)), in: Rectangle())
+                    .glassEffect(
+                        .regular.tint(
+                            isDark
+                                ? CompactPopoverPalette.darkCanvas.opacity(0.60)
+                                : .white.opacity(0.10)
+                        ),
+                        in: Rectangle()
+                    )
             }
         } else {
-            content.background(.regularMaterial)
+            content
+                .background(.regularMaterial)
+                .background {
+                    Rectangle()
+                        .fill(isDark ? CompactPopoverPalette.darkCanvas.opacity(0.55) : .clear)
+                }
         }
     }
 }

@@ -47,9 +47,9 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(app.contains("nonisolated static let websiteURL"))
         XCTAssertTrue(popover.contains("Link(destination: RoutinUsageApp.websiteURL)"))
         XCTAssertTrue(popover.contains("Image(nsImage: NSImage(named: \"PopoverColorBrandLogo\")"))
-        XCTAssertTrue(popover.contains("frame(width: 32, height: 32)"))
+        XCTAssertTrue(popover.contains("frame(width: 36, height: 36)"))
         XCTAssertTrue(popover.contains("strokeBorder("))
-        XCTAssertTrue(popover.contains(".shadow(color: .white.opacity(0.16)"))
+        XCTAssertTrue(popover.contains(".shadow(color: Color.black.opacity(0.25)"))
         XCTAssertTrue(popover.contains("repeatForever"))
         XCTAssertTrue(popover.contains("打开 MyToken 官网"))
         XCTAssertTrue(popover.contains(".overlay(alignment: .center)"))
@@ -275,7 +275,9 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(row.contains("RefreshingCardBorder"))
         XCTAssertTrue(row.contains("TimelineView(.animation"))
         XCTAssertTrue(row.contains("refreshFailureIndicator"))
-        XCTAssertTrue(row.contains("exclamationmark.triangle.fill"))
+        XCTAssertTrue(row.contains("avatarWithStatus"))
+        XCTAssertTrue(row.contains("Image(systemName: \"exclamationmark\")"))
+        XCTAssertTrue(row.contains("RefreshFailurePopover"))
         XCTAssertTrue(row.contains("UsageFormatter.refreshFailureTooltip"))
         XCTAssertFalse(row.contains("clock.badge.exclamationmark"))
     }
@@ -651,11 +653,22 @@ final class ProjectBootstrapTests: XCTestCase {
 
     func test更新弹窗操作按钮整块可点击() throws {
         let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
-        let phase = try XCTUnwrap(popover.range(of: "Text(\"取消\")"))
-        let end = try XCTUnwrap(popover.range(of: ".font(.callout.weight(.medium))", range: phase.upperBound..<popover.endIndex))
+        let phase = try XCTUnwrap(popover.range(of: "ghostButton(title: \"稍后更新\""))
+        let end = try XCTUnwrap(popover.range(of: "private var publishedText"))
         let actionButtons = popover[phase.lowerBound..<end.lowerBound]
 
         XCTAssertEqual(actionButtons.components(separatedBy: ".contentShape(Rectangle())").count - 1, 2)
+    }
+
+    func test更新弹窗使用版本徽章并随系统深浅色() throws {
+        let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
+
+        XCTAssertTrue(popover.contains("发现新版本"))
+        XCTAssertFalse(popover.contains("更新日志 & 优化项目"))
+        XCTAssertTrue(popover.contains("UpdateNotesView(notes: update.notes)"))
+        XCTAssertTrue(popover.contains("稍后更新"))
+        XCTAssertTrue(popover.contains("立即更新"))
+        XCTAssertFalse(popover.contains(".environment(\\.colorScheme, .light)"))
     }
 
     func testAndroid卡片失败标识与刷新按钮同处标题区() throws {
@@ -672,12 +685,15 @@ final class ProjectBootstrapTests: XCTestCase {
                 .appendingPathComponent("android/feature-credentials/src/main/kotlin/ai/routin/mytoken/feature/credentials/XiaomiLoginDialog.kt"),
             encoding: .utf8
         )
-        let headerStart = try XCTUnwrap(card.range(of: "modifier = Modifier.fillMaxWidth(),\n                verticalAlignment = Alignment.Top,"))
-        let metricsStart = try XCTUnwrap(card.range(of: "val metrics = card.snapshot?.metrics.orEmpty()"))
-        let header = card[headerStart.lowerBound..<metricsStart.lowerBound]
+        // 失败徽章改挂头像后，标题区改为 CredentialCardHeader：头像徽章在左，刷新按钮在右。
+        let headerStart = try XCTUnwrap(card.range(of: "CredentialCardHeader("))
+        let avatarCallIndex = try XCTUnwrap(card.range(of: "AvatarWithFailureBadge(card = card"))
+        let refreshTagIndex = try XCTUnwrap(card.range(of: "credential_refresh_${card.credential.id}"))
+        let header = card[headerStart.lowerBound..<refreshTagIndex.lowerBound]
 
-        XCTAssertTrue(header.contains("credential_failure_"))
-        XCTAssertTrue(header.contains("credential_refresh_"))
+        XCTAssertTrue(header.contains("AvatarWithFailureBadge(card = card"))
+        XCTAssertTrue(card.contains("credential_failure_${card.credential.id}"))
+        XCTAssertTrue(avatarCallIndex.lowerBound < refreshTagIndex.lowerBound)
         XCTAssertTrue(card.contains("widthIn(max = 96.dp)"))
         XCTAssertTrue(dialog.contains("WebSettings.LOAD_NO_CACHE"))
         XCTAssertTrue(dialog.contains("removeAllCookies"))

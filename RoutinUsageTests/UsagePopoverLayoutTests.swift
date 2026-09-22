@@ -72,7 +72,7 @@ final class UsagePopoverLayoutTests: XCTestCase {
         XCTAssertTrue(segmentedIndex < gearIndex)
     }
 
-    func test弹窗简洁模式两列排布并带切换动画() throws {
+    func test弹窗简洁模式单列排布并带切换动画() throws {
         let popover = try String(
             contentsOf: URL(fileURLWithPath: #filePath)
                 .deletingLastPathComponent()
@@ -88,9 +88,10 @@ final class UsagePopoverLayoutTests: XCTestCase {
             encoding: .utf8
         )
 
-        XCTAssertTrue(popover.contains("WaterfallLayout(columns: 2, spacing: 8)"))
         XCTAssertTrue(popover.contains("usageCardDensity == .compact"))
+        XCTAssertTrue(popover.contains("LazyVGrid(columns: [GridItem(.flexible())], spacing: 14)"))
         XCTAssertTrue(popover.contains("LazyVGrid(columns: [GridItem(.flexible())], spacing: 8)"))
+        XCTAssertFalse(popover.contains("WaterfallLayout(columns: 2, spacing: 8)"))
         XCTAssertTrue(popover.contains(".id(settings.usageCardDensity)"))
         XCTAssertTrue(segmented.contains("withAnimation(.spring(response: 0.35, dampingFraction: 0.8))"))
     }
@@ -102,6 +103,44 @@ final class UsagePopoverLayoutTests: XCTestCase {
         XCTAssertEqual(layout.shortestColumnIndex(in: [120, 80]), 1)
         XCTAssertEqual(layout.shortestColumnIndex(in: [80, 120]), 0)
         XCTAssertEqual(layout.shortestColumnIndex(in: [60, 60]), 0)
+    }
+
+    func test供应商筛选使用自定义玻璃胶囊() throws {
+        let source = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/ProviderFilterMenu.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(source.contains("chevron.down"))
+        XCTAssertTrue(source.contains(".buttonStyle(.plain)"))
+        XCTAssertTrue(source.contains(".menuIndicator(.hidden)"))
+        XCTAssertFalse(source.contains("chevron.up.chevron.down"))
+        XCTAssertFalse(source.contains(".menuStyle(.borderlessButton)"))
+        XCTAssertTrue(source.contains("cornerRadius: 9"))
+    }
+
+    func test卡片装饰层关闭命中测试且列表切换不带动画() throws {
+        let row = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/UsageRowView.swift"),
+            encoding: .utf8
+        )
+        let popover = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/UsagePopoverView.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(row.contains(".allowsHitTesting(false)"))
+        XCTAssertFalse(row.contains(".frame(maxWidth: .infinity, maxHeight: .infinity"))
+        XCTAssertTrue(popover.contains(".transaction { $0.animation = nil }"))
     }
 
     func test弹窗设置按钮复用右键菜单激活逻辑() throws {

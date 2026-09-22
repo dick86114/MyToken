@@ -333,7 +333,7 @@ object UsageShareContentBuilder {
 
     private fun displayPercent(value: Double?): String {
         value ?: return "—"
-        val rounded = BigDecimal(value).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros()
+        val rounded = BigDecimal(value).setScale(0, RoundingMode.HALF_UP)
         return "${rounded.toPlainString()}%"
     }
 

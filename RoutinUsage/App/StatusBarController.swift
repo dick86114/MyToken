@@ -236,6 +236,9 @@ final class StatusBarController: NSObject {
         }
         let contentSize = popoverContentSize(for: button)
         popover.contentSize = contentSize
+        // accessory 应用默认 inactive：首次点击 Menu 会被系统吞掉用于激活，
+        // 导致供应商下拉需要点两次。展示弹窗前手动激活即可一次生效。
+        NSApp.activate(ignoringOtherApps: true)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         configurePopoverWindow(contentSize: contentSize, anchoredTo: button)
     }
@@ -260,6 +263,7 @@ final class StatusBarController: NSObject {
             window.contentViewController?.preferredContentSize = refreshedSize
             window.setContentSize(refreshedSize)
             self.positionPopoverWindow(window, anchoredTo: button)
+            window.makeKeyAndOrderFront(nil)
         }
 
         if let popoverWindowResignObserver {

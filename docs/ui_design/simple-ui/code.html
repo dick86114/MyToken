@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<title>账户用量监控 - Account Usage Monitor</title>
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"', '"SF Pro"', '"Helvetica Neue"', 'Helvetica', '"PingFang SC"', '"Hiragino Sans GB"', '"Microsoft YaHei"', 'sans-serif'],
+            mono: ['"SF Mono"', 'SFMono-Regular', 'ui-monospace', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+          },
+          colors: {
+            apple: {
+              gray: '#86868b',
+              subtext: '#6e6e73',
+              dark: '#1d1d1f',
+              blue: '#0071e3',
+              red: '#ff3b30',
+              emerald: '#34c759',
+              orange: '#ff9500',
+            }
+          }
+        }
+      }
+    }
+  </script>
+<!-- BEGIN: Apple HIG / macOS Liquid Glass Style Tokens -->
+<style data-purpose="macos-hig-glassmorphism">
+    /* High-end macOS Sonoma / Tahoe wallpaper luminous mesh ambient background */
+    body {
+      background-color: #eef2f6;
+      background-image: 
+        radial-gradient(at 15% 15%, rgba(199, 219, 248, 0.7) 0px, transparent 50%),
+        radial-gradient(at 85% 10%, rgba(224, 214, 248, 0.6) 0px, transparent 48%),
+        radial-gradient(at 50% 50%, rgba(238, 244, 252, 0.8) 0px, transparent 65%),
+        radial-gradient(at 10% 80%, rgba(204, 238, 242, 0.65) 0px, transparent 55%),
+        radial-gradient(at 90% 85%, rgba(210, 230, 250, 0.6) 0px, transparent 50%);
+      background-attachment: fixed;
+      min-height: 100vh;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* macOS Precision Acrylic Glass Window System */
+    .macos-window {
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(28px) saturate(190%);
+      -webkit-backdrop-filter: blur(28px) saturate(190%);
+      border: 1px solid rgba(255, 255, 255, 0.82);
+      box-shadow: 
+        0 1px 1px 0 rgba(255, 255, 255, 0.9) inset,
+        0 8px 24px -4px rgba(15, 30, 50, 0.05),
+        0 2px 6px -1px rgba(15, 30, 50, 0.03);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    
+    .macos-window:hover {
+      background: rgba(255, 255, 255, 0.82);
+      border-color: rgba(255, 255, 255, 0.95);
+      box-shadow: 
+        0 1px 1px 0 rgba(255, 255, 255, 1) inset,
+        0 14px 30px -6px rgba(15, 30, 50, 0.08),
+        0 4px 10px -2px rgba(15, 30, 50, 0.03);
+    }
+
+    /* macOS Segmented Control Capsule */
+    .macos-segmented {
+      background: rgba(0, 0, 0, 0.06);
+      box-shadow: inset 0 0.5px 1.5px rgba(0, 0, 0, 0.12);
+    }
+    .macos-seg-active {
+      background: #ffffff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0.5px 1px rgba(0, 0, 0, 0.08);
+    }
+
+    /* macOS HIG Circular Action Buttons */
+    .macos-action-btn {
+      background: rgba(0, 0, 0, 0.035);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      color: #64748b;
+      transition: all 0.15s ease;
+    }
+    .macos-action-btn:hover {
+      background: rgba(255, 255, 255, 0.9);
+      color: #0f172a;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    }
+    .macos-action-btn:active {
+      transform: scale(0.92);
+      background: rgba(0, 0, 0, 0.08);
+    }
+
+    /* Tabular figures for Apple Pro Productivity data display */
+    .t-num {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Horizontal Metric Badge Items */
+    .metric-gauge-item {
+      background: rgba(255, 255, 255, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+  </style>
+<!-- END: Apple HIG / macOS Liquid Glass Style Tokens -->
+</head>
+<body class="text-[#1d1d1f] antialiased selection:bg-blue-500/20 selection:text-blue-900 pb-28">
+<!-- Mobile Viewport Shell -->
+<div class="max-w-[480px] mx-auto min-h-screen px-3.5 pt-3.5 flex flex-col justify-between relative">
+<!-- BEGIN: TopHeaderNavigation -->
+<header class="w-full mb-4 px-0.5" data-purpose="top-navigation">
+<div class="flex items-center justify-between gap-2">
+<!-- Version Pill (macOS Capsule Badge) -->
+<div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/70 border border-white/80 shadow-[0_1px_3px_rgba(0,0,0,0.04),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-xl text-[11px] font-semibold text-slate-600 tracking-tight">
+<svg class="w-3 h-3 text-slate-400 stroke-[2.2]" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" viewbox="0 0 24 24">
+<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+<line x1="7" x2="7.01" y1="7" y2="7"></line>
+</svg>
+<span class="t-num font-mono text-[11px] text-slate-700">v5.4.4</span>
+</div>
+<!-- Center App Brand Icon (macOS App Icon squircle aesthetic) -->
+<div class="flex items-center justify-center">
+<div class="w-9 h-9 rounded-2xl overflow-hidden shadow-[0_4px_12px_rgba(15,23,42,0.25),0_1px_2px_rgba(0,0,0,0.1)] ring-1 ring-white/40 active:scale-95 transition-transform cursor-pointer flex items-center justify-center bg-slate-900"><img alt="App Icon" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAo2YVpmtzK4BU1k-xb71fDVXh47tTHC_3_oEPyp6HW63chCl63dlY0aaEtiWyX0YCfuor1VLjLrUumYJnx4U5V3IhKZz4z7kh_6aA6sPWJnNV2RZ2QjHlBOn9LWgKUuS3MyZlh4xDArrIYBycTUlQXXrdi0ZzNSb5XczWV8xkAqTHdDaxaISf_vFoDLMUw5PqCYqCUV9Wck3Hwh_iRu8q7pw3hd8aM9Be6ZjwLvH4HNxP_XWvqVLK-lvigGVvdoW4jiQ"/></div>
+</div>
+<!-- Mode Segmented Switch & Settings Icon -->
+<div class="flex items-center gap-1.5">
+<!-- macOS Native Segmented Control -->
+<div class="macos-segmented p-0.5 rounded-[9px] flex items-center backdrop-blur-md">
+<button class="macos-seg-active px-2.5 py-1 rounded-[7px] text-slate-800 text-[11px] font-medium tracking-tight transition-all">简洁</button>
+<button class="px-2.5 py-1 rounded-[7px] text-slate-500 hover:text-slate-900 text-[11px] font-medium tracking-tight transition-all">完整</button>
+</div>
+<!-- Settings Button (macOS Circular Control) -->
+<button aria-label="Settings" class="macos-action-btn w-7 h-7 rounded-full flex items-center justify-center shadow-xs">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="3"></circle>
+<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+</svg>
+</button>
+</div>
+</div>
+</header>
+<!-- END: TopHeaderNavigation -->
+<!-- BEGIN: PageTitleAndFilter -->
+<section class="mb-3.5 px-1" data-purpose="title-and-filter">
+<div class="flex items-end justify-between">
+<div>
+<div class="flex items-center gap-2">
+<h1 class="text-[23px] font-bold tracking-tight text-[#1d1d1f] font-sans">
+              账户用量
+            </h1>
+<span class="inline-flex items-center text-[11px] font-medium text-emerald-700 bg-emerald-500/10 border border-emerald-600/20 px-2 py-0.5 rounded-full shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)] backdrop-blur-sm t-num">
+              8 个 Key
+            </span>
+</div>
+</div>
+<!-- Supplier Filter Dropdown Button (macOS PopUp Menu Style) -->
+<button class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[9px] bg-white/70 border border-white/80 shadow-[0_1px_2px_rgba(0,0,0,0.04),inset_0_1px_1px_rgba(255,255,255,0.9)] backdrop-blur-xl text-xs font-medium text-slate-700 active:scale-95 transition-all hover:bg-white/90">
+<svg class="w-3 h-3 text-slate-400 stroke-[2.2]" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" viewbox="0 0 24 24">
+<polyline points="6 9 12 15 18 9"></polyline>
+</svg>
+<span class="text-[11px] font-medium tracking-tight">供应商：全部</span>
+</button>
+</div>
+</section>
+<!-- END: PageTitleAndFilter -->
+<!-- BEGIN: MonitorCardMatrixGrid (Single Column Full-Width Cards) -->
+<main class="flex flex-col gap-3.5" data-purpose="metrics-dashboard-grid">
+<!-- Card 1: 武 (GLM Coding Plan - High Alert 96% & 19%) -->
+<article class="macos-window rounded-2xl p-3.5 relative overflow-hidden" data-purpose="account-card">
+<div class="absolute -top-10 -right-10 w-28 h-28 bg-red-500/10 rounded-full blur-xl pointer-events-none"></div>
+<!-- Header -->
+<div class="flex items-center justify-between pb-2.5 border-b border-black/[0.04] relative z-10">
+<div class="flex items-center gap-2.5">
+<div class="w-7 h-7 rounded-xl bg-emerald-500/15 text-emerald-800 border border-emerald-500/30 flex items-center justify-center font-bold text-xs shadow-xs">
+        武
+      </div>
+<div>
+<div class="flex items-center gap-2">
+<h2 class="text-[13px] font-semibold text-slate-900 leading-tight">武</h2>
+<span class="text-[10px] text-red-500 font-medium bg-red-500/10 px-1.5 py-0.2 rounded border border-red-500/20">即将耗尽</span>
+</div>
+<p class="text-[10.5px] font-medium text-[#86868b] tracking-tight mt-0.5">GLM · Coding Plan</p>
+</div>
+</div>
+<div class="flex items-center gap-1.5">
+<button aria-label="Share" class="macos-action-btn w-6 h-6 rounded-full flex items-center justify-center">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" x2="12" y1="2" y2="15"></line></svg>
+</button>
+<button aria-label="Refresh" class="macos-action-btn w-6 h-6 rounded-full flex items-center justify-center">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+</button>
+</div>
+</div>
+<!-- Metrics Horizontal Grid -->
+<div class="grid grid-cols-2 gap-2.5 mt-2.5 relative z-10">
+<!-- Item 1: 5 小时用量 (96%) -->
+<div class="metric-gauge-item rounded-xl p-2.5 flex items-center gap-3">
+<div class="relative w-11 h-11 flex-shrink-0 flex items-center justify-center">
+<svg class="w-11 h-11 -rotate-90" viewbox="0 0 36 36">
+<path class="text-slate-200/80" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.6"></path>
+<path class="text-red-500 drop-shadow-[0_0_5px_rgba(239,68,68,0.7)]" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="96, 100" stroke-linecap="round" stroke-width="3.6"></path>
+</svg>
+<span class="absolute text-[10px] font-bold text-red-500 font-mono t-num">96%</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="text-[11px] font-medium text-slate-700 flex items-center gap-1 leading-tight">
+<span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+          5 小时用量
+        </div>
+<div class="text-[10px] text-slate-400 font-mono tracking-tight t-num mt-1">重置 17:39</div>
+</div>
+</div>
+<!-- Item 2: 每周用量 (19%) -->
+<div class="metric-gauge-item rounded-xl p-2.5 flex items-center gap-3">
+<div class="relative w-11 h-11 flex-shrink-0 flex items-center justify-center">
+<svg class="w-11 h-11 -rotate-90" viewbox="0 0 36 36">
+<path class="text-slate-200/80" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.6"></path>
+<path class="text-emerald-500 drop-shadow-[0_0_4px_rgba(16,185,129,0.5)]" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="19, 100" stroke-linecap="round" stroke-width="3.6"></path>
+</svg>
+<span class="absolute text-[10px] font-bold text-slate-800 font-mono t-num">19%</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="text-[11px] font-medium text-slate-700 leading-tight">每周用量</div>
+<div class="text-[10px] text-slate-400 font-mono tracking-tight t-num mt-1">重置 09-29 09:08</div>
+</div>
+</div>
+</div>
+</article>
+<!-- Card 2: 洋 (GLM Coding Plan - 0% & 37%) -->
+<article class="macos-window rounded-2xl p-3.5 relative overflow-hidden" data-purpose="account-card">
+<!-- Header -->
+<div class="flex items-center justify-between pb-2.5 border-b border-black/[0.04]">
+<div class="flex items-center gap-2.5">
+<div class="w-7 h-7 rounded-xl bg-teal-500/15 text-teal-800 border border-teal-500/30 flex items-center justify-center font-bold text-xs shadow-xs">
+        洋
+      </div>
+<div>
+<h2 class="text-[13px] font-semibold text-slate-900 leading-tight">洋</h2>
+<p class="text-[10.5px] font-medium text-[#86868b] tracking-tight mt-0.5">GLM · Coding Plan</p>
+</div>
+</div>
+<div class="flex items-center gap-1.5">
+<button aria-label="Share" class="macos-action-btn w-6 h-6 rounded-full flex items-center justify-center">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" x2="12" y1="2" y2="15"></line></svg>
+</button>
+<button aria-label="Refresh" class="macos-action-btn w-6 h-6 rounded-full flex items-center justify-center">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+</button>
+</div>
+</div>
+<!-- Metrics Horizontal Grid -->
+<div class="grid grid-cols-2 gap-2.5 mt-2.5">
+<!-- Item 1: 5 小时用量 (0%) -->
+<div class="metric-gauge-item rounded-xl p-2.5 flex items-center gap-3">
+<div class="relative w-11 h-11 flex-shrink-0 flex items-center justify-center">
+<svg class="w-11 h-11 -rotate-90" viewbox="0 0 36 36">
+<path class="text-slate-200/80" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.6"></path>
+</svg>
+<span class="absolute text-[10px] font-semibold text-slate-400 font-mono t-num">0%</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="text-[11px] font-medium text-slate-700 leading-tight">5 小时用量</div>
+<div class="text-[10px] text-slate-400 font-mono tracking-tight t-num mt-1">待命中</div>
+</div>
+</div>
+<!-- Item 2: 每周用量 (37%) -->
+<div class="metric-gauge-item rounded-xl p-2.5 flex items-center gap-3">
+<div class="relative w-11 h-11 flex-shrink-0 flex items-center justify-center">
+<svg class="w-11 h-11 -rotate-90" viewbox="0 0 36 36">
+<path class="text-slate-200/80" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.6"></path>
+<path class="text-emerald-500 drop-shadow-[0_0_4px_rgba(16,185,129,0.6)]" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="37, 100" stroke-linecap="round" stroke-width="3.6"></path>
+</svg>
+<span class="absolute text-[10px] font-bold text-slate-800 font-mono t-num">37%</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="text-[11px] font-medium text-slate-700 leading-tight">每周用量</div>
+<div class="text-[10px] text-slate-400 font-mono tracking-tight t-num mt-1">重置 09-28 17:19</div>
+</div>
+</div>
+</div>
+</article>
+<!-- Card 3: 文 (火山方舟 Pro Plan - 3 Metrics: 21.34%, 12.17%, 29.74%) -->
+<article class="macos-window rounded-2xl p-3.5 relative overflow-hidden" data-purpose="account-card">
+<!-- Header -->
+<div class="flex items-center justify-between pb-2.5 border-b border-black/[0.04]">
+<div class="flex items-center gap-2.5">
+<div class="w-7 h-7 rounded-xl bg-orange-500/15 text-orange-700 border border-orange-500/30 flex items-center justify-center font-bold text-xs shadow-xs">
+        文
+      </div>
+<div>
+<h2 class="text-[13px] font-semibold text-slate-900 leading-tight">文</h2>
+<p class="text-[10.5px] font-medium text-[#86868b] tracking-tight mt-0.5">火山方舟 · Pro Plan</p>
+</div>
+</div>
+<div class="flex items-center gap-1.5">
+<button aria-label="Share" class="macos-action-btn w-6 h-6 rounded-full flex items-center justify-center">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" x2="12" y1="2" y2="15"></line></svg>
+</button>
+<button aria-label="Refresh" class="macos-action-btn w-6 h-6 rounded-full flex items-center justify-center">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+</button>
+</div>
+</div>
+<!-- Metrics Horizontal Grid: 3 columns -->
+<div class="grid grid-cols-3 gap-2 mt-2.5">
+<!-- Item 1: 近 5 小时用量 (21.34%) -->
+<div class="metric-gauge-item rounded-xl p-2 flex flex-col items-center text-center">
+<div class="relative w-10 h-10 flex-shrink-0 flex items-center justify-center mb-1.5">
+<svg class="w-10 h-10 -rotate-90" viewbox="0 0 36 36">
+<path class="text-slate-200/80" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.6"></path>
+<path class="text-emerald-500 drop-shadow-[0_0_4px_rgba(16,185,129,0.5)]" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="21.34, 100" stroke-linecap="round" stroke-width="3.6"></path>
+</svg>
+<span class="absolute text-[8.5px] font-bold text-slate-800 font-mono t-num">21.3%</span>
+</div>
+<div class="text-[10px] font-medium text-slate-700 leading-tight">近 5 小时用量</div>
+<div class="text-[9px] text-slate-400 font-mono tracking-tight t-num mt-0.5 truncate w-full">重置 17:22</div>
+</div>
+<!-- Item 2: 近一周用量 (12.17%) -->
+<div class="metric-gauge-item rounded-xl p-2 flex flex-col items-center text-center">
+<div class="relative w-10 h-10 flex-shrink-0 flex items-center justify-center mb-1.5">
+<svg class="w-10 h-10 -rotate-90" viewbox="0 0 36 36">
+<path class="text-slate-200/80" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.6"></path>
+<path class="text-emerald-500 drop-shadow-[0_0_4px_rgba(16,185,129,0.5)]" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="12.17, 100" stroke-linecap="round" stroke-width="3.6"></path>
+</svg>
+<span class="absolute text-[8.5px] font-bold text-slate-800 font-mono t-num">12.2%</span>
+</div>
+<div class="text-[10px] font-medium text-slate-700 leading-tight">近一周用量</div>
+<div class="text-[9px] text-slate-400 font-mono tracking-tight t-num mt-0.5 truncate w-full">09-28 00:00</div>
+</div>
+<!-- Item 3: 近一月用量 (29.74%) -->
+<div class="metric-gauge-item rounded-xl p-2 flex flex-col items-center text-center">
+<div class="relative w-10 h-10 flex-shrink-0 flex items-center justify-center mb-1.5">
+<svg class="w-10 h-10 -rotate-90" viewbox="0 0 36 36">
+<path class="text-slate-200/80" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.6"></path>
+<path class="text-teal-500 drop-shadow-[0_0_4px_rgba(20,184,166,0.5)]" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="29.74, 100" stroke-linecap="round" stroke-width="3.6"></path>
+</svg>
+<span class="absolute text-[8.5px] font-bold text-slate-800 font-mono t-num">29.7%</span>
+</div>
+<div class="text-[10px] font-medium text-slate-700 leading-tight">近一月用量</div>
+<div class="text-[9px] text-slate-400 font-mono tracking-tight t-num mt-0.5 truncate w-full">10-09 23:59</div>
+</div>
+</div>
+</article>
+<!-- Card 4: 邵 (Command Code GOAT - 3 Metrics: 0%, 39.49%, 69.74%) -->
+<article class="macos-window rounded-2xl p-3.5 relative overflow-hidden" data-purpose="account-card">
+<!-- Header -->
+<div class="flex items-center justify-between pb-2.5 border-b border-black/[0.04]">
+<div class="flex items-center gap-2.5">
+<div class="w-7 h-7 rounded-xl bg-sky-500/15 text-sky-800 border border-sky-500/30 flex items-center justify-center font-bold text-xs shadow-xs">
+        邵
+      </div>
+<div>
+<h2 class="text-[13px] font-semibold text-slate-900 leading-tight">邵</h2>
+<p class="text-[10.5px] font-medium text-[#86868b] tracking-tight mt-0.5">Command Code · GOAT</p>
+</div>
+</div>
+<div class="flex items-center gap-1.5">
+<button aria-label="Share" class="macos-action-btn w-6 h-6 rounded-full flex items-center justify-center">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" x2="12" y1="2" y2="15"></line></svg>
+</button>
+<button aria-label="Refresh" class="macos-action-btn w-6 h-6 rounded-full flex items-center justify-center">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+</button>
+</div>
+</div>
+<!-- Metrics Horizontal Grid: 3 columns -->
+<div class="grid grid-cols-3 gap-2 mt-2.5">
+<!-- Item 1: 5 小时 (0%) -->
+<div class="metric-gauge-item rounded-xl p-2 flex flex-col items-center text-center">
+<div class="relative w-10 h-10 flex-shrink-0 flex items-center justify-center mb-1.5">
+<svg class="w-10 h-10 -rotate-90" viewbox="0 0 36 36">
+<path class="text-slate-200/80" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.6"></path>
+</svg>
+<span class="absolute text-[8.5px] font-semibold text-slate-400 font-mono t-num">0%</span>
+</div>
+<div class="text-[10px] font-medium text-slate-700 leading-tight">5 小时</div>
+<div class="text-[9px] text-slate-400 font-mono tracking-tight t-num mt-0.5 truncate w-full">01-01 08:00</div>
+</div>
+<!-- Item 2: 周 (39.49%) -->
+<div class="metric-gauge-item rounded-xl p-2 flex flex-col items-center text-center">
+<div class="relative w-10 h-10 flex-shrink-0 flex items-center justify-center mb-1.5">
+<svg class="w-10 h-10 -rotate-90" viewbox="0 0 36 36">
+<path class="text-slate-200/80" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.6"></path>
+<path class="text-emerald-500 drop-shadow-[0_0_4px_rgba(16,185,129,0.5)]" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="39.49, 100" stroke-linecap="round" stroke-width="3.6"></path>
+</svg>
+<span class="absolute text-[8.5px] font-bold text-slate-800 font-mono t-num">39.5%</span>
+</div>
+<div class="text-[10px] font-medium text-slate-700 leading-tight">周</div>
+<div class="text-[9px] text-slate-400 font-mono tracking-tight t-num mt-0.5 truncate w-full">09-24 18:29</div>
+</div>
+<!-- Item 3: 月 (69.74% - High Amber) -->
+<div class="metric-gauge-item rounded-xl p-2 flex flex-col items-center text-center border-orange-500/25 bg-orange-500/[0.04]">
+<div class="relative w-10 h-10 flex-shrink-0 flex items-center justify-center mb-1.5">
+<svg class="w-10 h-10 -rotate-90" viewbox="0 0 36 36">
+<path class="text-slate-200/80" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.6"></path>
+<path class="text-amber-500 drop-shadow-[0_0_5px_rgba(245,158,11,0.6)]" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="69.74, 100" stroke-linecap="round" stroke-width="3.6"></path>
+</svg>
+<span class="absolute text-[8.5px] font-bold text-amber-600 font-mono t-num">69.7%</span>
+</div>
+<div class="text-[10px] font-medium text-amber-600 leading-tight flex items-center gap-1">
+<span class="w-1 h-1 rounded-full bg-amber-500"></span>月
+      </div>
+<div class="text-[9px] text-amber-600/80 font-mono tracking-tight t-num mt-0.5 truncate w-full">中高负荷</div>
+</div>
+</div>
+</article>
+<!-- Card 5: 亮 (DeepSeek API Balance - Full Width Horizontal Layout) -->
+<article class="macos-window rounded-2xl p-3.5 relative overflow-hidden group hover:border-emerald-500/30 transition-all" data-purpose="balance-card">
+<div class="absolute -bottom-8 -right-8 w-28 h-28 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
+<svg class="absolute bottom-0 left-0 right-0 w-full h-10 text-emerald-500/10 pointer-events-none" fill="currentColor" preserveaspectratio="none" viewbox="0 0 100 40">
+<path d="M0,35 Q25,12 55,26 T100,10 L100,40 L0,40 Z"></path>
+</svg>
+<div class="flex items-center justify-between relative z-10">
+<!-- Left: Account Info -->
+<div class="flex items-center gap-2.5">
+<div class="w-7 h-7 rounded-xl bg-indigo-500/15 text-indigo-700 border border-indigo-500/30 flex items-center justify-center font-bold text-xs shadow-xs">
+        亮
+      </div>
+<div>
+<h2 class="text-[13px] font-semibold text-slate-900 leading-tight">亮</h2>
+<p class="text-[10.5px] font-medium text-[#86868b] tracking-tight mt-0.5">DeepSeek · API 余额</p>
+</div>
+</div>
+<!-- Center: Balance Value -->
+<div class="text-center px-2">
+<div class="text-[10px] text-[#86868b] font-medium">余额</div>
+<div class="text-[20px] font-bold text-emerald-600 tracking-tight font-sans t-num drop-shadow-[0_1px_6px_rgba(16,185,129,0.25)] leading-tight">
+        ¥26.62
+      </div>
+</div>
+<!-- Right: Badge & Actions -->
+<div class="flex items-center gap-2">
+<span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 font-medium">充足</span>
+<div class="flex items-center gap-1">
+<button aria-label="Share" class="macos-action-btn w-6 h-6 rounded-full flex items-center justify-center">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" x2="12" y1="2" y2="15"></line></svg>
+</button>
+<button aria-label="Refresh" class="macos-action-btn w-6 h-6 rounded-full flex items-center justify-center">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+</button>
+</div>
+</div>
+</div>
+</article>
+<!-- Card 6: 熠 (Routin 成长版 - 2 Metrics: 31.42% & 48.79%) -->
+<article class="macos-window rounded-2xl p-3.5 relative overflow-hidden" data-purpose="account-card">
+<!-- Header -->
+<div class="flex items-center justify-between pb-2.5 border-b border-black/[0.04]">
+<div class="flex items-center gap-2.5">
+<div class="w-7 h-7 rounded-xl bg-cyan-500/15 text-cyan-800 border border-cyan-500/30 flex items-center justify-center font-bold text-xs shadow-xs">
+        熠
+      </div>
+<div>
+<h2 class="text-[13px] font-semibold text-slate-900 leading-tight">熠</h2>
+<p class="text-[10.5px] font-medium text-[#86868b] tracking-tight mt-0.5">Routin · 成长版</p>
+</div>
+</div>
+<div class="flex items-center gap-1.5">
+<button aria-label="Share" class="macos-action-btn w-6 h-6 rounded-full flex items-center justify-center">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" x2="12" y1="2" y2="15"></line></svg>
+</button>
+<button aria-label="Refresh" class="macos-action-btn w-6 h-6 rounded-full flex items-center justify-center">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+</button>
+</div>
+</div>
+<!-- Metrics Horizontal Grid: 2 columns -->
+<div class="grid grid-cols-2 gap-2.5 mt-2.5">
+<!-- Item 1: 5 小时 (31.42%) -->
+<div class="metric-gauge-item rounded-xl p-2.5 flex items-center gap-3">
+<div class="relative w-11 h-11 flex-shrink-0 flex items-center justify-center">
+<svg class="w-11 h-11 -rotate-90" viewbox="0 0 36 36">
+<path class="text-slate-200/80" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.6"></path>
+<path class="text-sky-500 drop-shadow-[0_0_4px_rgba(14,165,233,0.5)]" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="31.42, 100" stroke-linecap="round" stroke-width="3.6"></path>
+</svg>
+<span class="absolute text-[10px] font-bold text-slate-800 font-mono t-num">31.4%</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="text-[11px] font-medium text-slate-700 leading-tight">5 小时</div>
+<div class="text-[10px] text-slate-400 font-mono tracking-tight t-num mt-1">重置 20:00</div>
+</div>
+</div>
+<!-- Item 2: 周 (48.79%) -->
+<div class="metric-gauge-item rounded-xl p-2.5 flex items-center gap-3">
+<div class="relative w-11 h-11 flex-shrink-0 flex items-center justify-center">
+<svg class="w-11 h-11 -rotate-90" viewbox="0 0 36 36">
+<path class="text-slate-200/80" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.6"></path>
+<path class="text-blue-500 drop-shadow-[0_0_4px_rgba(59,130,246,0.5)]" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="48.79, 100" stroke-linecap="round" stroke-width="3.6"></path>
+</svg>
+<span class="absolute text-[10px] font-bold text-slate-800 font-mono t-num">48.8%</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="text-[11px] font-medium text-slate-700 leading-tight">周</div>
+<div class="text-[10px] text-slate-400 font-mono tracking-tight t-num mt-1">重置 09-27 02:03</div>
+</div>
+</div>
+</div>
+</article>
+<!-- Card 7: 亮 (小米 MiMo API - Full Width Horizontal Layout) -->
+<article class="macos-window rounded-2xl p-3.5 relative overflow-hidden group hover:border-emerald-500/30 transition-all" data-purpose="balance-card">
+<div class="absolute -bottom-8 -right-8 w-28 h-28 bg-teal-500/10 rounded-full blur-2xl pointer-events-none"></div>
+<svg class="absolute bottom-0 left-0 right-0 w-full h-10 text-teal-500/10 pointer-events-none" fill="currentColor" preserveaspectratio="none" viewbox="0 0 100 40">
+<path d="M0,28 Q35,38 65,18 T100,14 L100,40 L0,40 Z"></path>
+</svg>
+<div class="flex items-center justify-between relative z-10">
+<!-- Left: Account Info -->
+<div class="flex items-center gap-2.5">
+<div class="w-7 h-7 rounded-xl bg-rose-500/15 text-rose-700 border border-rose-500/30 flex items-center justify-center font-bold text-xs shadow-xs">
+        亮
+      </div>
+<div>
+<h2 class="text-[13px] font-semibold text-slate-900 leading-tight">亮</h2>
+<p class="text-[10.5px] font-medium text-[#86868b] tracking-tight mt-0.5">小米 MiMo · API 按量</p>
+</div>
+</div>
+<!-- Center: Balance Value -->
+<div class="text-center px-2">
+<div class="text-[10px] text-[#86868b] font-medium">账户余额</div>
+<div class="text-[20px] font-bold text-emerald-600 tracking-tight font-sans t-num drop-shadow-[0_1px_6px_rgba(16,185,129,0.25)] leading-tight">
+        ¥58.78
+      </div>
+</div>
+<!-- Right: Badge & Actions -->
+<div class="flex items-center gap-2">
+<span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 font-medium">正常</span>
+<div class="flex items-center gap-1">
+<button aria-label="Share" class="macos-action-btn w-6 h-6 rounded-full flex items-center justify-center">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" x2="12" y1="2" y2="15"></line></svg>
+</button>
+<button aria-label="Refresh" class="macos-action-btn w-6 h-6 rounded-full flex items-center justify-center">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+</button>
+</div>
+</div>
+</div>
+</article>
+<!-- Card 8: 洋 (Command Code GOAT - 3 Metrics: 0%, 0%, 29.56%) -->
+<article class="macos-window rounded-2xl p-3.5 relative overflow-hidden" data-purpose="account-card">
+<!-- Header -->
+<div class="flex items-center justify-between pb-2.5 border-b border-black/[0.04]">
+<div class="flex items-center gap-2.5">
+<div class="w-7 h-7 rounded-xl bg-teal-500/15 text-teal-800 border border-teal-500/30 flex items-center justify-center font-bold text-xs shadow-xs">
+        洋
+      </div>
+<div>
+<h2 class="text-[13px] font-semibold text-slate-900 leading-tight">洋</h2>
+<p class="text-[10.5px] font-medium text-[#86868b] tracking-tight mt-0.5">Command Code · GOAT</p>
+</div>
+</div>
+<div class="flex items-center gap-1.5">
+<button aria-label="Share" class="macos-action-btn w-6 h-6 rounded-full flex items-center justify-center">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" x2="12" y1="2" y2="15"></line></svg>
+</button>
+<button aria-label="Refresh" class="macos-action-btn w-6 h-6 rounded-full flex items-center justify-center">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+</button>
+</div>
+</div>
+<!-- Metrics Horizontal Grid: 3 columns -->
+<div class="grid grid-cols-3 gap-2 mt-2.5">
+<!-- Item 1: 5 小时 (0%) -->
+<div class="metric-gauge-item rounded-xl p-2 flex flex-col items-center text-center">
+<div class="relative w-10 h-10 flex-shrink-0 flex items-center justify-center mb-1.5">
+<svg class="w-10 h-10 -rotate-90" viewbox="0 0 36 36">
+<path class="text-slate-200/80" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.6"></path>
+</svg>
+<span class="absolute text-[8.5px] font-semibold text-slate-400 font-mono t-num">0%</span>
+</div>
+<div class="text-[10px] font-medium text-slate-700 leading-tight">5 小时</div>
+<div class="text-[9px] text-slate-400 font-mono tracking-tight t-num mt-0.5 truncate w-full">01-01 08:00</div>
+</div>
+<!-- Item 2: 周 (0%) -->
+<div class="metric-gauge-item rounded-xl p-2 flex flex-col items-center text-center">
+<div class="relative w-10 h-10 flex-shrink-0 flex items-center justify-center mb-1.5">
+<svg class="w-10 h-10 -rotate-90" viewbox="0 0 36 36">
+<path class="text-slate-200/80" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.6"></path>
+</svg>
+<span class="absolute text-[8.5px] font-semibold text-slate-400 font-mono t-num">0%</span>
+</div>
+<div class="text-[10px] font-medium text-slate-700 leading-tight">周</div>
+<div class="text-[9px] text-slate-400 font-mono tracking-tight t-num mt-0.5 truncate w-full">01-01 08:00</div>
+</div>
+<!-- Item 3: 月 (29.56%) -->
+<div class="metric-gauge-item rounded-xl p-2 flex flex-col items-center text-center">
+<div class="relative w-10 h-10 flex-shrink-0 flex items-center justify-center mb-1.5">
+<svg class="w-10 h-10 -rotate-90" viewbox="0 0 36 36">
+<path class="text-slate-200/80" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.6"></path>
+<path class="text-emerald-500 drop-shadow-[0_0_4px_rgba(16,185,129,0.5)]" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="29.56, 100" stroke-linecap="round" stroke-width="3.6"></path>
+</svg>
+<span class="absolute text-[8.5px] font-bold text-slate-800 font-mono t-num">29.6%</span>
+</div>
+<div class="text-[10px] font-medium text-slate-700 leading-tight">月</div>
+<div class="text-[9px] text-emerald-600 font-mono tracking-tight t-num mt-0.5 truncate w-full">健康用量</div>
+</div>
+</div>
+</article>
+</main>
+<!-- END: MonitorCardMatrixGrid -->
+<!-- BEGIN: FloatingBottomBar (macOS Dock / Control Center Capsule) -->
+<footer class="fixed bottom-3.5 left-0 right-0 max-w-[480px] mx-auto px-3 z-30" data-purpose="floating-status-bar">
+<div class="macos-window rounded-full px-3 py-2 flex items-center justify-between shadow-[0_12px_32px_rgba(0,0,0,0.12),0_2px_6px_rgba(0,0,0,0.04)]">
+<!-- Left: Refresh Button -->
+<button aria-label="Refresh All Data" class="macos-action-btn w-7 h-7 rounded-full flex items-center justify-center active:rotate-180 transition-all duration-300">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24">
+<path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+</svg>
+</button>
+<!-- Center: Subtle Timestamp -->
+<div class="text-[11px] text-[#86868b] font-mono tracking-tight select-none t-num">
+          最后刷新 2026-09-22 17:09:28
+        </div>
+<!-- Right: Power Action Button -->
+<button aria-label="System Power / Reset" class="macos-action-btn w-7 h-7 rounded-full flex items-center justify-center hover:text-red-500">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24">
+<path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+<line x1="12" x2="12" y1="2" y2="12"></line>
+</svg>
+</button>
+</div>
+</footer>
+<!-- END: FloatingBottomBar -->
+</div>
+</body></html>
