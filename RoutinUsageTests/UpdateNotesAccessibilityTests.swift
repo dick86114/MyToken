@@ -24,6 +24,29 @@ final class UpdateNotesAccessibilityTests: XCTestCase {
         XCTAssertFalse(text.contains("- "))
     }
 
+    func testHTML更新日志压缩列表缩进并保留条目文本() throws {
+        let attributedText = try XCTUnwrap(
+            UpdateNotesRenderer.attributedText(
+                notes: "<ul>\n<li>新增简洁/完整模式切换</li>\n<li>支持更加简洁的方式呈现用量</li>\n<li>优化排版布局</li>\n</ul>"
+            )
+        )
+
+        let text = String(attributedText.characters)
+        XCTAssertTrue(text.contains("新增简洁/完整模式切换"))
+        XCTAssertTrue(text.contains("支持更加简洁的方式呈现用量"))
+        XCTAssertTrue(text.contains("优化排版布局"))
+        XCTAssertFalse(text.contains("<li>"))
+    }
+
+    func testHTML渲染注入紧凑列表样式() throws {
+        let source = try TestSourceReader.read([
+            "RoutinUsage", "Views", "UpdateNotesView.swift"
+        ])
+
+        XCTAssertTrue(source.contains("padding-left: 16px"))
+        XCTAssertTrue(source.contains("li { margin: 0; }"))
+    }
+
     func test空更新日志朗读明确空状态() {
         XCTAssertEqual(
             UpdateNotesAccessibility.label(notes: " \n "),

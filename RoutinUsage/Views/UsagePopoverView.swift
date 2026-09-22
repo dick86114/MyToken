@@ -740,11 +740,16 @@ private struct UpdateReleasePopup: View {
                     .font(.caption.weight(.medium))
                     .foregroundStyle(secondaryGray)
 
-                ScrollView(.vertical, showsIndicators: false) {
+                ViewThatFits(in: .vertical) {
                     UpdateNotesView(notes: update.notes)
                         .frame(maxWidth: .infinity, alignment: .leading)
+
+                    ScrollView(.vertical, showsIndicators: false) {
+                        UpdateNotesView(notes: update.notes)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(height: 160)
                 }
-                .frame(height: 120)
                 .padding(10)
                 .background {
                     RoundedRectangle(cornerRadius: 9, style: .continuous)
