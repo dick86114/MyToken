@@ -259,7 +259,7 @@ private extension UsagePopoverView {
                     }
                 }
             }
-            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: settings.usageCardDensity)
+            .id(settings.usageCardDensity)
             .padding(.horizontal, 12)
         }
     }
