@@ -16,6 +16,11 @@ on:
 permissions:
   contents: write
 
+# 同一时刻只允许一个发布流程，避免发版 commit 竞争。
+concurrency:
+  group: release-macos
+  cancel-in-progress: false
+
 jobs:
   build:
     name: 构建 macOS DMG v${{ inputs.version }}
@@ -46,6 +51,15 @@ jobs:
       - name: 写入应用版本
         run: |
           sed -i '' "s/MARKETING_VERSION: \"[^\"]*\"/MARKETING_VERSION: \"${RELEASE_VERSION}\"/" project.yml
+      # 把版本号做成发布时刻的发版 commit，Release 的 created_at 取自
+      # tag 指向的 commit 时间——这样“最后发布的客户端”一定排在最前。
+      - name: 提交发版 commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add project.yml
+          git diff --cached --quiet || git commit -m "chore(release): macOS v${RELEASE_VERSION}"
+          git push origin HEAD:master
       - name: 构建 DMG
         run: scripts/build-dmg.sh
       - name: 重命名安装包
@@ -57,6 +71,7 @@ jobs:
       - name: 创建 macOS Release
         uses: softprops/action-gh-release@v2
         with:
+          target_commitish: master
           tag_name: v${{ inputs.version }}
           name: MyToken v${{ inputs.version }}
           body: ${{ inputs.release_notes }}

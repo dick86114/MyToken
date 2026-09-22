@@ -20,6 +20,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-android
+  cancel-in-progress: false
+
 jobs:
   build:
     name: 构建 Android APK v${{ inputs.version }}
@@ -121,9 +125,18 @@ jobs:
           ./android/gradlew -p android "${args[@]}" --stacktrace
           mkdir -p android/build/dist
           cp "${apk_source}" "android/build/dist/${apk_name}"
+      # 发布时刻的空 commit：Release created_at 取自 tag 指向的 commit 时间，
+      # 保证“最后发布的客户端”在 Releases 页面排在最前。
+      - name: 提交发版 commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "chore(release): Android v${RELEASE_VERSION}"
+          git push origin HEAD:master
       - name: 创建 Android Release
         uses: softprops/action-gh-release@v2
         with:
+          target_commitish: master
           tag_name: android-v${{ inputs.version }}
           name: MyToken Android v${{ inputs.version }}
           body: ${{ inputs.release_notes }}
