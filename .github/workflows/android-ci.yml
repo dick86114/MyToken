@@ -13,10 +13,17 @@ on:
 permissions:
   contents: read
 
+# 同一分支只保留最新一次 CI；旧 run 卡死时新推送会自动取消它。
+concurrency:
+  group: android-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   jvm-tests:
     name: Android JVM 单元测试与 instrumented 构建验证
     runs-on: ubuntu-latest
+    # 防止 runner 偶发卡死把 job 挂满默认 6 小时。
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
