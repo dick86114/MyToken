@@ -4,6 +4,7 @@ import ai.routin.mytoken.domain.model.AppError
 import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.model.CredentialSecret
 import ai.routin.mytoken.domain.model.ProviderId
+import ai.routin.mytoken.domain.model.UsageCardDensity
 import ai.routin.mytoken.domain.model.UsageSnapshot
 import ai.routin.mytoken.domain.repository.CredentialRepository
 import ai.routin.mytoken.domain.usage.CredentialUsageState
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -87,6 +89,7 @@ data class ProviderGroupUi(
 @Immutable
 data class HomeUiState(
     val isLoading: Boolean = true,
+    val usageCardDensity: UsageCardDensity = UsageCardDensity.FULL,
     val cards: List<CredentialCardUi> = emptyList(),
     val groups: List<ProviderGroupUi> = emptyList(),
     val credentialCount: Int = 0,
@@ -103,6 +106,8 @@ class HomeViewModel(
     private val repository: CredentialRepository,
     private val refreshUseCase: RefreshCredentialsUseCase,
     private val credentialOrderIds: Flow<List<String>> = emptyFlow(),
+    usageCardDensityFlow: Flow<UsageCardDensity> = flowOf(UsageCardDensity.FULL),
+    private val onUsageCardDensityChange: suspend (UsageCardDensity) -> Unit = {},
     private val clock: Clock = Clock.systemUTC(),
     refreshOnStart: Boolean = true,
     private val retryOnFailure: Boolean = false,
@@ -120,6 +125,18 @@ class HomeViewModel(
     internal val nowTick: StateFlow<Long> = nowTickCounter.asStateFlow()
 
     private val nowTickEnabled = MutableStateFlow(true)
+
+    /** 卡片密度：来自本地显示设置，切换后立即反映到首页。 */
+    val usageCardDensity: StateFlow<UsageCardDensity> = usageCardDensityFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = UsageCardDensity.FULL,
+        )
+
+    fun setUsageCardDensity(density: UsageCardDensity) {
+        viewModelScope.launch { onUsageCardDensityChange(density) }
+    }
 
     private val orderedCredentialsFlow = combine(
         repository.observeCredentials(),

@@ -1,6 +1,7 @@
 package ai.routin.mytoken.feature.settings
 
 import android.content.Context
+import ai.routin.mytoken.domain.model.UsageCardDensity
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -15,6 +16,7 @@ enum class AppThemeMode { SYSTEM, LIGHT, DARK }
 /** Android-only home display preferences; none of these sync to the Mac. */
 data class DisplaySettings(
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+    val usageCardDensity: UsageCardDensity = UsageCardDensity.COMPACT,
     val showDisabledCredentials: Boolean = true,
     val defaultExpandGroups: Boolean = true,
     val showUsageProgress: Boolean = true,
@@ -25,6 +27,7 @@ data class DisplaySettings(
 interface DisplaySettingsStore {
     val settings: Flow<DisplaySettings>
     suspend fun setThemeMode(mode: AppThemeMode)
+    suspend fun setUsageCardDensity(density: UsageCardDensity)
     suspend fun setShowDisabledCredentials(enabled: Boolean)
     suspend fun setDefaultExpandGroups(enabled: Boolean)
     suspend fun setShowUsageProgress(enabled: Boolean)
@@ -43,6 +46,9 @@ class DataStoreDisplaySettingsStore(private val context: Context) : DisplaySetti
             themeMode = prefs[THEME_MODE]?.let { stored ->
                 AppThemeMode.entries.firstOrNull { it.name == stored }
             } ?: AppThemeMode.SYSTEM,
+            usageCardDensity = prefs[USAGE_CARD_DENSITY]?.let { stored ->
+                UsageCardDensity.entries.firstOrNull { it.name == stored }
+            } ?: if (prefs.asMap().isEmpty()) UsageCardDensity.COMPACT else UsageCardDensity.FULL,
             showDisabledCredentials = prefs[SHOW_DISABLED] ?: true,
             defaultExpandGroups = prefs[DEFAULT_EXPAND] ?: true,
             showUsageProgress = prefs[SHOW_USAGE_PROGRESS] ?: true,
@@ -53,6 +59,9 @@ class DataStoreDisplaySettingsStore(private val context: Context) : DisplaySetti
 
     override suspend fun setThemeMode(mode: AppThemeMode) =
         edit { it[THEME_MODE] = mode.name }
+
+    override suspend fun setUsageCardDensity(density: UsageCardDensity) =
+        edit { it[USAGE_CARD_DENSITY] = density.name }
 
     override suspend fun setShowDisabledCredentials(enabled: Boolean) =
         edit { it[SHOW_DISABLED] = enabled }
@@ -75,6 +84,7 @@ class DataStoreDisplaySettingsStore(private val context: Context) : DisplaySetti
 
     private companion object {
         val THEME_MODE = stringPreferencesKey("themeMode")
+        val USAGE_CARD_DENSITY = stringPreferencesKey("usageCardDensity")
         val SHOW_DISABLED = booleanPreferencesKey("showDisabledCredentials")
         val DEFAULT_EXPAND = booleanPreferencesKey("defaultExpandGroups")
         val SHOW_USAGE_PROGRESS = booleanPreferencesKey("showUsageProgress")
