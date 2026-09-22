@@ -4,6 +4,7 @@ import SwiftUI
 struct ConfigurationBackupSettings: Codable, Equatable, Sendable {
     var refreshMinutes: Int
     var displayDimension: DisplayDimension
+    var usageCardDensity: UsageCardDensity
     var menuBarStyle: MenuBarStyle
     var notificationsEnabled: Bool
     var thresholds: AlertThresholds
@@ -17,6 +18,7 @@ struct ConfigurationBackupSettings: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case refreshMinutes
         case displayDimension
+        case usageCardDensity
         case menuBarStyle
         case notificationsEnabled
         case thresholds
@@ -31,6 +33,7 @@ struct ConfigurationBackupSettings: Codable, Equatable, Sendable {
     init(
         refreshMinutes: Int,
         displayDimension: DisplayDimension,
+        usageCardDensity: UsageCardDensity,
         menuBarStyle: MenuBarStyle,
         notificationsEnabled: Bool,
         thresholds: AlertThresholds,
@@ -43,6 +46,7 @@ struct ConfigurationBackupSettings: Codable, Equatable, Sendable {
     ) {
         self.refreshMinutes = refreshMinutes
         self.displayDimension = displayDimension
+        self.usageCardDensity = usageCardDensity
         self.menuBarStyle = menuBarStyle
         self.notificationsEnabled = notificationsEnabled
         self.thresholds = thresholds
@@ -58,6 +62,10 @@ struct ConfigurationBackupSettings: Codable, Equatable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         refreshMinutes = try container.decode(Int.self, forKey: .refreshMinutes)
         displayDimension = try container.decode(DisplayDimension.self, forKey: .displayDimension)
+        usageCardDensity = try container.decodeIfPresent(
+            UsageCardDensity.self,
+            forKey: .usageCardDensity
+        ) ?? .full
         menuBarStyle = try container.decode(MenuBarStyle.self, forKey: .menuBarStyle)
         notificationsEnabled = try container.decode(Bool.self, forKey: .notificationsEnabled)
         thresholds = try container.decode(AlertThresholds.self, forKey: .thresholds)

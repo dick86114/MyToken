@@ -39,6 +39,93 @@ final class UsagePresentationPolicyTests: XCTestCase {
         XCTAssertEqual(UsageMetricGridPolicy.layout(providerID: .newAPI, metrics: metrics).columns, 2)
     }
 
+    func test简洁模式按供应商返回写死字段() {
+        XCTAssertEqual(
+            UsageCardDensityPolicy.compactSpec(providerID: .routin, metadata: [:]).metricIDs,
+            ["fiveHour", "weekly"]
+        )
+        XCTAssertEqual(
+            UsageCardDensityPolicy.compactSpec(
+                providerID: .routin,
+                metadata: ["usageKind": "tokenPack"]
+            ).metricIDs,
+            ["token"]
+        )
+        XCTAssertEqual(
+            UsageCardDensityPolicy.compactSpec(providerID: .deepseek, metadata: [:]).metricIDs,
+            ["balance"]
+        )
+        XCTAssertEqual(
+            UsageCardDensityPolicy.compactSpec(
+                providerID: .xiaomi,
+                metadata: ["usageKind": "api"]
+            ).metricIDs,
+            ["account-balance"]
+        )
+        let xiaomiPlan = UsageCardDensityPolicy.compactSpec(
+            providerID: .xiaomi,
+            metadata: ["usageKind": "plan"]
+        )
+        XCTAssertEqual(xiaomiPlan.metricIDs, ["plan-total"])
+        XCTAssertFalse(xiaomiPlan.showsResetTime)
+        XCTAssertEqual(
+            UsageCardDensityPolicy.compactSpec(providerID: .glm, metadata: [:]).metricIDs,
+            ["five-hour", "weekly"]
+        )
+        XCTAssertEqual(
+            UsageCardDensityPolicy.compactSpec(providerID: .volcengine, metadata: [:]).metricIDs,
+            ["fiveHour", "weekly", "monthly"]
+        )
+        XCTAssertEqual(
+            UsageCardDensityPolicy.compactSpec(providerID: .newAPI, metadata: [:]).metricIDs,
+            ["today-token", "one-day-token", "seven-day-token", "thirty-day-token"]
+        )
+        XCTAssertEqual(
+            UsageCardDensityPolicy.compactSpec(providerID: .commandCode, metadata: [:]).metricIDs,
+            ["five-hour", "weekly", "credit-progress"]
+        )
+        XCTAssertTrue(
+            UsageCardDensityPolicy.compactSpec(providerID: .glm, metadata: [:]).showsResetTime
+        )
+    }
+
+    func test简洁模式指标按短周期到长周期排序() {
+        func metric(_ id: String) -> NormalizedUsageMetric {
+            NormalizedUsageMetric(
+                id: id,
+                label: id,
+                unit: .currency,
+                presentation: .progress,
+                semantic: .usedQuota
+            )
+        }
+
+        let ordered = UsageCardDensityPolicy.orderedMetrics(
+            providerID: .commandCode,
+            metadata: [:],
+            metrics: [
+                metric("credit-progress"),
+                metric("weekly"),
+                metric("five-hour"),
+                metric("request-count")
+            ]
+        )
+
+        XCTAssertEqual(ordered.map(\.id), ["five-hour", "weekly", "credit-progress"])
+
+        let volcengine = UsageCardDensityPolicy.orderedMetrics(
+            providerID: .volcengine,
+            metadata: [:],
+            metrics: [
+                metric("monthly"),
+                metric("fiveHour"),
+                metric("weekly")
+            ]
+        )
+
+        XCTAssertEqual(volcengine.map(\.id), ["fiveHour", "weekly", "monthly"])
+    }
+
     func test弹窗为CommandCode接入专用指标视图() throws {
         let source = try String(
             contentsOf: URL(fileURLWithPath: #filePath)
@@ -217,6 +304,23 @@ final class UsagePresentationPolicyTests: XCTestCase {
         XCTAssertTrue(
             source.contains("? Color.green : Color.secondary")
         )
+        XCTAssertTrue(source.contains("case .relativeDuration"))
+        XCTAssertTrue(
+            source.contains("UsageFormatter.remainingDurationText(until: windowEnd, now: now)")
+        )
+    }
+
+    func test简洁进度格只渲染重置时刻() throws {
+        let source = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/NormalizedUsageMetricGrid.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(source.contains("case .resetTimeOnly"))
+        XCTAssertTrue(source.contains("UsageFormatter.resetTime(windowEnd, now: now)"))
     }
 
     func test弹窗通用卡片按Routin逻辑显示重置剩余时长() throws {
@@ -233,6 +337,81 @@ final class UsagePresentationPolicyTests: XCTestCase {
         XCTAssertTrue(source.contains("normalizedMetricsContent(snapshot: snapshot, now: now)"))
         XCTAssertTrue(source.contains("resetTimeStyle: .relativeDuration"))
         XCTAssertTrue(source.contains("now: now"))
+    }
+
+    func test弹窗卡片按密度渲染并默认完整以免详情页误伤() throws {
+        let row = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/UsageRowView.swift"),
+            encoding: .utf8
+        )
+        let popover = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/UsagePopoverView.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(row.contains("var density: UsageCardDensity = .full"))
+        XCTAssertTrue(popover.contains("density: settings.usageCardDensity"))
+        XCTAssertFalse(row.contains("groupMultiplierText(currentGroupMultiplier)"))
+    }
+
+    func test完整卡片保留内边距() throws {
+        let row = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/UsageRowView.swift"),
+            encoding: .utf8
+        )
+        let fullStart = try XCTUnwrap(row.range(of: "private func fullCard(now: Date)"))
+        let compactStart = try XCTUnwrap(row.range(of: "private func compactCard(now: Date)"))
+        let fullBody = row[fullStart.lowerBound..<compactStart.lowerBound]
+
+        XCTAssertTrue(fullBody.contains(".padding(.vertical, 10)"))
+        XCTAssertTrue(fullBody.contains(".padding(.horizontal, 8)"))
+    }
+
+    func test简洁卡片统一纵向排列指标() throws {
+        let sections = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/ProviderUsageMetricSections.swift"),
+            encoding: .utf8
+        )
+        let command = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/CommandCodeUsageMetricsView.swift"),
+            encoding: .utf8
+        )
+        let row = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/UsageRowView.swift"),
+            encoding: .utf8
+        )
+        let details = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/Settings/CredentialDetailsView.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertFalse(sections.contains("var density: UsageCardDensity"))
+        XCTAssertFalse(command.contains("var density: UsageCardDensity"))
+        XCTAssertTrue(row.contains("func compactCard(now: Date)"))
+        XCTAssertTrue(row.contains("func compactMetricRow(_ metric: NormalizedUsageMetric, now: Date)"))
+        XCTAssertTrue(row.contains("UsageCardDensityPolicy.orderedMetrics("))
+        XCTAssertFalse(details.contains("density: .compact"))
     }
 
     func test弹窗供应商信息显示供应商与套餐() throws {

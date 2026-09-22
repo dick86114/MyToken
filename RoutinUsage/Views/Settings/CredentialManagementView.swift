@@ -224,6 +224,7 @@ struct CredentialManagementView: View {
 
             UsageRowView(
                 state: state,
+                density: environment.settings.usageCardDensity,
                 actions: nil,
                 refreshCredential: {
                     Task { await environment.refreshCredential(state.configuration.id) }

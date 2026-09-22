@@ -113,6 +113,12 @@ final class AppSettings {
         }
     }
 
+    var usageCardDensity: UsageCardDensity {
+        didSet {
+            defaults.set(usageCardDensity.rawValue, forKey: Keys.usageCardDensity)
+        }
+    }
+
     /// nil = 直连 GitHub；非空 = 走该镜像前缀下载和检测。
     var updateMirrorBase: String? {
         updateChannel == .cdn && !updateCDNBase.isEmpty ? updateCDNBase : nil
@@ -165,6 +171,7 @@ final class AppSettings {
         ConfigurationBackupSettings(
             refreshMinutes: refreshMinutes,
             displayDimension: displayDimension,
+            usageCardDensity: usageCardDensity,
             menuBarStyle: menuBarStyle,
             notificationsEnabled: notificationsEnabled,
             thresholds: thresholds,
@@ -182,6 +189,7 @@ final class AppSettings {
             ? backup.refreshMinutes
             : refreshMinutes
         displayDimension = backup.displayDimension
+        usageCardDensity = backup.usageCardDensity
         menuBarStyle = backup.menuBarStyle
         notificationsEnabled = backup.notificationsEnabled
         thresholds = backup.thresholds
@@ -305,6 +313,21 @@ final class AppSettings {
 
         let storedMigratedIDs = defaults.stringArray(forKey: Self.migratedUsagePreferenceIDsKey) ?? []
         migratedUsagePreferenceIDs = Set(storedMigratedIDs)
+
+        if let storedDensity = defaults.string(forKey: Keys.usageCardDensity)
+            .flatMap({ UsageCardDensity(rawValue: $0) }) {
+            usageCardDensity = storedDensity
+        } else {
+            let hasLegacySettings = defaults.object(forKey: Keys.refreshMinutes) != nil
+                || defaults.object(forKey: Self.displayOrderKey) != nil
+                || defaults.object(forKey: Keys.selectedCredentialIDs) != nil
+                || defaults.object(forKey: Keys.availableCredentialIDs) != nil
+                || defaults.object(forKey: Self.credentialUsagePreferencesKey) != nil
+            let initialDensity: UsageCardDensity = hasLegacySettings ? .full : .compact
+            defaults.set(initialDensity.rawValue, forKey: Keys.usageCardDensity)
+            usageCardDensity = initialDensity
+        }
+
         syncUpdateMirrorBase()
     }
 }
@@ -323,6 +346,7 @@ private extension AppSettings {
         static let updateCDNBase = "updateCDNBase"
         static let selectedCredentialIDs = "selectedCredentialIDs"
         static let availableCredentialIDs = "availableCredentialIDs"
+        static let usageCardDensity = "usageCardDensity"
     }
 
     static let displayOrderKey = "displayOrder.v1"
