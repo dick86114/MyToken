@@ -20,9 +20,10 @@ class NumberFormattingTest {
     }
 
     @Test
-    fun percentValuesKeepAtMostTwoFractionDigits() {
-        assertEquals("0.13%", formatPercent(0.1342))
-        assertEquals("67.56%", formatPercent(67.555))
+    fun percentValuesRoundToInteger() {
+        assertEquals("0%", formatPercent(0.1342))
+        assertEquals("68%", formatPercent(67.555))
+        assertEquals("21%", formatPercent(21.34))
         assertEquals("42%", formatPercent(42.0))
     }
 

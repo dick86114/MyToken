@@ -78,7 +78,7 @@ enum UsageFormatter {
         return numberText(value, grouping: grouping)
     }
 
-    /// 凭证内的百分比统一四舍五入到最多两位小数，菜单栏仍使用整数百分比。
+    /// 卡片内的百分比统一四舍五入到整数，避免小数位干扰扫读。
     static func displayPercentText(_ value: Double?) -> String {
         guard let value, value.isFinite else { return "—" }
         let formatter = NumberFormatter()
@@ -87,7 +87,7 @@ enum UsageFormatter {
         formatter.usesGroupingSeparator = false
         formatter.roundingMode = .halfUp
         formatter.minimumFractionDigits = 0
-        formatter.maximumFractionDigits = 2
+        formatter.maximumFractionDigits = 0
         let text = formatter.string(from: NSNumber(value: value))
             ?? NSDecimalNumber(value: value).stringValue
         return text + "%"

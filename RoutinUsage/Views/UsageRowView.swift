@@ -2,6 +2,7 @@ import SwiftUI
 
 @MainActor
 struct UsageRowView: View {
+    @Environment(\.colorScheme) private var colorScheme
     let state: KeyUsageState
     var density: UsageCardDensity = .full
     var actions: AnyView?
@@ -41,36 +42,32 @@ struct UsageRowView: View {
     }
 
     private func compactCard(now: Date) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 6) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(state.configuration.displayName)
-                        .font(.headline.weight(.semibold))
-                        .lineLimit(1)
+        let metrics = compactOrderedMetrics
+        let arrangement = CompactUsageCardPresentation.arrangement(for: metrics)
 
-                    Text(UsageRowPresentation.subscriptionDescription(
-                        providerID: state.configuration.providerID,
-                        planName: state.snapshot?.planName ?? ""
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .lineLimit(3)
-                    .multilineTextAlignment(.leading)
-                }
-
-                Spacer(minLength: 4)
-
-                HStack(spacing: 2) {
-                    if state.error != nil {
-                        refreshFailureIndicator
+        return Group {
+            if arrangement == .balance, let metric = metrics.first {
+                compactBalanceCard(metric: metric)
+                    .background(alignment: .bottom) {
+                        CompactBalanceWave()
+                            .frame(height: 40)
+                            .allowsHitTesting(false)
                     }
-                    if onShare != nil {
-                        shareButton
-                    }
-                    headerRefreshButton
-                }
+            } else {
+                compactStandardCard(now: now)
             }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .modifier(UsageCardChrome(state: state, isExpired: isSubscriptionExpired(now: now)))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(accessibilityLabel(now: now))
+        .accessibilityHint(accessibilityHint)
+    }
+
+    private func compactStandardCard(now: Date) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            compactHeader(showsDivider: true)
 
             if let snapshot = state.snapshot {
                 compactMetrics(snapshot: snapshot, now: now)
@@ -78,67 +75,251 @@ struct UsageRowView: View {
                 statusLabel
             }
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .modifier(UsageCardChrome(state: state, isExpired: isSubscriptionExpired(now: now)))
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(accessibilityLabel(now: now))
-        .accessibilityHint(accessibilityHint)
+    }
+
+    private func compactBalanceCard(metric: NormalizedUsageMetric) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            compactIdentity
+            Spacer(minLength: 8)
+            CompactBalanceStrip(metric: metric)
+            Spacer(minLength: 8)
+            HStack(spacing: 8) {
+                Text(CompactUsageCardPresentation.balanceStatusText(healthState: metric.healthState))
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(CompactPopoverPalette.badgeGreen(colorScheme))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background {
+                        Capsule()
+                            .fill(Color.green.opacity(0.10))
+                    }
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(Color.green.opacity(0.20), lineWidth: 1)
+                    }
+                compactActionButtons
+            }
+        }
+    }
+
+    private func compactHeader(showsDivider: Bool) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            compactIdentity
+            Spacer(minLength: 8)
+            compactActionButtons
+        }
+        .padding(.bottom, showsDivider ? 10 : 0)
+        .overlay(alignment: .bottom) {
+            if showsDivider {
+                Rectangle()
+                    .fill(CompactPopoverPalette.hairline(colorScheme))
+                    .frame(height: 1)
+                    .allowsHitTesting(false)
+            }
+        }
+    }
+
+    private var compactIdentity: some View {
+        HStack(alignment: .center, spacing: 10) {
+            avatarWithStatus
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(state.configuration.displayName)
+                        .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1)
+
+                    if CompactUsageCardPresentation.isNearlyExhausted(metrics: compactOrderedMetrics) {
+                        Text("即将耗尽")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Color.red)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 1)
+                            .background {
+                                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                    .fill(Color.red.opacity(0.10))
+                            }
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                    .strokeBorder(Color.red.opacity(0.20), lineWidth: 1)
+                            }
+                    }
+                }
+
+                Text(UsageRowPresentation.subscriptionDescription(
+                    providerID: state.configuration.providerID,
+                    planName: state.snapshot?.planName ?? ""
+                ))
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundStyle(CompactPopoverPalette.subtitle(colorScheme))
+                .lineLimit(2)
+            }
+        }
+    }
+
+    private var compactActionButtons: some View {
+        HStack(spacing: 6) {
+            if onShare != nil {
+                CompactCardActionButton(
+                    action: { onShare?() },
+                    help: "分享 \(state.configuration.displayName) 当前用量",
+                    disabled: state.snapshot == nil
+                ) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .accessibilityLabel("分享 \(state.configuration.displayName) 当前用量")
+            }
+            CompactCardActionButton(
+                action: refreshCredential,
+                help: "刷新 \(state.configuration.displayName)",
+                disabled: state.isRefreshing || !state.configuration.isEnabled
+            ) {
+                Group {
+                    if state.isRefreshing {
+                        ProgressView()
+                            .controlSize(.mini)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                }
+            }
+            .accessibilityLabel("刷新 \(state.configuration.displayName)")
+        }
+    }
+
+    private var compactOrderedMetrics: [NormalizedUsageMetric] {
+        guard let snapshot = state.snapshot else { return [] }
+        return UsageCardDensityPolicy.orderedMetrics(
+            providerID: state.configuration.providerID,
+            metadata: state.configuration.metadata,
+            metrics: snapshot.normalizedMetrics
+        )
     }
 }
 
+/// 刷新时的流星边框：发光亮点沿卡片边框匀速环绕，身后拖出渐隐尾迹。
 private struct RefreshingCardBorder: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let color: Color
 
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { timeline in
-            let phase = reduceMotion
-                ? 0
-                : -timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1) * 28
+    private let orbitPeriod: Double = 2.4
+    private let tailFraction: CGFloat = 0.22
+    private let tailSegments = 4
 
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(
-                    color,
-                    style: StrokeStyle(
-                        lineWidth: 2,
-                        lineCap: .round,
-                        lineJoin: .round,
-                        dash: [12, 7],
-                        dashPhase: phase
-                    )
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 24.0, paused: reduceMotion)) { timeline in
+            let phase = reduceMotion
+                ? CGFloat(0.72)
+                : CGFloat(
+                    (timeline.date.timeIntervalSinceReferenceDate / orbitPeriod)
+                        .truncatingRemainder(dividingBy: 1)
                 )
-                .shadow(color: color.opacity(0.35), radius: 2)
+
+            GeometryReader { geometry in
+                let path = RoundedRectangle(
+                    cornerRadius: CompactPopoverMetrics.cardCornerRadius,
+                    style: .continuous
+                )
+                .path(in: CGRect(origin: .zero, size: geometry.size))
+
+                ZStack {
+                    ForEach(0..<tailSegments, id: \.self) { index in
+                        cometSegment(path: path, head: phase, index: index)
+                    }
+
+                    Circle()
+                        .fill(color)
+                        .frame(width: 5, height: 5)
+                        .shadow(color: color, radius: 5)
+                        .position(cometHead(path: path, at: phase))
+                }
+            }
         }
+        .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    private func cometHead(path: Path, at phase: CGFloat) -> CGPoint {
+        // Path 没有 point(at:)，用极短片段的终点近似头部位置。
+        let epsilon: CGFloat = 0.0008
+        let head = path.trimmedPath(from: phase, to: min(phase + epsilon, 1))
+        return head.currentPoint ?? path.currentPoint ?? .zero
+    }
+
+    private func cometSegment(path: Path, head: CGFloat, index: Int) -> some View {
+        let fade = 1 - CGFloat(index) / CGFloat(tailSegments)
+        let end = head - tailFraction * (1 - fade)
+        let start = end - tailFraction / CGFloat(tailSegments)
+
+        return segmentPath(path, from: start, to: end)
+            .stroke(
+                color.opacity(Double(fade) * 0.9),
+                style: StrokeStyle(lineWidth: 2.4 * fade + 0.4, lineCap: .round)
+            )
+    }
+
+    private func segmentPath(_ path: Path, from start: CGFloat, to end: CGFloat) -> Path {
+        if start < 0 {
+            return path
+                .trimmedPath(from: start + 1, to: 1)
+                .union(path.trimmedPath(from: 0, to: end))
+        }
+        return path.trimmedPath(from: start, to: end)
     }
 }
 
 private struct UsageCardChrome: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+
     let state: KeyUsageState
     let isExpired: Bool
 
     func body(content: Content) -> some View {
-        content
-            .background {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(ProviderTheme.background(for: state.configuration.providerID))
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(ProviderTheme.borderColor(for: state.configuration.providerID))
-            }
-            .overlay {
-                if state.isRefreshing {
-                    RefreshingCardBorder(
-                        color: ProviderTheme.accentColor(for: state.configuration.providerID)
+        let shape = RoundedRectangle(cornerRadius: CompactPopoverMetrics.cardCornerRadius, style: .continuous)
+        let highlight = CompactPopoverPalette.cardStroke(colorScheme)
+
+        Group {
+            if #available(macOS 26.0, *) {
+                content
+                    .glassEffect(
+                        .regular.tint(CompactPopoverPalette.cardSurfaceTint(colorScheme)),
+                        in: shape
                     )
-                }
+            } else {
+                content
+                    .background {
+                        shape
+                            .fill(.ultraThinMaterial)
+                            .overlay {
+                                shape.fill(
+                                    colorScheme == .dark
+                                        ? CompactPopoverPalette.darkSurface.opacity(0.50)
+                                        : Color.white.opacity(0.42)
+                                )
+                            }
+                            .allowsHitTesting(false)
+                    }
             }
-            .saturation(state.configuration.isEnabled ? 1 : 0)
-            .opacity(isExpired ? 0.45 : 1)
+        }
+        .overlay {
+            shape
+                .strokeBorder(highlight, lineWidth: 1)
+                .allowsHitTesting(false)
+        }
+        .overlay {
+            if state.isRefreshing {
+                RefreshingCardBorder(
+                    color: ProviderTheme.accentColor(for: state.configuration.providerID)
+                )
+                .allowsHitTesting(false)
+            }
+        }
+        .shadow(color: Color.black.opacity(0.04), radius: 8, y: 2)
+        .saturation(state.configuration.isEnabled ? 1 : 0)
+        .opacity(isExpired ? 0.45 : 1)
     }
 }
 
@@ -216,21 +397,18 @@ enum UsageRowPresentation {
 
 private extension UsageRowView {
     func headerView(now: Date) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .center, spacing: 8) {
-                Text(state.configuration.displayName)
-                    .font(.largeTitle.weight(.semibold))
-                    .lineLimit(1)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    subscriptionDescription(now: now)
-                    subscriptionPeriodDetails
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 10) {
+                compactIdentity
                 Spacer(minLength: 8)
+                compactActionButtons
+            }
 
-                if validMetric(state.snapshot?.token) != nil || state.snapshot?.metrics.isEmpty == false {
+            if fullHeaderShowsSummary {
+                HStack(alignment: .top, spacing: 8) {
+                    subscriptionPeriodDetails
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
                     VStack(alignment: .trailing, spacing: 3) {
                         if let metric = validMetric(state.snapshot?.token),
                            metric.percent.isFinite {
@@ -247,54 +425,25 @@ private extension UsageRowView {
                            state.configuration.providerID != .xiaomi {
                             normalizedHeaderMetric(metric)
                         }
-
                     }
-                }
-
-                HStack(spacing: 2) {
-                    if state.error != nil {
-                        refreshFailureIndicator
-                    }
-                    if onShare != nil {
-                        shareButton
-                    }
-                    headerRefreshButton
                 }
             }
         }
     }
 
-    var shareButton: some View {
-        Button {
-            onShare?()
-        } label: {
-            Image(systemName: "square.and.arrow.up")
-                .font(.system(size: 12, weight: .semibold))
-                .frame(width: 20, height: 20)
+    private var fullHeaderShowsSummary: Bool {
+        if validMetric(state.snapshot?.token) != nil {
+            return true
         }
-        .buttonStyle(.borderless)
-        .disabled(state.snapshot == nil)
-        .help("分享 \(state.configuration.displayName) 当前用量")
-        .accessibilityLabel("分享 \(state.configuration.displayName) 当前用量")
-    }
-
-    var headerRefreshButton: some View {
-        Button(action: refreshCredential) {
-            Group {
-                if state.isRefreshing {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-            }
-            .frame(width: 20, height: 20)
+        if state.snapshot?.metrics.isEmpty == false {
+            return true
         }
-        .buttonStyle(.borderless)
-        .disabled(state.isRefreshing || !state.configuration.isEnabled)
-        .help("刷新 \(state.configuration.displayName)")
-        .accessibilityLabel("刷新 \(state.configuration.displayName)")
+        if let snapshot = state.snapshot,
+           snapshot.kind == .periodic,
+           snapshot.subscriptionStartAt != nil || snapshot.subscriptionEndAt != nil {
+            return true
+        }
+        return false
     }
 
     @ViewBuilder
@@ -393,15 +542,50 @@ private extension UsageRowView {
             metadata: state.configuration.metadata,
             metrics: snapshot.normalizedMetrics
         )
+        let arrangement = CompactUsageCardPresentation.arrangement(for: metrics)
 
         if !metrics.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(metrics) { metric in
-                    compactMetricRow(metric, now: now)
+            switch arrangement {
+            case .balance:
+                EmptyView()
+            case .horizontalGauges:
+                HStack(alignment: .top, spacing: 10) {
+                    ForEach(metrics) { metric in
+                        compactMetricRow(metric, now: now)
+                    }
+                }
+            case .verticalGauges:
+                HStack(alignment: .top, spacing: 8) {
+                    ForEach(metrics) { metric in
+                        CompactMetricGaugeTile(
+                            metric: metric,
+                            now: now,
+                            style: .vertical,
+                            providerID: state.configuration.providerID
+                        )
+                    }
+                }
+            case .valueTiles:
+                LazyVGrid(
+                    columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)],
+                    spacing: 8
+                ) {
+                    ForEach(metrics) { metric in
+                        if metric.presentation == .progress {
+                            CompactMetricGaugeTile(
+                                metric: metric,
+                                now: now,
+                                style: metrics.count > 2 ? .vertical : .horizontal,
+                                providerID: state.configuration.providerID
+                            )
+                        } else {
+                            CompactValueTile(metric: metric, valueText: compactValueText(for: metric))
+                        }
+                    }
                 }
             }
         } else if snapshot.kind == .periodic {
-            VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
                 compactLegacyMetricRow(title: "5 小时", metric: validMetric(snapshot.fiveHour), now: now)
                 compactLegacyMetricRow(title: "周", metric: validMetric(snapshot.weekly), now: now)
             }
@@ -413,44 +597,12 @@ private extension UsageRowView {
     }
 
     func compactMetricRow(_ metric: NormalizedUsageMetric, now: Date) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(metric.label)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-                Spacer(minLength: 4)
-
-                if metric.presentation == .progress, let percent = metric.displayedPercent {
-                    Text(UsageFormatter.displayPercentText(percent))
-                        .font(.system(.caption, design: .rounded, weight: .semibold))
-                        .foregroundStyle(normalizedMetricColor(metric.healthState))
-                        .monospacedDigit()
-                }
-            }
-
-            if metric.presentation == .progress {
-                UsageMetricProgressBar(percent: metric.displayedPercent ?? 0)
-
-                if let windowEnd = metric.windowEnd {
-                    Text("重置 \(UsageFormatter.resetTime(windowEnd, now: now))")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                        .help("重置 \(UsageFormatter.fullDateTime(windowEnd))")
-                }
-            } else {
-                Text(compactValueText(for: metric))
-                    .font(.system(.caption, design: .rounded, weight: .semibold))
-                    .foregroundStyle(normalizedMetricColor(metric.healthState))
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(compactAccessibilityText(for: metric, now: now))
+        CompactMetricGaugeTile(
+            metric: metric,
+            now: now,
+            style: .horizontal,
+            providerID: state.configuration.providerID
+        )
     }
 
     func compactLegacyMetricRow(
@@ -677,71 +829,58 @@ private extension UsageRowView {
         }
     }
 
+    /// 失败徽章挂在别名头像右上角，点击头像即可查看失败详情。
     @ViewBuilder
-    func subscriptionDescription(now: Date) -> some View {
-        subscriptionDescriptionContent(now: now)
-            .frame(maxWidth: .infinity, alignment: .leading)
-    }
+    var avatarWithStatus: some View {
+        let avatar = CompactAccountAvatar(
+            letter: CompactUsageCardPresentation.avatarLetter(
+                displayName: state.configuration.displayName,
+                providerID: state.configuration.providerID
+            ),
+            providerID: state.configuration.providerID
+        )
 
-    @ViewBuilder
-    func subscriptionDescriptionContent(now: Date) -> some View {
-        if let snapshot = state.snapshot {
-            let planSuffix = snapshot.planName.isEmpty ? "" : " · \(snapshot.planName)"
-
-            if let expiryText = UsageFormatter.subscriptionExpiryText(
-                until: snapshot.subscriptionEndAt,
-                now: now
-            ) {
-                HStack(spacing: 4) {
-                    HStack(spacing: 2) {
-                        providerNameLabel
-                        if !planSuffix.isEmpty {
-                            Text(planSuffix)
-                        }
+        if state.error != nil {
+            Button {
+                showsFailureDetails = true
+            } label: {
+                avatar
+                    .overlay(alignment: .topTrailing) {
+                        refreshFailureIndicator
                     }
-                    .foregroundStyle(.secondary)
-                    Text(expiryText)
-                        .foregroundStyle(.red)
-                }
-                .font(.caption)
-            } else {
-                HStack(spacing: 2) {
-                    providerNameLabel
-                    if !planSuffix.isEmpty {
-                        Text(planSuffix)
-                    }
-                }
-                .font(.system(.body, weight: .semibold))
-                .foregroundStyle(.primary)
+                    .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
+            .buttonStyle(.plain)
+            .popover(isPresented: $showsFailureDetails, arrowEdge: .bottom) {
+                RefreshFailurePopover(
+                    state: state,
+                    retry: {
+                        showsFailureDetails = false
+                        retryCredential()
+                    }
+                )
+            }
+            .help(UsageFormatter.refreshFailureTooltip(state: state))
+            .accessibilityLabel("查看刷新失败详情")
         } else {
-            Text("等待用量数据")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            avatar
         }
     }
 
     var refreshFailureIndicator: some View {
-        Button {
-            showsFailureDetails = true
-        } label: {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.caption)
-                .foregroundStyle(.orange)
-                .frame(width: 16, height: 16)
-        }
-        .buttonStyle(.borderless)
-        .help(UsageFormatter.refreshFailureTooltip(state: state))
-        .accessibilityLabel("查看刷新失败详情")
-        .popover(isPresented: $showsFailureDetails, arrowEdge: .bottom) {
-            RefreshFailurePopover(
-                state: state,
-                retry: {
-                    showsFailureDetails = false
-                    retryCredential()
-                }
-            )
-        }
+        Image(systemName: "exclamationmark")
+            .font(.system(size: 7, weight: .black))
+            .foregroundStyle(.white)
+            .frame(width: 12, height: 12)
+            .background {
+                Circle()
+                    .fill(Color(red: 1.0, green: 0.28, blue: 0.34))
+            }
+            .overlay {
+                Circle()
+                    .strokeBorder(.white.opacity(0.85), lineWidth: 1)
+            }
+            .offset(x: 5, y: -5)
     }
 
     func subscriptionDescriptionText(for snapshot: UsageSnapshot) -> String {

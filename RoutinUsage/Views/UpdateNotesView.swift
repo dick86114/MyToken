@@ -3,13 +3,21 @@ import SwiftUI
 
 enum UpdateNotesRenderer {
     static func attributedText(notes: String) -> AttributedString? {
-        if let html = htmlAttributedText(notes: notes) {
-            return AttributedString(html)
+        if notes.contains("<"), notes.contains(">") {
+            if let markdownSource = markdownFromSimpleHTML(notes) {
+                return markdownAttributedText(notes: markdownSource)
+            }
+            return htmlAttributedText(notes: notes).map { AttributedString($0) }
         }
         return markdownAttributedText(notes: notes)
     }
 
     static func plainText(notes: String) -> String {
+        if notes.contains("<"), notes.contains(">"),
+           let markdownSource = markdownFromSimpleHTML(notes) {
+            let rendered = String(markdownAttributedText(notes: markdownSource).characters)
+            return rendered.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         if let html = htmlAttributedText(notes: notes) {
             return html.string.trimmingCharacters(in: .whitespacesAndNewlines)
         }
@@ -34,6 +42,66 @@ enum UpdateNotesRenderer {
             .split(whereSeparator: { $0.isWhitespace })
             .joined(separator: " ")
         return String(flattened.prefix(maxLength))
+    }
+
+    /// GitHub Release 常见 <p>/<ul>/<li>/<br> 结构转成 markdown 行，
+    /// 让弹窗与帮助页共用同一套紧凑的 markdown 排版，避免 HTML 列表的大缩进。
+    private static func markdownFromSimpleHTML(_ notes: String) -> String? {
+        guard notes.contains("<li") || notes.contains("<p")
+                || notes.contains("<h") || notes.contains("<br") else {
+            return nil
+        }
+
+        var text = notes
+        text = replacingTag("br", in: text, replacement: "\n")
+        text = replacingTag("li", in: text, replacement: "\n- ")
+        for block in ["p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol"] {
+            text = replacingTag(block, in: text, replacement: "\n")
+        }
+
+        text = text.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+        let entities = [
+            "&nbsp;": " ",
+            "&amp;": "&",
+            "&lt;": "<",
+            "&gt;": ">",
+            "&quot;": "\"",
+            "&#39;": "'"
+        ]
+        for (entity, replacement) in entities {
+            text = text.replacingOccurrences(of: entity, with: replacement)
+        }
+
+        let trimmed = text
+            .replacingOccurrences(of: "\n{3,}", with: "\n\n", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private static func replacingTag(_ name: String, in text: String, replacement: String) -> String {
+        guard let opening = try? NSRegularExpression(
+            pattern: "<\\s*\(name)[^>]*>",
+            options: [.caseInsensitive]
+        ) else {
+            return text
+        }
+        var result = opening.stringByReplacingMatches(
+            in: text,
+            range: NSRange(text.startIndex..., in: text),
+            withTemplate: replacement
+        )
+        guard let closing = try? NSRegularExpression(
+            pattern: "</\\s*\(name)\\s*>",
+            options: [.caseInsensitive]
+        ) else {
+            return result
+        }
+        result = closing.stringByReplacingMatches(
+            in: result,
+            range: NSRange(result.startIndex..., in: result),
+            withTemplate: ""
+        )
+        return result
     }
 
     private static func htmlAttributedText(notes: String) -> NSAttributedString? {

@@ -17,8 +17,8 @@ final class UsageFormatterTests: XCTestCase {
         XCTAssertEqual(UsageFormatter.numberText(Decimal(string: "12.345")), "12.35")
         XCTAssertEqual(UsageFormatter.numberText(Decimal(string: "12.344")), "12.34")
         XCTAssertEqual(UsageFormatter.numberText(7), "7")
-        XCTAssertEqual(UsageFormatter.displayPercentText(0.1342), "0.13%")
-        XCTAssertEqual(UsageFormatter.displayPercentText(67.555), "67.56%")
+        XCTAssertEqual(UsageFormatter.displayPercentText(0.1342), "0%")
+        XCTAssertEqual(UsageFormatter.displayPercentText(67.555), "68%")
         XCTAssertEqual(UsageFormatter.displayPercentText(42), "42%")
     }
 
@@ -764,7 +764,7 @@ final class UsageFormatterTests: XCTestCase {
                 metric: metric,
                 dimension: .fiveHour,
             ),
-            "主账号，已使用 67.5%，$6.80 / $10.00，5 小时剩余 —，周剩余 —"
+            "主账号，已使用 68%，$6.80 / $10.00，5 小时剩余 —，周剩余 —"
         )
         XCTAssertEqual(
             UsageRowAccessibility.hint(),
@@ -782,7 +782,7 @@ final class UsageFormatterTests: XCTestCase {
                 metric: metric,
                 dimension: .fiveHour,
             ),
-            "主账号，已使用 67.5%，$6.80 / $10.00，5 小时剩余 —，周剩余 —"
+            "主账号，已使用 68%，$6.80 / $10.00，5 小时剩余 —，周剩余 —"
         )
         XCTAssertEqual(
             UsageRowAccessibility.hint(),

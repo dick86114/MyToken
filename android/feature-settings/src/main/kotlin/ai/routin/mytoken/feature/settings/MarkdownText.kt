@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -15,8 +16,8 @@ import androidx.compose.ui.text.withStyle
  * 渲染 Release body 中常用的 Markdown 子集，避免把远程内容当作 HTML 或 Compose 内容执行。
  */
 @Composable
-internal fun MarkdownText(markdown: String) {
-    Column {
+internal fun MarkdownText(markdown: String, modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
         markdown.replace("\r\n", "\n").split('\n').forEach { line ->
             Text(
                 text = markdownLine(line),

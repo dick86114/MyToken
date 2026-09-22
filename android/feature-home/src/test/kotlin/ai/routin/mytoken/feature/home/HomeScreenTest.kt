@@ -372,7 +372,8 @@ class HomeScreenTest {
             useUnmergedTree = true,
         ).getUnclippedBoundsInRoot()
         assertTrue(failureBounds.left < refreshBounds.left)
-        assertTrue(kotlin.math.abs(failureBounds.top.value - refreshBounds.top.value) < 1f)
+        // 失败徽章改挂头像右上角后，头像(30dp)与按钮(30dp)顶对齐，容差放宽到 6dp。
+        assertTrue(kotlin.math.abs(failureBounds.top.value - refreshBounds.top.value) < 6f)
         assertTrue(refreshBounds.right <= composeRule.onRoot().getUnclippedBoundsInRoot().right)
         assertEquals(true, refreshed)
         composeRule.onNodeWithTag(
