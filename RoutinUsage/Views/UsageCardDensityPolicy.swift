@@ -43,4 +43,17 @@ enum UsageCardDensityPolicy {
             )
         }
     }
+
+    static func orderedMetrics(
+        providerID: ProviderID,
+        metadata: [String: String],
+        metrics: [NormalizedUsageMetric]
+    ) -> [NormalizedUsageMetric] {
+        let byID = Dictionary(
+            uniqueKeysWithValues: metrics.map { ($0.id, $0) }
+        )
+        return compactSpec(providerID: providerID, metadata: metadata)
+            .metricIDs
+            .compactMap { byID[$0] }
+    }
 }
