@@ -2,6 +2,7 @@ import SwiftUI
 
 struct XiaomiAPIMetricsView: View {
     let metrics: [NormalizedUsageMetric]
+    var density: UsageCardDensity = .full
 
     private let accountIDs = [
         "account-balance",
@@ -17,17 +18,36 @@ struct XiaomiAPIMetricsView: View {
     ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            metricRow(accountIDs)
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Token")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-                metricRow(tokenIDs)
+        if density == .compact {
+            HStack(alignment: .top, spacing: 12) {
+                ForEach(compactMetrics) { metric in
+                    metricCell(metric)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
+        } else {
+            VStack(alignment: .leading, spacing: 12) {
+                metricRow(accountIDs)
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Token")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                    metricRow(tokenIDs)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var compactMetrics: [NormalizedUsageMetric] {
+        let allowed = Set(
+            UsageCardDensityPolicy.compactSpec(
+                providerID: .xiaomi,
+                metadata: ["usageKind": "api"]
+            ).metricIDs
+        )
+        return metrics.filter { allowed.contains($0.id) }
     }
 
     private func metricRow(_ ids: [String]) -> some View {
@@ -83,6 +103,7 @@ struct XiaomiAPIMetricsView: View {
 
 struct VolcengineCodingPlanMetricsView: View {
     let metrics: [NormalizedUsageMetric]
+    var density: UsageCardDensity = .full
     let now: Date
 
     private var session: NormalizedUsageMetric? { metric("fiveHour") }
@@ -90,16 +111,33 @@ struct VolcengineCodingPlanMetricsView: View {
     private var monthly: NormalizedUsageMetric? { metric("monthly") }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 16) {
-                codingQuotaCell(session, fallbackTitle: "session")
-                codingQuotaCell(weekly, fallbackTitle: "weekly")
+        if density == .compact {
+            NormalizedUsageMetricGrid(
+                metrics: compactMetrics,
+                columns: 2,
+                resetTimeStyle: .resetTimeOnly,
+                now: now,
+                showsAmountDetails: false
+            )
+        } else {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top, spacing: 16) {
+                    codingQuotaCell(session, fallbackTitle: "session")
+                    codingQuotaCell(weekly, fallbackTitle: "weekly")
+                }
+                if let monthly {
+                    codingMonthlyCell(monthly)
+                }
             }
-            if let monthly {
-                codingMonthlyCell(monthly)
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var compactMetrics: [NormalizedUsageMetric] {
+        let allowed = Set(
+            UsageCardDensityPolicy.compactSpec(providerID: .volcengine, metadata: [:]).metricIDs
+        )
+        return metrics.filter { allowed.contains($0.id) }
     }
 
     private func codingQuotaCell(
@@ -216,24 +254,43 @@ struct VolcengineCodingPlanMetricsView: View {
 /// 火山两个计划共用周期额度卡片；月度额度横跨整行，避免 Coding Plan 的第三项挤压前两项。
 struct VolcenginePlanUsageMetricsView: View {
     let metrics: [NormalizedUsageMetric]
+    var density: UsageCardDensity = .full
     let now: Date
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        if density == .compact {
             NormalizedUsageMetricGrid(
-                metrics: metrics.filter { $0.presentation == .progress },
+                metrics: compactMetrics,
                 columns: 2,
-                resetTimeStyle: .relativeDuration,
-                now: now
+                resetTimeStyle: .resetTimeOnly,
+                now: now,
+                showsAmountDetails: false
             )
+        } else {
+            VStack(alignment: .leading, spacing: 10) {
+                NormalizedUsageMetricGrid(
+                    metrics: metrics.filter { $0.presentation == .progress },
+                    columns: 2,
+                    resetTimeStyle: .relativeDuration,
+                    now: now
+                )
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var compactMetrics: [NormalizedUsageMetric] {
+        let allowed = Set(
+            UsageCardDensityPolicy.compactSpec(providerID: .volcengine, metadata: [:]).metricIDs
+        )
+        return metrics.filter { allowed.contains($0.id) && $0.presentation == .progress }
     }
 }
 
 /// New API 的指标语义与订阅型供应商不同：额度有上限，消费和请求是活动统计。
 struct NewAPIUsageMetricsView: View {
     let metrics: [NormalizedUsageMetric]
+    var density: UsageCardDensity = .full
     let now: Date
 
     private var quotaMetric: NormalizedUsageMetric? {
@@ -256,17 +313,36 @@ struct NewAPIUsageMetricsView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if let quotaMetric {
-                quotaCard(quotaMetric)
+        if density == .compact {
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 2),
+                alignment: .leading,
+                spacing: 10
+            ) {
+                ForEach(compactTokenMetrics) { metric in
+                    compactTokenCell(metric)
+                }
             }
+        } else {
+            VStack(alignment: .leading, spacing: 10) {
+                if let quotaMetric {
+                    quotaCard(quotaMetric)
+                }
 
-            if !consumptionMetrics.isEmpty {
-                consumptionSection
+                if !consumptionMetrics.isEmpty {
+                    consumptionSection
+                }
+
+                activitySection
             }
-
-            activitySection
         }
+    }
+
+    private var compactTokenMetrics: [NormalizedUsageMetric] {
+        let allowed = Set(
+            UsageCardDensityPolicy.compactSpec(providerID: .newAPI, metadata: [:]).metricIDs
+        )
+        return consumptionMetrics.filter { allowed.contains($0.id) }
     }
 
     private func quotaCard(_ metric: NormalizedUsageMetric) -> some View {
@@ -406,6 +482,23 @@ struct NewAPIUsageMetricsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private func compactTokenCell(_ metric: NormalizedUsageMetric) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(metric.label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Text(UsageFormatter.exactTokenText(metric.value))
+                .font(.system(.headline, design: .rounded, weight: .semibold))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(metric.label)，\(UsageFormatter.exactTokenText(metric.value))")
+    }
+
     private func activityCell(
         label: String,
         value: Decimal?,
@@ -463,6 +556,7 @@ struct NewAPIUsageMetricsView: View {
 /// GLM 的两个调用量是无上限统计，展示为标准“标签 + 右对齐数值”行。
 struct GLMUsageMetricsView: View {
     let metrics: [NormalizedUsageMetric]
+    var density: UsageCardDensity = .full
     let now: Date
 
     private var progressMetrics: [NormalizedUsageMetric] {
@@ -489,6 +583,27 @@ struct GLMUsageMetricsView: View {
     }
 
     var body: some View {
+        if density == .compact {
+            NormalizedUsageMetricGrid(
+                metrics: compactMetrics,
+                columns: 2,
+                resetTimeStyle: .resetTimeOnly,
+                now: now,
+                showsAmountDetails: false
+            )
+        } else {
+            fullContent
+        }
+    }
+
+    private var compactMetrics: [NormalizedUsageMetric] {
+        let allowed = Set(
+            UsageCardDensityPolicy.compactSpec(providerID: .glm, metadata: [:]).metricIDs
+        )
+        return metrics.filter { allowed.contains($0.id) && $0.presentation == .progress }
+    }
+
+    private var fullContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             if !progressMetrics.isEmpty {
                 NormalizedUsageMetricGrid(

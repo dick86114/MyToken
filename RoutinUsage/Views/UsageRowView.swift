@@ -343,7 +343,10 @@ private extension UsageRowView {
         if state.configuration.providerID == .xiaomi,
            state.configuration.metadata["usageKind"] != "plan" {
             return AnyView(
-                XiaomiAPIMetricsView(metrics: snapshot.normalizedMetrics)
+                XiaomiAPIMetricsView(
+                    metrics: snapshot.normalizedMetrics,
+                    density: density
+                )
             )
         }
         if state.configuration.providerID == .commandCode {
@@ -351,6 +354,7 @@ private extension UsageRowView {
                 CommandCodeUsageMetricsView(
                     metrics: snapshot.normalizedMetrics,
                     now: now,
+                    density: density,
                     displayMode: .card
                 )
             )
@@ -358,13 +362,21 @@ private extension UsageRowView {
 
         if state.configuration.providerID == .glm {
             return AnyView(
-                GLMUsageMetricsView(metrics: snapshot.normalizedMetrics, now: now)
+                GLMUsageMetricsView(
+                    metrics: snapshot.normalizedMetrics,
+                    density: density,
+                    now: now
+                )
             )
         }
 
         if state.configuration.providerID == .newAPI {
             return AnyView(
-                NewAPIUsageMetricsView(metrics: snapshot.normalizedMetrics, now: now)
+                NewAPIUsageMetricsView(
+                    metrics: snapshot.normalizedMetrics,
+                    density: density,
+                    now: now
+                )
             )
         }
 
@@ -373,6 +385,7 @@ private extension UsageRowView {
                 return AnyView(
                     VolcengineCodingPlanMetricsView(
                         metrics: snapshot.normalizedMetrics,
+                        density: density,
                         now: now
                     )
                 )
@@ -380,21 +393,39 @@ private extension UsageRowView {
             return AnyView(
                 VolcenginePlanUsageMetricsView(
                     metrics: snapshot.normalizedMetrics,
+                    density: density,
                     now: now
                 )
             )
         }
 
+        var metrics = snapshot.normalizedMetrics
+        var resetStyle = NormalizedUsageMetricResetStyle.relativeDuration
+        var showsAmountDetails = true
+        var showsResetTime = true
+        if density == .compact {
+            let spec = UsageCardDensityPolicy.compactSpec(
+                providerID: state.configuration.providerID,
+                metadata: state.configuration.metadata
+            )
+            let allowed = Set(spec.metricIDs)
+            metrics = metrics.filter { allowed.contains($0.id) }
+            resetStyle = .resetTimeOnly
+            showsAmountDetails = false
+            showsResetTime = spec.showsResetTime
+        }
         let layout = UsageMetricGridPolicy.layout(
             providerID: state.configuration.providerID,
-            metrics: snapshot.normalizedMetrics
+            metrics: metrics
         )
         return AnyView(
             NormalizedUsageMetricGrid(
                 metrics: layout.metrics,
                 columns: layout.columns,
-                resetTimeStyle: .relativeDuration,
-                now: now
+                resetTimeStyle: resetStyle,
+                now: now,
+                showsAmountDetails: showsAmountDetails,
+                showsResetTime: showsResetTime
             )
         )
     }

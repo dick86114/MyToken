@@ -298,7 +298,8 @@ final class UsagePresentationPolicyTests: XCTestCase {
         )
 
         XCTAssertTrue(source.contains("normalizedMetricsContent(snapshot: snapshot, now: now)"))
-        XCTAssertTrue(source.contains("resetTimeStyle: .relativeDuration"))
+        XCTAssertTrue(source.contains("resetStyle = .resetTimeOnly"))
+        XCTAssertTrue(source.contains("showsResetTime: showsResetTime"))
         XCTAssertTrue(source.contains("now: now"))
     }
 
@@ -321,6 +322,36 @@ final class UsagePresentationPolicyTests: XCTestCase {
         XCTAssertTrue(row.contains("var density: UsageCardDensity = .full"))
         XCTAssertTrue(popover.contains("density: settings.usageCardDensity"))
         XCTAssertFalse(row.contains("groupMultiplierText(currentGroupMultiplier)"))
+    }
+
+    func test供应商简洁视图按策略过滤字段() throws {
+        let sections = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/ProviderUsageMetricSections.swift"),
+            encoding: .utf8
+        )
+        let command = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/CommandCodeUsageMetricsView.swift"),
+            encoding: .utf8
+        )
+        let details = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/Settings/CredentialDetailsView.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(sections.contains("var density: UsageCardDensity = .full"))
+        XCTAssertTrue(command.contains("var density: UsageCardDensity = .full"))
+        XCTAssertTrue(sections.contains("UsageCardDensityPolicy.compactSpec("))
+        XCTAssertFalse(details.contains("density: .compact"))
+        XCTAssertTrue(command.contains("density == .compact"))
     }
 
     func test弹窗供应商信息显示供应商与套餐() throws {
