@@ -17,6 +17,7 @@ final class ConfigurationBackupTests: XCTestCase {
         let settings = AppSettings(defaults: context.defaults)
         settings.refreshMinutes = 30
         settings.displayDimension = .weekly
+        settings.usageCardDensity = .full
         var colorRules = settings.menuBarColorRules
         colorRules.warningThreshold = 35
         colorRules.criticalThreshold = 75
@@ -42,6 +43,7 @@ final class ConfigurationBackupTests: XCTestCase {
         XCTAssertEqual(decoded.credentials.first?.secret, "sk-test")
         XCTAssertEqual(decoded.settings.refreshMinutes, 30)
         XCTAssertEqual(decoded.settings.displayDimension, .weekly)
+        XCTAssertEqual(decoded.settings.usageCardDensity, .full)
         XCTAssertEqual(decoded.settings.menuBarColorRules, colorRules)
         XCTAssertEqual(decoded.settings.updateChannel, .direct)
         XCTAssertEqual(decoded.settings.displayOrder.menuBarCredentialIDs, [id])
