@@ -237,40 +237,47 @@ private extension UsagePopoverView {
             .accessibilityElement(children: .combine)
             .accessibilityLabel("空配置，尚未配置 Key")
         } else {
-            LazyVGrid(columns: cardColumns, spacing: 8) {
-                ForEach(filteredPopoverKeyIDs, id: \.self) { id in
-                    if let state = store.state(for: id) {
-                        UsageRowView(
-                            state: state,
-                            density: settings.usageCardDensity,
-                            actions: nil,
-                            refreshCredential: {
-                                Task { await refreshCredential(id) }
-                            },
-                            retryCredential: {
-                                Task { await retryCredential(id) }
-                            },
-                            onShare: {
-                                if let content = UsageShareContentBuilder.build(state: state) {
-                                    UsageSharePanelController.shared.present(content: content)
-                                }
-                            }
-                        )
-                    }
-                }
-            }
+            densityListContent
             .id(settings.usageCardDensity)
             .padding(.horizontal, 12)
         }
     }
 
-    var cardColumns: [GridItem] {
-        settings.usageCardDensity == .compact
-            ? [
-                GridItem(.flexible(), spacing: 8),
-                GridItem(.flexible())
-            ]
-            : [GridItem(.flexible())]
+    @ViewBuilder
+    private var densityListContent: some View {
+        if settings.usageCardDensity == .compact {
+            WaterfallLayout(columns: 2, spacing: 8) {
+                cardViews
+            }
+        } else {
+            LazyVGrid(columns: [GridItem(.flexible())], spacing: 8) {
+                cardViews
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var cardViews: some View {
+        ForEach(filteredPopoverKeyIDs, id: \.self) { id in
+            if let state = store.state(for: id) {
+                UsageRowView(
+                    state: state,
+                    density: settings.usageCardDensity,
+                    actions: nil,
+                    refreshCredential: {
+                        Task { await refreshCredential(id) }
+                    },
+                    retryCredential: {
+                        Task { await retryCredential(id) }
+                    },
+                    onShare: {
+                        if let content = UsageShareContentBuilder.build(state: state) {
+                            UsageSharePanelController.shared.present(content: content)
+                        }
+                    }
+                )
+            }
+        }
     }
 
     var popoverKeyIDs: [UUID] {
