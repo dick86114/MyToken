@@ -302,6 +302,27 @@ final class UsagePresentationPolicyTests: XCTestCase {
         XCTAssertTrue(source.contains("now: now"))
     }
 
+    func test弹窗卡片按密度渲染并默认完整以免详情页误伤() throws {
+        let row = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/UsageRowView.swift"),
+            encoding: .utf8
+        )
+        let popover = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/UsagePopoverView.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(row.contains("var density: UsageCardDensity = .full"))
+        XCTAssertTrue(popover.contains("density: settings.usageCardDensity"))
+        XCTAssertFalse(row.contains("groupMultiplierText(currentGroupMultiplier)"))
+    }
+
     func test弹窗供应商信息显示供应商与套餐() throws {
         XCTAssertEqual(
             UsageRowPresentation.subscriptionDescription(providerID: .glm, planName: "Coding Plan"),
