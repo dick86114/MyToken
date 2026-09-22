@@ -89,6 +89,43 @@ final class UsagePresentationPolicyTests: XCTestCase {
         )
     }
 
+    func test简洁模式指标按短周期到长周期排序() {
+        func metric(_ id: String) -> NormalizedUsageMetric {
+            NormalizedUsageMetric(
+                id: id,
+                label: id,
+                unit: .currency,
+                presentation: .progress,
+                semantic: .usedQuota
+            )
+        }
+
+        let ordered = UsageCardDensityPolicy.orderedMetrics(
+            providerID: .commandCode,
+            metadata: [:],
+            metrics: [
+                metric("credit-progress"),
+                metric("weekly"),
+                metric("five-hour"),
+                metric("request-count")
+            ]
+        )
+
+        XCTAssertEqual(ordered.map(\.id), ["five-hour", "weekly", "credit-progress"])
+
+        let volcengine = UsageCardDensityPolicy.orderedMetrics(
+            providerID: .volcengine,
+            metadata: [:],
+            metrics: [
+                metric("monthly"),
+                metric("fiveHour"),
+                metric("weekly")
+            ]
+        )
+
+        XCTAssertEqual(volcengine.map(\.id), ["fiveHour", "weekly", "monthly"])
+    }
+
     func test弹窗为CommandCode接入专用指标视图() throws {
         let source = try String(
             contentsOf: URL(fileURLWithPath: #filePath)
@@ -357,7 +394,7 @@ final class UsagePresentationPolicyTests: XCTestCase {
         XCTAssertFalse(command.contains("var density: UsageCardDensity"))
         XCTAssertTrue(row.contains("func compactCard(now: Date)"))
         XCTAssertTrue(row.contains("func compactMetricRow(_ metric: NormalizedUsageMetric, now: Date)"))
-        XCTAssertTrue(row.contains("UsageCardDensityPolicy.compactSpec("))
+        XCTAssertTrue(row.contains("UsageCardDensityPolicy.orderedMetrics("))
         XCTAssertFalse(details.contains("density: .compact"))
     }
 

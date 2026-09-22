@@ -386,12 +386,11 @@ private extension UsageRowView {
 
     @ViewBuilder
     func compactMetrics(snapshot: UsageSnapshot, now: Date) -> some View {
-        let spec = UsageCardDensityPolicy.compactSpec(
+        let metrics = UsageCardDensityPolicy.orderedMetrics(
             providerID: state.configuration.providerID,
-            metadata: state.configuration.metadata
+            metadata: state.configuration.metadata,
+            metrics: snapshot.normalizedMetrics
         )
-        let allowed = Set(spec.metricIDs)
-        let metrics = snapshot.normalizedMetrics.filter { allowed.contains($0.id) }
 
         if !metrics.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
