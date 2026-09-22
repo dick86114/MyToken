@@ -46,7 +46,6 @@ struct NormalizedUsageMetricGrid: View {
     var resetTimeStyle: NormalizedUsageMetricResetStyle = .fullDateTime
     var now: Date = .now
     var showsAmountDetails: Bool = true
-    var showsResetTime: Bool = true
 
     var body: some View {
         let rows = stride(from: 0, to: metrics.count, by: columns).map {
@@ -61,7 +60,6 @@ struct NormalizedUsageMetricGrid: View {
                         resetTimeStyle: resetTimeStyle,
                         now: now,
                         showsAmountDetails: showsAmountDetails,
-                        showsResetTime: showsResetTime,
                         spansAllColumns: true
                     )
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -69,13 +67,12 @@ struct NormalizedUsageMetricGrid: View {
                     HStack(alignment: .top, spacing: 16) {
                         ForEach(0..<columns, id: \.self) { columnIndex in
                             if columnIndex < row.count {
-                        NormalizedUsageMetricCell(
-                            metric: row[columnIndex],
-                            resetTimeStyle: resetTimeStyle,
-                            now: now,
-                            showsAmountDetails: showsAmountDetails,
-                                showsResetTime: showsResetTime
-                        )
+                                NormalizedUsageMetricCell(
+                                    metric: row[columnIndex],
+                                    resetTimeStyle: resetTimeStyle,
+                                    now: now,
+                                    showsAmountDetails: showsAmountDetails
+                                )
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             } else {
                                 Color.clear
@@ -94,7 +91,6 @@ private struct NormalizedUsageMetricCell: View {
     let resetTimeStyle: NormalizedUsageMetricResetStyle
     let now: Date
     var showsAmountDetails: Bool = true
-    var showsResetTime: Bool = true
     var spansAllColumns: Bool = false
 
     var body: some View {
@@ -164,7 +160,7 @@ private struct NormalizedUsageMetricCell: View {
                 }
             }
 
-            if showsResetTime, let windowEnd = metric.windowEnd {
+            if let windowEnd = metric.windowEnd {
                 switch resetTimeStyle {
                 case .fullDateTime:
                     Text("重置 \(UsageFormatter.fullDateTime(windowEnd))")

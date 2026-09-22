@@ -72,6 +72,28 @@ final class UsagePopoverLayoutTests: XCTestCase {
         XCTAssertTrue(segmentedIndex < gearIndex)
     }
 
+    func test弹窗简洁模式两列排布并带切换动画() throws {
+        let popover = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/UsagePopoverView.swift"),
+            encoding: .utf8
+        )
+        let segmented = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/UsageCardDensitySegmentedControl.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(popover.contains("LazyVGrid(columns: cardColumns, spacing: 8)"))
+        XCTAssertTrue(popover.contains("usageCardDensity == .compact"))
+        XCTAssertTrue(popover.contains(".animation(.spring(response: 0.35, dampingFraction: 0.8), value: settings.usageCardDensity)"))
+        XCTAssertTrue(segmented.contains("withAnimation(.spring(response: 0.35, dampingFraction: 0.8))"))
+    }
+
     func test弹窗设置按钮复用右键菜单激活逻辑() throws {
         let popover = try TestSourceReader.read([
             "RoutinUsage",

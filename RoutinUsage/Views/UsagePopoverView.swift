@@ -237,7 +237,7 @@ private extension UsagePopoverView {
             .accessibilityElement(children: .combine)
             .accessibilityLabel("空配置，尚未配置 Key")
         } else {
-            VStack(spacing: 8) {
+            LazyVGrid(columns: cardColumns, spacing: 8) {
                 ForEach(filteredPopoverKeyIDs, id: \.self) { id in
                     if let state = store.state(for: id) {
                         UsageRowView(
@@ -259,8 +259,18 @@ private extension UsagePopoverView {
                     }
                 }
             }
+            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: settings.usageCardDensity)
             .padding(.horizontal, 12)
         }
+    }
+
+    var cardColumns: [GridItem] {
+        settings.usageCardDensity == .compact
+            ? [
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible())
+            ]
+            : [GridItem(.flexible())]
     }
 
     var popoverKeyIDs: [UUID] {
