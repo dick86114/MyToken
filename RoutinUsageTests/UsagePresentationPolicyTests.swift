@@ -360,6 +360,22 @@ final class UsagePresentationPolicyTests: XCTestCase {
         XCTAssertFalse(row.contains("groupMultiplierText(currentGroupMultiplier)"))
     }
 
+    func test完整卡片保留内边距() throws {
+        let row = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/UsageRowView.swift"),
+            encoding: .utf8
+        )
+        let fullStart = try XCTUnwrap(row.range(of: "private func fullCard(now: Date)"))
+        let compactStart = try XCTUnwrap(row.range(of: "private func compactCard(now: Date)"))
+        let fullBody = row[fullStart.lowerBound..<compactStart.lowerBound]
+
+        XCTAssertTrue(fullBody.contains(".padding(.vertical, 10)"))
+        XCTAssertTrue(fullBody.contains(".padding(.horizontal, 8)"))
+    }
+
     func test简洁卡片统一纵向排列指标() throws {
         let sections = try String(
             contentsOf: URL(fileURLWithPath: #filePath)

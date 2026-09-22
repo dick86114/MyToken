@@ -32,6 +32,8 @@ struct UsageRowView: View {
                     .padding(.top, 2)
             }
         }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 8)
         .modifier(UsageCardChrome(state: state, isExpired: isSubscriptionExpired(now: now)))
         .accessibilityElement(children: .contain)
         .accessibilityLabel(accessibilityLabel(now: now))
