@@ -35,7 +35,7 @@ internal fun UsageRing(
     val accent = when (tone) {
         UsageMetricTone.Warning -> colors.warning
         UsageMetricTone.Critical -> colors.critical
-        UsageMetricTone.Normal -> CardPalette.emerald(isDark)
+        UsageMetricTone.Normal -> colors.brand
     }
     val track = if (isDark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.08f)
     val strokeWidth = diameter * 0.10f

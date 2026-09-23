@@ -19,7 +19,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.math.RoundingMode
 import java.math.BigDecimal
@@ -34,7 +33,11 @@ internal data class MetricTone(val color: Color)
 
 internal fun statusColor(metric: UsageMetric, percent: Double?, colors: StatusColors): Color =
     when (metric.healthState) {
-        UsageMetricHealthState.Normal -> colors.normal
+        UsageMetricHealthState.Normal -> when (metric.presentation) {
+            ai.routin.mytoken.domain.model.UsageMetricPresentation.Balance,
+            ai.routin.mytoken.domain.model.UsageMetricPresentation.Status -> colors.positive
+            else -> colors.brand
+        }
         UsageMetricHealthState.Warning -> colors.warning
         UsageMetricHealthState.Critical, UsageMetricHealthState.Unavailable -> colors.critical
         UsageMetricHealthState.Stale, UsageMetricHealthState.Unknown -> if (percent == null) colors.neutral else colors.secondaryFallback()
@@ -45,7 +48,7 @@ internal fun progressColor(percent: Double?, colors: StatusColors): Color = when
     percent == null -> colors.neutral
     percent >= 80 -> colors.critical
     percent >= 50 -> colors.warning
-    else -> colors.normal
+    else -> colors.brand
 }
 
 private fun StatusColors.secondaryFallback(): Color = neutral
@@ -149,7 +152,7 @@ internal fun RemainingDurationText(end: Instant, colors: StatusColors, modifier:
     Text(
         text = "剩余 ${formatRemainingDuration(end, now)}",
         style = MaterialTheme.typography.labelSmall,
-        color = if (highlight) colors.normal else MaterialTheme.colorScheme.onSurfaceVariant,
+        color = if (highlight) colors.positive else MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = modifier,
     )
 }
@@ -264,8 +267,6 @@ private fun XiaomiMetricCell(metric: UsageMetric?, modifier: Modifier = Modifier
             text = metric?.label ?: "-",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
         )
         Text(
             text = when {
@@ -280,8 +281,6 @@ private fun XiaomiMetricCell(metric: UsageMetric?, modifier: Modifier = Modifier
             } else {
                 MaterialTheme.colorScheme.onSurface
             },
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -302,7 +301,7 @@ private fun ProgressCell(metric: UsageMetric, colors: StatusColors, modifier: Mo
     val color = progressColor(percent, colors)
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(metric.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Text(metric.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
             Text(formatPercent(percent), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = color)
         }
         UsageProgressBar(percent = percent, color = color)
@@ -416,15 +415,11 @@ private fun GLMActivityMetric(metric: UsageMetric, modifier: Modifier = Modifier
             text = glmActivityText(metric),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
         )
         Text(
             text = metric.label,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -621,7 +616,7 @@ private fun CommandCodeProgressMetric(
             Text(
                 text = line.text,
                 style = MaterialTheme.typography.labelSmall,
-                color = if (line.highlight) colors.normal else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (line.highlight) colors.positive else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -689,16 +684,12 @@ private fun CommandCodeRequestMetric(
                 text = metric.label.ifEmpty { "累计请求" },
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
                 modifier = Modifier.weight(1f),
             )
             Text(
                 text = "${formatCompact(metric.value)} 次",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Clip,
             )
         }
     } else {
@@ -712,9 +703,6 @@ private fun CommandCodeRequestMetric(
                 text = "${formatCompact(metric.value)} 次",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Clip,
             )
         }
     }

@@ -119,4 +119,85 @@ final class StatusBarIconRenderTests: XCTestCase {
         }
         return false
     }
+    func test余额单元比进度单元更宽且混合宽度按实际单元累加() {
+        let progress = MenuBarIndicatorModel(
+            shortCode: "GLM",
+            percent: 60,
+            healthState: .normal,
+            accessibilityLabel: "GLM",
+            content: .progress(60)
+        )
+        let balance = MenuBarIndicatorModel(
+            shortCode: "DS",
+            percent: nil,
+            healthState: .normal,
+            accessibilityLabel: "DeepSeek",
+            content: .balance("12")
+        )
+
+        XCTAssertGreaterThan(
+            MenuBarMultiUsageIcon.imageWidth(for: [balance]),
+            MenuBarMultiUsageIcon.imageWidth(for: [progress])
+        )
+        XCTAssertEqual(
+            MenuBarMultiUsageIcon.imageWidth(for: [progress, balance]),
+            MenuBarMultiUsageIcon.outerPadding * 2
+                + MenuBarMultiUsageIcon.unitWidth
+                + MenuBarMultiUsageIcon.balanceUnitWidth
+                + MenuBarMultiUsageIcon.gap
+        )
+    }
+
+    func test余额圆圈按健康状态使用绿红规则() throws {
+        var rules = MenuBarColorRules.standard
+        rules.normalColor = .init(red: 0.1, green: 0.9, blue: 0.3)
+        rules.criticalColor = .init(red: 0.95, green: 0.1, blue: 0.2)
+        let normal = MenuBarIndicatorModel(
+            shortCode: "DS",
+            percent: nil,
+            healthState: .normal,
+            accessibilityLabel: "余额正常",
+            content: .balance("99")
+        )
+        let warning = MenuBarIndicatorModel(
+            shortCode: "DS",
+            percent: nil,
+            healthState: .warning,
+            accessibilityLabel: "余额偏低",
+            content: .balance("1")
+        )
+
+        let normalBitmap = try renderedBitmap(
+            MenuBarMultiUsageIcon.image(indicators: [normal], colorRules: rules)
+        )
+        let warningBitmap = try renderedBitmap(
+            MenuBarMultiUsageIcon.image(indicators: [warning], colorRules: rules)
+        )
+
+        XCTAssertTrue(
+            try containsColor(
+                in: normalBitmap,
+                contains: rules.normalColor,
+                tolerance: 0.05
+            )
+        )
+        XCTAssertTrue(
+            try containsColor(
+                in: warningBitmap,
+                contains: rules.criticalColor,
+                tolerance: 0.05
+            )
+        )
+    }
+
+    func test圆圈文字按背景亮度选择黑白() {
+        XCTAssertEqual(
+            MenuBarMultiUsageIcon.highContrastTextColor(for: .black).usingColorSpace(.sRGB),
+            NSColor.white.usingColorSpace(.sRGB)
+        )
+        XCTAssertEqual(
+            MenuBarMultiUsageIcon.highContrastTextColor(for: .white).usingColorSpace(.sRGB),
+            NSColor.black.usingColorSpace(.sRGB)
+        )
+    }
 }

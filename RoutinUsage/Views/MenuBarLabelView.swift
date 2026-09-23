@@ -1,10 +1,71 @@
 import AppKit
 
+enum MenuBarBalanceFormatter {
+    static func compactText(_ value: Decimal?) -> String {
+        guard let value, !value.isNaN else {
+            return "--"
+        }
+
+        let integerBehavior = NSDecimalNumberHandler(
+            roundingMode: .down,
+            scale: 0,
+            raiseOnExactness: false,
+            raiseOnOverflow: false,
+            raiseOnUnderflow: false,
+            raiseOnDivideByZero: false
+        )
+        let absoluteDecimal = abs(value)
+        let absoluteValue = NSDecimalNumber(decimal: absoluteDecimal)
+        let isNegative = value < 0
+
+        let units: [(threshold: Decimal, divisor: Decimal, suffix: String)] = [
+            (Decimal(1_000_000_000), Decimal(1_000_000_000), "B"),
+            (Decimal(1_000_000), Decimal(1_000_000), "M"),
+            (Decimal(1_000), Decimal(1_000), "k")
+        ]
+
+        for unit in units where absoluteDecimal >= unit.threshold {
+            let shortened = absoluteValue
+                .dividing(by: NSDecimalNumber(decimal: unit.divisor))
+                .rounding(accordingToBehavior: integerBehavior)
+            let signedShortened = isNegative ? -shortened.decimalValue : shortened.decimalValue
+            let number = NSDecimalNumber(decimal: signedShortened).stringValue
+            return number + unit.suffix
+        }
+
+        let integer = absoluteValue.rounding(accordingToBehavior: integerBehavior)
+        let signedInteger = isNegative ? -integer.decimalValue : integer.decimalValue
+        return NSDecimalNumber(decimal: signedInteger).stringValue
+    }
+}
+
+enum MenuBarIndicatorContent: Equatable, Sendable {
+    case progress(Double)
+    case balance(String)
+    case status
+    case none
+}
+
 struct MenuBarIndicatorModel: Equatable, Sendable {
     let shortCode: String
     let percent: Double?
     let healthState: UsageMetricHealthState
     let accessibilityLabel: String
+    let content: MenuBarIndicatorContent
+
+    init(
+        shortCode: String,
+        percent: Double?,
+        healthState: UsageMetricHealthState,
+        accessibilityLabel: String,
+        content: MenuBarIndicatorContent? = nil
+    ) {
+        self.shortCode = shortCode
+        self.percent = percent
+        self.healthState = healthState
+        self.accessibilityLabel = accessibilityLabel
+        self.content = content ?? percent.map { .progress($0) } ?? .none
+    }
 
     static func hoverSummary(for indicators: [MenuBarIndicatorModel]) -> String {
         indicators.map(\.accessibilityLabel).joined(separator: "\n")
@@ -23,7 +84,8 @@ struct MenuBarIndicatorModel: Equatable, Sendable {
                 healthState: metric.healthState == .unknown
                     ? MenuBarUsageRisk.healthState(for: percent)
                     : metric.healthState,
-                accessibilityLabel: "\(descriptor.displayName)，\(state.configuration.displayName)，\(metric.displaysRemainingPercent ? "剩余" : "已使用") \(Int(percent.rounded()))%"
+                accessibilityLabel: "\(descriptor.displayName)，\(state.configuration.displayName)，\(metric.displaysRemainingPercent ? "剩余" : "已使用") \(Int(percent.rounded()))%",
+                content: .progress(percent)
             )
         }
 
@@ -33,7 +95,8 @@ struct MenuBarIndicatorModel: Equatable, Sendable {
                 shortCode: descriptor.shortCode,
                 percent: nil,
                 healthState: metric.healthState,
-                accessibilityLabel: "\(descriptor.displayName)，\(state.configuration.displayName)，余额 \(value)"
+                accessibilityLabel: "\(descriptor.displayName)，\(state.configuration.displayName)，余额 \(value)",
+                content: .balance(MenuBarBalanceFormatter.compactText(metric.value))
             )
         }
 
@@ -42,7 +105,8 @@ struct MenuBarIndicatorModel: Equatable, Sendable {
                 shortCode: descriptor.shortCode,
                 percent: nil,
                 healthState: metric.healthState,
-                accessibilityLabel: "\(descriptor.displayName)，\(state.configuration.displayName)，账户状态"
+                accessibilityLabel: "\(descriptor.displayName)，\(state.configuration.displayName)，账户状态",
+                content: .status
             )
         }
 
@@ -119,16 +183,29 @@ enum MenuBarMultiUsageIcon {
         indicators: [MenuBarIndicatorModel],
         colorRules: MenuBarColorRules = .standard
     ) -> NSImage {
-        let count = max(1, min(indicators.count, maximumCount))
-        let imageSize = NSSize(width: imageWidth(for: count), height: size.height)
+        let displayedIndicators = Array(indicators.prefix(maximumCount))
+        let imageSize = NSSize(
+            width: imageWidth(for: displayedIndicators),
+            height: size.height
+        )
         let image = NSImage(size: imageSize, flipped: false) { _ in
-            for (index, indicator) in indicators.prefix(maximumCount).enumerated() {
-                let x = outerPadding + CGFloat(index) * (unitWidth + gap)
+            var cursor = outerPadding
+            for (index, indicator) in displayedIndicators.enumerated() {
+                let width = unitWidth(for: indicator)
                 draw(
                     indicator: indicator,
                     colorRules: colorRules,
-                    in: NSRect(x: x, y: 0, width: unitWidth, height: size.height)
+                    in: NSRect(
+                        x: cursor,
+                        y: 0,
+                        width: width,
+                        height: size.height
+                    )
                 )
+                cursor += width
+                if index < displayedIndicators.count - 1 {
+                    cursor += gap
+                }
             }
             return true
         }
@@ -188,34 +265,24 @@ enum MenuBarMultiUsageIcon {
             NSString(string: character).draw(at: origin, withAttributes: attributes)
         }
 
-        let trackRect = NSRect(x: rect.minX + 9.5, y: 4, width: 7.5, height: rect.height - 8)
-        let track = NSBezierPath(roundedRect: trackRect, xRadius: 2.5, yRadius: 2.5)
-        track.lineWidth = 1
-        NSColor.labelColor.withAlphaComponent(0.34).setStroke()
-        NSColor.secondaryLabelColor.withAlphaComponent(0.22).setFill()
-        track.fill()
-
-        let fillHeight: CGFloat
-        if let percent = indicator.percent {
-            fillHeight = (trackRect.height - track.lineWidth) * CGFloat(min(max(percent, 0), 100)) / 100
-        } else {
-            fillHeight = indicator.healthState == .unknown ? 0 : 3
+        switch indicator.content {
+        case let .progress(percent):
+            drawProgress(
+                percent: percent,
+                indicator: indicator,
+                colorRules: colorRules,
+                in: rect
+            )
+        case let .balance(text):
+            drawBalance(
+                text: text,
+                indicator: indicator,
+                colorRules: colorRules,
+                in: rect
+            )
+        case .status, .none:
+            break
         }
-        if fillHeight > 0 {
-            NSGraphicsContext.saveGraphicsState()
-            track.addClip()
-            progressColor(for: indicator, rules: colorRules).setFill()
-            NSBezierPath(
-                rect: NSRect(
-                    x: trackRect.minX + track.lineWidth / 2,
-                    y: trackRect.minY + track.lineWidth / 2,
-                    width: trackRect.width - track.lineWidth,
-                    height: fillHeight
-                )
-            ).fill()
-            NSGraphicsContext.restoreGraphicsState()
-        }
-        track.stroke()
     }
 
     private static func progressColor(
@@ -383,6 +450,133 @@ enum MenuBarLogoUsageIcon {
             return .systemOrange
         case .critical:
             return .systemRed
+        }
+    }
+}
+extension MenuBarMultiUsageIcon {
+    static let balanceUnitWidth: CGFloat = 30
+    static let balanceDiameter: CGFloat = 18
+    static func imageWidth(for indicators: [MenuBarIndicatorModel]) -> CGFloat {
+        let displayed = indicators.prefix(maximumCount)
+        guard !displayed.isEmpty else {
+            return imageWidth(for: 0)
+        }
+
+        let widths = displayed.map(unitWidth(for:))
+        return outerPadding * 2
+            + widths.reduce(0, +)
+            + gap * CGFloat(max(0, widths.count - 1))
+    }
+
+    static func unitWidth(for indicator: MenuBarIndicatorModel) -> CGFloat {
+        if case .balance = indicator.content {
+            return balanceUnitWidth
+        }
+        return unitWidth
+    }
+    private static func drawProgress(
+        percent: Double,
+        indicator: MenuBarIndicatorModel,
+        colorRules: MenuBarColorRules,
+        in rect: NSRect
+    ) {
+        let trackRect = NSRect(
+            x: rect.minX + 9.5,
+            y: 4,
+            width: 7.5,
+            height: rect.height - 8
+        )
+        let track = NSBezierPath(roundedRect: trackRect, xRadius: 2.5, yRadius: 2.5)
+        track.lineWidth = 1
+        NSColor.labelColor.withAlphaComponent(0.34).setStroke()
+        NSColor.secondaryLabelColor.withAlphaComponent(0.22).setFill()
+        track.fill()
+
+        let fillHeight = (trackRect.height - track.lineWidth)
+            * CGFloat(min(max(percent, 0), 100)) / 100
+        if fillHeight > 0 {
+            NSGraphicsContext.saveGraphicsState()
+            track.addClip()
+            progressColor(for: indicator, rules: colorRules).setFill()
+            NSBezierPath(
+                rect: NSRect(
+                    x: trackRect.minX + track.lineWidth / 2,
+                    y: trackRect.minY + track.lineWidth / 2,
+                    width: trackRect.width - track.lineWidth,
+                    height: fillHeight
+                )
+            ).fill()
+            NSGraphicsContext.restoreGraphicsState()
+        }
+        track.stroke()
+    }
+
+    private static func drawBalance(
+        text: String,
+        indicator: MenuBarIndicatorModel,
+        colorRules: MenuBarColorRules,
+        in rect: NSRect
+    ) {
+        let circleRect = NSRect(
+            x: rect.maxX - balanceDiameter - 1.5,
+            y: (rect.height - balanceDiameter) / 2,
+            width: balanceDiameter,
+            height: balanceDiameter
+        )
+        let fill = balanceColor(for: indicator, rules: colorRules)
+        fill.setFill()
+        NSBezierPath(ovalIn: circleRect).fill()
+
+        let fontSize: CGFloat = text.count >= 4 ? 6.5 : 7.5
+        let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .bold)
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: highContrastTextColor(for: fill)
+        ]
+        let textSize = NSString(string: text).size(withAttributes: attributes)
+        NSString(string: text).draw(
+            at: NSPoint(
+                x: circleRect.midX - textSize.width / 2,
+                y: circleRect.midY - textSize.height / 2
+            ),
+            withAttributes: attributes
+        )
+    }
+
+    static func highContrastTextColor(for fill: NSColor) -> NSColor {
+        guard let srgb = fill.usingColorSpace(.sRGB) else {
+            return .white
+        }
+
+        func linearized(_ component: CGFloat) -> CGFloat {
+            component <= 0.04045
+                ? component / 12.92
+                : pow((component + 0.055) / 1.055, 2.4)
+        }
+
+        let luminance = 0.2126 * linearized(srgb.redComponent)
+            + 0.7152 * linearized(srgb.greenComponent)
+            + 0.0722 * linearized(srgb.blueComponent)
+        let contrastWithBlack = (luminance + 0.05) / 0.05
+        let contrastWithWhite = 1.05 / (luminance + 0.05)
+        return contrastWithBlack >= contrastWithWhite ? .black : .white
+    }
+
+    private static func balanceColor(
+        for indicator: MenuBarIndicatorModel,
+        rules: MenuBarColorRules
+    ) -> NSColor {
+        if case let .balance(text) = indicator.content, text == "--" {
+            return .gray
+        }
+
+        switch indicator.healthState {
+        case .normal:
+            return rules.normalColor.nsColor
+        case .warning, .critical, .unavailable, .stale:
+            return rules.criticalColor.nsColor
+        case .unknown:
+            return .gray
         }
     }
 }

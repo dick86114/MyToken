@@ -2,15 +2,15 @@ package ai.routin.mytoken.feature.settings
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeUp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -30,7 +30,12 @@ class SettingsScreenTest {
     private val refreshStore = FakeRefreshSettingsStore()
     private val displayStore = FakeDisplaySettingsStore()
 
-    private fun setContent(onOpenTransfer: () -> Unit = {}) {
+    private fun setContent(
+        onOpenTransfer: () -> Unit = {},
+        updateState: AppUpdateUiState = AppUpdateUiState.Idle,
+        mirrorBase: String = "",
+        onOpenInstallPermissionSettings: () -> Unit = {},
+    ) {
         val releaseHistoryState = AppReleaseHistoryUiState.Loaded(
             listOf(
                 AppReleaseHistoryItem(
@@ -54,13 +59,16 @@ class SettingsScreenTest {
                         isLoading = false,
                         refresh = refreshStore.state.value,
                         display = displayStore.state.value,
+                        update = UpdateSettings(mirrorBase = mirrorBase),
                     ),
                     appVersion = "0.1.0",
+                    updateState = updateState,
                     releaseHistoryState = releaseHistoryState,
                     onOpenAppRefreshChange = { refreshStore.state.value = refreshStore.state.value.copy(openAppRefresh = it) },
                     onRetryOnFailureChange = { refreshStore.state.value = refreshStore.state.value.copy(retryOnFailure = it) },
                     onThemeModeChange = { displayStore.state.value = displayStore.state.value.copy(themeMode = it) },
                     onOpenTransfer = onOpenTransfer,
+                    onOpenInstallPermissionSettings = onOpenInstallPermissionSettings,
                 )
             }
         }
@@ -100,27 +108,58 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun aboutSectionShowsVersionAndHelpWithoutMacOnlyOptions() {
+    fun aboutSectionUsesIconsAndConciseCopy() {
         setContent()
 
-        // Scroll the (lazy) settings list down until the 关于 section is composed.
-        repeat(4) {
-            composeRule.onNodeWithTag("settings_list").performTouchInput { swipeUp() }
-            composeRule.waitForIdle()
-        }
+        scrollToAbout()
         composeRule.onNodeWithText("关于").assertIsDisplayed()
         composeRule.onNodeWithText("MyToken 0.1.0", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithText("GitHub").assertIsDisplayed()
-        composeRule.onNodeWithText("当前版本更新日志").assertIsDisplayed()
         composeRule.onNodeWithText("当前版本修复内容").assertIsDisplayed()
-
-        composeRule.onNodeWithTag("release_history_button").performClick()
-        composeRule.onNodeWithText("历史版本更新日志").assertIsDisplayed()
-        composeRule.onNodeWithText("历史版本修复内容").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("打开 GitHub").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("查看历史版本").assertIsDisplayed()
+        composeRule.onNodeWithText("更新日志").assertIsDisplayed()
+        composeRule.onNodeWithText("当前版本更新日志").assertDoesNotExist()
+        composeRule.onNodeWithText("应用更新").assertDoesNotExist()
+        composeRule.onNodeWithText("查看历史版本").assertDoesNotExist()
+        composeRule.onNodeWithTag("update_channel_selector").assertIsDisplayed()
+        composeRule.onNodeWithTag("check_updates_button").assertIsDisplayed()
 
         // macOS-only settings must not appear on Android.
         composeRule.onNodeWithText("菜单栏").assertDoesNotExist()
         composeRule.onNodeWithText("登录项").assertDoesNotExist()
         assertTrue(displayStore.state.value.showDisabledCredentials)
+    }
+
+    @Test
+    fun historyIconOpensReleaseHistoryDialog() {
+        setContent()
+        scrollToAbout()
+
+        composeRule.onNodeWithContentDescription("查看历史版本").performClick()
+
+        composeRule.onNodeWithText("历史版本").assertIsDisplayed()
+        composeRule.onNodeWithText("历史版本修复内容").assertIsDisplayed()
+    }
+
+    @Test
+    fun installPermissionUsesSinglePrimaryAction() {
+        var openedPermissionSettings = 0
+        setContent(
+            updateState = AppUpdateUiState.NeedsInstallPermission("0.2.0"),
+            onOpenInstallPermissionSettings = { openedPermissionSettings++ },
+        )
+        scrollToAbout()
+
+        composeRule.onNodeWithText("授权并安装").assertIsDisplayed()
+        composeRule.onNodeWithText("打开安装权限设置").assertDoesNotExist()
+        composeRule.onNodeWithText("授权后继续安装").assertDoesNotExist()
+        composeRule.onNodeWithTag("install_permission_button").performClick()
+
+        assertEquals(1, openedPermissionSettings)
+    }
+
+    private fun scrollToAbout() {
+        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText("关于"))
+        composeRule.waitForIdle()
     }
 }

@@ -49,7 +49,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(popover.contains("Image(nsImage: NSImage(named: \"PopoverColorBrandLogo\")"))
         XCTAssertTrue(popover.contains("frame(width: 36, height: 36)"))
         XCTAssertTrue(popover.contains("strokeBorder("))
-        XCTAssertTrue(popover.contains(".shadow(color: Color.black.opacity(0.25)"))
+        XCTAssertFalse(popover.contains(".shadow(color: Color.black.opacity(0.25)"))
         XCTAssertTrue(popover.contains("repeatForever"))
         XCTAssertTrue(popover.contains("打开 MyToken 官网"))
         XCTAssertTrue(popover.contains(".overlay(alignment: .center)"))
@@ -266,7 +266,7 @@ final class ProjectBootstrapTests: XCTestCase {
         let usageRowView = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
 
         XCTAssertTrue(usageRowView.contains("UsageMetricProgressBar(metric: metric)"))
-        XCTAssertTrue(usageRowView.contains("UsageMetricPresentation.color(for: metric.percent)"))
+        XCTAssertTrue(usageRowView.contains("rules: menuBarColorRules"))
     }
 
     func test凭证刷新使用边框动效且失败改用悬浮标识() throws {
@@ -368,13 +368,15 @@ final class ProjectBootstrapTests: XCTestCase {
         let projectSpec = try sourceText(at: "project.yml")
 
         XCTAssertTrue(surface.contains("if #available(macOS 26.0, *)"))
-        XCTAssertTrue(surface.contains(".glassEffect(.regular.tint(.white.opacity("))
+        XCTAssertTrue(surface.contains(".glassEffect("))
         XCTAssertTrue(surface.contains(".buttonStyle(.glass)"))
         XCTAssertTrue(surface.contains(".buttonStyle(.glassProminent)"))
         XCTAssertTrue(surface.contains(".regularMaterial"))
-        XCTAssertTrue(surface.contains("shape.stroke(.white.opacity("))
+        XCTAssertTrue(surface.contains("shape.stroke(Color.white.opacity("))
         XCTAssertTrue(surface.contains(".shadow("))
-        XCTAssertTrue(surface.contains("func liquidGlassSurface(cornerRadius: CGFloat = 16)"))
+        XCTAssertTrue(surface.contains("func liquidGlassSurface("))
+        XCTAssertTrue(surface.contains("PopoverVisualPolicy.cornerRadius(for: .outer)"))
+        XCTAssertTrue(surface.contains("func liquidGlassModalSurface("))
         XCTAssertTrue(surface.contains("func liquidGlassWindowBackground()"))
         XCTAssertTrue(projectSpec.contains("macOS: \"14.0\""))
     }
@@ -424,7 +426,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(popover.contains(".liquidGlassProgressSurface()"))
         XCTAssertFalse(row.contains(".liquidGlassSurface(cornerRadius:"))
         XCTAssertFalse(row.contains(".liquidGlassProgressSurface()"))
-        XCTAssertTrue(onboarding.contains(".liquidGlassSurface(cornerRadius: 24)"))
+        XCTAssertTrue(onboarding.contains(".liquidGlassSurface()"))
         XCTAssertTrue(onboarding.contains(".liquidGlassButton(prominent: true)"))
         XCTAssertTrue(onboarding.contains(".liquidGlassWindowBackground()"))
     }
@@ -684,7 +686,7 @@ final class ProjectBootstrapTests: XCTestCase {
         )
         let dialog = try String(
             contentsOf: projectRoot
-                .appendingPathComponent("android/feature-credentials/src/main/kotlin/ai/routin/mytoken/feature/credentials/XiaomiLoginDialog.kt"),
+                .appendingPathComponent("android/feature-credentials/src/main/kotlin/ai/routin/mytoken/feature/credentials/XiaomiLoginActivity.kt"),
             encoding: .utf8
         )
         // 失败徽章改挂头像后，标题区改为 CredentialCardHeader：头像徽章在左，刷新按钮在右。
@@ -696,7 +698,8 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(header.contains("AvatarWithFailureBadge(card = card"))
         XCTAssertTrue(card.contains("credential_failure_${card.credential.id}"))
         XCTAssertTrue(avatarCallIndex.lowerBound < refreshTagIndex.lowerBound)
-        XCTAssertTrue(card.contains("widthIn(max = 96.dp)"))
+        XCTAssertFalse(card.contains("widthIn(max = 96.dp)"))
+        XCTAssertFalse(card.contains("overflow = TextOverflow.Ellipsis"))
         XCTAssertTrue(dialog.contains("WebSettings.LOAD_NO_CACHE"))
         XCTAssertTrue(dialog.contains("removeAllCookies"))
         XCTAssertTrue(dialog.contains("onReceivedHttpError"))

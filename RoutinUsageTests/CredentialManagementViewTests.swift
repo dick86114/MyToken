@@ -30,7 +30,7 @@ final class CredentialManagementViewTests: XCTestCase {
         XCTAssertFalse(source.contains(".sheet(item: $alertSettingsPresentation)"))
         XCTAssertTrue(surface.contains("LiquidGlassOverlay"))
         XCTAssertTrue(surface.contains("onTapGesture(perform: onDismiss)"))
-        XCTAssertTrue(surface.contains("liquidGlassSurface(cornerRadius: 18)"))
+        XCTAssertTrue(surface.contains(".liquidGlassModalSurface()"))
     }
 
     func test凭证编辑器弹窗高度贴合内容() throws {

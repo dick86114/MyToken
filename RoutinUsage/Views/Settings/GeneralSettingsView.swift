@@ -241,9 +241,9 @@ struct GeneralSettingsView: View {
     private func settingLabel(title: String, message: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.headline)
+                .font(.system(size: 14, weight: .semibold))
             Text(message)
-                .font(.caption)
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
         }
     }
@@ -256,7 +256,7 @@ struct GeneralSettingsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)
-        .liquidGlassSurface(cornerRadius: 16)
+        .liquidGlassSurface()
     }
 
     private var launchAtLoginBinding: Binding<Bool> {

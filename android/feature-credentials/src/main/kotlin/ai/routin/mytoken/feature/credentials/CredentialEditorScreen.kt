@@ -38,6 +38,7 @@ import ai.routin.mytoken.core.ui.glassFilterChipColors
 import ai.routin.mytoken.core.ui.LiquidGlassSurface
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
+import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -112,7 +113,10 @@ fun CredentialEditorScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (state.isNew) {
-                LiquidGlassSurface(shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
+                LiquidGlassSurface(
+                    surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
+                ) {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),

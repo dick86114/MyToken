@@ -54,7 +54,8 @@ fun LiquidGlassNavigationRail(
             modifier = Modifier
                 .width(railWidth)
                 .fillMaxHeight(),
-            shape = RoundedCornerShape(24.dp),
+            surfaceRole = MyTokenVisualPolicy.SurfaceRole.Window,
+            shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
             contentAlignment = Alignment.TopCenter,
         ) {
             Column(
@@ -74,7 +75,7 @@ fun LiquidGlassNavigationRail(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
+                            .clip(RoundedCornerShape(MyTokenVisualPolicy.buttonRadiusDp))
                             .clickable(
                                 interactionSource = interactionSource,
                                 indication = null,

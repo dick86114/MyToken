@@ -4,20 +4,37 @@ enum UsageMetricTone: Equatable {
     case normal
     case warning
     case critical
-
-    var color: Color {
-        switch self {
-        case .normal:
-            return .green
-        case .warning:
-            return .orange
-        case .critical:
-            return .red
-        }
-    }
 }
 
 enum UsageMetricPresentation {
+    static func tone(for percent: Double, rules: MenuBarColorRules) -> UsageMetricTone {
+        switch MenuBarUsageRisk.level(for: percent, rules: rules) {
+        case .normal:
+            return .normal
+        case .warning:
+            return .warning
+        case .critical:
+            return .critical
+        }
+    }
+
+    static func color(
+        for percent: Double,
+        scheme: ColorScheme,
+        rules: MenuBarColorRules
+    ) -> Color {
+        Color(nsColor: rules.color(for: MenuBarUsageRisk.level(for: percent, rules: rules)))
+    }
+
+    static func color(for tone: UsageMetricTone, rules: MenuBarColorRules) -> Color {
+        let level: MenuBarUsageRisk
+        switch tone {
+        case .normal: level = .normal
+        case .warning: level = .warning
+        case .critical: level = .critical
+        }
+        return Color(nsColor: rules.color(for: level))
+    }
     static func clampedPercent(_ percent: Double) -> Double {
         guard percent.isFinite else {
             return 0
@@ -36,12 +53,21 @@ enum UsageMetricPresentation {
         }
     }
 
-    static func color(for percent: Double) -> Color {
-        tone(for: percent).color
+    static func color(for percent: Double, scheme: ColorScheme) -> Color {
+        switch tone(for: percent) {
+        case .normal:
+            return CompactPopoverPalette.brand(scheme)
+        case .warning:
+            return CompactPopoverPalette.warningColor
+        case .critical:
+            return CompactPopoverPalette.criticalColor
+        }
     }
 }
 
 struct UsageMetricProgressBar: View {
+    @Environment(\.menuBarColorRules) private var menuBarColorRules
+    @Environment(\.colorScheme) private var colorScheme
     let percent: Double
 
     init(percent: Double) {
@@ -59,7 +85,13 @@ struct UsageMetricProgressBar: View {
                 Capsule()
                     .fill(Color.primary.opacity(0.12))
                 Capsule()
-                    .fill(UsageMetricPresentation.color(for: percent))
+                    .fill(
+                        UsageMetricPresentation.color(
+                            for: percent,
+                            scheme: colorScheme,
+                            rules: menuBarColorRules
+                        )
+                    )
                     .frame(
                         width: max(
                             clampedPercent == 0 ? 0 : 2,
@@ -70,6 +102,17 @@ struct UsageMetricProgressBar: View {
         }
         .frame(height: 6)
         .accessibilityHidden(true)
+    }
+}
+
+private struct MenuBarColorRulesKey: EnvironmentKey {
+    static let defaultValue: MenuBarColorRules = .standard
+}
+
+extension EnvironmentValues {
+    var menuBarColorRules: MenuBarColorRules {
+        get { self[MenuBarColorRulesKey.self] }
+        set { self[MenuBarColorRulesKey.self] = newValue }
     }
 }
 
