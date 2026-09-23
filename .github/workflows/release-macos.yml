@@ -16,9 +16,9 @@ on:
 permissions:
   contents: write
 
-# 同一时刻只允许一个发布流程，避免发版 commit 竞争。
+# macOS 与 Android 共用发布并发组，避免两个发版流程同时推送 master。
 concurrency:
-  group: release-macos
+  group: release
   cancel-in-progress: false
 
 jobs:
@@ -32,6 +32,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: 同步发布基线
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin master
+          git merge --no-edit origin/master
       - name: 校验版本号
         run: |
           [[ "${RELEASE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
