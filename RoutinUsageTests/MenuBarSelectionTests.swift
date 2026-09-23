@@ -136,6 +136,7 @@ final class MenuBarSelectionTests: XCTestCase {
         )
 
         XCTAssertEqual(indicator.shortCode, "GLM")
+        XCTAssertEqual(indicator.content, .progress(68))
         XCTAssertEqual(indicator.percent, 68)
         XCTAssertEqual(indicator.healthState, .warning)
     }
@@ -159,6 +160,7 @@ final class MenuBarSelectionTests: XCTestCase {
         )
 
         XCTAssertNil(indicator.percent)
+        XCTAssertEqual(indicator.content, .balance("12"))
         XCTAssertTrue(indicator.accessibilityLabel.contains("余额"))
     }
 

@@ -105,7 +105,7 @@ final class UsagePopoverLayoutTests: XCTestCase {
         XCTAssertEqual(layout.shortestColumnIndex(in: [60, 60]), 0)
     }
 
-    func test供应商筛选使用自定义玻璃胶囊() throws {
+    func test供应商筛选使用统一实色控件() throws {
         let source = try String(
             contentsOf: URL(fileURLWithPath: #filePath)
                 .deletingLastPathComponent()
@@ -119,7 +119,7 @@ final class UsagePopoverLayoutTests: XCTestCase {
         XCTAssertTrue(source.contains(".menuIndicator(.hidden)"))
         XCTAssertFalse(source.contains("chevron.up.chevron.down"))
         XCTAssertFalse(source.contains(".menuStyle(.borderlessButton)"))
-        XCTAssertTrue(source.contains("cornerRadius: 9"))
+        XCTAssertTrue(source.contains("PopoverVisualPolicy.cornerRadius(for: .button)"))
     }
 
     func test卡片装饰层关闭命中测试且列表切换不带动画() throws {
@@ -159,5 +159,29 @@ final class UsagePopoverLayoutTests: XCTestCase {
         XCTAssertTrue(popover.contains("let openSettings: @MainActor () -> Void"))
         XCTAssertTrue(controller.contains("openSettings: { [weak self] in"))
         XCTAssertTrue(controller.contains("self?.openSettingsWindow()"))
+    }
+
+    func test弹窗版本号旁按更新状态切换检测与更新入口() throws {
+        let popover = try TestSourceReader.read([
+            "RoutinUsage",
+            "Views",
+            "UsagePopoverView.swift"
+        ])
+        let controller = try TestSourceReader.read([
+            "RoutinUsage",
+            "App",
+            "StatusBarController.swift"
+        ])
+        let toolbarStart = try XCTUnwrap(popover.range(of: "var toolbar: some View"))
+        let toolbar = String(popover[toolbarStart.lowerBound...])
+
+        XCTAssertTrue(popover.contains("typealias CheckForUpdates = @MainActor () async -> Void"))
+        XCTAssertTrue(popover.contains("let checkForUpdates: CheckForUpdates"))
+        XCTAssertTrue(toolbar.contains("if case let .available(update) = updateStatus"))
+        XCTAssertTrue(toolbar.contains("selectedUpdate = update"))
+        XCTAssertTrue(toolbar.contains("Image(systemName: \"arrow.triangle.2.circlepath\")"))
+        XCTAssertTrue(toolbar.contains("await checkForUpdates()"))
+        XCTAssertTrue(toolbar.contains("检测更新"))
+        XCTAssertTrue(controller.contains("checkForUpdates: environment.checkForUpdates"))
     }
 }

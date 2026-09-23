@@ -1,5 +1,6 @@
 package ai.routin.mytoken.core.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Card
@@ -40,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -55,26 +56,27 @@ import androidx.compose.ui.unit.dp
 
 /**
  * 玻璃控件统一设计规则：
- * - 交互控件（按钮/开关/chip）统一胶囊圆角，容器卡片 14-16dp 圆角；
+ * - 普通按钮和内层控件 10dp 圆角，卡片和窗口壳 14dp 圆角；
  * - 全局唯一强调色 = 主题 primary，破坏性操作 = 主题 error；
  * - 明暗两套主题都按底色亮度自动切换，文字对比度满足 WCAG AA。
  */
 
-/** 玻璃按钮的语义色调。 */
+/** 按钮的语义色调。 */
 enum class GlassButtonTone { Primary, Neutral, Destructive }
 
 private data class GlassToneColors(
     val base: Color,
     val content: Color,
+    val container: Color,
 ) {
     companion object {
         @Composable
         fun of(tone: GlassButtonTone): GlassToneColors {
             val scheme = MaterialTheme.colorScheme
             return when (tone) {
-                GlassButtonTone.Primary -> GlassToneColors(scheme.primary, scheme.primary)
-                GlassButtonTone.Neutral -> GlassToneColors(scheme.onSurface, scheme.onSurface)
-                GlassButtonTone.Destructive -> GlassToneColors(scheme.error, scheme.error)
+                GlassButtonTone.Primary -> GlassToneColors(scheme.primary, scheme.onPrimary, scheme.primary)
+                GlassButtonTone.Neutral -> GlassToneColors(scheme.onSurface, scheme.onSurface, scheme.surfaceVariant)
+                GlassButtonTone.Destructive -> GlassToneColors(scheme.error, scheme.error, scheme.error.copy(alpha = 0.12f))
             }
         }
     }
@@ -84,7 +86,7 @@ private data class GlassToneColors(
 private fun isDarkTheme(): Boolean = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
 /**
- * 液态玻璃按钮：胶囊形、渐变玻璃底、同色系描边。
+ * 方案 A 按钮：实色底、10dp 圆角、细描边。
  * [GlassButtonTone.Primary] 只给当前区块的主操作，避免一屏多个强强调。
  */
 @Composable
@@ -97,23 +99,14 @@ fun GlassButton(
     icon: ImageVector? = null,
 ) {
     val toneColors = GlassToneColors.of(tone)
-    val dark = isDarkTheme()
-    val shape = RoundedCornerShape(100)
-    val containerAlpha = if (dark) 0.22f else 0.10f
+    val shape = RoundedCornerShape(MyTokenVisualPolicy.buttonRadiusDp)
     val contentAlpha = if (enabled) 1f else 0.45f
     val interactionSource = remember { MutableInteractionSource() }
     Box(
         modifier = modifier
             .clip(shape)
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        toneColors.base.copy(alpha = containerAlpha * 1.6f),
-                        toneColors.base.copy(alpha = containerAlpha * 0.7f),
-                    )
-                )
-            )
-            .border(1.dp, toneColors.base.copy(alpha = if (dark) 0.45f else 0.30f), shape)
+            .background(toneColors.container)
+            .border(1.dp, toneColors.base.copy(alpha = 0.36f), shape)
             .clickable(
                 interactionSource = interactionSource,
                 indication = ripple(color = toneColors.base),
@@ -234,7 +227,10 @@ fun GlassTextField(
     trailingIcon: @Composable (() -> Unit)? = null,
     supportingText: String? = null,
 ) {
-    LiquidGlassSurface(shape = RoundedCornerShape(14.dp)) {
+    LiquidGlassSurface(
+        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Control,
+        shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
+    ) {
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
@@ -250,7 +246,7 @@ fun GlassTextField(
                     )
                 }
             },
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(MyTokenVisualPolicy.buttonRadiusDp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,
                 unfocusedContainerColor = Color.Transparent,
@@ -276,33 +272,44 @@ fun GlassTextField(
 @Composable
 fun LiquidGlassSurface(
     modifier: Modifier = Modifier,
-    shape: RoundedCornerShape = RoundedCornerShape(24.dp),
+    surfaceRole: MyTokenVisualPolicy.SurfaceRole = MyTokenVisualPolicy.SurfaceRole.Control,
+    shape: RoundedCornerShape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
     contentAlignment: Alignment = Alignment.TopStart,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val baseColor = if (isDark) Color(0xFF151921) else Color.White
-    val borderColor = if (isDark) Color.White.copy(alpha = 0.20f) else Color.Black.copy(alpha = 0.18f)
-    val backgroundBrush = remember(isDark, baseColor) {
-        Brush.verticalGradient(
-            colors = listOf(
-                baseColor.copy(alpha = if (isDark) 0.78f else 0.82f),
-                baseColor.copy(alpha = if (isDark) 0.62f else 0.68f),
+    val material = MyTokenVisualPolicy.materialFor(surfaceRole)
+    val solidBase = when (surfaceRole) {
+        MyTokenVisualPolicy.SurfaceRole.Metric -> MaterialTheme.colorScheme.surfaceVariant
+        else -> MaterialTheme.colorScheme.surface
+    }
+    val borderColor = if (isDark) Color.White.copy(alpha = 0.14f) else Color.Black.copy(alpha = 0.08f)
+    val backgroundBrush = remember(isDark, material, solidBase) {
+        when (material) {
+            MyTokenVisualPolicy.Material.WindowGlass -> Brush.verticalGradient(
+                listOf(
+                    (if (isDark) MyTokenPalette.darkCanvas else MyTokenPalette.lightCanvas).copy(alpha = if (isDark) 0.88f else 0.78f),
+                    (if (isDark) MyTokenPalette.darkSurface else MyTokenPalette.lightSurface).copy(alpha = if (isDark) 0.72f else 0.64f),
+                )
             )
-        )
+            MyTokenVisualPolicy.Material.ModalGlass -> Brush.verticalGradient(
+                listOf(solidBase.copy(alpha = 0.97f), solidBase.copy(alpha = 0.94f))
+            )
+            MyTokenVisualPolicy.Material.Solid -> Brush.verticalGradient(listOf(solidBase, solidBase))
+        }
     }
     val borderBrush = remember(isDark, borderColor) {
         Brush.linearGradient(
             colors = listOf(
-                // 浅色主题下白色描边不可见，改用黑色系细描边；深色保持白色高光。
-                if (isDark) Color.White.copy(alpha = 0.36f) else Color.Black.copy(alpha = 0.14f),
-                if (isDark) borderColor.copy(alpha = 0.14f) else Color.Black.copy(alpha = 0.05f),
-                if (isDark) Color.White.copy(alpha = 0.22f) else Color.Black.copy(alpha = 0.10f),
+                borderColor,
+                borderColor.copy(alpha = 0.55f),
+                borderColor.copy(alpha = 0.85f),
             )
         )
     }
     Box(
         modifier = modifier
+            .then(if (MyTokenVisualPolicy.allowsShadow(surfaceRole)) Modifier.shadow(12.dp, shape) else Modifier)
             .clip(shape)
             .background(brush = backgroundBrush)
             .border(width = 1.dp, brush = borderBrush, shape = shape),
@@ -337,7 +344,8 @@ fun LiquidGlassBottomBar(
                 .padding(bottom = 4.dp)
                 .fillMaxWidth()
                 .height(64.dp),
-            shape = RoundedCornerShape(32.dp),
+            surfaceRole = MyTokenVisualPolicy.SurfaceRole.Window,
+            shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
             contentAlignment = Alignment.Center,
         ) {
             Row(
@@ -359,7 +367,7 @@ fun LiquidGlassBottomBar(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxSize()
-                            .clip(RoundedCornerShape(26.dp))
+                            .clip(RoundedCornerShape(MyTokenVisualPolicy.buttonRadiusDp))
                             .clickable(
                                 interactionSource = interactionSource,
                                 indication = ripple(color = contentColor),
@@ -399,9 +407,10 @@ fun SectionCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(
             modifier = Modifier

@@ -87,6 +87,7 @@ struct NormalizedUsageMetricGrid: View {
 }
 
 private struct NormalizedUsageMetricCell: View {
+    @Environment(\.colorScheme) private var colorScheme
     let metric: NormalizedUsageMetric
     let resetTimeStyle: NormalizedUsageMetricResetStyle
     let now: Date
@@ -114,11 +115,11 @@ private struct NormalizedUsageMetricCell: View {
         return VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(metric.label)
-                    .font(.caption)
+                    .font(.system(size: 12))
                     .foregroundStyle(.tertiary)
                 Spacer(minLength: 4)
                 Text(percentText)
-                    .font(.system(.headline, design: .rounded, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
                     .foregroundStyle(healthColor)
                     .monospacedDigit()
             }
@@ -129,7 +130,7 @@ private struct NormalizedUsageMetricCell: View {
                 if usesFullWidthDetails {
                     HStack(alignment: .firstTextBaseline, spacing: 12) {
                         Text("已用 \(decimalText(used)) / \(decimalText(limit))")
-                            .font(.caption2)
+                            .font(.system(size: 10))
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
                             .fixedSize(horizontal: false, vertical: true)
@@ -138,7 +139,7 @@ private struct NormalizedUsageMetricCell: View {
 
                         if let remaining = metric.remaining {
                             Text("剩余 \(decimalText(remaining))")
-                                .font(.caption2)
+                                .font(.system(size: 10))
                                 .foregroundStyle(.secondary)
                                 .monospacedDigit()
                                 .fixedSize(horizontal: false, vertical: true)
@@ -146,14 +147,14 @@ private struct NormalizedUsageMetricCell: View {
                     }
                 } else {
                     Text("已用 \(decimalText(used)) / \(decimalText(limit))")
-                        .font(.caption2)
+                        .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                         .fixedSize(horizontal: false, vertical: true)
 
                     if let remaining = metric.remaining {
                         Text("剩余 \(decimalText(remaining))")
-                            .font(.caption2)
+                            .font(.system(size: 10))
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
                     }
@@ -164,13 +165,13 @@ private struct NormalizedUsageMetricCell: View {
                 switch resetTimeStyle {
                 case .fullDateTime:
                     Text("重置 \(UsageFormatter.fullDateTime(windowEnd))")
-                        .font(.caption2)
+                        .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                         .fixedSize(horizontal: false, vertical: true)
                 case .resetTimeOnly:
                     Text("重置 \(UsageFormatter.resetTime(windowEnd, now: now))")
-                        .font(.caption2)
+                        .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                         .fixedSize(horizontal: false, vertical: true)
@@ -179,7 +180,7 @@ private struct NormalizedUsageMetricCell: View {
                     if usesFullWidthDetails {
                         HStack(alignment: .firstTextBaseline, spacing: 12) {
                             Text("重置 \(UsageFormatter.resetTime(windowEnd, now: now))")
-                                .font(.caption2)
+                                .font(.system(size: 10))
                                 .foregroundStyle(.secondary)
                                 .monospacedDigit()
                                 .fixedSize(horizontal: false, vertical: true)
@@ -188,31 +189,31 @@ private struct NormalizedUsageMetricCell: View {
                             Spacer(minLength: 12)
 
                             Text("剩余 \(UsageFormatter.remainingDurationText(until: windowEnd, now: now))")
-                                .font(.caption2)
+                                .font(.system(size: 10))
                                 .foregroundStyle(
                                     UsageFormatter.shouldHighlightRemainingDuration(
                                         for: metric,
                                         now: now
-                                    ) ? Color.green : Color.secondary
+                                    ) ? CompactPopoverPalette.positive(colorScheme) : Color.secondary
                                 )
                                 .monospacedDigit()
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     } else {
                         Text("重置 \(UsageFormatter.resetTime(windowEnd, now: now))")
-                            .font(.caption2)
+                            .font(.system(size: 10))
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
                             .fixedSize(horizontal: false, vertical: true)
                             .help("重置 \(UsageFormatter.fullDateTime(windowEnd))")
 
                         Text("剩余 \(UsageFormatter.remainingDurationText(until: windowEnd, now: now))")
-                            .font(.caption2)
+                            .font(.system(size: 10))
                             .foregroundStyle(
                                 UsageFormatter.shouldHighlightRemainingDuration(
                                     for: metric,
                                     now: now
-                                ) ? Color.green : Color.secondary
+                                ) ? CompactPopoverPalette.positive(colorScheme) : Color.secondary
                             )
                             .monospacedDigit()
                             .fixedSize(horizontal: false, vertical: true)
@@ -232,13 +233,13 @@ private struct NormalizedUsageMetricCell: View {
         if isDeepSeekSummary {
             VStack(alignment: .leading, spacing: 4) {
                 Text(UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode))
-                    .font(.system(.title3, design: .rounded, weight: .semibold))
+                    .font(.system(size: 20, weight: .semibold, design: .monospaced))
                     .foregroundStyle(healthColor)
                     .monospacedDigit()
                     .lineLimit(1)
 
                 Text("账户余额")
-                    .font(.caption2)
+                    .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -247,11 +248,11 @@ private struct NormalizedUsageMetricCell: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(metric.label)
-                    .font(.caption)
+                    .font(.system(size: 12))
                     .foregroundStyle(.tertiary)
                 Spacer(minLength: 4)
                 Text(UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode))
-                    .font(.system(.headline, design: .rounded, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
                     .foregroundStyle(healthColor)
                     .monospacedDigit()
             }
@@ -269,12 +270,12 @@ private struct NormalizedUsageMetricCell: View {
         if isDeepSeekSummary {
             VStack(alignment: .leading, spacing: 4) {
                 Text(metric.healthState == .unavailable ? "不可用" : "可用")
-                    .font(.system(.title3, design: .rounded, weight: .semibold))
-                    .foregroundStyle(metric.healthState == .unavailable ? Color.red : Color.primary)
+                    .font(.system(size: 20, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(metric.healthState == .unavailable ? CompactPopoverPalette.criticalColor : Color.primary)
                     .lineLimit(1)
 
                 Text("账户状态")
-                    .font(.caption2)
+                    .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -284,15 +285,15 @@ private struct NormalizedUsageMetricCell: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(metric.label)
-                    .font(.caption)
+                    .font(.system(size: 12))
                     .foregroundStyle(.tertiary)
                 Spacer(minLength: 4)
                 Text(metric.healthState == .unavailable ? "不可用" : "可用")
-                    .font(.system(.headline, design: .rounded, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
                     .foregroundStyle(healthColor)
             }
             Text("账户状态")
-                .font(.caption2)
+                .font(.system(size: 10))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -308,13 +309,13 @@ private struct NormalizedUsageMetricCell: View {
         if isDeepSeekSummary {
             VStack(alignment: .leading, spacing: 4) {
                 Text(valueText)
-                    .font(.system(.title3, design: .rounded, weight: .semibold))
+                    .font(.system(size: 20, weight: .semibold, design: .monospaced))
                     .foregroundStyle(healthColor)
                     .monospacedDigit()
                     .lineLimit(1)
 
                 Text(metric.label)
-                    .font(.caption2)
+                    .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -323,11 +324,11 @@ private struct NormalizedUsageMetricCell: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(metric.label)
-                        .font(.caption)
+                        .font(.system(size: 12))
                         .foregroundStyle(.tertiary)
                     Spacer(minLength: 4)
                     Text(valueText)
-                        .font(.system(.headline, design: .rounded, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
                         .monospacedDigit()
                 }
             }
@@ -353,12 +354,7 @@ private struct NormalizedUsageMetricCell: View {
     }
 
     private var healthColor: Color {
-        switch metric.healthState {
-        case .normal: return .green
-        case .warning: return .orange
-        case .critical, .unavailable: return .red
-        case .stale, .unknown: return .secondary
-        }
+        CompactPopoverPalette.healthColor(for: metric.healthState, colorScheme)
     }
 
     private func decimalText(_ value: Decimal?) -> String {

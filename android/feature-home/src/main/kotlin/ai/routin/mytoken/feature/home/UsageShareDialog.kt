@@ -51,6 +51,7 @@ import ai.routin.mytoken.core.ui.GlassSwitch
 import ai.routin.mytoken.core.ui.GlassTextField
 import ai.routin.mytoken.core.ui.LiquidGlassSurface
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
+import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
 import ai.routin.mytoken.core.ui.glassFilterChipBorder
 import ai.routin.mytoken.core.ui.glassFilterChipColors
 import kotlinx.coroutines.launch
@@ -320,7 +321,10 @@ private fun ShareControlSection(
     action: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    LiquidGlassSurface(shape = RoundedCornerShape(16.dp)) {
+    LiquidGlassSurface(
+        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
+        shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -368,7 +372,7 @@ private fun ShareToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(MyTokenVisualPolicy.innerRadiusDp))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
             .clickable(onClick = onToggle)
             .padding(horizontal = 12.dp, vertical = 12.dp),

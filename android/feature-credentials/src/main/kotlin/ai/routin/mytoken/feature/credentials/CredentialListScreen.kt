@@ -6,8 +6,8 @@ import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.core.ui.LiquidGlassSurface
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
+import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -59,7 +59,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.util.UUID
 import sh.calvin.reorderable.ReorderableItem
@@ -141,15 +140,10 @@ fun CredentialListScreen(
                     contentType = { _, _ -> "credential-row" },
                 ) { index, credential ->
                     ReorderableItem(reorderableState, key = credential.id) { isDragging ->
-                        val elevation by animateDpAsState(
-                            targetValue = if (isDragging) 8.dp else 0.dp,
-                            label = "credentialDragElevation",
-                        )
                         CredentialRow(
                             credential = credential,
                             order = index + 1,
                             providerName = ProviderNames.displayName(credential.providerId),
-                            elevation = elevation,
                             isDragging = isDragging,
                             dragHandleModifier = Modifier.longPressDraggableHandle(
                                 onDragStarted = {
@@ -215,15 +209,10 @@ private fun ExpandedCredentialGrid(
         ) {
             gridItemsIndexed(state.items, key = { _, item -> item.id }) { index, credential ->
                 ReorderableItem(reorderableState, key = credential.id) { isDragging ->
-                    val elevation by animateDpAsState(
-                        targetValue = if (isDragging) 8.dp else 0.dp,
-                        label = "credentialGridDragElevation",
-                    )
                     CredentialRow(
                         credential = credential,
                         order = index + 1,
                         providerName = ProviderNames.displayName(credential.providerId),
-                        elevation = elevation,
                         isDragging = isDragging,
                         dragHandleModifier = Modifier.longPressDraggableHandle(
                             onDragStarted = {
@@ -248,7 +237,6 @@ private fun CredentialRow(
     credential: Credential,
     order: Int,
     providerName: String,
-    elevation: androidx.compose.ui.unit.Dp,
     isDragging: Boolean,
     dragHandleModifier: Modifier,
     onToggleEnabled: () -> Unit,
@@ -265,14 +253,14 @@ private fun CredentialRow(
                     Modifier.graphicsLayer {
                         scaleX = 1.02f
                         scaleY = 1.02f
-                        shadowElevation = elevation.toPx()
                         clip = false
                     }
                 } else {
                     Modifier
                 }
             ),
-        shape = RoundedCornerShape(16.dp),
+        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
+        shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 10.dp),
@@ -306,8 +294,6 @@ private fun CredentialRow(
                     text = credential.name,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = "$providerName · ${kindLabel(credential.credentialKind)}",

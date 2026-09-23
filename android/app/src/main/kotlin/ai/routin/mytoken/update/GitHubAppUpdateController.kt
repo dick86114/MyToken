@@ -100,11 +100,22 @@ class GitHubAppUpdateController(
 
     override fun loadCachedReleaseHistory() {
         scope.launch {
+            if (_releaseHistoryState.value is AppReleaseHistoryUiState.Loading) return@launch
+            if (_releaseHistoryState.value is AppReleaseHistoryUiState.Loaded &&
+                (_releaseHistoryState.value as AppReleaseHistoryUiState.Loaded)
+                    .releases.any { it.version == currentVersionName }
+            ) {
+                return@launch
+            }
+
             val cached = cacheStore?.cachedReleases?.let { flow ->
                 runCatching { flow.first() }.getOrNull()
             } ?: return@launch
-            if (_releaseHistoryState.value is AppReleaseHistoryUiState.Loading) return@launch
-            _releaseHistoryState.value = AppReleaseHistoryUiState.Loaded(cached)
+            if (cached.any { it.version == currentVersionName }) {
+                _releaseHistoryState.value = AppReleaseHistoryUiState.Loaded(cached)
+                return@launch
+            }
+            loadReleaseHistory()
         }
     }
 

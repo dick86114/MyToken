@@ -23,6 +23,7 @@ private struct SystemPopoverArrow: Shape {
 }
 
 struct MenuBarManagementView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @Bindable var environment: AppEnvironment
     let ordering: CredentialOrderingController
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -111,13 +112,13 @@ struct MenuBarManagementView: View {
     private func systemMenuBarStrip(highlightIndicator: Bool) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "apple.logo")
-                .font(.caption.weight(.semibold))
+                .font(.system(size: 12, weight: .semibold))
             Text("Finder")
-                .font(.caption.weight(.medium))
+                .font(.system(size: 12, weight: .medium))
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
             Text("文件")
-                .font(.caption)
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
@@ -146,10 +147,10 @@ struct MenuBarManagementView: View {
                 }
 
             Image(systemName: "wifi")
-                .font(.caption)
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
             Text("10:09")
-                .font(.caption.monospacedDigit())
+                .font(.system(size: 10, design: .monospaced))
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
         }
@@ -166,7 +167,7 @@ struct MenuBarManagementView: View {
         HStack(spacing: 0) {
             if menuBarStates.isEmpty {
                 Text("未显示指标")
-                    .font(.caption)
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             } else {
@@ -190,7 +191,7 @@ struct MenuBarManagementView: View {
             ZStack {
                 HStack {
                     Text("v1.0.0")
-                        .font(.caption.monospacedDigit())
+                        .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
@@ -199,7 +200,7 @@ struct MenuBarManagementView: View {
                     Spacer()
 
                     Image(systemName: "arrow.clockwise")
-                        .font(.callout.weight(.medium))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.secondary)
                         .frame(width: 28, height: 28)
                         .background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 7))
@@ -229,17 +230,17 @@ struct MenuBarManagementView: View {
 
             HStack(alignment: .firstTextBaseline) {
                 Text("账户用量")
-                    .font(.headline)
+                    .font(.system(size: 14, weight: .semibold))
                 Spacer()
                 Text("\(unifiedStates.count) 个凭证")
-                    .font(.caption.monospacedDigit())
+                    .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 10)
 
             if unifiedStates.isEmpty {
                 Text("尚无可展示凭证")
-                    .font(.callout)
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(10)
@@ -259,7 +260,7 @@ struct MenuBarManagementView: View {
                 Image(systemName: "gearshape")
                 Image(systemName: "power")
             }
-            .font(.caption)
+            .font(.system(size: 12))
             .foregroundStyle(.secondary)
             .padding(.horizontal, 10)
             .padding(.bottom, 10)
@@ -276,7 +277,7 @@ struct MenuBarManagementView: View {
             Text(planName(for: state.configuration))
             Spacer(minLength: 0)
         }
-        .font(.callout.weight(.medium))
+        .font(.system(size: 12, weight: .medium))
         .lineLimit(1)
         .minimumScaleFactor(0.85)
         .padding(.horizontal, 10)
@@ -302,7 +303,7 @@ struct MenuBarManagementView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(title)
-                    .font(.headline)
+                    .font(.system(size: 14, weight: .semibold))
                 Spacer()
                 Text("\(count) 个")
                     .font(.subheadline.monospacedDigit())
@@ -314,14 +315,14 @@ struct MenuBarManagementView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .liquidGlassSurface(cornerRadius: 16)
+        .liquidGlassSurface()
     }
 
     private var cardList: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("凭证顺序")
-                    .font(.headline)
+                    .font(.system(size: 14, weight: .semibold))
                 Spacer()
                 Text("\(unifiedStates.count) 个")
                     .font(.subheadline.monospacedDigit())
@@ -340,7 +341,7 @@ struct MenuBarManagementView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .liquidGlassSurface(cornerRadius: 16)
+        .liquidGlassSurface()
     }
 
     @ViewBuilder
@@ -376,12 +377,12 @@ struct MenuBarManagementView: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 7) {
                     Text(state.configuration.displayName)
-                        .font(.headline)
+                        .font(.system(size: 14, weight: .semibold))
                         .lineLimit(1)
 
                     if isInMenuBar {
                         Text("菜单栏")
-                            .font(.caption.weight(.medium))
+                            .font(.system(size: 12, weight: .medium))
                             .padding(.horizontal, 7)
                             .padding(.vertical, 2)
                             .background(.tint.opacity(0.14), in: Capsule())
@@ -407,7 +408,7 @@ struct MenuBarManagementView: View {
                         : "plus.circle.fill"
                 )
                     .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(isInMenuBar ? Color.green : Color.blue)
+                    .foregroundStyle(isInMenuBar ? CompactPopoverPalette.positive(colorScheme) : CompactPopoverPalette.brand(colorScheme))
                     .frame(width: 34, height: 34)
                     .contentShape(Circle())
             }
@@ -515,7 +516,7 @@ struct MenuBarManagementView: View {
             }
         } label: {
             Label(selectedMetricTitle(for: state, resolution: resolution), systemImage: "gauge.with.dots.needle.33percent")
-                .font(.caption.weight(.medium))
+                .font(.system(size: 12, weight: .medium))
                 .lineLimit(1)
         }
         .menuStyle(.borderlessButton)
