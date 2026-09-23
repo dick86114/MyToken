@@ -79,6 +79,8 @@ final class AppEnvironment {
     @ObservationIgnored private let apiClient: any UsageFetching
     @ObservationIgnored private let notificationSender: any NotificationSending
     @ObservationIgnored private let updateService: any UpdateChecking
+    @ObservationIgnored private let releaseHistoryCache: (any ReleaseHistoryCacheStoring)?
+    @ObservationIgnored private let releaseHistoryAppVersion: String
     @ObservationIgnored private let logWriter: any AppLogWriting
     @ObservationIgnored private let updateCheckScheduler: any UpdateCheckScheduling
     @ObservationIgnored private let notificationTaskYield: @Sendable () async -> Void
@@ -104,6 +106,8 @@ final class AppEnvironment {
         notificationSender: any NotificationSending,
         applicationNotificationCenter: NotificationCenter = .default,
         updateService: any UpdateChecking = NoUpdateService(),
+        releaseHistoryCache: (any ReleaseHistoryCacheStoring)? = nil,
+        releaseHistoryAppVersion: String = RoutinUsageApp.currentVersion,
         updateCheckScheduler: (any UpdateCheckScheduling)? = nil,
         notificationTaskYield: @escaping @Sendable () async -> Void = { await Task.yield() },
         logWriter: any AppLogWriting = NoopAppLogWriter(),
@@ -121,6 +125,8 @@ final class AppEnvironment {
         self.notificationSender = notificationSender
         self.applicationNotificationCenter = applicationNotificationCenter
         self.updateService = updateService
+        self.releaseHistoryCache = releaseHistoryCache
+        self.releaseHistoryAppVersion = releaseHistoryAppVersion
         self.logWriter = logWriter
         self.updateCheckScheduler = updateCheckScheduler ?? UpdateCheckScheduler()
         self.notificationTaskYield = notificationTaskYield
@@ -210,6 +216,8 @@ final class AppEnvironment {
             apiClient: apiClient,
             notificationSender: notificationSender,
             updateService: GitHubUpdateService(logWriter: logWriter),
+            releaseHistoryCache: UserDefaultsReleaseHistoryCache(defaults: defaults),
+            releaseHistoryAppVersion: RoutinUsageApp.currentVersion,
             updateCheckScheduler: UpdateCheckScheduler(),
             logWriter: logWriter,
             xiaomiWebSession: xiaomiWebSession,
@@ -297,7 +305,12 @@ final class AppEnvironment {
             switch releaseHistoryState {
             case .loading, .loaded:
                 return
-            case .idle, .failed:
+            case .idle:
+                if let releases = releaseHistoryCache?.load(appVersion: releaseHistoryAppVersion) {
+                    releaseHistoryState = .loaded(releases)
+                    return
+                }
+            case .failed:
                 break
             }
         }
@@ -311,6 +324,10 @@ final class AppEnvironment {
             do {
                 let releases = try await updateService.fetchReleaseHistory()
                 guard !Task.isCancelled else { return }
+                self?.releaseHistoryCache?.save(
+                    appVersion: self?.releaseHistoryAppVersion ?? "",
+                    releases: releases
+                )
                 self?.releaseHistoryState = .loaded(releases)
             } catch is CancellationError {
                 return

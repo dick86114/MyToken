@@ -2,6 +2,7 @@ import SwiftUI
 
 @MainActor
 struct UsageRowView: View {
+    @Environment(\.menuBarColorRules) private var menuBarColorRules
     @Environment(\.colorScheme) private var colorScheme
     let state: KeyUsageState
     var density: UsageCardDensity = .full
@@ -84,18 +85,24 @@ struct UsageRowView: View {
             CompactBalanceStrip(metric: metric)
             Spacer(minLength: 8)
             HStack(spacing: 8) {
+                let balanceAccent = CompactPopoverPalette.balanceAccent(
+                    for: metric.healthState,
+                    colorScheme
+                )
+
                 Text(CompactUsageCardPresentation.balanceStatusText(healthState: metric.healthState))
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .foregroundStyle(CompactPopoverPalette.badgeGreen(colorScheme))
+                    .foregroundStyle(balanceAccent)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background {
-                        Capsule()
-                            .fill(Color.green.opacity(0.10))
+                        Capsule().fill(balanceAccent.opacity(0.10))
                     }
                     .overlay {
-                        Capsule()
-                            .strokeBorder(Color.green.opacity(0.20), lineWidth: 1)
+                        Capsule().strokeBorder(
+                            balanceAccent.opacity(0.22),
+                            lineWidth: 1
+                        )
                     }
                 compactActionButtons
             }
@@ -126,22 +133,25 @@ struct UsageRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(state.configuration.displayName)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .lineLimit(1)
 
-                    if CompactUsageCardPresentation.isNearlyExhausted(metrics: compactOrderedMetrics) {
+                    if CompactUsageCardPresentation.isNearlyExhausted(
+                        metrics: compactOrderedMetrics,
+                        rules: menuBarColorRules
+                    ) {
                         Text("即将耗尽")
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(Color.red)
+                            .foregroundStyle(CompactPopoverPalette.criticalColor)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 1)
                             .background {
-                                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                    .fill(Color.red.opacity(0.10))
+                                Capsule()
+                                    .fill(CompactPopoverPalette.criticalColor.opacity(0.10))
                             }
                             .overlay {
-                                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                    .strokeBorder(Color.red.opacity(0.20), lineWidth: 1)
+                                Capsule()
+                                    .strokeBorder(CompactPopoverPalette.criticalColor.opacity(0.22), lineWidth: 1)
                             }
                     }
                 }
@@ -150,7 +160,7 @@ struct UsageRowView: View {
                     providerID: state.configuration.providerID,
                     planName: state.snapshot?.planName ?? ""
                 ))
-                .font(.system(size: 10.5, weight: .medium))
+                .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(CompactPopoverPalette.subtitle(colorScheme))
                 .lineLimit(2)
             }
@@ -166,7 +176,7 @@ struct UsageRowView: View {
                     disabled: state.snapshot == nil
                 ) {
                     Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                 }
                 .accessibilityLabel("分享 \(state.configuration.displayName) 当前用量")
             }
@@ -181,7 +191,7 @@ struct UsageRowView: View {
                             .controlSize(.mini)
                     } else {
                         Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                     }
                 }
             }
@@ -233,7 +243,7 @@ private struct RefreshingCardBorder: View {
                     Circle()
                         .fill(color)
                         .frame(width: 5, height: 5)
-                        .shadow(color: color, radius: 5)
+                        .shadow(color: color.opacity(0.22), radius: 2)
                         .position(cometHead(path: path, at: phase))
                 }
             }
@@ -278,30 +288,18 @@ private struct UsageCardChrome: ViewModifier {
     let isExpired: Bool
 
     func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: CompactPopoverMetrics.cardCornerRadius, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .outer), style: .continuous)
+        let material = PopoverVisualPolicy.material(for: .card)
         let highlight = CompactPopoverPalette.cardStroke(colorScheme)
 
         Group {
-            if #available(macOS 26.0, *) {
-                content
-                    .glassEffect(
-                        .regular.tint(CompactPopoverPalette.cardSurfaceTint(colorScheme)),
-                        in: shape
-                    )
-            } else {
-                content
-                    .background {
-                        shape
-                            .fill(.ultraThinMaterial)
-                            .overlay {
-                                shape.fill(
-                                    colorScheme == .dark
-                                        ? CompactPopoverPalette.darkSurface.opacity(0.50)
-                                        : Color.white.opacity(0.42)
-                                )
-                            }
-                            .allowsHitTesting(false)
-                    }
+            switch material {
+            case .solid:
+                content.background {
+                    shape.fill(CompactPopoverPalette.surface(.card, colorScheme))
+                }
+            case .windowGlass, .modalGlass:
+                content.background(shape.fill(CompactPopoverPalette.surface(.card, colorScheme)))
             }
         }
         .overlay {
@@ -312,12 +310,11 @@ private struct UsageCardChrome: ViewModifier {
         .overlay {
             if state.isRefreshing {
                 RefreshingCardBorder(
-                    color: ProviderTheme.accentColor(for: state.configuration.providerID)
+                    color: CompactPopoverPalette.brand(colorScheme)
                 )
                 .allowsHitTesting(false)
             }
         }
-        .shadow(color: Color.black.opacity(0.04), radius: 8, y: 2)
         .saturation(state.configuration.isEnabled ? 1 : 0)
         .opacity(isExpired ? 0.45 : 1)
     }
@@ -413,7 +410,7 @@ private extension UsageRowView {
                         if let metric = validMetric(state.snapshot?.token),
                            metric.percent.isFinite {
                             Text(UsageFormatter.displayPercentText(metric.percent))
-                                .font(.system(.headline, design: .rounded, weight: .semibold))
+                                .font(.system(size: 14, weight: .semibold, design: .monospaced))
                                 .monospacedDigit()
                                 .foregroundStyle(progressColor(for: metric))
                         }
@@ -462,7 +459,7 @@ private extension UsageRowView {
                         .frame(maxWidth: .infinity, alignment: .trailing)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .font(.caption2)
+                .font(.system(size: 10))
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
             }
@@ -479,18 +476,18 @@ private extension UsageRowView {
                     .multiplying(by: 100)
                     .doubleValue
                 Text(UsageFormatter.displayPercentText(percent))
-                    .font(.system(.headline, design: .rounded, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
                     .monospacedDigit()
                     .foregroundStyle(normalizedMetricColor(metric.healthState))
             }
         case .balance:
             Text("余额 \(UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode))")
-                .font(.caption.weight(.semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(normalizedMetricColor(metric.healthState))
         case .status:
             Text(metric.healthState == .unavailable ? "不可用" : "可用")
-                .font(.caption.weight(.semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(normalizedMetricColor(metric.healthState))
         case .value:
             EmptyView()
@@ -502,12 +499,7 @@ private extension UsageRowView {
     }
 
     func normalizedMetricColor(_ state: UsageMetricHealthState) -> Color {
-        switch state {
-        case .normal: return .green
-        case .warning: return .orange
-        case .critical, .unavailable: return .red
-        case .stale, .unknown: return .secondary
-        }
+        CompactPopoverPalette.healthColor(for: state, colorScheme)
     }
 
     @ViewBuilder
@@ -557,11 +549,10 @@ private extension UsageRowView {
             case .verticalGauges:
                 HStack(alignment: .top, spacing: 8) {
                     ForEach(metrics) { metric in
-                        CompactMetricGaugeTile(
+                    CompactMetricGaugeTile(
                             metric: metric,
                             now: now,
                             style: .vertical,
-                            providerID: state.configuration.providerID
                         )
                     }
                 }
@@ -571,13 +562,12 @@ private extension UsageRowView {
                     spacing: 8
                 ) {
                     ForEach(metrics) { metric in
-                        if metric.presentation == .progress {
-                            CompactMetricGaugeTile(
-                                metric: metric,
-                                now: now,
-                                style: metrics.count > 2 ? .vertical : .horizontal,
-                                providerID: state.configuration.providerID
-                            )
+                            if metric.presentation == .progress {
+                                CompactMetricGaugeTile(
+                                    metric: metric,
+                                    now: now,
+                                    style: metrics.count > 2 ? .vertical : .horizontal,
+                                )
                         } else {
                             CompactValueTile(metric: metric, valueText: compactValueText(for: metric))
                         }
@@ -601,7 +591,6 @@ private extension UsageRowView {
             metric: metric,
             now: now,
             style: .horizontal,
-            providerID: state.configuration.providerID
         )
     }
 
@@ -613,14 +602,14 @@ private extension UsageRowView {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
                 Text(title)
-                    .font(.caption)
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
 
                 Spacer(minLength: 4)
 
                 if let metric {
                     Text(UsageFormatter.displayPercentText(metric.percent))
-                        .font(.system(.caption, design: .rounded, weight: .semibold))
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
                         .foregroundStyle(progressColor(for: metric))
                         .monospacedDigit()
                 }
@@ -631,7 +620,7 @@ private extension UsageRowView {
 
                 if metric.windowEnd != nil {
                     Text("重置 \(UsageFormatter.resetTime(metric, now: now))")
-                        .font(.caption2)
+                        .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                 }
@@ -754,11 +743,11 @@ private extension UsageRowView {
             VStack(alignment: .leading, spacing: 5) {
                 HStack {
                     Text(title)
-                        .font(.caption)
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 4)
                     Text(UsageFormatter.displayPercentText(metric.percent))
-                        .font(.system(.headline, design: .rounded, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
                         .foregroundStyle(progressColor(for: metric))
                         .monospacedDigit()
                 }
@@ -779,13 +768,13 @@ private extension UsageRowView {
                                     for: metric,
                                     dimension: dimension,
                                     now: now
-                                ) ? Color.green : Color.secondary
+                                ) ? CompactPopoverPalette.positive(colorScheme) : Color.secondary
                             )
                     }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .font(.caption2)
+            .font(.system(size: 10))
             .foregroundStyle(.secondary)
             .monospacedDigit()
             .textSelection(.enabled)
@@ -795,7 +784,7 @@ private extension UsageRowView {
                 Text("—")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .font(.caption)
+            .font(.system(size: 12))
             .foregroundStyle(.secondary)
         }
     }
@@ -848,7 +837,7 @@ private extension UsageRowView {
                     .overlay(alignment: .topTrailing) {
                         refreshFailureIndicator
                     }
-                    .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .button), style: .continuous))
             }
             .buttonStyle(.plain)
             .popover(isPresented: $showsFailureDetails, arrowEdge: .bottom) {
@@ -874,7 +863,7 @@ private extension UsageRowView {
             .frame(width: 12, height: 12)
             .background {
                 Circle()
-                    .fill(Color(red: 1.0, green: 0.28, blue: 0.34))
+                    .fill(CompactPopoverPalette.criticalColor)
             }
             .overlay {
                 Circle()
@@ -899,7 +888,11 @@ private extension UsageRowView {
     }
 
     func progressColor(for metric: UsageMetric) -> Color {
-        UsageMetricPresentation.color(for: metric.percent)
+        UsageMetricPresentation.color(
+            for: metric.percent,
+            scheme: colorScheme,
+            rules: menuBarColorRules
+        )
     }
 
     @ViewBuilder
@@ -945,15 +938,15 @@ private struct RefreshFailurePopover: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label("刷新失败", systemImage: "exclamationmark.triangle.fill")
-                .font(.headline)
-                .foregroundStyle(.orange)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(CompactPopoverPalette.warningColor)
 
             Text(failureReason)
-                .font(.callout)
+                .font(.system(size: 12))
                 .fixedSize(horizontal: false, vertical: true)
 
             Text(dataSourceText)
-                .font(.caption)
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 

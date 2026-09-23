@@ -11,7 +11,7 @@ struct UsageCardDensitySegmentedControl: View {
         }
         .padding(2)
         .background {
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
+            RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .button), style: .continuous)
                 .fill(Color.primary.opacity(0.06))
         }
         .accessibilityElement(children: .contain)
@@ -34,16 +34,14 @@ struct UsageCardDensitySegmentedControl: View {
                 .frame(height: 22)
                 .background {
                     if isSelected {
-                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .inner), style: .continuous)
                             .fill(CompactPopoverPalette.selectedSegmentFill(colorScheme))
                             .overlay {
-                                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .inner), style: .continuous)
                                     .strokeBorder(CompactPopoverPalette.selectedSegmentStroke(colorScheme), lineWidth: 1)
                             }
-                            .shadow(color: .black.opacity(colorScheme == .dark ? 0.30 : 0.12), radius: 1.5, y: 0.5)
                     }
                 }
-                .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(density.title)

@@ -13,7 +13,8 @@ class ModelIdChipPaletteTest {
         val second = ModelIdChipPalette.colorIndex(modelId)
 
         assertEquals(first, second)
-        assertTrue(first in ModelIdChipPalette.colorIndices.indices)
+        assertTrue(first in ModelIdChipPalette.emphasisIndices.indices)
+        assertTrue(ModelIdChipPalette.emphasis(modelId) in 0f..1f)
     }
 
     @Test
@@ -26,6 +27,6 @@ class ModelIdChipPaletteTest {
             "deepseek-v4-pro",
         ).map(ModelIdChipPalette::colorIndex)
 
-        assertEquals(indices.size, indices.toSet().size)
+        assertTrue(indices.toSet().size >= 2)
     }
 }

@@ -37,7 +37,6 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.math.BigDecimal
 import java.time.Instant
@@ -166,7 +165,7 @@ fun CredentialDetailScreen(
                     Icon(
                         imageVector = if (card.credential.isEnabled) Icons.Filled.CheckCircle else Icons.Filled.PauseCircle,
                         contentDescription = null,
-                        tint = if (card.credential.isEnabled) statusColors().normal else MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = if (card.credential.isEnabled) statusColors().positive else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
                         text = if (card.credential.isEnabled) "已启用" else "已停用",
@@ -342,8 +341,6 @@ private fun MetadataSection(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.primary,
                         textAlign = TextAlign.End,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .weight(1f)
                             .clickable {

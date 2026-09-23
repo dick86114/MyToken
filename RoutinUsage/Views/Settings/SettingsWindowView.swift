@@ -62,6 +62,7 @@ struct SettingsWindowView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .liquidGlassWindowBackground()
+        .environment(\.menuBarColorRules, environment.settings.menuBarColorRules)
         .background(WindowFramePersistence())
         .background(SettingsWindowDockIconAnchor())
         .frame(minWidth: 820, idealWidth: 880, minHeight: 560, idealHeight: 640)

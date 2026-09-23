@@ -81,10 +81,10 @@ struct ProviderFilterMenu: View {
     private var filterChip: some View {
         HStack(spacing: 6) {
             Image(systemName: "chevron.down")
-                .font(.system(size: 9, weight: .semibold))
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(CompactPopoverPalette.chipSecondary(colorScheme))
             Text(selectedTitle)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(CompactPopoverPalette.chipText(colorScheme))
                 .lineLimit(1)
         }
@@ -94,34 +94,15 @@ struct ProviderFilterMenu: View {
             chipBackground
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(colorScheme == .dark ? 0.22 : 0.95),
-                            Color.white.opacity(colorScheme == .dark ? 0.10 : 0.55)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 1
-                )
+            RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .button), style: .continuous)
+                .strokeBorder(CompactPopoverPalette.cardStroke(colorScheme), lineWidth: 1)
                 .allowsHitTesting(false)
         }
-        .shadow(color: Color.black.opacity(0.04), radius: 1, y: 1)
         .onHover { isHovered = $0 }
     }
 
-    @ViewBuilder
     private var chipBackground: some View {
-        let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
-        let fill = CompactPopoverPalette.chipFill(hovered: isHovered, colorScheme)
-        if #available(macOS 26.0, *) {
-            shape
-                .fill(fill)
-                .glassEffect(.regular.tint(CompactPopoverPalette.glassTint(colorScheme)), in: shape)
-        } else {
-            shape.fill(fill)
-        }
+        RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .button), style: .continuous)
+            .fill(CompactPopoverPalette.chipFill(hovered: isHovered, colorScheme))
     }
 }

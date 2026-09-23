@@ -25,9 +25,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import ai.routin.mytoken.core.ui.GlassButton
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
+import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -111,7 +110,7 @@ fun TransferScannerScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(RoundedCornerShape(16.dp)),
+                        .clip(RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp)),
                 ) {
                     CameraQrPreview(onQrCodeScanned = onQrCodeScanned)
                     Box(
@@ -120,7 +119,7 @@ fun TransferScannerScreen(
                             .size(252.dp)
                             .border(
                                 border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
-                                shape = RoundedCornerShape(20.dp),
+                                shape = RoundedCornerShape(MyTokenVisualPolicy.innerRadiusDp),
                             ),
                     )
                 }

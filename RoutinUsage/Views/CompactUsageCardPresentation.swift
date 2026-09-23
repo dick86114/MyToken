@@ -32,7 +32,10 @@ enum CompactUsageCardPresentation {
         return .valueTiles
     }
 
-    static func isNearlyExhausted(metrics: [NormalizedUsageMetric]) -> Bool {
+    static func isNearlyExhausted(
+        metrics: [NormalizedUsageMetric],
+        rules: MenuBarColorRules = .standard
+    ) -> Bool {
         metrics.contains { metric in
             guard metric.presentation == .progress else { return false }
             if metric.healthState == .critical {
@@ -41,7 +44,7 @@ enum CompactUsageCardPresentation {
             guard let percent = metric.displayedPercent else {
                 return false
             }
-            return UsageMetricPresentation.tone(for: percent) == .critical
+            return UsageMetricPresentation.tone(for: percent, rules: rules) == .critical
         }
     }
 
@@ -59,13 +62,14 @@ enum CompactUsageCardPresentation {
         for metric: NormalizedUsageMetric,
         now: Date,
         style: CompactGaugeStyle,
-        timeZone: TimeZone = .current
+        timeZone: TimeZone = .current,
+        rules: MenuBarColorRules = .standard
     ) -> String {
         if metric.presentation != .progress {
             return ""
         }
 
-        let tone = metric.displayedPercent.map(UsageMetricPresentation.tone(for:))
+        let tone = metric.displayedPercent.map { UsageMetricPresentation.tone(for: $0, rules: rules) }
         if style == .vertical {
             if tone == .critical || metric.healthState == .critical {
                 return "即将耗尽"
@@ -101,11 +105,12 @@ enum CompactUsageCardPresentation {
     }
 
     static func gaugeTone(
-        for metric: NormalizedUsageMetric
+        for metric: NormalizedUsageMetric,
+        rules: MenuBarColorRules = .standard
     ) -> UsageMetricTone? {
         guard metric.presentation == .progress else { return nil }
         if let percent = metric.displayedPercent {
-            return UsageMetricPresentation.tone(for: percent)
+            return UsageMetricPresentation.tone(for: percent, rules: rules)
         }
         switch metric.healthState {
         case .warning:

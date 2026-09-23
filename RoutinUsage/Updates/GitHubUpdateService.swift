@@ -23,7 +23,7 @@ struct AppUpdate: Equatable, Sendable {
     }
 }
 
-struct AppReleaseHistoryItem: Identifiable, Equatable, Sendable {
+struct AppReleaseHistoryItem: Identifiable, Equatable, Codable, Sendable {
     let version: String
     let releaseURL: URL
     let notes: String
