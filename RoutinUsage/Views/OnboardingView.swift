@@ -21,12 +21,11 @@ struct OnboardingView: View {
                 .interpolation(.high)
                 .scaledToFit()
                 .frame(width: 72, height: 72)
-                .shadow(color: .black.opacity(0.16), radius: 4, y: 2)
                 .accessibilityHidden(true)
 
             VStack(spacing: 8) {
                 Text("欢迎使用 MyToken")
-                    .font(.title.weight(.semibold))
+                    .font(.system(size: 20, weight: .semibold))
                 Text("添加第一个 plan Key，即可在菜单栏查看 5 小时、周或 Token 资源包用量。")
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
@@ -36,7 +35,7 @@ struct OnboardingView: View {
             .accessibilityElement(children: .combine)
 
             Label("Key 仅保存在这台 Mac 的本地偏好设置中", systemImage: "lock.shield")
-                .font(.callout)
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
 
             Button("添加第一个 Key") {
@@ -47,7 +46,7 @@ struct OnboardingView: View {
             .accessibilityHint("打开 Key 编辑表单")
         }
         .padding(32)
-        .liquidGlassSurface(cornerRadius: 24)
+        .liquidGlassSurface()
         .padding(36)
         .frame(width: 460)
         .frame(minHeight: 350)

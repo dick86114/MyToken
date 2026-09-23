@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct HelpUpdateView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @Bindable var environment: AppEnvironment
     @State private var showingReleaseHistory = false
 
@@ -45,12 +46,21 @@ struct HelpUpdateView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .accessibilityLabel("在 GitHub 查看当前版本")
+
+                Button {
+                    Task { await environment.loadReleaseHistoryIfNeeded(force: true) }
+                } label: {
+                    Label("获取当前版本日志", systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .accessibilityLabel("获取当前版本日志")
             }
 
             Divider()
 
             Text("当前版本更新日志")
-                .font(.headline)
+                .font(.system(size: 14, weight: .semibold))
 
             currentReleaseNotes
 
@@ -80,7 +90,7 @@ struct HelpUpdateView: View {
         case let .failed(message):
             VStack(alignment: .leading, spacing: 10) {
                 Text(message)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(CompactPopoverPalette.criticalColor)
 
                 Button("重试") {
                     Task { await environment.loadReleaseHistoryIfNeeded(force: true) }
@@ -92,7 +102,7 @@ struct HelpUpdateView: View {
                 UpdateNotesView(notes: current.notes)
             } else {
                 Text("此版本未提供更新日志")
-                    .font(.caption)
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
         }
@@ -110,7 +120,7 @@ struct HelpUpdateView: View {
         @Bindable var settings = environment.settings
         return settingSection {
             Text("应用更新")
-                .font(.headline)
+                .font(.system(size: 14, weight: .semibold))
 
             Picker("更新通道", selection: $settings.updateChannel) {
                 Text("GitHub 直连").tag(UpdateChannel.direct)
@@ -128,7 +138,7 @@ struct HelpUpdateView: View {
                 .accessibilityLabel("CDN 加速源")
 
                 Text("大陆网络建议选择 CDN 加速；若某镜像不可用可切换其他源。")
-                    .font(.caption)
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
 
@@ -167,7 +177,7 @@ struct HelpUpdateView: View {
         case let .completed(version):
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
+                    .foregroundStyle(CompactPopoverPalette.positive(colorScheme))
                     .accessibilityHidden(true)
                 Text("更新完成，当前版本 \(version)")
             }
@@ -175,7 +185,7 @@ struct HelpUpdateView: View {
         case let .failed(message):
             VStack(alignment: .leading, spacing: 12) {
                 Text(message)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(CompactPopoverPalette.criticalColor)
 
                 Button("重试") {
                     Task { await environment.checkForUpdates() }
@@ -188,7 +198,7 @@ struct HelpUpdateView: View {
     private func availableUpdate(_ update: AppUpdate) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("发现新版本 \(update.version)")
-                .font(.headline)
+                .font(.system(size: 14, weight: .semibold))
 
             UpdateNotesView(notes: update.notes)
 
@@ -200,7 +210,7 @@ struct HelpUpdateView: View {
                 .accessibilityLabel("安装更新")
 
                 Link("查看发布说明", destination: update.releaseURL)
-                    .font(.callout)
+                    .font(.system(size: 12))
                     .accessibilityLabel("查看发布说明")
 
                 Spacer(minLength: 0)
@@ -237,10 +247,10 @@ struct HelpUpdateView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("遇到问题？")
-                        .font(.headline)
+                        .font(.system(size: 14, weight: .semibold))
 
                     Text("发送问题描述和本地诊断日志")
-                        .font(.caption)
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
 
@@ -263,7 +273,7 @@ struct HelpUpdateView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)
-        .liquidGlassSurface(cornerRadius: 16)
+        .liquidGlassSurface()
     }
 }
 
@@ -277,7 +287,7 @@ private struct ReleaseHistorySheet: View {
         VStack(spacing: 0) {
             HStack {
                 Text("历史版本更新日志")
-                    .font(.title2.weight(.semibold))
+                    .font(.system(size: 20, weight: .semibold))
 
                 Spacer(minLength: 16)
 
@@ -310,7 +320,7 @@ private struct ReleaseHistorySheet: View {
         case let .failed(message):
             VStack(alignment: .leading, spacing: 12) {
                 Text(message)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(CompactPopoverPalette.criticalColor)
 
                 Button("重试") {
                     Task { await onRetry() }
@@ -344,13 +354,13 @@ private struct ReleaseHistorySheet: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text("v\(release.version)")
-                    .font(.headline)
+                    .font(.system(size: 14, weight: .semibold))
 
                 Spacer(minLength: 12)
 
                 if let publishedAt = release.publishedAt {
                     Text(publishedAt.formatted(date: .abbreviated, time: .omitted))
-                        .font(.caption)
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                 }
@@ -359,7 +369,7 @@ private struct ReleaseHistorySheet: View {
             UpdateNotesView(notes: release.notes)
 
             Link("在 GitHub 查看", destination: release.releaseURL)
-                .font(.caption)
+                .font(.system(size: 12))
         }
         .padding(.vertical, 16)
         .accessibilityElement(children: .contain)

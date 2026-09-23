@@ -146,7 +146,6 @@ private fun CredentialSelector(
                                 text = credential.name,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
                             )
                             Text(
                                 text = ProviderCatalog.displayName(credential.providerId),

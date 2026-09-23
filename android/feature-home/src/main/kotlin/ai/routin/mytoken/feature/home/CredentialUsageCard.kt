@@ -2,6 +2,8 @@ package ai.routin.mytoken.feature.home
 
 import ai.routin.mytoken.domain.usage.RefreshStatus
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
+import ai.routin.mytoken.core.ui.MyTokenPalette
+import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
 import ai.routin.mytoken.domain.model.UsageCardDensity
 import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
@@ -27,7 +29,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -63,30 +64,26 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.testTag
 
-/** 深色令牌对齐 simple-ui/dark：面板 #121722、emerald 主色、珊瑚红失败徽章。 */
+/** 方案 A：石墨蓝承载卡片，品牌蓝表达正常用量，彩色只表达状态。 */
 internal object CardPalette {
-    val darkSurface = Color(0xE6121722)
-    val darkSurfaceBorder = Color(0x1AFFFFFF)
-    val emeraldDark = Color(0xFF10F49C)
-    val emeraldLight = Color(0xFF059669)
-    val coral = Color(0xFFFF4557)
-
-    fun emerald(isDark: Boolean) = if (isDark) emeraldDark else emeraldLight
+    val darkSurface = MyTokenPalette.darkSurface
+    val darkSurfaceBorder = Color(0x1FFFFFFF)
+    val coral = MyTokenPalette.critical
 }
 
 internal data class StatusColors(
-    val normal: Color,
+    val brand: Color,
+    val positive: Color,
     val warning: Color,
     val critical: Color,
     val neutral: Color,
 ) {
     companion object {
-        val lightPalette = StatusColors(Color(0xFF24A148), Color(0xFFD97706), Color(0xFFDA1E28), Color(0xFF8D8D8D))
-        val darkPalette = StatusColors(Color(0xFF42BE65), Color(0xFFF1C21B), Color(0xFFFA4D56), Color(0xFFA8A8A8))
+        val lightPalette = StatusColors(MyTokenPalette.brandLight, MyTokenPalette.positiveLight, MyTokenPalette.warning, MyTokenPalette.critical, Color(0xFF6F7782))
+        val darkPalette = StatusColors(MyTokenPalette.brandDark, MyTokenPalette.positiveDark, MyTokenPalette.warning, MyTokenPalette.critical, MyTokenPalette.darkMutedText)
         fun forTheme(isDark: Boolean) = if (isDark) darkPalette else lightPalette
     }
 }
@@ -113,7 +110,6 @@ fun CredentialUsageCard(
     layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
     usageCardDensity: UsageCardDensity = UsageCardDensity.FULL,
 ) {
-    val accent = ProviderCatalog.accentColor(card.credential.providerId)
     val providerName = ProviderCatalog.displayName(card.credential.providerId)
     val plan = card.snapshot?.planName.orEmpty()
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -122,20 +118,20 @@ fun CredentialUsageCard(
 
     val cometModifier = Modifier.refreshCometBorder(
         isLoading = card.status == RefreshStatus.Loading,
-        color = accent,
+        color = MaterialTheme.colorScheme.primary,
     )
 
     Card(
         onClick = onOpen,
         modifier = modifier.fillMaxWidth().then(cometModifier),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
         colors = CardDefaults.cardColors(
             containerColor = if (isDark) CardPalette.darkSurface else MaterialTheme.colorScheme.surface,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         border = BorderStroke(
             1.dp,
-            if (isDark) CardPalette.darkSurfaceBorder else accent.copy(alpha = 0.22f),
+            MaterialTheme.colorScheme.outlineVariant,
         ),
     ) {
         Column(
@@ -309,9 +305,6 @@ private fun CredentialCardHeader(
                     text = card.credential.name,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(max = 96.dp),
                 )
                 if (nearlyExhausted) {
                     StatusPill(text = "即将耗尽", color = statusColors().critical, isDark = isDark)
@@ -321,8 +314,6 @@ private fun CredentialCardHeader(
                 text = if (plan.isEmpty()) providerName else "$providerName · $plan",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 1.dp),
             )
         }
@@ -395,8 +386,8 @@ private fun AvatarWithFailureBadge(
         Box(
             modifier = Modifier
                 .size(30.dp)
-                .background(accent.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-                .border(1.dp, accent.copy(alpha = 0.30f), RoundedCornerShape(12.dp)),
+                .background(accent.copy(alpha = 0.15f), RoundedCornerShape(MyTokenVisualPolicy.innerRadiusDp))
+                .border(1.dp, accent.copy(alpha = 0.30f), RoundedCornerShape(MyTokenVisualPolicy.innerRadiusDp)),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -460,7 +451,7 @@ private fun StatusPill(text: String, color: Color, isDark: Boolean) {
         text = text,
         style = MaterialTheme.typography.labelSmall,
         fontWeight = FontWeight.SemiBold,
-        color = CardPalette.emerald(isDark).takeIf { color == statusColors().normal } ?: color,
+        color = color,
         modifier = Modifier
             .padding(start = 6.dp)
             .background(color.copy(alpha = 0.12f), CircleShape)
@@ -494,39 +485,34 @@ private fun CompactUsageCardBody(card: CredentialCardUi, isDark: Boolean) {
         )
         CompactUsageArrangement.HorizontalRings -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             metrics.forEach { metric ->
-                Box(
+                Column(
                     modifier = Modifier
                         .weight(1f)
-                        .ringTileBackground(isDark, tone = CompactUsageCardPresentation.tone(metric)),
+                        .ringTileBackground(isDark, tone = CompactUsageCardPresentation.tone(metric))
+                        .padding(10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Row(
-                        modifier = Modifier.padding(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        UsageRing(
-                            percent = progressPercent(metric),
-                            tone = CompactUsageCardPresentation.tone(metric),
-                            isDark = isDark,
-                            diameter = 44.dp,
-                        )
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(
-                                text = metric.label,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                text = ringSubtitle(metric, vertical = false),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
+                    UsageRing(
+                        percent = progressPercent(metric),
+                        tone = CompactUsageCardPresentation.tone(metric),
+                        isDark = isDark,
+                        diameter = 44.dp,
+                    )
+                    Text(
+                        text = metric.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        text = ringSubtitle(metric, vertical = false),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
         }
@@ -565,8 +551,6 @@ private fun CompactUsageCardBody(card: CredentialCardUi, isDark: Boolean) {
                             } else {
                                 toneColor
                             },
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
                         )
                         Text(
                             text = ringSubtitle(metric, vertical = true),
@@ -576,8 +560,6 @@ private fun CompactUsageCardBody(card: CredentialCardUi, isDark: Boolean) {
                             } else {
                                 toneColor
                             },
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
@@ -615,8 +597,8 @@ private fun Modifier.ringTileBackground(isDark: Boolean, tone: UsageMetricTone):
     // 深色下普通用量扁平化，不铺格子底和框线。
     if (tone == UsageMetricTone.Normal && isDark) return this
     return this
-        .background(fill, RoundedCornerShape(12.dp))
-        .border(1.dp, stroke, RoundedCornerShape(12.dp))
+        .background(fill, RoundedCornerShape(MyTokenVisualPolicy.innerRadiusDp))
+        .border(1.dp, stroke, RoundedCornerShape(MyTokenVisualPolicy.innerRadiusDp))
 }
 
 @Composable
@@ -634,12 +616,12 @@ private fun BalanceStrip(metric: UsageMetric, isDark: Boolean) {
             .fillMaxWidth()
             .background(
                 if (isDark) CardPalette.darkSurface else MaterialTheme.colorScheme.surface,
-                RoundedCornerShape(12.dp),
+                RoundedCornerShape(MyTokenVisualPolicy.innerRadiusDp),
             )
             .border(
                 1.dp,
                 if (isDark) CardPalette.darkSurfaceBorder else statusColor.copy(alpha = 0.18f),
-                RoundedCornerShape(12.dp),
+                RoundedCornerShape(MyTokenVisualPolicy.innerRadiusDp),
             ),
     ) {
         // 底部渐隐波浪装饰
@@ -649,14 +631,14 @@ private fun BalanceStrip(metric: UsageMetric, isDark: Boolean) {
                 .fillMaxWidth()
                 .height(36.dp),
         ) {
-            val waveColor = CardPalette.emerald(isDark).copy(alpha = 0.08f)
+            val waveColor = statusColor.copy(alpha = 0.08f)
             val path = androidx.compose.ui.graphics.Path()
             path.moveTo(0f, size.height * 0.7f)
-            path.quadraticBezierTo(
+            path.quadraticTo(
                 size.width * 0.25f, size.height * 0.2f,
                 size.width * 0.5f, size.height * 0.5f,
             )
-            path.quadraticBezierTo(
+            path.quadraticTo(
                 size.width * 0.75f, size.height * 0.8f,
                 size.width, size.height * 0.3f,
             )
@@ -682,7 +664,7 @@ private fun BalanceStrip(metric: UsageMetric, isDark: Boolean) {
                     text = formatCurrency(metric.value, metric.currencyCode),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
-                    color = CardPalette.emerald(isDark),
+                    color = statusColor(metric, null, colors),
                 )
             }
             StatusPill(text = statusText, color = statusColor, isDark = isDark)
@@ -712,8 +694,6 @@ private fun CompactMetricRow(metric: UsageMetric) {
                 text = metric.label,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
             if (isProgress && percent != null) {
@@ -744,8 +724,6 @@ private fun CompactMetricRow(metric: UsageMetric) {
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = statusColor(metric, percent, colors),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
             )
         }
     }

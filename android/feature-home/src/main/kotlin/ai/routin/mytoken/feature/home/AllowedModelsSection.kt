@@ -21,41 +21,26 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
 internal object ModelIdChipPalette {
-    val colorIndices = listOf(
-        Color(0xFF1565C0),
-        Color(0xFF00838F),
-        Color(0xFF3949AB),
-        Color(0xFF2E7D32),
-        Color(0xFFEF6C00),
-        Color(0xFF6A1B9A),
-        Color(0xFFAD1457),
-        Color(0xFF00897B),
-        Color(0xFF4E342E),
-        Color(0xFFC62828),
-        Color(0xFF37474F),
-        Color(0xFFB26A00),
-    )
+    val emphasisIndices = listOf(0.72f, 0.84f, 0.96f)
 
     fun colorIndex(modelID: String): Int {
         var hash = 0xcbf29ce484222325UL
         modelID.forEach { character ->
             hash = (hash xor character.code.toULong()) * 0x100000001b3UL
         }
-        return (hash % colorIndices.size.toULong()).toInt()
+        return (hash % emphasisIndices.size.toULong()).toInt()
     }
 
-    fun color(modelID: String): Color = colorIndices[colorIndex(modelID)]
+    fun emphasis(modelID: String): Float = emphasisIndices[colorIndex(modelID)]
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -120,7 +105,11 @@ private fun ModelIDChip(
     isCopied: Boolean,
     onCopy: (String) -> Unit,
 ) {
-    val accent = ModelIdChipPalette.color(modelID)
+    val accent = if (isCopied) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ModelIdChipPalette.emphasis(modelID))
+    }
     val description = if (isCopied) "已复制模型 ID $modelID" else "复制模型 ID $modelID"
 
     Surface(
@@ -140,8 +129,6 @@ private fun ModelIDChip(
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Medium,
                 color = accent,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
             )
             if (isCopied) {
                 Icon(

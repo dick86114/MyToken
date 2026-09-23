@@ -2,8 +2,8 @@ import SwiftUI
 
 /// 简洁卡片视觉组件：头像、环形用量、余额条和圆形操作按钮。
 enum CompactPopoverMetrics {
-    static let cardCornerRadius: CGFloat = 16
-    static let metricCornerRadius: CGFloat = 12
+    static var cardCornerRadius: CGFloat { PopoverVisualPolicy.cornerRadius(for: .outer) }
+    static var metricCornerRadius: CGFloat { PopoverVisualPolicy.cornerRadius(for: .inner) }
     static let avatarSize: CGFloat = 28
     static let largeGaugeSize: CGFloat = 44
     static let smallGaugeSize: CGFloat = 40
@@ -12,94 +12,152 @@ enum CompactPopoverMetrics {
 
 
 enum CompactPopoverPalette {
-    // 深色令牌取自 simple-ui/dark：深蓝底 #0A0D14、面板 #121722、emerald 主色。
-    static let darkCanvas = Color(red: 0.039, green: 0.051, blue: 0.078)
-    static let darkSurface = Color(red: 0.071, green: 0.090, blue: 0.133)
-    static let darkEmerald = Color(red: 0.063, green: 0.957, blue: 0.612)
+    // 方案 A：石墨蓝承载结构，品牌蓝强调操作和正常用量，彩色只表达状态。
+    static let darkCanvas = Color(red: 0.043, green: 0.059, blue: 0.078)
+    static let darkSurface = Color(red: 0.071, green: 0.094, blue: 0.129)
+    static let darkElevated = Color(red: 0.102, green: 0.133, blue: 0.188)
     static let darkMutedText = Color(red: 0.580, green: 0.639, blue: 0.722)
+    static let lightCanvas = Color(red: 0.957, green: 0.961, blue: 0.969)
+    static let brandLight = Color(red: 0.184, green: 0.502, blue: 0.929)
+    static let brandDark = Color(red: 0.302, green: 0.580, blue: 0.961)
+    static let positiveLight = Color(red: 0.184, green: 0.620, blue: 0.471)
+    static let positiveDark = Color(red: 0.271, green: 0.706, blue: 0.545)
+    static let warningColor = Color(red: 0.788, green: 0.541, blue: 0.180)
+    static let criticalColor = Color(red: 0.820, green: 0.357, blue: 0.357)
 
-    static func cardSurfaceTint(_ scheme: ColorScheme) -> Color {
-        isDark(scheme) ? darkSurface.opacity(0.50) : glassTint(scheme)
+    static func brand(_ scheme: ColorScheme) -> Color {
+        isDark(scheme) ? brandDark : brandLight
+    }
+
+    static func balanceAccent(
+        for state: UsageMetricHealthState,
+        _ scheme: ColorScheme
+    ) -> Color {
+        switch PopoverVisualPolicy.balanceAccentRole(for: state) {
+        case .positive:
+            return positive(scheme)
+        case .critical:
+            return criticalColor
+        case .secondary:
+            return .secondary
+        }
+    }
+
+    static func positive(_ scheme: ColorScheme) -> Color {
+        isDark(scheme) ? positiveDark : positiveLight
+    }
+
+    static func healthColor(for state: UsageMetricHealthState, _ scheme: ColorScheme) -> Color {
+        switch PopoverVisualPolicy.healthAccentRole(for: state) {
+        case .brand:
+            return brand(scheme)
+        case .warning:
+            return warningColor
+        case .critical:
+            return criticalColor
+        case .secondary:
+            return .secondary
+        }
+    }
+
+    static func statusColor(for tone: UsageMetricTone) -> Color {
+        switch PopoverVisualPolicy.gaugeAccentRole(for: tone) {
+        case .brand: return brandLight
+        case .warning: return warningColor
+        case .critical: return criticalColor
+        }
+    }
+
+    static func surface(_ role: PopoverVisualPolicy.SurfaceRole, _ scheme: ColorScheme) -> Color {
+        switch PopoverVisualPolicy.material(for: role) {
+        case .windowGlass:
+            return isDark(scheme) ? darkCanvas.opacity(0.72) : lightCanvas.opacity(0.38)
+        case .solid:
+            switch role {
+            case .card: return isDark(scheme) ? darkSurface : .white
+            case .metric: return isDark(scheme) ? darkElevated.opacity(0.58) : lightCanvas
+            case .control: return isDark(scheme) ? darkElevated.opacity(0.72) : .white.opacity(0.88)
+            case .window, .modal: return .clear
+            }
+        case .modalGlass:
+            return isDark(scheme) ? darkSurface.opacity(0.94) : .white.opacity(0.94)
+        }
     }
 
     static func isDark(_ scheme: ColorScheme) -> Bool { scheme == .dark }
 
-    static func glassTint(_ scheme: ColorScheme) -> Color {
-        Color.white.opacity(isDark(scheme) ? 0.04 : 0.22)
-    }
-
     static func cardStroke(_ scheme: ColorScheme) -> Color {
-        Color.white.opacity(isDark(scheme) ? 0.10 : 0.82)
+        isDark(scheme) ? Color.white.opacity(0.10) : Color.black.opacity(0.08)
     }
 
     static func chipFill(hovered: Bool, _ scheme: ColorScheme) -> Color {
         if isDark(scheme) {
-            return Color.white.opacity(hovered ? 0.10 : 0.06)
+            return darkElevated.opacity(hovered ? 0.96 : 0.74)
         }
-        return Color.white.opacity(hovered ? 0.90 : 0.70)
+        return .white.opacity(hovered ? 1 : 0.86)
     }
 
     static func chipText(_ scheme: ColorScheme) -> Color {
-        isDark(scheme) ? Color.white.opacity(0.92) : Color(red: 0.20, green: 0.25, blue: 0.33)
+        isDark(scheme) ? Color.white.opacity(0.92) : Color(red: 0.12, green: 0.15, blue: 0.20)
     }
 
     static func chipSecondary(_ scheme: ColorScheme) -> Color {
-        isDark(scheme) ? darkMutedText : Color(red: 0.58, green: 0.64, blue: 0.72)
+        isDark(scheme) ? darkMutedText : Color(red: 0.43, green: 0.47, blue: 0.53)
     }
 
     static func selectedSegmentFill(_ scheme: ColorScheme) -> Color {
-        isDark(scheme) ? Color.white.opacity(0.10) : Color.white
+        isDark(scheme) ? darkElevated : .white
     }
 
     static func selectedSegmentStroke(_ scheme: ColorScheme) -> Color {
-        isDark(scheme) ? Color.white.opacity(0.18) : Color.clear
+        isDark(scheme) ? Color.white.opacity(0.12) : Color.black.opacity(0.06)
     }
 
     static func tileFill(_ scheme: ColorScheme, tone: UsageMetricTone) -> Color {
+        let base = surface(.metric, scheme)
         switch tone {
         case .warning:
-            return Color.orange.opacity(isDark(scheme) ? 0.12 : 0.08)
+            return warningColor.opacity(isDark(scheme) ? 0.12 : 0.08)
         case .critical:
-            return Color.red.opacity(isDark(scheme) ? 0.12 : 0.08)
+            return criticalColor.opacity(isDark(scheme) ? 0.12 : 0.08)
         case .normal:
-            // 深色下普通用量不铺底色，避免"卡片套卡片"的繁琐感。
-            return isDark(scheme) ? .clear : Color.white.opacity(0.45)
+            return base
         }
     }
 
     static func tileStroke(_ scheme: ColorScheme, tone: UsageMetricTone) -> Color {
         switch tone {
         case .warning:
-            return Color.orange.opacity(isDark(scheme) ? 0.40 : 0.25)
+            return warningColor.opacity(isDark(scheme) ? 0.34 : 0.22)
         case .critical:
-            return Color.red.opacity(isDark(scheme) ? 0.40 : 0.22)
+            return criticalColor.opacity(isDark(scheme) ? 0.34 : 0.22)
         case .normal:
-            return isDark(scheme) ? .clear : Color.white.opacity(0.55)
+            return cardStroke(scheme)
         }
     }
 
     static func subtitle(_ scheme: ColorScheme) -> Color {
-        isDark(scheme) ? darkMutedText : Color(red: 0.53, green: 0.53, blue: 0.55)
+        isDark(scheme) ? darkMutedText : Color(red: 0.42, green: 0.45, blue: 0.50)
     }
 
     static func amountGreen(_ scheme: ColorScheme) -> Color {
-        isDark(scheme) ? darkEmerald : Color(red: 0.02, green: 0.59, blue: 0.41)
+        positive(scheme)
     }
 
     static func badgeGreen(_ scheme: ColorScheme) -> Color {
-        isDark(scheme) ? darkEmerald : Color(red: 0.02, green: 0.45, blue: 0.33)
+        positive(scheme)
     }
 
     static func gaugeTrack(_ scheme: ColorScheme) -> Color {
-        Color.primary.opacity(isDark(scheme) ? 0.06 : 0.08)
+        Color.primary.opacity(isDark(scheme) ? 0.10 : 0.10)
     }
 
     static func actionStroke(_ scheme: ColorScheme) -> Color {
-        Color.white.opacity(isDark(scheme) ? 0.12 : 0.55)
+        cardStroke(scheme)
     }
 
     static func hairline(_ scheme: ColorScheme) -> Color {
-        Color.primary.opacity(isDark(scheme) ? 0.08 : 0.04)
+        Color.primary.opacity(isDark(scheme) ? 0.12 : 0.08)
     }
 }
 
@@ -115,10 +173,10 @@ struct CompactAccountAvatar: View {
             .frame(width: CompactPopoverMetrics.avatarSize, height: CompactPopoverMetrics.avatarSize)
             .background(
                 ProviderTheme.accentColor(for: providerID).opacity(0.15),
-                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                in: RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .inner), style: .continuous)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .inner), style: .continuous)
                     .strokeBorder(ProviderTheme.accentColor(for: providerID).opacity(0.30), lineWidth: 1)
             }
             .accessibilityHidden(true)
@@ -157,9 +215,9 @@ struct CompactCardActionButton<Label: View>: View {
 }
 
 struct CompactUsageGauge: View {
+    @Environment(\.menuBarColorRules) private var menuBarColorRules
     let percent: Double?
     let tone: UsageMetricTone
-    let accent: Color
     var size: CGFloat = CompactPopoverMetrics.largeGaugeSize
     @Environment(\.colorScheme) private var colorScheme
 
@@ -195,16 +253,16 @@ struct CompactUsageGauge: View {
     private var gaugeColor: Color {
         switch tone {
         case .normal:
-            return accent
+            return UsageMetricPresentation.color(for: tone, rules: menuBarColorRules)
         case .warning, .critical:
-            return tone.color
+            return UsageMetricPresentation.color(for: tone, rules: menuBarColorRules)
         }
     }
 
     /// 数字放大突出，百分号缩小并轻微上移。
     private var gaugeLabel: Text {
-        let numberSize: CGFloat = size > 42 ? 13.5 : 11.5
-        let percentSize: CGFloat = size > 42 ? 9.5 : 8.0
+        let numberSize: CGFloat = size > 42 ? 14 : 12
+        let percentSize: CGFloat = 10
         let numberWeight: Font.Weight = (percent ?? 0) <= 0 ? .semibold : .bold
 
         return Text(CompactUsageCardPresentation.compactPercentNumberText(percent))
@@ -220,32 +278,39 @@ struct CompactUsageGauge: View {
         }
         switch tone {
         case .critical:
-            return .red
+            return UsageMetricPresentation.color(for: tone, rules: menuBarColorRules)
         case .warning:
-            return Color.orange
+            return UsageMetricPresentation.color(for: tone, rules: menuBarColorRules)
         case .normal:
-            return Color.primary.opacity(0.85)
+            return UsageMetricPresentation.color(for: tone, rules: menuBarColorRules)
         }
     }
 }
 
 struct CompactMetricGaugeTile: View {
+    @Environment(\.menuBarColorRules) private var menuBarColorRules
     let metric: NormalizedUsageMetric
     let now: Date
     let style: CompactGaugeStyle
-    let providerID: ProviderID
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let tone = CompactUsageCardPresentation.gaugeTone(for: metric) ?? .normal
-        let subtitle = CompactUsageCardPresentation.subtitle(for: metric, now: now, style: style)
+        let tone = CompactUsageCardPresentation.gaugeTone(
+            for: metric,
+            rules: menuBarColorRules
+        ) ?? .normal
+        let subtitle = CompactUsageCardPresentation.subtitle(
+            for: metric,
+            now: now,
+            style: style,
+            rules: menuBarColorRules
+        )
         Group {
             if style == .horizontal {
                 HStack(spacing: 12) {
                     CompactUsageGauge(
                         percent: metric.displayedPercent,
                         tone: tone,
-                        accent: ProviderTheme.accentColor(for: providerID),
                         size: CompactPopoverMetrics.largeGaugeSize
                     )
                     VStack(alignment: .leading, spacing: 4) {
@@ -265,13 +330,12 @@ struct CompactMetricGaugeTile: View {
                     CompactUsageGauge(
                         percent: metric.displayedPercent,
                         tone: tone,
-                        accent: ProviderTheme.accentColor(for: providerID),
                         size: CompactPopoverMetrics.smallGaugeSize
                     )
                     labelRow(tone: tone)
                         .multilineTextAlignment(.center)
                     Text(subtitle)
-                        .font(.system(size: 9, design: .monospaced))
+                            .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(subtitleColor(tone: tone))
                         .monospacedDigit()
                         .lineLimit(1)
@@ -299,12 +363,16 @@ struct CompactMetricGaugeTile: View {
         HStack(spacing: 4) {
             if tone == .critical || tone == .warning {
                 Circle()
-                    .fill(tone.color)
+                    .fill(UsageMetricPresentation.color(for: tone, rules: menuBarColorRules))
                     .frame(width: tone == .critical ? 6 : 4, height: tone == .critical ? 6 : 4)
             }
             Text(metric.label)
-                .font(.system(size: style == .horizontal ? 11 : 10, weight: .medium))
-                .foregroundStyle(tone == .warning || tone == .critical ? tone.color : Color.primary.opacity(0.78))
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(
+                    tone == .warning || tone == .critical
+                        ? UsageMetricPresentation.color(for: tone, rules: menuBarColorRules)
+                        : Color.primary.opacity(0.82)
+                )
                 .lineLimit(1)
         }
     }
@@ -320,9 +388,9 @@ struct CompactMetricGaugeTile: View {
     private func subtitleColor(tone: UsageMetricTone) -> Color {
         switch tone {
         case .warning:
-            return Color.orange
+            return UsageMetricPresentation.color(for: tone, rules: menuBarColorRules)
         case .critical:
-            return Color.red
+            return UsageMetricPresentation.color(for: tone, rules: menuBarColorRules)
         case .normal:
             return CompactPopoverPalette.subtitle(colorScheme)
         }
@@ -349,7 +417,7 @@ struct CompactValueTile: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
             Text(valueText)
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .font(.system(size: 14, weight: .semibold, design: .monospaced))
                 .monospacedDigit()
                 .foregroundStyle(.primary)
                 .lineLimit(1)
@@ -383,7 +451,6 @@ struct CompactBalanceStrip: View {
                 .font(.system(size: 20, weight: .bold))
                 .monospacedDigit()
                 .foregroundStyle(CompactPopoverPalette.amountGreen(colorScheme))
-                .shadow(color: Color.green.opacity(0.12), radius: 3, y: 1)
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
         }
@@ -393,6 +460,8 @@ struct CompactBalanceStrip: View {
 }
 
 struct CompactBalanceWave: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         GeometryReader { geometry in
             Path { path in
@@ -411,7 +480,7 @@ struct CompactBalanceWave: View {
                 path.addLine(to: CGPoint(x: 0, y: height))
                 path.closeSubpath()
             }
-            .fill(Color.green.opacity(0.10))
+            .fill(CompactPopoverPalette.positive(colorScheme).opacity(0.10))
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)

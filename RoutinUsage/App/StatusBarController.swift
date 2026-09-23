@@ -173,8 +173,10 @@ final class StatusBarController: NSObject {
             )
         }
         if !selectedIndicators.isEmpty {
-            let displayedCount = min(selectedIndicators.count, MenuBarMultiUsageIcon.maximumCount)
-            let imageWidth = MenuBarMultiUsageIcon.imageWidth(for: displayedCount)
+            let displayedIndicators = Array(
+                selectedIndicators.prefix(MenuBarMultiUsageIcon.maximumCount)
+            )
+            let imageWidth = MenuBarMultiUsageIcon.imageWidth(for: displayedIndicators)
             statusItem.length = imageWidth + 8
             button.title = ""
             button.image = MenuBarMultiUsageIcon.image(
@@ -431,12 +433,13 @@ private struct StatusPopoverContent: View {
     let openSettings: @MainActor () -> Void
 
     var body: some View {
-            UsagePopoverView(
-                store: environment.store,
-                settings: environment.settings,
-                updateStatus: environment.updateStatus,
-                installAvailableUpdate: environment.installAvailableUpdate,
-                refreshCredential: environment.refreshCredential(_:),
+        UsagePopoverView(
+            store: environment.store,
+            settings: environment.settings,
+            updateStatus: environment.updateStatus,
+            checkForUpdates: environment.checkForUpdates,
+            installAvailableUpdate: environment.installAvailableUpdate,
+            refreshCredential: environment.refreshCredential(_:),
             retryCredential: environment.retryCredential(_:),
             openSettings: openSettings
         )

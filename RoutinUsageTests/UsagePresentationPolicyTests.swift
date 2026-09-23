@@ -288,7 +288,7 @@ final class UsagePresentationPolicyTests: XCTestCase {
         )
 
         XCTAssertTrue(
-            source.contains("Text(metric.label)\n                    .font(.caption)")
+            source.contains("Text(metric.label)\n                    .font(.system(size: 12))")
         )
         XCTAssertFalse(source.contains(".font(.body)"))
         XCTAssertTrue(
@@ -302,7 +302,7 @@ final class UsagePresentationPolicyTests: XCTestCase {
             source.contains("UsageFormatter.shouldHighlightRemainingDuration(")
         )
         XCTAssertTrue(
-            source.contains("? Color.green : Color.secondary")
+            source.contains("? CompactPopoverPalette.positive(colorScheme) : Color.secondary")
         )
         XCTAssertTrue(source.contains("case .relativeDuration"))
         XCTAssertTrue(

@@ -4,11 +4,13 @@ import SwiftUI
 @MainActor
 struct UsagePopoverView: View {
     typealias InstallAvailableUpdate = @MainActor () async -> Void
+    typealias CheckForUpdates = @MainActor () async -> Void
     @Environment(\.colorScheme) private var colorScheme
 
     @Bindable var store: UsageStore
     @Bindable var settings: AppSettings
     let updateStatus: AppUpdateStatus
+    let checkForUpdates: CheckForUpdates
     let installAvailableUpdate: InstallAvailableUpdate
     let refreshCredential: @MainActor (UUID) async -> Void
     let retryCredential: @MainActor (UUID) async -> Void
@@ -20,11 +22,13 @@ struct UsagePopoverView: View {
     @State private var showRefreshSuccess = false
     @State private var isVersionLinkHovered = false
     @State private var isUpdateBadgeHovered = false
+    @State private var isCheckForUpdatesHovered = false
 
     init(
         store: UsageStore,
         settings: AppSettings,
         updateStatus: AppUpdateStatus = .idle,
+        checkForUpdates: @escaping CheckForUpdates = {},
         installAvailableUpdate: @escaping InstallAvailableUpdate = {},
         refreshCredential: @escaping @MainActor (UUID) async -> Void = { _ in },
         retryCredential: @escaping @MainActor (UUID) async -> Void = { _ in },
@@ -33,6 +37,7 @@ struct UsagePopoverView: View {
         self.store = store
         self.settings = settings
         self.updateStatus = updateStatus
+        self.checkForUpdates = checkForUpdates
         self.installAvailableUpdate = installAvailableUpdate
         self.refreshCredential = refreshCredential
         self.retryCredential = retryCredential
@@ -86,6 +91,7 @@ struct UsagePopoverView: View {
             }
         }
         .frame(width: 440)
+        .environment(\.menuBarColorRules, settings.menuBarColorRules)
         // 窗口偶尔高于内容时固定顶部对齐，避免内容悬浮居中。
         .frame(maxHeight: maxPopoverHeight, alignment: .top)
         .liquidGlassWindowBackground()
@@ -97,6 +103,7 @@ struct UsagePopoverView: View {
 
 private extension UsagePopoverView {
     var toolbar: some View {
+        VStack(alignment: .leading, spacing: 6) {
         HStack(spacing: 10) {
             HStack(spacing: 6) {
                 Link(destination: RoutinUsageApp.releasesURL) {
@@ -106,7 +113,7 @@ private extension UsagePopoverView {
                         Text("v\(RoutinUsageApp.currentVersion)")
                             .monospacedDigit()
                     }
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .foregroundStyle(CompactPopoverPalette.chipText(colorScheme))
@@ -116,12 +123,8 @@ private extension UsagePopoverView {
                     }
                     .overlay {
                         Capsule()
-                            .strokeBorder(
-                                Color.white.opacity(colorScheme == .dark ? 0.12 : 0.80),
-                                lineWidth: 1
-                            )
+                            .strokeBorder(CompactPopoverPalette.cardStroke(colorScheme), lineWidth: 1)
                     }
-                    .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.20 : 0.04), radius: 2, y: 1)
                 }
                 .buttonStyle(.plain)
                 .onHover { isVersionLinkHovered = $0 }
@@ -135,15 +138,15 @@ private extension UsagePopoverView {
                     } label: {
                         Image(systemName: "arrow.up")
                             .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.green)
+                            .foregroundStyle(.white)
                             .frame(width: 22, height: 22)
                             .background {
                                 Circle()
-                                    .fill(Color.green.opacity(0.10))
+                                    .fill(CompactPopoverPalette.brand(colorScheme))
                             }
                             .overlay {
                                 Circle()
-                                    .strokeBorder(Color.green.opacity(0.55), lineWidth: 1)
+                                    .strokeBorder(CompactPopoverPalette.brand(colorScheme).opacity(0.45), lineWidth: 1)
                             }
                             .opacity(isUpdateIndicatorVisible ? 1 : 0.28)
                             .scaleEffect(isUpdateBadgeHovered ? 1.08 : isUpdateIndicatorVisible ? 1 : 0.94)
@@ -157,6 +160,41 @@ private extension UsagePopoverView {
                     .onHover { isUpdateBadgeHovered = $0 }
                     .help("查看 v\(update.version) 更新详情")
                     .accessibilityLabel("发现新版本 v\(update.version)，查看更新详情")
+                } else {
+                    Button {
+                        Task { await checkForUpdates() }
+                    } label: {
+                        Group {
+                            if updateStatus == .checking {
+                                TimelineView(.animation) { timeline in
+                                    let angle = timeline.date.timeIntervalSinceReferenceDate
+                                        .truncatingRemainder(dividingBy: 1) * 360
+                                    Image(systemName: "arrow.triangle.2.circlepath")
+                                        .rotationEffect(.degrees(angle))
+                                }
+                            } else {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                            }
+                        }
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(CompactPopoverPalette.chipText(colorScheme))
+                        .frame(width: 22, height: 22)
+                        .background {
+                            Circle()
+                                .fill(CompactPopoverPalette.chipFill(hovered: isCheckForUpdatesHovered, colorScheme))
+                        }
+                        .overlay {
+                            Circle()
+                                .strokeBorder(CompactPopoverPalette.cardStroke(colorScheme), lineWidth: 1)
+                        }
+                        .scaleEffect(isCheckForUpdatesHovered ? 1.06 : 1)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(updateStatus == .checking || isDownloadingUpdate)
+                    .onHover { isCheckForUpdatesHovered = $0 }
+                    .animation(.easeInOut(duration: 0.15), value: isCheckForUpdatesHovered)
+                    .help(checkForUpdatesHelp)
+                    .accessibilityLabel(checkForUpdatesAccessibilityLabel)
                 }
             }
             .overlay(alignment: .leading) {
@@ -175,7 +213,7 @@ private extension UsagePopoverView {
                     help: "设置"
                 ) {
                     Image(systemName: "gearshape")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 14, weight: .medium))
                 }
                 .keyboardShortcut(",")
                 .accessibilityLabel("打开设置")
@@ -188,21 +226,60 @@ private extension UsagePopoverView {
                     .interpolation(.high)
                     .scaledToFit()
                     .frame(width: 36, height: 36)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .inner), style: .continuous))
                     .background {
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(Color.black.opacity(0.88))
+                        RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .inner), style: .continuous)
+                            .fill(CompactPopoverPalette.surface(.control, colorScheme))
                     }
                     .overlay {
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.40), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .inner), style: .continuous)
+                            .strokeBorder(CompactPopoverPalette.cardStroke(colorScheme), lineWidth: 1)
                     }
-                    .shadow(color: Color.black.opacity(0.25), radius: 8, y: 3)
             }
             .buttonStyle(.plain)
             .help("打开 MyToken 官网")
             .accessibilityLabel("打开 MyToken 官网")
         }
+        if case let .failed = updateStatus {
+            Label("检测更新失败，请稍后重试", systemImage: "exclamationmark.triangle.fill")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(CompactPopoverPalette.criticalColor)
+                .accessibilityElement(children: .combine)
+        }
+    }
+
+    }
+    var checkForUpdatesHelp: String {
+        switch updateStatus {
+        case .checking:
+            return "正在检测更新"
+        case .downloading:
+            return "正在下载更新"
+        case .failed:
+            return "检测更新（上次检测失败）"
+        case .idle, .available, .completed:
+            return "检测更新"
+        }
+    }
+
+    var checkForUpdatesAccessibilityLabel: String {
+        switch updateStatus {
+        case .checking:
+            return "正在检测更新"
+        case .downloading:
+            return "正在下载更新"
+        case .failed:
+            return "检测更新，上次检测失败，点击重试"
+        case .idle, .available, .completed:
+            return "检测更新"
+        }
+    }
+
+    var isDownloadingUpdate: Bool {
+        if case .downloading = updateStatus {
+            return true
+        }
+        return false
     }
 
     @ViewBuilder
@@ -210,12 +287,12 @@ private extension UsagePopoverView {
         if store.visibleKeyIDs.isEmpty {
             VStack(spacing: 8) {
                 Image(systemName: "key.slash")
-                    .font(.title2)
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Text(store.orderedKeyIDs.isEmpty ? "尚未配置 Key" : "没有启用的 Key")
-                    .font(.headline)
+                    .font(.system(size: 14, weight: .semibold))
                 Text(store.orderedKeyIDs.isEmpty ? "请在设置中添加一个 plan Key" : "请在设置中启用至少一个 Key")
-                    .font(.caption)
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
@@ -283,22 +360,22 @@ private extension UsagePopoverView {
         HStack(alignment: .bottom, spacing: 10) {
             HStack(alignment: .center, spacing: 8) {
                 Text("账户用量")
-                    .font(.system(size: 23, weight: .bold))
+                    .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(.primary)
 
                 Text("\(filteredPopoverKeyIDs.count) 个 Key")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
                     .monospacedDigit()
-                    .foregroundStyle(CompactPopoverPalette.badgeGreen(colorScheme))
+                    .foregroundStyle(CompactPopoverPalette.chipSecondary(colorScheme))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background {
                         Capsule()
-                            .fill(CompactPopoverPalette.badgeGreen(colorScheme).opacity(0.10))
+                            .fill(CompactPopoverPalette.chipFill(hovered: false, colorScheme))
                     }
                     .overlay {
                         Capsule()
-                            .strokeBorder(CompactPopoverPalette.badgeGreen(colorScheme).opacity(colorScheme == .dark ? 0.30 : 0.20), lineWidth: 1)
+                            .strokeBorder(CompactPopoverPalette.cardStroke(colorScheme), lineWidth: 1)
                     }
             }
 
@@ -386,8 +463,8 @@ private extension UsagePopoverView {
 
             if case let .completed(version) = updateStatus {
                 Label("更新完成，当前版本 \(version)", systemImage: "checkmark.circle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.green)
+                    .font(.system(size: 12))
+                    .foregroundStyle(CompactPopoverPalette.positive(colorScheme))
                     .accessibilityElement(children: .combine)
             }
         }
@@ -419,14 +496,14 @@ private extension UsagePopoverView {
                         }
                     } else if showRefreshSuccess {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
+                            .foregroundStyle(CompactPopoverPalette.positive(colorScheme))
                             .transition(.scale.combined(with: .opacity))
                     } else {
                         Image(systemName: "arrow.clockwise")
                             .transition(.opacity)
                     }
                 }
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 14, weight: .medium))
             }
             .disabled(store.isRefreshing || store.visibleKeyIDs.isEmpty)
             .accessibilityLabel(store.isRefreshing ? "正在刷新全部 Key" : "刷新全部 Key")
@@ -450,7 +527,7 @@ private extension UsagePopoverView {
                 help: "退出 MyToken"
             ) {
                 Image(systemName: "power")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
             }
             .keyboardShortcut("q")
             .accessibilityLabel("退出 MyToken")
@@ -458,7 +535,7 @@ private extension UsagePopoverView {
         .overlay {
             Text(refreshDescription)
                 .lineLimit(1)
-                .font(.system(size: 11, design: .monospaced))
+                .font(.system(size: 12, design: .monospaced))
                 .foregroundStyle(CompactPopoverPalette.subtitle(colorScheme))
                 .allowsHitTesting(false)
                 .accessibilityLabel(refreshAccessibilityLabel)
@@ -467,25 +544,16 @@ private extension UsagePopoverView {
         .padding(.vertical, 8)
         .background {
             Capsule(style: .continuous)
-                .fill(.thinMaterial)
-                .overlay {
-                    Capsule(style: .continuous)
-                        .fill(
-                            colorScheme == .dark
-                                ? CompactPopoverPalette.darkCanvas.opacity(0.45)
-                                : .clear
-                        )
-                }
+                .fill(CompactPopoverPalette.surface(.control, colorScheme))
         }
         .overlay {
             Capsule(style: .continuous)
                 .strokeBorder(
-                    Color.white.opacity(colorScheme == .dark ? 0.14 : 0.78),
+                    CompactPopoverPalette.cardStroke(colorScheme),
                     lineWidth: 1
                 )
                 .allowsHitTesting(false)
         }
-        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.28 : 0.12), radius: 16, y: 6)
     }
 
     @ViewBuilder
@@ -507,7 +575,7 @@ private extension UsagePopoverView {
                 ProgressView()
             }
         }
-        .font(.caption)
+        .font(.system(size: 12))
         .foregroundStyle(.secondary)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
@@ -605,7 +673,7 @@ private struct ThinVerticalScrollIndicator: View {
     }
 }
 
-/// 更新弹窗：玻璃卡片、emerald 版本徽章与内嵌日志卡，深浅色随系统切换。
+/// 更新弹窗：玻璃模态、品牌蓝版本徽章与内嵌日志卡，深浅色随系统切换。
 private struct UpdateReleasePopup: View {
     let update: AppUpdate
     let status: AppUpdateStatus
@@ -618,10 +686,10 @@ private struct UpdateReleasePopup: View {
     @State private var isLaterHovered = false
     @State private var isInstallHovered = false
 
-    private let actionBlue = Color(red: 0.15, green: 0.42, blue: 0.95)
 
     private var isDark: Bool { colorScheme == .dark }
-    private var emerald: Color { CompactPopoverPalette.badgeGreen(colorScheme) }
+    private var accent: Color { CompactPopoverPalette.brand(colorScheme) }
+    private var positive: Color { CompactPopoverPalette.positive(colorScheme) }
     private var mutedText: Color { CompactPopoverPalette.subtitle(colorScheme) }
 
     var body: some View {
@@ -632,27 +700,9 @@ private struct UpdateReleasePopup: View {
         }
         .padding(18)
         .frame(width: 360)
-        .background {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(popupSurface)
-        }
-        .background {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(.ultraThinMaterial)
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(Color.white.opacity(isDark ? 0.14 : 0.85), lineWidth: 1)
-                .allowsHitTesting(false)
-        }
-        .shadow(color: .black.opacity(isDark ? 0.45 : 0.30), radius: 22, y: 10)
+        .liquidGlassModalSurface()
     }
 
-    private var popupSurface: Color {
-        isDark
-            ? Color(red: 0.071, green: 0.090, blue: 0.133).opacity(0.88)
-            : Color.white.opacity(0.88)
-    }
 
     private var header: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -660,22 +710,22 @@ private struct UpdateReleasePopup: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 Text("发现新版本")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(emerald)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(accent)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background {
                         Capsule()
-                            .fill(emerald.opacity(0.12))
+                            .fill(accent.opacity(0.12))
                     }
                     .overlay {
                         Capsule()
-                            .strokeBorder(emerald.opacity(0.30), lineWidth: 1)
+                            .strokeBorder(accent.opacity(0.28), lineWidth: 1)
                     }
 
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("v\(update.version)")
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .font(.system(size: 20, weight: .bold, design: .monospaced))
                         .monospacedDigit()
                         .foregroundStyle(.primary)
 
@@ -696,23 +746,13 @@ private struct UpdateReleasePopup: View {
 
     private var updateIcon: some View {
         Image(systemName: "arrow.up")
-            .font(.system(size: 21, weight: .bold))
+            .font(.system(size: 20, weight: .bold))
             .foregroundStyle(.white)
             .frame(width: 48, height: 48)
             .background {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 0.36, green: 0.86, blue: 0.60),
-                                Color(red: 0.05, green: 0.76, blue: 0.52)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .inner), style: .continuous)
+                    .fill(accent)
             }
-            .shadow(color: Color.green.opacity(0.35), radius: 8, y: 3)
             .accessibilityHidden(true)
     }
 
@@ -721,19 +761,19 @@ private struct UpdateReleasePopup: View {
             HStack(spacing: 5) {
                 Text("发布页")
                 Image(systemName: "arrow.up.right")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
             }
             .font(.system(size: 12, weight: .semibold))
             .foregroundStyle(CompactPopoverPalette.chipText(colorScheme))
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background {
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .button), style: .continuous)
                     .fill(CompactPopoverPalette.chipFill(hovered: isReleaseLinkHovered, colorScheme))
             }
             .overlay {
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .strokeBorder(Color.white.opacity(isDark ? 0.14 : 0.85), lineWidth: 1)
+                RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .button), style: .continuous)
+                    .strokeBorder(CompactPopoverPalette.cardStroke(colorScheme), lineWidth: 1)
             }
         }
         .buttonStyle(.plain)
@@ -764,9 +804,9 @@ private struct UpdateReleasePopup: View {
         case .completed(let version):
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
+                    .foregroundStyle(positive)
                 Text("更新完成，v\(version) 正在重启")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.primary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -776,9 +816,9 @@ private struct UpdateReleasePopup: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(message)
                     .font(.system(size: 12))
-                    .foregroundStyle(.red)
+                    .foregroundStyle(CompactPopoverPalette.criticalColor)
                 Text("可关闭后稍后在设置里重试。")
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundStyle(mutedText)
             }
 
@@ -797,23 +837,23 @@ private struct UpdateReleasePopup: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("正在下载更新")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.primary)
                 Spacer(minLength: 8)
                 if let progress {
                     Text("\(Int((progress * 100).rounded()))%")
-                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
                         .monospacedDigit()
-                        .foregroundStyle(actionBlue)
+                        .foregroundStyle(accent)
                 }
             }
 
             ProgressView(value: progress ?? 0, total: 1)
                 .progressViewStyle(.linear)
-                .tint(actionBlue)
+                .tint(accent)
 
             Text("下载完成后将自动安装并重启 MyToken")
-                .font(.system(size: 11))
+                .font(.system(size: 12))
                 .foregroundStyle(mutedText)
 
             HStack {
@@ -844,17 +884,13 @@ private struct UpdateReleasePopup: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(
-                    isDark
-                        ? Color(red: 0.039, green: 0.051, blue: 0.078).opacity(0.60)
-                        : Color.white
-                )
+            RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .inner), style: .continuous)
+                .fill(CompactPopoverPalette.surface(.metric, colorScheme))
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .inner), style: .continuous)
                 .strokeBorder(
-                    isDark ? Color.white.opacity(0.08) : Color.black.opacity(0.06),
+                    CompactPopoverPalette.cardStroke(colorScheme),
                     lineWidth: 1
                 )
                 .allowsHitTesting(false)
@@ -873,7 +909,7 @@ private struct UpdateReleasePopup: View {
                 Image(systemName: "arrow.down")
                 Text("立即更新")
             }
-            .font(.system(size: 13, weight: .semibold))
+            .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(Color.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
@@ -881,10 +917,9 @@ private struct UpdateReleasePopup: View {
         }
         .buttonStyle(.plain)
         .background {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(actionBlue.opacity(isInstallHovered ? 0.88 : 1))
+            RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .button), style: .continuous)
+                .fill(accent.opacity(isInstallHovered ? 0.88 : 1))
         }
-        .shadow(color: actionBlue.opacity(0.35), radius: 8, y: 2)
         .onHover { isInstallHovered = $0 }
         .accessibilityLabel("立即更新到 v\(update.version)")
     }
@@ -898,30 +933,22 @@ private struct UpdateReleasePopup: View {
             action()
         } label: {
             Text(title)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .frame(maxWidth: fillWidth ? .infinity : nil)
-                .foregroundStyle(
-                    isDark
-                        ? Color.white.opacity(isLaterHovered ? 1 : 0.90)
-                        : Color(red: 0.11, green: 0.11, blue: 0.12)
-                )
+                .foregroundStyle(CompactPopoverPalette.chipText(colorScheme))
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .background {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(
-                    isDark
-                        ? Color.white.opacity(isLaterHovered ? 0.10 : 0.06)
-                        : Color.white.opacity(isLaterHovered ? 0.97 : 0.92)
-                )
+            RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .button), style: .continuous)
+                .fill(CompactPopoverPalette.chipFill(hovered: isLaterHovered, colorScheme))
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .button), style: .continuous)
                 .strokeBorder(
-                    isDark ? Color.white.opacity(0.12) : Color.black.opacity(0.08),
+                    CompactPopoverPalette.cardStroke(colorScheme),
                     lineWidth: 1
                 )
         }
@@ -938,7 +965,7 @@ private struct UpdateReleasePopup: View {
     }
 }
 
-/// 弹窗内统一的玻璃图标按钮：整个 30×30 边框区域都是点击热区，
+/// 弹窗内统一的实色图标按钮：整个 30×30 边框区域都是点击热区，
 /// 悬停时底色和描边加深，按下时再加深，给出明确的可点击反馈。
 private struct GlassIconButton<Label: View>: View {
     var action: () -> Void
@@ -961,18 +988,16 @@ private struct GlassIconButton<Label: View>: View {
                 }
                 .overlay {
                     Circle()
-                        .strokeBorder(
-                            Color.white.opacity(
-                                colorScheme == .dark
-                                    ? (isHovered ? 0.22 : 0.12)
-                                    : (isHovered ? 0.80 : 0.55)
-                            ),
-                            lineWidth: 1
-                        )
+                        .strokeBorder(CompactPopoverPalette.cardStroke(colorScheme), lineWidth: 1)
                 }
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
         .animation(.easeInOut(duration: 0.15), value: isHovered)
         .onHover { isHovered = $0 }
         .help(help)

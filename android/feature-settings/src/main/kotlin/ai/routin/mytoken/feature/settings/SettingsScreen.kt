@@ -26,25 +26,37 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.material3.HorizontalDivider
 import ai.routin.mytoken.core.ui.SectionCard
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
@@ -54,8 +66,6 @@ import ai.routin.mytoken.core.ui.GlassButtonTone
 import ai.routin.mytoken.core.ui.glassFilterChipBorder
 import ai.routin.mytoken.core.ui.glassFilterChipColors
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -198,48 +208,62 @@ fun SettingsScreen(
 
                         Spacer(modifier = Modifier.weight(1f))
 
-                        TextButton(
+                        IconButton(
+                            onClick = onLoadReleaseHistory,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .testTag("release_notes_refresh_button"),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Refresh,
+                                contentDescription = "获取当前版本日志",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+
+                        IconButton(
                             onClick = {
                                 uriHandler.openUri(
                                     currentRelease?.releaseUrl
                                         ?: "https://github.com/dick86114/MyToken/releases",
                                 )
                             },
+                            modifier = Modifier
+                                .size(44.dp)
+                                .testTag("github_button"),
                         ) {
-                            Text("GitHub")
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                                contentDescription = "打开 GitHub",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                    Spacer(modifier = Modifier.height(14.dp))
                     CurrentReleaseNotesSection(
                         state = releaseHistoryState,
                         currentVersion = appVersion,
                         onRetry = onLoadReleaseHistory,
+                        onShowHistory = { showReleaseHistory = true },
                     )
-                    GlassButton(
-                        onClick = { showReleaseHistory = true },
-                        text = "查看历史版本",
-                        modifier = Modifier.testTag("release_history_button"),
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                    Spacer(modifier = Modifier.height(14.dp))
+                    UpdateChannelSection(
+                        mirrorBase = state.update.mirrorBase,
+                        onMirrorBaseChange = onMirrorBaseChange,
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            text = "应用更新",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        UpdateChannelSection(
-                            mirrorBase = state.update.mirrorBase,
-                            onMirrorBaseChange = onMirrorBaseChange,
-                        )
-                        UpdateSection(
-                            state = updateState,
-                            currentVersion = appVersion,
-                            onCheckForUpdates = onCheckForUpdates,
-                            onDownloadAndInstall = onDownloadAndInstall,
-                            onOpenInstallPermissionSettings = onOpenInstallPermissionSettings,
-                            onInstallDownloadedUpdate = onInstallDownloadedUpdate,
-                        )
-                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    UpdateSection(
+                        state = updateState,
+                        currentVersion = appVersion,
+                        onCheckForUpdates = onCheckForUpdates,
+                        onDownloadAndInstall = onDownloadAndInstall,
+                        onOpenInstallPermissionSettings = onOpenInstallPermissionSettings,
+                        onInstallDownloadedUpdate = onInstallDownloadedUpdate,
+                    )
                 }
                 }
             }
@@ -261,45 +285,58 @@ private fun CurrentReleaseNotesSection(
     state: AppReleaseHistoryUiState,
     currentVersion: String,
     onRetry: () -> Unit,
+    onShowHistory: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(
-            text = "当前版本更新日志",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        when (state) {
-            AppReleaseHistoryUiState.Idle -> {
-                Text(
-                    text = "暂未获取更新日志",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "更新日志",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            IconButton(
+                onClick = onShowHistory,
+                modifier = Modifier
+                    .size(40.dp)
+                    .testTag("release_history_button"),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.History,
+                    contentDescription = "查看历史版本",
+                    modifier = Modifier.size(20.dp),
                 )
-                GlassButton(onClick = onRetry, text = "获取更新日志")
             }
+        }
+        when (state) {
+            AppReleaseHistoryUiState.Idle -> Text(
+                text = "暂无更新日志",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             AppReleaseHistoryUiState.Loading -> {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                     Text(
-                        text = "正在获取更新日志...",
+                        text = "正在加载...",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
-            is AppReleaseHistoryUiState.Error -> {
-                Text(
-                    text = state.message,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-                GlassButton(onClick = onRetry, text = "重试")
-            }
+            is AppReleaseHistoryUiState.Error -> Text(
+                text = "日志获取失败",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
             is AppReleaseHistoryUiState.Loaded -> {
                 val current = state.releases.firstOrNull { it.version == currentVersion }
                 if (current == null || current.releaseNotes.isBlank()) {
                     Text(
-                        text = "此版本未提供更新日志",
+                        text = "暂无更新日志",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -319,7 +356,7 @@ private fun ReleaseHistoryDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("历史版本更新日志") },
+        title = { Text("历史版本") },
         text = {
             when (state) {
                 AppReleaseHistoryUiState.Idle,
@@ -327,17 +364,23 @@ private fun ReleaseHistoryDialog(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    Text("正在加载更新日志...")
+                    Text("正在加载...")
                 }
                 is AppReleaseHistoryUiState.Error -> Column(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Text(state.message, color = MaterialTheme.colorScheme.error)
-                    GlassButton(onClick = onRetry, text = "重试")
+                        Text("日志获取失败", color = MaterialTheme.colorScheme.error)
+                    GlassButton(
+                        onClick = onRetry,
+                        modifier = Modifier.fillMaxWidth(),
+                        tone = GlassButtonTone.Primary,
+                        text = "重试",
+                        icon = Icons.Filled.Refresh,
+                    )
                 }
                 is AppReleaseHistoryUiState.Loaded -> {
                     if (state.releases.isEmpty()) {
-                        Text("暂无历史版本更新日志")
+                        Text("暂无更新日志")
                     } else {
                         ReleaseHistoryList(releases = state.releases)
                     }
@@ -378,17 +421,33 @@ private fun ReleaseHistoryList(releases: List<AppReleaseHistoryItem>) {
                         )
                     }
                 }
-                if (release.releaseNotes.isBlank()) {
-                    Text(
-                        text = "此版本未提供更新日志",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    MarkdownText(markdown = release.releaseNotes)
-                }
-                TextButton(onClick = { uriHandler.openUri(release.releaseUrl) }) {
-                    Text("在 GitHub 查看")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (release.releaseNotes.isBlank()) {
+                        Text(
+                            text = "暂无更新日志",
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        MarkdownText(
+                            markdown = release.releaseNotes,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    IconButton(
+                        onClick = { uriHandler.openUri(release.releaseUrl) },
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                            contentDescription = "在 GitHub 查看",
+                            modifier = Modifier.size(19.dp),
+                        )
+                    }
                 }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
@@ -408,14 +467,19 @@ private fun UpdateSection(
     when (state) {
         is AppUpdateUiState.Checking -> {
             Text(
-                text = "正在检查更新...",
+                text = "正在检查更新",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             GlassButton(
                 onClick = onCheckForUpdates,
                 enabled = false,
+                tone = GlassButtonTone.Primary,
                 text = "检测更新",
+                icon = Icons.Filled.Refresh,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("check_updates_button"),
             )
         }
 
@@ -438,28 +502,28 @@ private fun UpdateSection(
                     modifier = Modifier
                         .size(44.dp)
                         .background(
-                            Brush.linearGradient(listOf(Color(0xFF5CE69E), Color(0xFF0DC285))),
-                            RoundedCornerShape(14.dp),
+                            MaterialTheme.colorScheme.primary,
+                            RoundedCornerShape(10.dp),
                         ),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Filled.ArrowUpward,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(22.dp),
                     )
                 }
                 Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
-                    val emerald = Color(0xFF059669)
+                    val updateAccent = MaterialTheme.colorScheme.primary
                     Text(
                         text = "发现新版本",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.SemiBold,
-                        color = emerald,
+                        color = updateAccent,
                         modifier = Modifier
-                            .background(emerald.copy(alpha = 0.12f), RoundedCornerShape(999.dp))
-                            .border(1.dp, emerald.copy(alpha = 0.30f), RoundedCornerShape(999.dp))
+                            .background(updateAccent.copy(alpha = 0.12f), RoundedCornerShape(999.dp))
+                            .border(1.dp, updateAccent.copy(alpha = 0.30f), RoundedCornerShape(999.dp))
                             .padding(horizontal = 8.dp, vertical = 3.dp),
                     )
                     Row(modifier = Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -486,27 +550,38 @@ private fun UpdateSection(
             }
             GlassButton(
                 onClick = { onDownloadAndInstall(state.version, state.downloadUrl) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 10.dp),
+                modifier = Modifier.fillMaxWidth().testTag("download_update_button"),
                 tone = GlassButtonTone.Primary,
                 text = "下载并安装",
+                icon = Icons.Filled.Download,
             )
         }
 
         is AppUpdateUiState.NeedsInstallPermission -> {
+            var permissionRequestPending by rememberSaveable { mutableStateOf(false) }
+            LifecycleResumeEffect(Unit) {
+                if (permissionRequestPending) {
+                    permissionRequestPending = false
+                    onInstallDownloadedUpdate()
+                }
+                onPauseOrDispose {}
+            }
             Text(
-                text = "安装更新前，需要允许 MyToken 安装未知来源应用。",
+                text = "需要安装权限",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             GlassButton(
-                onClick = onOpenInstallPermissionSettings,
-                text = "打开安装权限设置",
-            )
-            GlassButton(
-                onClick = onInstallDownloadedUpdate,
-                text = "授权后继续安装",
+                onClick = {
+                    permissionRequestPending = true
+                    onOpenInstallPermissionSettings()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("install_permission_button"),
+                tone = GlassButtonTone.Primary,
+                text = "授权并安装",
+                icon = Icons.AutoMirrored.Filled.OpenInNew,
             )
         }
 
@@ -518,42 +593,57 @@ private fun UpdateSection(
             )
             GlassButton(
                 onClick = onInstallDownloadedUpdate,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("install_update_button"),
                 tone = GlassButtonTone.Primary,
                 text = "安装更新",
+                icon = Icons.Filled.ArrowUpward,
             )
         }
 
         is AppUpdateUiState.Error -> {
             Text(
-                text = state.message,
+                text = "更新失败，请重试",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
             GlassButton(
                 onClick = onCheckForUpdates,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("check_updates_button"),
+                tone = GlassButtonTone.Primary,
                 text = "重试",
+                icon = Icons.Filled.Refresh,
             )
         }
 
         is AppUpdateUiState.UpToDate -> {
             Text(
-                text = "v$currentVersion 已是最新版本。"
-                    .takeIf { state.currentVersion == currentVersion }
-                    ?: "当前已是最新版本。",
+                text = "已是最新版本",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             GlassButton(
                 onClick = onCheckForUpdates,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("check_updates_button"),
                 tone = GlassButtonTone.Primary,
                 text = "检测更新",
+                icon = Icons.Filled.Refresh,
             )
         }
 
         AppUpdateUiState.Idle -> GlassButton(
             onClick = onCheckForUpdates,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("check_updates_button"),
             tone = GlassButtonTone.Primary,
             text = "检测更新",
+            icon = Icons.Filled.Refresh,
         )
     }
 }
@@ -642,24 +732,66 @@ private fun UpdateChannelSection(
     mirrorBase: String,
     onMirrorBaseChange: (String) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            text = "更新源",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("update_channel_selector"),
+        ) {
+            SegmentedButton(
                 selected = mirrorBase.isEmpty(),
                 onClick = { onMirrorBaseChange("") },
-                label = { Text(text = "GitHub 直连") },
-                colors = glassFilterChipColors(selected = mirrorBase.isEmpty()),
-                border = glassFilterChipBorder(selected = mirrorBase.isEmpty()),
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                icon = {},
+                label = {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Code,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text("GitHub")
+                    }
+                },
             )
-            FilterChip(
+            SegmentedButton(
                 selected = mirrorBase.isNotEmpty(),
-                onClick = { if (mirrorBase.isEmpty()) onMirrorBaseChange(DEFAULT_UPDATE_CDN_BASES.first()) },
-                label = { Text(text = "CDN 加速") },
-                colors = glassFilterChipColors(selected = mirrorBase.isNotEmpty()),
-                border = glassFilterChipBorder(selected = mirrorBase.isNotEmpty()),
+                onClick = {
+                    if (mirrorBase.isEmpty()) {
+                        onMirrorBaseChange(DEFAULT_UPDATE_CDN_BASES.first())
+                    }
+                },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                icon = {},
+                label = {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Cloud,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text("CDN")
+                    }
+                },
             )
         }
         if (mirrorBase.isNotEmpty()) {
+            Text(
+                text = "镜像源",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 DEFAULT_UPDATE_CDN_BASES.forEach { base ->
                     FilterChip(
@@ -671,11 +803,6 @@ private fun UpdateChannelSection(
                     )
                 }
             }
-            Text(
-                text = "大陆网络建议选择 CDN 加速；若某镜像不可用可切换其他源。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }

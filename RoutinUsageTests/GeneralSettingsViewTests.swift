@@ -11,7 +11,7 @@ final class GeneralSettingsViewTests: XCTestCase {
         XCTAssertTrue(source.contains("notificationsEnabled"))
         XCTAssertTrue(source.contains("settingSection"))
         XCTAssertTrue(source.contains("MenuBarColorRulesEditor"))
-        XCTAssertTrue(source.contains(".liquidGlassSurface(cornerRadius: 16)"))
+        XCTAssertTrue(source.contains(".liquidGlassSurface()"))
         XCTAssertFalse(source.contains("Form {"))
         XCTAssertFalse(source.contains(".formStyle(.grouped)"))
         XCTAssertFalse(source.contains("displayDimension"))

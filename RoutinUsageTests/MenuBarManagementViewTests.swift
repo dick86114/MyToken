@@ -31,7 +31,7 @@ final class MenuBarManagementViewTests: XCTestCase {
         XCTAssertTrue(source.contains("MenuBarMetricResolver.options"))
         XCTAssertTrue(source.contains("checkmark.circle.fill"))
         XCTAssertTrue(source.contains("plus.circle.fill"))
-        XCTAssertTrue(source.contains("Color.green : Color.blue"))
+        XCTAssertTrue(source.contains("CompactPopoverPalette.positive(colorScheme) : CompactPopoverPalette.brand(colorScheme)"))
         XCTAssertTrue(source.contains("font(.system(size: 26, weight: .semibold))"))
         XCTAssertTrue(source.contains("setUsagePreferences"))
         XCTAssertTrue(source.contains("accessibilityLabel"))
