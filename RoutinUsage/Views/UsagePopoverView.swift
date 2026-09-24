@@ -102,6 +102,30 @@ struct UsagePopoverView: View {
 }
 
 private extension UsagePopoverView {
+    @ViewBuilder
+    private var popoverBrandLogo: some View {
+        let logo = Image(nsImage: NSImage(named: "PopoverColorBrandLogo") ?? NSApp.applicationIconImage)
+            .resizable()
+            .interpolation(.high)
+            .scaledToFit()
+            .frame(width: 28, height: 28)
+
+        if colorScheme == .dark {
+            logo
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .background {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(CompactPopoverPalette.logoBacking(colorScheme))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(CompactPopoverPalette.cardStroke(colorScheme), lineWidth: 1)
+                }
+        } else {
+            logo
+        }
+    }
+
     var toolbar: some View {
         VStack(alignment: .leading, spacing: 6) {
         HStack(spacing: 10) {
@@ -221,20 +245,7 @@ private extension UsagePopoverView {
         }
         .overlay(alignment: .center) {
             Link(destination: RoutinUsageApp.websiteURL) {
-                Image(nsImage: NSImage(named: "PopoverColorBrandLogo") ?? NSApp.applicationIconImage)
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFit()
-                    .frame(width: 36, height: 36)
-                    .clipShape(RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .inner), style: .continuous))
-                    .background {
-                        RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .inner), style: .continuous)
-                            .fill(CompactPopoverPalette.surface(.control, colorScheme))
-                    }
-                    .overlay {
-                        RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .inner), style: .continuous)
-                            .strokeBorder(CompactPopoverPalette.cardStroke(colorScheme), lineWidth: 1)
-                    }
+                popoverBrandLogo
             }
             .buttonStyle(.plain)
             .help("打开 MyToken 官网")

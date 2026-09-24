@@ -43,12 +43,57 @@ final class ProjectBootstrapTests: XCTestCase {
     func test菜单栏弹窗顶部使用左版本中彩色透明Logo右刷新布局() throws {
         let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
         let app = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
+        let projectRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let assetURL = projectRoot.appendingPathComponent(
+            "RoutinUsage/Assets.xcassets/PopoverColorBrandLogo.imageset/Contents.json"
+        )
+        let asset = try JSONSerialization.jsonObject(with: Data(contentsOf: assetURL))
+        let assetObject = try XCTUnwrap(asset as? [String: Any])
+        let images = try XCTUnwrap(assetObject["images"] as? [[String: Any]])
 
         XCTAssertTrue(app.contains("nonisolated static let websiteURL"))
         XCTAssertTrue(popover.contains("Link(destination: RoutinUsageApp.websiteURL)"))
         XCTAssertTrue(popover.contains("Image(nsImage: NSImage(named: \"PopoverColorBrandLogo\")"))
-        XCTAssertTrue(popover.contains("frame(width: 36, height: 36)"))
-        XCTAssertTrue(popover.contains("strokeBorder("))
+        let logoStart = try XCTUnwrap(popover.range(of: "private var popoverBrandLogo"))
+        let logoEnd = try XCTUnwrap(
+            popover.range(
+                of: "var toolbar",
+                range: logoStart.lowerBound..<popover.endIndex
+            )
+        )
+        let logoSource = String(popover[logoStart.lowerBound..<logoEnd.lowerBound])
+        XCTAssertTrue(logoSource.contains("frame(width: 28, height: 28)"))
+        XCTAssertFalse(logoSource.contains("frame(width: 24, height: 24)"))
+        XCTAssertTrue(popover.contains("if colorScheme == .dark"))
+
+        func appearanceValue(_ image: [String: Any]) -> String? {
+            let appearances = image["appearances"] as? [[String: Any]]
+            return appearances?.first?["value"] as? String
+        }
+        let lightScales = images
+            .filter { appearanceValue($0) == "light" }
+            .compactMap { $0["scale"] as? String }
+        let darkScales = images
+            .filter { appearanceValue($0) == "dark" }
+            .compactMap { $0["scale"] as? String }
+        XCTAssertEqual(Set(lightScales), ["1x", "2x"])
+        XCTAssertEqual(Set(darkScales), ["1x", "2x"])
+        for filename in [
+            "popover-color-brand-logo-light.png",
+            "popover-color-brand-logo-light@2x.png",
+            "popover-color-brand-logo-dark.png",
+            "popover-color-brand-logo-dark@2x.png"
+        ] {
+            XCTAssertTrue(FileManager.default.fileExists(
+                atPath: projectRoot
+                    .appendingPathComponent("RoutinUsage/Assets.xcassets/PopoverColorBrandLogo.imageset")
+                    .appendingPathComponent(filename)
+                    .path
+            ))
+        }
+
         XCTAssertFalse(popover.contains(".shadow(color: Color.black.opacity(0.25)"))
         XCTAssertTrue(popover.contains("repeatForever"))
         XCTAssertTrue(popover.contains("打开 MyToken 官网"))

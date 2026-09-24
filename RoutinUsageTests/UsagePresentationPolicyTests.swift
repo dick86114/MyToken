@@ -429,6 +429,35 @@ final class UsagePresentationPolicyTests: XCTestCase {
         )
     }
 
+    func test凭证卡片供应商名称恢复官网链接交互() throws {
+        let source = try TestSourceReader.read([
+            "RoutinUsage", "Views", "UsageRowView.swift"
+        ])
+
+        let identityStart = try XCTUnwrap(source.range(of: "private var compactIdentity"))
+        let identityEnd = try XCTUnwrap(
+            source.range(
+                of: "private var compactActionButtons",
+                range: identityStart.lowerBound..<source.endIndex
+            )
+        )
+        let identity = String(source[identityStart.lowerBound..<identityEnd.lowerBound])
+
+        XCTAssertFalse(identity.contains("Text(UsageRowPresentation.subscriptionDescription("))
+        XCTAssertTrue(identity.contains("providerSubtitle"))
+
+        let componentStart = try XCTUnwrap(source.range(of: "private struct ProviderWebsiteLink"))
+        let component = String(source[componentStart.lowerBound...])
+        XCTAssertTrue(component.contains("Link(destination: destination)"))
+        XCTAssertTrue(component.contains(".help(\"打开 \\(providerName) 官网\")"))
+        XCTAssertTrue(component.contains("Image(systemName: \"arrow.up.right\")"))
+        XCTAssertTrue(component.contains("Capsule().fill"))
+        XCTAssertTrue(component.contains("isHovering ? 0.14 : 0.06"))
+        XCTAssertTrue(component.contains("NSCursor.pointingHand.push()"))
+        XCTAssertTrue(component.contains("NSCursor.pop()"))
+        XCTAssertTrue(component.contains(".onDisappear"))
+    }
+
     func test设置窗口存在时显示Dock图标关闭后恢复菜单栏形态() throws {
         let coordinator = try String(
             contentsOf: URL(fileURLWithPath: #filePath)

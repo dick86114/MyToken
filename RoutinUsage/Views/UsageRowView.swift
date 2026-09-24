@@ -143,10 +143,9 @@ struct UsageRowView: View {
                     }
                 }
 
-                Text(UsageRowPresentation.subscriptionDescription(
-                    providerID: state.configuration.providerID,
-                    planName: state.snapshot?.planName ?? ""
-                ))
+                HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    providerSubtitle
+                }
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(CompactPopoverPalette.subtitle(colorScheme))
                 .lineLimit(2)
@@ -265,6 +264,51 @@ private struct RefreshingCardBorder: View {
                 .union(path.trimmedPath(from: 0, to: end))
         }
         return path.trimmedPath(from: start, to: end)
+    }
+}
+
+private struct ProviderWebsiteLink: View {
+    let providerName: String
+    let destination: URL
+    let colorScheme: ColorScheme
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Link(destination: destination) {
+            HStack(spacing: 2) {
+                Text(providerName)
+
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 7, weight: .semibold))
+            }
+            .padding(.horizontal, 4)
+            .padding(.vertical, 1)
+            .background {
+                Capsule().fill(
+                    CompactPopoverPalette.brand(colorScheme).opacity(
+                        isHovering ? 0.14 : 0.06
+                    )
+                )
+            }
+        }
+        .foregroundStyle(CompactPopoverPalette.brand(colorScheme))
+        .contentShape(Rectangle())
+        .help("打开 \(providerName) 官网")
+        .accessibilityLabel("打开 \(providerName) 官网")
+        .onHover { hovering in
+            isHovering = hovering
+            if hovering {
+                NSCursor.pointingHand.push()
+            } else {
+                NSCursor.pop()
+            }
+        }
+        .onDisappear {
+            guard isHovering else { return }
+            isHovering = false
+            NSCursor.pop()
+        }
     }
 }
 
@@ -791,17 +835,27 @@ private extension UsageRowView {
     }
 
     @ViewBuilder
-    var providerNameLabel: some View {
+    var providerSubtitle: some View {
         let providerName = ProviderRegistry.builtInDescriptors
             .first(where: { $0.id == state.configuration.providerID })?
             .displayName ?? state.configuration.providerID.rawValue
+        let planName = state.snapshot?.planName ?? ""
 
         if let websiteURL = state.configuration.websiteURL {
-            Link(providerName, destination: websiteURL)
-                .help("打开 \(providerName) 官网")
-                .accessibilityLabel("打开 \(providerName) 官网")
+            ProviderWebsiteLink(
+                providerName: providerName,
+                destination: websiteURL,
+                colorScheme: colorScheme
+            )
+
+            if !planName.isEmpty {
+                Text(" · \(planName)")
+            }
         } else {
-            Text(providerName)
+            Text(UsageRowPresentation.subscriptionDescription(
+                providerID: state.configuration.providerID,
+                planName: planName
+            ))
         }
     }
 
