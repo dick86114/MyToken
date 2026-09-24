@@ -75,7 +75,7 @@ struct UsageRowView: View {
 
     private func compactBalanceCard(metric: NormalizedUsageMetric) -> some View {
         HStack(alignment: .center, spacing: 10) {
-            compactIdentity
+            compactIdentity(showsPlanBelowProvider: true)
             Spacer(minLength: 8)
             CompactBalanceStrip(metric: metric)
             Spacer(minLength: 8)
@@ -106,14 +106,14 @@ struct UsageRowView: View {
 
     private func compactHeader() -> some View {
         HStack(alignment: .center, spacing: 10) {
-            compactIdentity
+            compactIdentity(showsPlanBelowProvider: false)
             Spacer(minLength: 8)
             compactActionButtons
         }
         .padding(.bottom, 10)
     }
 
-    private var compactIdentity: some View {
+    private func compactIdentity(showsPlanBelowProvider: Bool) -> some View {
         HStack(alignment: .center, spacing: 10) {
             avatarWithStatus
 
@@ -143,12 +143,20 @@ struct UsageRowView: View {
                     }
                 }
 
-                HStack(alignment: .firstTextBaseline, spacing: 3) {
-                    providerSubtitle
+                Group {
+                    if showsPlanBelowProvider {
+                        VStack(alignment: .leading, spacing: 1) {
+                            providerSubtitle(showsPlanBelowProvider: true)
+                        }
+                    } else {
+                        HStack(alignment: .firstTextBaseline, spacing: 3) {
+                            providerSubtitle(showsPlanBelowProvider: false)
+                        }
+                    }
                 }
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(CompactPopoverPalette.subtitle(colorScheme))
-                .lineLimit(2)
+                .lineLimit(showsPlanBelowProvider ? 1 : 2)
             }
         }
     }
@@ -283,6 +291,7 @@ private struct ProviderWebsiteLink: View {
                 Image(systemName: "arrow.up.right")
                     .font(.system(size: 7, weight: .semibold))
             }
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 4)
             .padding(.vertical, 1)
             .background {
@@ -428,7 +437,7 @@ private extension UsageRowView {
     func headerView(now: Date) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 10) {
-                compactIdentity
+                compactIdentity(showsPlanBelowProvider: false)
                 Spacer(minLength: 8)
                 compactActionButtons
             }
@@ -836,7 +845,7 @@ private extension UsageRowView {
     }
 
     @ViewBuilder
-    var providerSubtitle: some View {
+    func providerSubtitle(showsPlanBelowProvider: Bool) -> some View {
         let providerName = ProviderRegistry.builtInDescriptors
             .first(where: { $0.id == state.configuration.providerID })?
             .displayName ?? state.configuration.providerID.rawValue
@@ -850,7 +859,11 @@ private extension UsageRowView {
             )
 
             if !planName.isEmpty {
-                Text(" · \(planName)")
+                if showsPlanBelowProvider {
+                    Text(planName)
+                } else {
+                    Text(" · \(planName)")
+                }
             }
         } else {
             Text(UsageRowPresentation.subscriptionDescription(

@@ -58,7 +58,7 @@ final class SettingsAndCardAppearanceTests: XCTestCase {
             source.range(of: "private func compactHeader(")
         )
         let headerEnd = try XCTUnwrap(
-            source.range(of: "private var compactIdentity")
+            source.range(of: "private func compactIdentity(")
         )
         let header = source[headerStart.lowerBound..<headerEnd.lowerBound]
 

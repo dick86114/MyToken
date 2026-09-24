@@ -434,7 +434,7 @@ final class UsagePresentationPolicyTests: XCTestCase {
             "RoutinUsage", "Views", "UsageRowView.swift"
         ])
 
-        let identityStart = try XCTUnwrap(source.range(of: "private var compactIdentity"))
+        let identityStart = try XCTUnwrap(source.range(of: "private func compactIdentity"))
         let identityEnd = try XCTUnwrap(
             source.range(
                 of: "private var compactActionButtons",
@@ -445,10 +445,34 @@ final class UsagePresentationPolicyTests: XCTestCase {
 
         XCTAssertFalse(identity.contains("Text(UsageRowPresentation.subscriptionDescription("))
         XCTAssertTrue(identity.contains("providerSubtitle"))
+        XCTAssertTrue(identity.contains(".lineLimit(showsPlanBelowProvider ? 1 : 2)"))
+        XCTAssertTrue(identity.contains("VStack(alignment: .leading, spacing: 1)"))
+        XCTAssertTrue(identity.contains("HStack(alignment: .firstTextBaseline, spacing: 3)"))
+
+        let balanceStart = try XCTUnwrap(source.range(of: "private func compactBalanceCard"))
+        let headerStart = try XCTUnwrap(source.range(of: "private func compactHeader"))
+        let balanceCard = String(source[balanceStart.lowerBound..<headerStart.lowerBound])
+        XCTAssertTrue(balanceCard.contains("compactIdentity(showsPlanBelowProvider: true)"))
+        XCTAssertFalse(balanceCard.contains("compactIdentity(showsPlanBelowProvider: false)"))
+
+        let standardStart = try XCTUnwrap(source.range(of: "private func compactStandardCard"))
+        let standardCard = String(source[standardStart.lowerBound..<balanceStart.lowerBound])
+        XCTAssertTrue(standardCard.contains("compactHeader()"))
+
+        let headerEnd = try XCTUnwrap(
+            source.range(
+                of: "private func compactIdentity",
+                range: headerStart.lowerBound..<source.endIndex
+            )
+        )
+        let header = String(source[headerStart.lowerBound..<headerEnd.lowerBound])
+        XCTAssertTrue(header.contains("compactIdentity(showsPlanBelowProvider: false)"))
+        XCTAssertFalse(header.contains("compactIdentity(showsPlanBelowProvider: true)"))
 
         let componentStart = try XCTUnwrap(source.range(of: "private struct ProviderWebsiteLink"))
         let component = String(source[componentStart.lowerBound...])
         XCTAssertTrue(component.contains("Link(destination: destination)"))
+        XCTAssertTrue(component.contains(".fixedSize(horizontal: true, vertical: false)"))
         XCTAssertTrue(component.contains(".help(\"打开 \\(providerName) 官网\")"))
         XCTAssertTrue(component.contains("Image(systemName: \"arrow.up.right\")"))
         XCTAssertTrue(component.contains("Capsule().fill"))
@@ -456,6 +480,17 @@ final class UsagePresentationPolicyTests: XCTestCase {
         XCTAssertTrue(component.contains("NSCursor.pointingHand.push()"))
         XCTAssertTrue(component.contains("NSCursor.pop()"))
         XCTAssertTrue(component.contains(".onDisappear"))
+
+        let subtitleStart = try XCTUnwrap(source.range(of: "func providerSubtitle"))
+        let subtitleEnd = try XCTUnwrap(
+            source.range(
+                of: "var avatarWithStatus",
+                range: subtitleStart.lowerBound..<source.endIndex
+            )
+        )
+        let subtitle = String(source[subtitleStart.lowerBound..<subtitleEnd.lowerBound])
+        XCTAssertTrue(subtitle.contains("Text(planName)"))
+        XCTAssertTrue(subtitle.contains("Text(\" · \\(planName)\")"))
     }
 
     func test设置窗口存在时显示Dock图标关闭后恢复菜单栏形态() throws {
