@@ -155,11 +155,6 @@ enum CompactPopoverPalette {
     static func actionStroke(_ scheme: ColorScheme) -> Color {
         cardStroke(scheme)
     }
-
-    /// 彩色 logo 内含白色图形，浅色弹窗必须使用深色承托才能保留对比度。
-    static func logoBacking(_ scheme: ColorScheme) -> Color {
-        isDark(scheme) ? darkElevated.opacity(0.72) : darkCanvas.opacity(0.94)
-    }
 }
 
 

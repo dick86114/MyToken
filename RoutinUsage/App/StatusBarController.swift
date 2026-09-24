@@ -194,8 +194,7 @@ final class StatusBarController: NSObject {
         let text = "尚未配置 Key"
         statusItem.length = 24
         button.title = ""
-        button.image = NSImage(named: "MenuBarBrandLogo")
-        button.image?.isTemplate = true
+        button.image = MenuBarMonoBrandLogo.image()
         button.imagePosition = .imageOnly
         button.imageScaling = .scaleProportionallyDown
         button.setAccessibilityLabel(text)

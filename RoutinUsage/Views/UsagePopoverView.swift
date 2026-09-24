@@ -102,28 +102,12 @@ struct UsagePopoverView: View {
 }
 
 private extension UsagePopoverView {
-    @ViewBuilder
     private var popoverBrandLogo: some View {
-        let logo = Image(nsImage: NSImage(named: "PopoverColorBrandLogo") ?? NSApp.applicationIconImage)
+        Image(nsImage: NSImage(named: "PopoverColorBrandLogo") ?? NSApp.applicationIconImage)
             .resizable()
             .interpolation(.high)
             .scaledToFit()
-            .frame(width: 28, height: 28)
-
-        if colorScheme == .dark {
-            logo
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                .background {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(CompactPopoverPalette.logoBacking(colorScheme))
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .strokeBorder(CompactPopoverPalette.cardStroke(colorScheme), lineWidth: 1)
-                }
-        } else {
-            logo
-        }
+            .frame(width: 36, height: 36)
     }
 
     var toolbar: some View {

@@ -389,6 +389,32 @@ enum MenuBarVerticalUsageIcon {
     }
 }
 
+enum MenuBarMonoBrandLogo {
+    static let size = NSSize(width: 18, height: 18)
+
+    static func image() -> NSImage {
+        // 和短码/进度条一致：使用动态 labelColor 延迟解析菜单栏外观。
+        let image = NSImage(size: size, flipped: false) { _ in
+            let rect = NSRect(origin: .zero, size: size)
+            guard let source = NSImage(named: "MenuBarMonoBrandLogo") else {
+                return false
+            }
+
+            NSColor.labelColor.setFill()
+            NSBezierPath(rect: rect).fill()
+            source.draw(
+                in: rect,
+                from: .zero,
+                operation: .destinationIn,
+                fraction: 1
+            )
+            return true
+        }
+        image.isTemplate = false
+        return image
+    }
+}
+
 enum MenuBarLogoUsageIcon {
     static let size = NSSize(width: 18, height: 18)
 

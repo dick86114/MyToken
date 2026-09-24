@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import RoutinUsage
 
@@ -64,9 +65,11 @@ final class ProjectBootstrapTests: XCTestCase {
             )
         )
         let logoSource = String(popover[logoStart.lowerBound..<logoEnd.lowerBound])
-        XCTAssertTrue(logoSource.contains("frame(width: 28, height: 28)"))
-        XCTAssertFalse(logoSource.contains("frame(width: 24, height: 24)"))
-        XCTAssertTrue(popover.contains("if colorScheme == .dark"))
+        XCTAssertTrue(logoSource.contains("frame(width: 36, height: 36)"))
+        XCTAssertFalse(logoSource.contains("frame(width: 28, height: 28)"))
+        XCTAssertFalse(logoSource.contains("clipShape"))
+        XCTAssertFalse(logoSource.contains("logoBacking"))
+        XCTAssertFalse(logoSource.contains("strokeBorder"))
 
         func appearanceValue(_ image: [String: Any]) -> String? {
             let appearances = image["appearances"] as? [[String: Any]]
@@ -93,6 +96,21 @@ final class ProjectBootstrapTests: XCTestCase {
                     .path
             ))
         }
+
+        func centerColor(_ filename: String) throws -> NSColor {
+            let url = projectRoot
+                .appendingPathComponent("RoutinUsage/Assets.xcassets/PopoverColorBrandLogo.imageset")
+                .appendingPathComponent(filename)
+            let rep = try XCTUnwrap(NSBitmapImageRep(data: try Data(contentsOf: url)))
+            return try XCTUnwrap(rep.colorAt(x: 42, y: 42))
+        }
+
+        let lightCenter = try centerColor("popover-color-brand-logo-light@2x.png")
+        let darkCenter = try centerColor("popover-color-brand-logo-dark@2x.png")
+        XCTAssertGreaterThan(lightCenter.alphaComponent, 0.9)
+        XCTAssertLessThan((lightCenter.redComponent + lightCenter.greenComponent + lightCenter.blueComponent) / 3, 0.25)
+        XCTAssertGreaterThan(darkCenter.alphaComponent, 0.9)
+        XCTAssertGreaterThan((darkCenter.redComponent + darkCenter.greenComponent + darkCenter.blueComponent) / 3, 0.75)
 
         XCTAssertFalse(popover.contains(".shadow(color: Color.black.opacity(0.25)"))
         XCTAssertTrue(popover.contains("repeatForever"))
@@ -289,14 +307,69 @@ final class ProjectBootstrapTests: XCTestCase {
     }
 
     @MainActor
-    func test未配置菜单栏使用新品牌模板图标() throws {
+    func test未配置菜单栏使用黑白图标并跟随菜单栏反色() throws {
         let source = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
-        let logo = NSImage(named: "MenuBarBrandLogo")
+        let menuBarLabelURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("RoutinUsage/Views/MenuBarLabelView.swift")
+        let menuBarLabel = try String(contentsOf: menuBarLabelURL, encoding: .utf8)
+        let logoStart = try XCTUnwrap(menuBarLabel.range(of: "enum MenuBarMonoBrandLogo"))
+        let logoEnd = try XCTUnwrap(
+            menuBarLabel.range(
+                of: "enum MenuBarLogoUsageIcon",
+                range: logoStart.lowerBound..<menuBarLabel.endIndex
+            )
+        )
+        let logoSource = String(menuBarLabel[logoStart.lowerBound..<logoEnd.lowerBound])
 
-        XCTAssertTrue(source.contains("MenuBarBrandLogo"))
-        XCTAssertEqual(logo?.size.width, 18)
-        XCTAssertEqual(logo?.size.height, 18)
-        XCTAssertTrue(logo?.isTemplate ?? false)
+        XCTAssertTrue(source.contains("button.image = MenuBarMonoBrandLogo.image()"))
+        XCTAssertFalse(source.contains("MenuBarMonoBrandLogo.image(appearance:"))
+        XCTAssertFalse(source.contains("observeStatusBarAppearance()"))
+        XCTAssertFalse(source.contains("scheduleStatusButtonUpdate()"))
+        XCTAssertTrue(logoSource.contains("NSImage(size: size, flipped: false)"))
+        XCTAssertTrue(logoSource.contains("NSColor.labelColor.setFill()"))
+        XCTAssertFalse(logoSource.contains("bestMatch(from: [.aqua, .darkAqua])"))
+        XCTAssertFalse(logoSource.contains("performAsCurrentDrawingAppearance"))
+        XCTAssertFalse(source.contains("button.image?.isTemplate = true"))
+    }
+
+    func test未配置菜单栏黑白图标资源包含明暗外观() throws {
+        let projectRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let contentsURL = projectRoot.appendingPathComponent(
+            "RoutinUsage/Assets.xcassets/MenuBarMonoBrandLogo.imageset/Contents.json"
+        )
+        let contents = try JSONSerialization.jsonObject(with: Data(contentsOf: contentsURL))
+        let contentsObject = try XCTUnwrap(contents as? [String: Any])
+        let images = try XCTUnwrap(contentsObject["images"] as? [[String: Any]])
+
+        func appearanceValue(_ image: [String: Any]) -> String? {
+            let appearances = image["appearances"] as? [[String: Any]]
+            return appearances?.first?["value"] as? String
+        }
+        let lightScales = images
+            .filter { appearanceValue($0) == "light" }
+            .compactMap { $0["scale"] as? String }
+        let darkScales = images
+            .filter { appearanceValue($0) == "dark" }
+            .compactMap { $0["scale"] as? String }
+        XCTAssertEqual(Set(lightScales), ["1x", "2x"])
+        XCTAssertEqual(Set(darkScales), ["1x", "2x"])
+        for filename in [
+            "menu-bar-mono-brand-logo-light.png",
+            "menu-bar-mono-brand-logo-light@2x.png",
+            "menu-bar-mono-brand-logo-dark.png",
+            "menu-bar-mono-brand-logo-dark@2x.png"
+        ] {
+            XCTAssertTrue(FileManager.default.fileExists(
+                atPath: projectRoot
+                    .appendingPathComponent("RoutinUsage/Assets.xcassets/MenuBarMonoBrandLogo.imageset")
+                    .appendingPathComponent(filename)
+                    .path
+            ))
+        }
     }
 
     func test更新完成提示不会阻塞首次启动检查() throws {
@@ -481,7 +554,7 @@ final class ProjectBootstrapTests: XCTestCase {
 
         XCTAssertTrue(statusBarController.contains("MenuBarMultiUsageIcon.image("))
         XCTAssertTrue(statusBarController.contains("indicators: selectedIndicators"))
-        XCTAssertFalse(statusBarController.contains("appearance: button.effectiveAppearance"))
+        XCTAssertTrue(statusBarController.contains("MenuBarMonoBrandLogo.image()"))
         XCTAssertTrue(statusBarController.contains("button.setAccessibilityLabel"))
     }
 
@@ -899,5 +972,38 @@ final class ProjectBootstrapTests: XCTestCase {
         guard let sourceURL = Bundle(for: ProjectBootstrapTests.self)
             .url(forResource: resource.name, withExtension: resource.extension) else { return nil }
         return try String(contentsOf: sourceURL, encoding: .utf8)
+    }
+
+    @MainActor
+    private func renderedBitmap(_ image: NSImage) throws -> NSBitmapImageRep {
+        let pixelScale = 2
+        let bitmap = try XCTUnwrap(
+            NSBitmapImageRep(
+                bitmapDataPlanes: nil,
+                pixelsWide: Int(image.size.width) * pixelScale,
+                pixelsHigh: Int(image.size.height) * pixelScale,
+                bitsPerSample: 8,
+                samplesPerPixel: 4,
+                hasAlpha: true,
+                isPlanar: false,
+                colorSpaceName: .calibratedRGB,
+                bytesPerRow: 0,
+                bitsPerPixel: 0
+            )
+        )
+        bitmap.size = image.size
+        let context = try XCTUnwrap(NSGraphicsContext(bitmapImageRep: bitmap))
+
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        image.draw(
+            in: NSRect(origin: .zero, size: image.size),
+            from: NSRect(origin: .zero, size: image.size),
+            operation: .sourceOver,
+            fraction: 1
+        )
+        NSGraphicsContext.restoreGraphicsState()
+
+        return bitmap
     }
 }
