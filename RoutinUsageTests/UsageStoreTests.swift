@@ -874,7 +874,7 @@ final class UsagePreferenceStore {
     var preferences: [UUID: CredentialUsagePreferences] = [:]
 }
 
-private final class StoreKeychainFake: LocalKeyStoring, @unchecked Sendable {
+private final class StoreKeychainFake: CredentialStoring, @unchecked Sendable {
     private let lock = NSLock()
     private var secrets: [UUID: String] = [:]
 

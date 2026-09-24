@@ -318,7 +318,7 @@ final class ProjectBootstrapTests: XCTestCase {
         let logoStart = try XCTUnwrap(menuBarLabel.range(of: "enum MenuBarMonoBrandLogo"))
         let logoEnd = try XCTUnwrap(
             menuBarLabel.range(
-                of: "enum MenuBarLogoUsageIcon",
+                of: "extension MenuBarMultiUsageIcon",
                 range: logoStart.lowerBound..<menuBarLabel.endIndex
             )
         )

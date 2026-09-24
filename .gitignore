@@ -15,3 +15,6 @@ docs/MyToken-官网内容与图片素材说明.md
 # Local-only Android test builds
 /MyToken-android-*.apk
 .playwright-cli/
+
+# Build and deployment artifacts are generated locally or by CI
+dist/

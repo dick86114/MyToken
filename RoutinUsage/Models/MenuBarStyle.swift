@@ -1,6 +1,9 @@
 import Foundation
 
 /// 菜单栏中使用的显示样式。
+///
+/// 历史设置项：菜单栏现在统一由多指标图标渲染，这个样式只用于
+/// 读取和迁移旧配置，不再决定实际显示效果。
 enum MenuBarStyle: String, CaseIterable, Codable, Equatable, Sendable {
     case percent
     case aliasLogoProgress

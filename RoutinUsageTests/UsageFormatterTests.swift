@@ -135,26 +135,6 @@ final class UsageFormatterTests: XCTestCase {
         )
     }
     @MainActor
-    func test菜单栏独立竖条图像有效渲染() {
-        let image = MenuBarVerticalUsageIcon.image(percent: 35)
-
-        XCTAssertEqual(image.size.width, 7)
-        XCTAssertEqual(image.size.height, 18)
-        XCTAssertTrue(image.isTemplate)
-    }
-
-    @MainActor
-    func test菜单栏Logo进度图标使用品牌轮廓和填充蒙版() {
-        let image = MenuBarLogoUsageIcon.image(percent: 35)
-
-        XCTAssertEqual(image.size.width, 18)
-        XCTAssertEqual(image.size.height, 18)
-        XCTAssertTrue(image.isTemplate)
-        XCTAssertNotNil(NSImage(named: "MenuBarLogoOutline"))
-        XCTAssertNotNil(NSImage(named: "MenuBarLogoMask"))
-    }
-
-    @MainActor
     func test菜单栏把百分比四舍五入为整数() {
         let state = makeState(snapshot: makePeriodicSnapshot(fiveHourPercent: 67.5))
 
@@ -306,68 +286,6 @@ final class UsageFormatterTests: XCTestCase {
         XCTAssertEqual(MenuBarUsageRisk.level(for: 70, rules: rules), .critical)
     }
 
-    func test菜单栏为竖条和Logo进度样式提供有效周期指标() throws {
-        let periodicState = makeState(snapshot: makePeriodicSnapshot(fiveHourPercent: 67.5))
-
-        XCTAssertEqual(
-            try XCTUnwrap(
-                MenuBarVerticalUsage.metric(
-                    state: periodicState,
-                    dimension: .fiveHour,
-                    style: .aliasVerticalBar
-                )
-            ).percent,
-            67.5
-        )
-        XCTAssertEqual(
-            try XCTUnwrap(
-                MenuBarVerticalUsage.metric(
-                    state: periodicState,
-                    dimension: .fiveHour,
-                    style: .logoProgress
-                )
-            ).percent,
-            67.5
-        )
-        XCTAssertNil(
-            MenuBarVerticalUsage.metric(
-                state: periodicState,
-                dimension: .fiveHour,
-                style: .percent
-            )
-        )
-        XCTAssertEqual(
-            try XCTUnwrap(
-                MenuBarVerticalUsage.metric(
-                    state: periodicState,
-                    dimension: .fiveHour,
-                    style: .aliasLogoProgress
-                )
-            ).percent,
-            67.5
-        )
-        XCTAssertNil(
-            MenuBarVerticalUsage.metric(
-                state: makeState(snapshot: nil, isRefreshing: true),
-                dimension: .fiveHour,
-                style: .aliasVerticalBar
-            )
-        )
-        XCTAssertNil(
-            MenuBarVerticalUsage.metric(
-                state: makeState(snapshot: nil, error: .network),
-                dimension: .fiveHour,
-                style: .aliasVerticalBar
-            )
-        )
-        XCTAssertNil(
-            MenuBarVerticalUsage.metric(
-                state: makeState(snapshot: makeTokenSnapshot(percent: 92.4)),
-                dimension: .weekly,
-                style: .aliasVerticalBar
-            )
-        )
-    }
 
     func test分组倍率合并为一行() {
         XCTAssertEqual(

@@ -1151,7 +1151,7 @@ private actor LifecycleUsageFetcher: UsageFetching {
     }
 }
 
-private final class LifecycleKeychainFake: LocalKeyStoring, @unchecked Sendable {
+private final class LifecycleKeychainFake: CredentialStoring, @unchecked Sendable {
     private let lock = NSLock()
     private var secrets: [UUID: String] = [:]
 

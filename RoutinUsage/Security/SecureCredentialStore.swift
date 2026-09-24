@@ -7,6 +7,3 @@ protocol CredentialStoring: Sendable {
 }
 
 protocol SecureCredentialStoring: CredentialStoring {}
-
-// Keep the old spelling source-compatible for existing migration adapters and clients.
-typealias LocalKeyStoring = CredentialStoring

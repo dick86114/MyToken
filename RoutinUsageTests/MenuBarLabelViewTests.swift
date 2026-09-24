@@ -37,10 +37,8 @@ final class MenuBarLabelViewTests: XCTestCase {
     }
 
     @MainActor
-    func test多指标图标非模板且其他菜单样式保持系统模板() {
+    func test多指标图标不使用系统模板() {
         XCTAssertFalse(MenuBarMultiUsageIcon.image(indicators: []).isTemplate)
-        XCTAssertTrue(MenuBarVerticalUsageIcon.image(percent: 35).isTemplate)
-        XCTAssertTrue(MenuBarLogoUsageIcon.image(percent: 35).isTemplate)
     }
 
     func test状态和无数据指标使用独立内容类型() throws {
