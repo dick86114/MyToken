@@ -49,11 +49,6 @@ struct UsageRowView: View {
         return Group {
             if arrangement == .balance, let metric = metrics.first {
                 compactBalanceCard(metric: metric)
-                    .background(alignment: .bottom) {
-                        CompactBalanceWave()
-                            .frame(height: 40)
-                            .allowsHitTesting(false)
-                    }
             } else {
                 compactStandardCard(now: now)
             }
@@ -68,7 +63,7 @@ struct UsageRowView: View {
 
     private func compactStandardCard(now: Date) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            compactHeader(showsDivider: true)
+            compactHeader()
 
             if let snapshot = state.snapshot {
                 compactMetrics(snapshot: snapshot, now: now)
@@ -109,21 +104,13 @@ struct UsageRowView: View {
         }
     }
 
-    private func compactHeader(showsDivider: Bool) -> some View {
+    private func compactHeader() -> some View {
         HStack(alignment: .center, spacing: 10) {
             compactIdentity
             Spacer(minLength: 8)
             compactActionButtons
         }
-        .padding(.bottom, showsDivider ? 10 : 0)
-        .overlay(alignment: .bottom) {
-            if showsDivider {
-                Rectangle()
-                    .fill(CompactPopoverPalette.hairline(colorScheme))
-                    .frame(height: 1)
-                    .allowsHitTesting(false)
-            }
-        }
+        .padding(.bottom, 10)
     }
 
     private var compactIdentity: some View {

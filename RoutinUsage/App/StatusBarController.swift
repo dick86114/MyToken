@@ -376,12 +376,13 @@ final class StatusBarController: NSObject {
     }
 
     @objc private func openSettingsWindow() {
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
+        popover.performClose(nil)
         let window = settingsWindow ?? makeSettingsWindow()
         settingsWindow = window
-        SettingsWindowActivationPolicy.register(window)
+        NSApp.setActivationPolicy(.regular)
         window.makeKeyAndOrderFront(nil)
+        SettingsWindowActivationPolicy.register(window)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     private func makeSettingsWindow() -> NSWindow {

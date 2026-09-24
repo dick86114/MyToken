@@ -171,6 +171,9 @@ enum MenuBarMultiUsageIcon {
     static let gap: CGFloat = 0
     static let outerPadding: CGFloat = 1.5
     static let size = NSSize(width: unitWidth, height: 26)
+    static let progressTrackHeight: CGFloat = 18
+    static let progressFillInset: CGFloat = 1
+    static let codeVerticalOffset: CGFloat = 2
 
     static func imageWidth(for count: Int) -> CGFloat {
         let displayedCount = max(1, min(count, maximumCount))
@@ -215,12 +218,23 @@ enum MenuBarMultiUsageIcon {
     }
 
     static func codeFont(for characterCount: Int) -> NSFont {
-        let size: CGFloat = characterCount >= 3 ? 8.4 : 9.5
+        let size: CGFloat
+        switch characterCount {
+        case ..<2:
+            size = 9.5
+        case 2:
+            size = 8.4
+        default:
+            size = 7
+        }
         return NSFont.monospacedSystemFont(ofSize: size, weight: .bold)
     }
 
     static func codeSlotHeight(for characterCount: Int) -> CGFloat {
-        8
+        guard characterCount > 1 else { return 0 }
+        let font = codeFont(for: characterCount)
+        return (progressTrackHeight - font.capHeight)
+            / CGFloat(characterCount - 1)
     }
 
     static func codeBaselineY(
@@ -228,12 +242,15 @@ enum MenuBarMultiUsageIcon {
         index: Int,
         font: NSFont
     ) -> CGFloat {
+        guard characterCount > 1 else {
+            return size.height / 2 + font.capHeight / 2 - codeVerticalOffset
+        }
         let slotHeight = codeSlotHeight(for: characterCount)
-        let stackHeight = slotHeight * CGFloat(max(0, characterCount - 1)) + font.capHeight
-        let topBaseline = (size.height + stackHeight) / 2 - font.capHeight
-        // 大写短码按 capHeight 居中时，视觉重心仍会偏上；这里按实际渲染结果做光学校正。
-        let opticalAdjustment: CGFloat = characterCount >= 3 ? -2 : -3
-        return topBaseline - slotHeight * CGFloat(index) + opticalAdjustment
+        let trackTop = (size.height - progressTrackHeight) / 2
+        let topBaseline = trackTop + progressTrackHeight
+            - font.capHeight
+            - codeVerticalOffset
+        return topBaseline - slotHeight * CGFloat(index)
     }
 
     private static func draw(
@@ -454,8 +471,42 @@ enum MenuBarLogoUsageIcon {
     }
 }
 extension MenuBarMultiUsageIcon {
+    static let indicatorStrokeWidth: CGFloat = 1
+    static var indicatorBorderColor: NSColor {
+        NSColor.labelColor
+    }
     static let balanceUnitWidth: CGFloat = 30
     static let balanceDiameter: CGFloat = 18
+    static var balanceTextMaximumWidth: CGFloat {
+        balanceDiameter - indicatorStrokeWidth - 4
+    }
+
+    static func balanceFontSize(for text: String) -> CGFloat {
+        let preferredSize: CGFloat
+        switch text.count {
+        case 1:
+            preferredSize = 10
+        case 2:
+            preferredSize = 9
+        case 3:
+            preferredSize = 7.5
+        default:
+            preferredSize = 6.5
+        }
+
+        var fontSize = preferredSize
+        while fontSize > 5 {
+            let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .bold)
+            let width = NSString(string: text).size(withAttributes: [
+                .font: font
+            ]).width
+            if width <= balanceTextMaximumWidth {
+                break
+            }
+            fontSize -= 0.5
+        }
+        return fontSize
+    }
     static func imageWidth(for indicators: [MenuBarIndicatorModel]) -> CGFloat {
         let displayed = indicators.prefix(maximumCount)
         guard !displayed.isEmpty else {
@@ -482,31 +533,36 @@ extension MenuBarMultiUsageIcon {
     ) {
         let trackRect = NSRect(
             x: rect.minX + 9.5,
-            y: 4,
+            y: (rect.height - progressTrackHeight) / 2,
             width: 7.5,
-            height: rect.height - 8
+            height: progressTrackHeight
         )
         let track = NSBezierPath(roundedRect: trackRect, xRadius: 2.5, yRadius: 2.5)
-        track.lineWidth = 1
-        NSColor.labelColor.withAlphaComponent(0.34).setStroke()
+        track.lineWidth = Self.indicatorStrokeWidth
+        indicatorBorderColor.setStroke()
         NSColor.secondaryLabelColor.withAlphaComponent(0.22).setFill()
         track.fill()
 
-        let fillHeight = (trackRect.height - track.lineWidth)
+        let innerRect = trackRect.insetBy(
+            dx: track.lineWidth / 2 + progressFillInset,
+            dy: track.lineWidth / 2 + progressFillInset
+        )
+        let fillHeight = innerRect.height
             * CGFloat(min(max(percent, 0), 100)) / 100
         if fillHeight > 0 {
-            NSGraphicsContext.saveGraphicsState()
-            track.addClip()
             progressColor(for: indicator, rules: colorRules).setFill()
+            let fillRect = NSRect(
+                x: innerRect.minX,
+                y: innerRect.minY,
+                width: innerRect.width,
+                height: fillHeight
+            )
+            let fillRadius = min(2, min(fillRect.width, fillRect.height) / 2)
             NSBezierPath(
-                rect: NSRect(
-                    x: trackRect.minX + track.lineWidth / 2,
-                    y: trackRect.minY + track.lineWidth / 2,
-                    width: trackRect.width - track.lineWidth,
-                    height: fillHeight
-                )
+                roundedRect: fillRect,
+                xRadius: fillRadius,
+                yRadius: fillRadius
             ).fill()
-            NSGraphicsContext.restoreGraphicsState()
         }
         track.stroke()
     }
@@ -523,15 +579,17 @@ extension MenuBarMultiUsageIcon {
             width: balanceDiameter,
             height: balanceDiameter
         )
-        let fill = balanceColor(for: indicator, rules: colorRules)
-        fill.setFill()
-        NSBezierPath(ovalIn: circleRect).fill()
+        let statusColor = balanceColor(for: indicator, rules: colorRules)
+        let circle = NSBezierPath(ovalIn: circleRect)
+        circle.lineWidth = Self.indicatorStrokeWidth
+        indicatorBorderColor.setStroke()
+        circle.stroke()
 
-        let fontSize: CGFloat = text.count >= 4 ? 6.5 : 7.5
+        let fontSize = balanceFontSize(for: text)
         let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .bold)
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
-            .foregroundColor: highContrastTextColor(for: fill)
+            .foregroundColor: statusColor
         ]
         let textSize = NSString(string: text).size(withAttributes: attributes)
         NSString(string: text).draw(

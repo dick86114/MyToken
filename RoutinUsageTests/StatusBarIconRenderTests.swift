@@ -119,6 +119,17 @@ final class StatusBarIconRenderTests: XCTestCase {
         }
         return false
     }
+
+    private func colorMatches(
+        _ color: NSColor,
+        expected: MenuBarColorComponents
+    ) -> Bool {
+        guard let rgb = color.usingColorSpace(.sRGB) else { return false }
+        return abs(rgb.redComponent - expected.red) < 0.05
+            && abs(rgb.greenComponent - expected.green) < 0.05
+            && abs(rgb.blueComponent - expected.blue) < 0.05
+            && rgb.alphaComponent > 0.9
+    }
     func test余额单元比进度单元更宽且混合宽度按实际单元累加() {
         let progress = MenuBarIndicatorModel(
             shortCode: "GLM",
@@ -199,5 +210,28 @@ final class StatusBarIconRenderTests: XCTestCase {
             MenuBarMultiUsageIcon.highContrastTextColor(for: .white).usingColorSpace(.sRGB),
             NSColor.black.usingColorSpace(.sRGB)
         )
+    }
+    func test进度填充与边框之间保留空隙() throws {
+        var rules = MenuBarColorRules.standard
+        rules.normalColor = .init(red: 0.1, green: 0.9, blue: 0.3)
+        let indicator = MenuBarIndicatorModel(
+            shortCode: "GLM",
+            percent: 100,
+            healthState: .normal,
+            accessibilityLabel: "GLM，已使用 100%",
+            content: .progress(100)
+        )
+        let bitmap = try renderedBitmap(
+            MenuBarMultiUsageIcon.image(indicators: [indicator], colorRules: rules)
+        )
+        let imageWidth = MenuBarMultiUsageIcon.imageWidth(for: [indicator])
+        let pixelScale = Double(bitmap.pixelsWide) / imageWidth
+        let trackX = MenuBarMultiUsageIcon.outerPadding + 9.5
+        let gapX = Int(((trackX + 1) * pixelScale).rounded())
+        let centerY = Int((13 * pixelScale).rounded())
+        let gapColor = try XCTUnwrap(bitmap.colorAt(x: gapX, y: centerY))
+
+        XCTAssertLessThan(gapColor.alphaComponent, 0.8)
+        XCTAssertFalse(colorMatches(gapColor, expected: rules.normalColor))
     }
 }

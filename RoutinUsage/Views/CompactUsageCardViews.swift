@@ -155,10 +155,6 @@ enum CompactPopoverPalette {
     static func actionStroke(_ scheme: ColorScheme) -> Color {
         cardStroke(scheme)
     }
-
-    static func hairline(_ scheme: ColorScheme) -> Color {
-        Color.primary.opacity(isDark(scheme) ? 0.12 : 0.08)
-    }
 }
 
 
@@ -179,6 +175,7 @@ struct CompactAccountAvatar: View {
                 RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .inner), style: .continuous)
                     .strokeBorder(ProviderTheme.accentColor(for: providerID).opacity(0.30), lineWidth: 1)
             }
+            .saturation(0.55)
             .accessibilityHidden(true)
     }
 }
@@ -456,33 +453,5 @@ struct CompactBalanceStrip: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(metric.label)，\(UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode))")
-    }
-}
-
-struct CompactBalanceWave: View {
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        GeometryReader { geometry in
-            Path { path in
-                let width = geometry.size.width
-                let height = geometry.size.height
-                path.move(to: CGPoint(x: 0, y: height * 0.78))
-                path.addQuadCurve(
-                    to: CGPoint(x: width * 0.55, y: height * 0.58),
-                    control: CGPoint(x: width * 0.22, y: height * 0.18)
-                )
-                path.addQuadCurve(
-                    to: CGPoint(x: width, y: height * 0.28),
-                    control: CGPoint(x: width * 0.82, y: height * 0.92)
-                )
-                path.addLine(to: CGPoint(x: width, y: height))
-                path.addLine(to: CGPoint(x: 0, y: height))
-                path.closeSubpath()
-            }
-            .fill(CompactPopoverPalette.positive(colorScheme).opacity(0.10))
-        }
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
     }
 }
