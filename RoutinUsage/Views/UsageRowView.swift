@@ -259,9 +259,10 @@ private struct RefreshingCardBorder: View {
 
     private func segmentPath(_ path: Path, from start: CGFloat, to end: CGFloat) -> Path {
         if start < 0 {
-            return path
-                .trimmedPath(from: start + 1, to: 1)
-                .union(path.trimmedPath(from: 0, to: end))
+            var wrapped = Path()
+            wrapped.addPath(path.trimmedPath(from: start + 1, to: 1))
+            wrapped.addPath(path.trimmedPath(from: 0, to: end))
+            return wrapped
         }
         return path.trimmedPath(from: start, to: end)
     }

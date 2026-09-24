@@ -56,7 +56,8 @@ final class ProjectBootstrapTests: XCTestCase {
 
         XCTAssertTrue(app.contains("nonisolated static let websiteURL"))
         XCTAssertTrue(popover.contains("Link(destination: RoutinUsageApp.websiteURL)"))
-        XCTAssertTrue(popover.contains("Image(nsImage: NSImage(named: \"PopoverColorBrandLogo\")"))
+        XCTAssertTrue(popover.contains("Image(\"PopoverColorBrandLogo\")"))
+        XCTAssertFalse(popover.contains("Image(nsImage: NSImage(named: \"PopoverColorBrandLogo\")"))
         let logoStart = try XCTUnwrap(popover.range(of: "private var popoverBrandLogo"))
         let logoEnd = try XCTUnwrap(
             popover.range(
@@ -398,6 +399,23 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(row.contains("RefreshFailurePopover"))
         XCTAssertTrue(row.contains("UsageFormatter.refreshFailureTooltip"))
         XCTAssertFalse(row.contains("clock.badge.exclamationmark"))
+    }
+
+    func test刷新光轨迹回绕时保留独立描边子路径() throws {
+        let row = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
+        let borderStart = try XCTUnwrap(row.range(of: "private struct RefreshingCardBorder"))
+        let borderEnd = try XCTUnwrap(
+            row.range(
+                of: "private struct ProviderWebsiteLink",
+                range: borderStart.lowerBound..<row.endIndex
+            )
+        )
+        let border = String(row[borderStart.lowerBound..<borderEnd.lowerBound])
+
+        XCTAssertFalse(border.contains(".union("))
+        XCTAssertTrue(border.contains("var wrapped = Path()"))
+        XCTAssertTrue(border.contains("wrapped.addPath(path.trimmedPath(from: start + 1, to: 1))"))
+        XCTAssertTrue(border.contains("wrapped.addPath(path.trimmedPath(from: 0, to: end))"))
     }
 
     func test菜单栏弹窗不再提供Key选中交互() throws {

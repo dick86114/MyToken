@@ -103,7 +103,7 @@ struct UsagePopoverView: View {
 
 private extension UsagePopoverView {
     private var popoverBrandLogo: some View {
-        Image(nsImage: NSImage(named: "PopoverColorBrandLogo") ?? NSApp.applicationIconImage)
+        Image("PopoverColorBrandLogo")
             .resizable()
             .interpolation(.high)
             .scaledToFit()
