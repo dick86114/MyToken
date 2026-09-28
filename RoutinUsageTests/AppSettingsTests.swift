@@ -128,8 +128,44 @@ final class AppSettingsTests: XCTestCase {
         let preferences = settings.usagePreferences(for: id)
 
         XCTAssertNil(preferences.menuBarMetricID)
+        XCTAssertEqual(preferences.menuBarStyle, .progressBar)
         XCTAssertTrue(preferences.notificationsEnabled)
         XCTAssertEqual(preferences.alertRules, [])
+    }
+
+    func test凭证菜单栏指标样式可持久化() throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let id = UUID()
+        let settings = AppSettings(defaults: context.defaults)
+        var preferences = settings.usagePreferences(for: id)
+        preferences.menuBarStyle = .stacked
+        settings.setUsagePreferences(preferences, for: id)
+
+        XCTAssertEqual(
+            AppSettings(defaults: context.defaults).usagePreferences(for: id).menuBarStyle,
+            .stacked
+        )
+    }
+
+    func test旧凭证用量偏好缺少菜单栏样式时回退进度条() throws {
+        let data = Data(
+            #"{"menuBarMetricID":"weekly","notificationsEnabled":true,"alertRules":[]}"#.utf8
+        )
+
+        let preferences = try JSONDecoder().decode(CredentialUsagePreferences.self, from: data)
+
+        XCTAssertEqual(preferences.menuBarStyle, .progressBar)
+    }
+
+    func test旧短码百分比持久化值解码为通用上下样式() throws {
+        let data = Data(
+            #"{"menuBarStyle":"shortCodePercent","notificationsEnabled":true,"alertRules":[]}"#.utf8
+        )
+
+        let preferences = try JSONDecoder().decode(CredentialUsagePreferences.self, from: data)
+
+        XCTAssertEqual(preferences.menuBarStyle, .stacked)
     }
 
     func test凭证用量偏好可持久化并按凭证删除() throws {

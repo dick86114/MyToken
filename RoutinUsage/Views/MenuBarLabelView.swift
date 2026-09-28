@@ -1,4 +1,5 @@
 import AppKit
+import CoreText
 
 enum MenuBarBalanceFormatter {
     static func compactText(_ value: Decimal?) -> String {
@@ -37,6 +38,20 @@ enum MenuBarBalanceFormatter {
         let signedInteger = isNegative ? -integer.decimalValue : integer.decimalValue
         return NSDecimalNumber(decimal: signedInteger).stringValue
     }
+
+    static func compactCurrencyText(
+        _ value: Decimal?,
+        currencyCode: String?
+    ) -> String {
+        guard let value, !value.isNaN else {
+            return "--"
+        }
+        let symbol = UsageFormatter.currencySymbol(for: currencyCode)
+        let text = compactText(value)
+        return text.hasPrefix("-")
+            ? "-" + symbol + String(text.dropFirst())
+            : symbol + text
+    }
 }
 
 enum MenuBarIndicatorContent: Equatable, Sendable {
@@ -52,19 +67,25 @@ struct MenuBarIndicatorModel: Equatable, Sendable {
     let healthState: UsageMetricHealthState
     let accessibilityLabel: String
     let content: MenuBarIndicatorContent
+    let style: MenuBarIndicatorStyle
+    let balanceCurrencyText: String?
 
     init(
         shortCode: String,
         percent: Double?,
         healthState: UsageMetricHealthState,
         accessibilityLabel: String,
-        content: MenuBarIndicatorContent? = nil
+        balanceCurrencyText: String? = nil,
+        content: MenuBarIndicatorContent? = nil,
+        style: MenuBarIndicatorStyle = .progressBar
     ) {
         self.shortCode = shortCode
         self.percent = percent
         self.healthState = healthState
         self.accessibilityLabel = accessibilityLabel
         self.content = content ?? percent.map { .progress($0) } ?? .none
+        self.style = style
+        self.balanceCurrencyText = balanceCurrencyText
     }
 
     static func hoverSummary(for indicators: [MenuBarIndicatorModel]) -> String {
@@ -74,7 +95,8 @@ struct MenuBarIndicatorModel: Equatable, Sendable {
     static func make(
         state: KeyUsageState,
         descriptor: ProviderDescriptor,
-        metric: NormalizedUsageMetric?
+        metric: NormalizedUsageMetric?,
+        style: MenuBarIndicatorStyle = .progressBar
     ) -> Self {
         if let metric, metric.semantic == .usedQuota || metric.semantic == .remainingQuota,
            let percent = metric.displayedPercent {
@@ -85,7 +107,8 @@ struct MenuBarIndicatorModel: Equatable, Sendable {
                     ? MenuBarUsageRisk.healthState(for: percent)
                     : metric.healthState,
                 accessibilityLabel: "\(descriptor.displayName)，\(state.configuration.displayName)，\(metric.displaysRemainingPercent ? "剩余" : "已使用") \(Int(percent.rounded()))%",
-                content: .progress(percent)
+                content: .progress(percent),
+                style: style
             )
         }
 
@@ -96,7 +119,12 @@ struct MenuBarIndicatorModel: Equatable, Sendable {
                 percent: nil,
                 healthState: metric.healthState,
                 accessibilityLabel: "\(descriptor.displayName)，\(state.configuration.displayName)，余额 \(value)",
-                content: .balance(MenuBarBalanceFormatter.compactText(metric.value))
+                balanceCurrencyText: MenuBarBalanceFormatter.compactCurrencyText(
+                    metric.value,
+                    currencyCode: metric.currencyCode
+                ),
+                content: .balance(MenuBarBalanceFormatter.compactText(metric.value)),
+                style: style
             )
         }
 
@@ -106,7 +134,8 @@ struct MenuBarIndicatorModel: Equatable, Sendable {
                 percent: nil,
                 healthState: metric.healthState,
                 accessibilityLabel: "\(descriptor.displayName)，\(state.configuration.displayName)，账户状态",
-                content: .status
+                content: .status,
+                style: style
             )
         }
 
@@ -114,7 +143,8 @@ struct MenuBarIndicatorModel: Equatable, Sendable {
             shortCode: descriptor.shortCode,
             percent: nil,
             healthState: state.error == nil ? .unknown : .unavailable,
-            accessibilityLabel: "\(descriptor.displayName)，\(state.configuration.displayName)，暂无用量数据"
+            accessibilityLabel: "\(descriptor.displayName)，\(state.configuration.displayName)，暂无用量数据",
+            style: style
         )
     }
 }
@@ -157,6 +187,17 @@ enum MenuBarMultiUsageIcon {
     static let progressTrackHeight: CGFloat = 18
     static let progressFillInset: CGFloat = 1
     static let codeVerticalOffset: CGFloat = 2
+    static let stackedProgressUnitWidth: CGFloat = 38
+    static let stackedBalanceHorizontalPadding: CGFloat = 2.5
+    static let stackedBalanceMinimumUnitWidth: CGFloat = 24
+    static let stackedTracking: CGFloat = 0.75
+    static let stackedValueFontSize: CGFloat = 13
+    static var stackedValueFont: NSFont {
+        NSFont.monospacedSystemFont(
+            ofSize: stackedValueFontSize,
+            weight: .bold
+        )
+    }
 
     static func imageWidth(for count: Int) -> CGFloat {
         let displayedCount = max(1, min(count, maximumCount))
@@ -241,6 +282,58 @@ enum MenuBarMultiUsageIcon {
         colorRules: MenuBarColorRules,
         in rect: NSRect
     ) {
+        if indicator.style == .stacked {
+            switch indicator.content {
+            case let .progress(percent):
+                drawStackedValue(
+                    indicator: indicator,
+                    valueText: stackedPercentText(percent),
+                    valueColor: progressColor(for: indicator, rules: colorRules),
+                    in: rect
+                )
+                return
+            case let .balance(text):
+                drawStackedValue(
+                    indicator: indicator,
+                    valueText: indicator.balanceCurrencyText ?? text,
+                    valueColor: balanceColor(for: indicator, rules: colorRules),
+                    in: rect
+                )
+                return
+            case .status, .none:
+                break
+            }
+        }
+
+        drawVerticalShortCode(
+            indicator: indicator,
+            in: rect
+        )
+
+        switch indicator.content {
+        case let .progress(percent):
+            drawProgress(
+                percent: percent,
+                indicator: indicator,
+                colorRules: colorRules,
+                in: rect
+            )
+        case let .balance(text):
+            drawBalance(
+                text: text,
+                indicator: indicator,
+                colorRules: colorRules,
+                in: rect
+            )
+        case .status, .none:
+            break
+        }
+    }
+
+    private static func drawVerticalShortCode(
+        indicator: MenuBarIndicatorModel,
+        in rect: NSRect
+    ) {
         let text = indicator.shortCode
         let characters = Array(text.prefix(3))
         let font = codeFont(for: characters.count)
@@ -264,25 +357,82 @@ enum MenuBarMultiUsageIcon {
             )
             NSString(string: character).draw(at: origin, withAttributes: attributes)
         }
+    }
 
-        switch indicator.content {
-        case let .progress(percent):
-            drawProgress(
-                percent: percent,
-                indicator: indicator,
-                colorRules: colorRules,
-                in: rect
+    private static func drawStackedValue(
+        indicator: MenuBarIndicatorModel,
+        valueText: String,
+        valueColor: NSColor,
+        in rect: NSRect
+    ) {
+        let text = String(indicator.shortCode.prefix(3))
+        let codeFont = codeFont(for: text.count)
+        let valueFont = stackedValueFont
+        let totalHeight = codeFont.capHeight
+            + 3
+            + valueFont.capHeight
+        let valueBaseline = (rect.height - totalHeight) / 2
+        let codeBaseline = valueBaseline
+            + valueFont.capHeight
+            + 3
+
+        drawCenteredLine(
+            text: text,
+            font: codeFont,
+            tracking: stackedTracking,
+            color: NSColor.labelColor,
+            baselineY: codeBaseline,
+            in: rect
+        )
+        drawCenteredLine(
+            text: valueText,
+            font: valueFont,
+            tracking: stackedTracking,
+            color: valueColor,
+            baselineY: valueBaseline,
+            in: rect
+        )
+    }
+
+    static func stackedPercentText(_ percent: Double) -> String {
+        let value = percent.isFinite ? min(max(percent, 0), 100) : 0
+        return "\(Int(value.rounded()))%"
+    }
+
+    private static func drawCenteredLine(
+        text: String,
+        font: NSFont,
+        tracking: CGFloat,
+        color: NSColor,
+        baselineY: CGFloat,
+        in rect: NSRect
+    ) {
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: color,
+            .kern: tracking
+        ]
+        let line = CTLineCreateWithAttributedString(
+            NSAttributedString(string: text, attributes: attributes)
+        )
+        let width = CGFloat(
+            CTLineGetTypographicBounds(
+                line,
+                nil,
+                nil,
+                nil
             )
-        case let .balance(text):
-            drawBalance(
-                text: text,
-                indicator: indicator,
-                colorRules: colorRules,
-                in: rect
-            )
-        case .status, .none:
-            break
+        )
+        guard let context = NSGraphicsContext.current?.cgContext else {
+            return
         }
+        context.saveGState()
+        context.textPosition = CGPoint(
+            x: rect.midX - width / 2,
+            y: baselineY
+        )
+        CTLineDraw(line, context)
+        context.restoreGState()
     }
 
     private static func progressColor(
@@ -371,6 +521,37 @@ extension MenuBarMultiUsageIcon {
         }
         return fontSize
     }
+
+    static func balanceFont(for text: String) -> NSFont {
+        NSFont.monospacedSystemFont(
+            ofSize: balanceFontSize(for: text),
+            weight: .bold
+        )
+    }
+
+    static func stackedBalanceUnitWidth(for indicator: MenuBarIndicatorModel) -> CGFloat {
+        let code = String(indicator.shortCode.prefix(3))
+        let valueText: String
+        switch indicator.content {
+        case let .balance(text):
+            valueText = indicator.balanceCurrencyText ?? text
+        case .progress, .status, .none:
+            valueText = ""
+        }
+        let codeWidth = NSString(string: code).size(withAttributes: [
+            .font: codeFont(for: code.count),
+            .kern: stackedTracking
+        ]).width
+        let valueWidth = NSString(string: valueText).size(withAttributes: [
+            .font: stackedValueFont,
+            .kern: stackedTracking
+        ]).width
+        return max(
+            stackedBalanceMinimumUnitWidth,
+            ceil(max(codeWidth, valueWidth) + stackedBalanceHorizontalPadding * 2)
+        )
+    }
+
     static func imageWidth(for indicators: [MenuBarIndicatorModel]) -> CGFloat {
         let displayed = indicators.prefix(maximumCount)
         guard !displayed.isEmpty else {
@@ -384,6 +565,16 @@ extension MenuBarMultiUsageIcon {
     }
 
     static func unitWidth(for indicator: MenuBarIndicatorModel) -> CGFloat {
+        if indicator.style == .stacked {
+            switch indicator.content {
+            case .progress:
+                return stackedProgressUnitWidth
+            case .balance:
+                return stackedBalanceUnitWidth(for: indicator)
+            case .status, .none:
+                break
+            }
+        }
         if case .balance = indicator.content {
             return balanceUnitWidth
         }
@@ -449,20 +640,27 @@ extension MenuBarMultiUsageIcon {
         indicatorBorderColor.setStroke()
         circle.stroke()
 
-        let fontSize = balanceFontSize(for: text)
-        let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .bold)
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: statusColor
-        ]
+        let font = balanceFont(for: text)
+        let attributes = balanceTextAttributes(font: font, color: statusColor)
         let textSize = NSString(string: text).size(withAttributes: attributes)
+        let origin = NSPoint(
+            x: circleRect.midX - textSize.width / 2,
+            y: circleRect.midY - textSize.height / 2
+        )
         NSString(string: text).draw(
-            at: NSPoint(
-                x: circleRect.midX - textSize.width / 2,
-                y: circleRect.midY - textSize.height / 2
-            ),
+            at: origin,
             withAttributes: attributes
         )
+    }
+
+    static func balanceTextAttributes(
+        font: NSFont,
+        color: NSColor
+    ) -> [NSAttributedString.Key: Any] {
+        return [
+            .font: font,
+            .foregroundColor: color
+        ]
     }
 
     static func highContrastTextColor(for fill: NSColor) -> NSColor {

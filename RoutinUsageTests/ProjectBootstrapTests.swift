@@ -484,6 +484,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(statusBarController.contains("usagePreferences(for: id)"))
         XCTAssertTrue(statusBarController.contains("MenuBarMetricResolver.resolve"))
         XCTAssertTrue(statusBarController.contains("metric: resolution.metric"))
+        XCTAssertTrue(statusBarController.contains("style: preferences.menuBarStyle"))
         XCTAssertFalse(statusBarController.contains("settings.displayDimension"))
     }
 

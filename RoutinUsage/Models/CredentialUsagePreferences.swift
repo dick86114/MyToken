@@ -2,14 +2,52 @@ import Foundation
 
 struct CredentialUsagePreferences: Codable, Equatable, Sendable {
     var menuBarMetricID: String?
+    var menuBarStyle: MenuBarIndicatorStyle
     var notificationsEnabled: Bool
     var alertRules: [MetricAlertRule]
 
     static let defaultValue = Self(
         menuBarMetricID: nil,
+        menuBarStyle: .progressBar,
         notificationsEnabled: true,
         alertRules: []
     )
+
+    private enum CodingKeys: String, CodingKey {
+        case menuBarMetricID
+        case menuBarStyle
+        case notificationsEnabled
+        case alertRules
+    }
+
+    init(
+        menuBarMetricID: String? = nil,
+        menuBarStyle: MenuBarIndicatorStyle = .progressBar,
+        notificationsEnabled: Bool = true,
+        alertRules: [MetricAlertRule] = []
+    ) {
+        self.menuBarMetricID = menuBarMetricID
+        self.menuBarStyle = menuBarStyle
+        self.notificationsEnabled = notificationsEnabled
+        self.alertRules = alertRules
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        menuBarMetricID = try container.decodeIfPresent(String.self, forKey: .menuBarMetricID)
+        menuBarStyle = try container.decodeIfPresent(
+            MenuBarIndicatorStyle.self,
+            forKey: .menuBarStyle
+        ) ?? .progressBar
+        notificationsEnabled = try container.decode(
+            Bool.self,
+            forKey: .notificationsEnabled
+        )
+        alertRules = try container.decode(
+            [MetricAlertRule].self,
+            forKey: .alertRules
+        )
+    }
 }
 
 enum MetricAlertValueSource: String, Codable, Equatable, Sendable {

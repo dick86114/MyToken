@@ -130,4 +130,142 @@ final class MenuBarCodeLayoutTests: XCTestCase {
             }
         }
     }
+
+    func test上下样式使用放大的粗体数值和固定宽度() {
+        let indicator = MenuBarIndicatorModel(
+            shortCode: "GLM",
+            percent: 68,
+            healthState: .warning,
+            accessibilityLabel: "GLM，已使用 68%",
+            content: .progress(68),
+            style: .stacked
+        )
+
+        XCTAssertEqual(
+            MenuBarMultiUsageIcon.codeFont(for: 3).pointSize,
+            7,
+            accuracy: 0.01
+        )
+        XCTAssertEqual(
+            MenuBarMultiUsageIcon.stackedValueFont.pointSize,
+            13,
+            accuracy: 0.01
+        )
+        XCTAssertTrue(
+            NSFontManager.shared.traits(of: MenuBarMultiUsageIcon.stackedValueFont)
+                .contains(.boldFontMask)
+        )
+        XCTAssertEqual(
+            MenuBarMultiUsageIcon.unitWidth(for: indicator),
+            MenuBarMultiUsageIcon.stackedProgressUnitWidth,
+            accuracy: 0.01
+        )
+    }
+
+    func test余额数字去掉描边并恢复粗体() {
+        let font = NSFont.monospacedSystemFont(ofSize: 8, weight: .bold)
+        let color = NSColor.systemOrange
+        let attributes = MenuBarMultiUsageIcon.balanceTextAttributes(
+            font: font,
+            color: color
+        )
+        let balanceFont = MenuBarMultiUsageIcon.balanceFont(for: "99")
+
+        XCTAssertNil(attributes[.strokeColor])
+        XCTAssertNil(attributes[.strokeWidth])
+        XCTAssertEqual(attributes[.foregroundColor] as? NSColor, color)
+        XCTAssertTrue(
+            NSFontManager.shared.traits(of: balanceFont)
+                .contains(.boldFontMask)
+        )
+        XCTAssertEqual(
+            MenuBarMultiUsageIcon.balanceTextMaximumWidth,
+            MenuBarMultiUsageIcon.balanceDiameter
+                - MenuBarMultiUsageIcon.indicatorStrokeWidth
+                - 4,
+            accuracy: 0.01
+        )
+    }
+
+    func test上下样式真实绘制为上下两行() throws {
+        let indicator = MenuBarIndicatorModel(
+            shortCode: "GLM",
+            percent: 68,
+            healthState: .warning,
+            accessibilityLabel: "GLM，已使用 68%",
+            content: .progress(68),
+            style: .stacked
+        )
+        let image = MenuBarMultiUsageIcon.image(indicators: [indicator])
+        let bitmap = try XCTUnwrap(
+            NSBitmapImageRep(data: XCTUnwrap(image.tiffRepresentation))
+        )
+        let scale = CGFloat(bitmap.pixelsWide)
+            / MenuBarMultiUsageIcon.imageWidth(for: [indicator])
+        let rowSegments = textRowSegments(in: bitmap)
+
+        XCTAssertEqual(rowSegments.count, 2)
+        let topHeight = rowSegments[0].upperBound - rowSegments[0].lowerBound
+        let bottomHeight = rowSegments[1].upperBound - rowSegments[1].lowerBound
+        let gap = rowSegments[1].lowerBound - rowSegments[0].upperBound
+
+        XCTAssertGreaterThan(
+            CGFloat(bottomHeight) / scale,
+            CGFloat(topHeight) / scale
+        )
+        XCTAssertEqual(
+            CGFloat(gap) / scale,
+            3,
+            accuracy: 1
+        )
+    }
+
+    private func textRowSegments(in bitmap: NSBitmapImageRep) -> [Range<Int>] {
+        var segments: [Range<Int>] = []
+        var start: Int?
+
+        for y in 0..<bitmap.pixelsHigh {
+            let hasContent = (0..<bitmap.pixelsWide).contains { x in
+                guard let color = bitmap.colorAt(x: x, y: y) else { return false }
+                return color.alphaComponent > 0.05
+            }
+            if hasContent, start == nil {
+                start = y
+            } else if !hasContent, let segmentStart = start {
+                segments.append(segmentStart..<y)
+                start = nil
+            }
+        }
+        if let start {
+            segments.append(start..<bitmap.pixelsHigh)
+        }
+        return segments
+    }
+
+    func test余额上下样式按货币文本宽度紧凑排布() throws {
+        let indicator = MenuBarIndicatorModel(
+            shortCode: "DS",
+            percent: nil,
+            healthState: .normal,
+            accessibilityLabel: "DeepSeek，余额 12.36 元",
+            balanceCurrencyText: "¥12",
+            content: .balance("12"),
+            style: .stacked
+        )
+        let image = MenuBarMultiUsageIcon.image(indicators: [indicator])
+        let bitmap = try XCTUnwrap(
+            NSBitmapImageRep(data: try XCTUnwrap(image.tiffRepresentation))
+        )
+
+        XCTAssertEqual(
+            MenuBarMultiUsageIcon.unitWidth(for: indicator),
+            MenuBarMultiUsageIcon.stackedBalanceUnitWidth(for: indicator),
+            accuracy: 0.01
+        )
+        XCTAssertLessThan(
+            MenuBarMultiUsageIcon.unitWidth(for: indicator),
+            MenuBarMultiUsageIcon.stackedProgressUnitWidth
+        )
+        XCTAssertEqual(textRowSegments(in: bitmap).count, 2)
+    }
 }

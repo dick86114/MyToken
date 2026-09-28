@@ -169,7 +169,8 @@ final class StatusBarController: NSObject {
             return MenuBarIndicatorModel.make(
                 state: state,
                 descriptor: descriptor,
-                metric: resolution.metric
+                metric: resolution.metric,
+                style: preferences.menuBarStyle
             )
         }
         if !selectedIndicators.isEmpty {

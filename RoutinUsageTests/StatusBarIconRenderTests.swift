@@ -234,4 +234,31 @@ final class StatusBarIconRenderTests: XCTestCase {
         XCTAssertLessThan(gapColor.alphaComponent, 0.8)
         XCTAssertFalse(colorMatches(gapColor, expected: rules.normalColor))
     }
+
+    func test上下百分比文字使用进度颜色规则() throws {
+        var rules = MenuBarColorRules.standard
+        rules.warningColor = .init(red: 0.9, green: 0.5, blue: 0.1)
+        let indicator = MenuBarIndicatorModel(
+            shortCode: "GLM",
+            percent: 60,
+            healthState: .warning,
+            accessibilityLabel: "GLM，已使用 60%",
+            content: .progress(60),
+            style: .stacked
+        )
+        let bitmap = try renderedBitmap(
+            MenuBarMultiUsageIcon.image(
+                indicators: [indicator],
+                colorRules: rules
+            )
+        )
+
+        XCTAssertTrue(
+            try containsColor(
+                in: bitmap,
+                contains: rules.warningColor,
+                tolerance: 0.08
+            )
+        )
+    }
 }

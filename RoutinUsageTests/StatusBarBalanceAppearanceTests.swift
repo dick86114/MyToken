@@ -76,7 +76,11 @@ final class StatusBarBalanceAppearanceTests: XCTestCase {
         XCTAssertTrue(progress.contains("indicatorBorderColor.setStroke()"))
         XCTAssertTrue(balance.contains("indicatorBorderColor.setStroke()"))
         XCTAssertFalse(balance.contains("statusColor.setStroke()"))
-        XCTAssertTrue(balance.contains(".foregroundColor: statusColor"))
+        XCTAssertTrue(balance.contains("balanceTextAttributes("))
+        XCTAssertTrue(balance.contains("color: statusColor"))
+        XCTAssertTrue(balance.contains(".foregroundColor: color"))
+        XCTAssertFalse(balance.contains(".strokeColor"))
+        XCTAssertFalse(balance.contains(".strokeWidth"))
     }
 
     private func renderedBitmap(_ image: NSImage) throws -> NSBitmapImageRep {

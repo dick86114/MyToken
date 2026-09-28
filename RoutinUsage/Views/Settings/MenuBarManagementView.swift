@@ -177,6 +177,7 @@ struct MenuBarManagementView: View {
                             state: state,
                             descriptor: descriptor,
                             metric: menuBarMetric(for: state),
+                            style: menuBarStyle(for: state),
                             colorRules: environment.settings.menuBarColorRules
                         )
                         .equatable()
@@ -368,6 +369,7 @@ struct MenuBarManagementView: View {
                     state: state,
                     descriptor: descriptor,
                     metric: menuBarMetric(for: state),
+                    style: menuBarStyle(for: state),
                     colorRules: environment.settings.menuBarColorRules
                 )
                 .equatable()
@@ -398,6 +400,7 @@ struct MenuBarManagementView: View {
             Spacer(minLength: 10)
 
             metricMenu(for: state)
+            styleMenu(for: state)
 
             Button {
                 setMenuBarMembership(isInMenuBar: !isInMenuBar, id: id)
@@ -490,6 +493,10 @@ struct MenuBarManagementView: View {
         menuBarResolution(for: state).metric
     }
 
+    private func menuBarStyle(for state: KeyUsageState) -> MenuBarIndicatorStyle {
+        environment.settings.usagePreferences(for: state.configuration.id).menuBarStyle
+    }
+
     private func menuBarResolution(for state: KeyUsageState) -> MenuBarMetricResolution {
         let id = state.configuration.id
         let preferences = environment.settings.usagePreferences(for: id)
@@ -552,6 +559,44 @@ struct MenuBarManagementView: View {
     private func setMenuBarMetric(_ metricID: String?, for id: UUID) {
         var preferences = environment.settings.usagePreferences(for: id)
         preferences.menuBarMetricID = metricID
+        environment.settings.setUsagePreferences(preferences, for: id)
+    }
+
+    private func styleMenu(for state: KeyUsageState) -> some View {
+        let metric = menuBarMetric(for: state)
+        let availableStyles = MenuBarIndicatorStyle.availableStyles(for: metric)
+        let storedStyle = menuBarStyle(for: state)
+        let selectedStyle = availableStyles.contains(storedStyle)
+            ? storedStyle
+            : availableStyles[0]
+
+        return Menu {
+            ForEach(availableStyles, id: \.self) { style in
+                Button {
+                    setMenuBarStyle(style, for: state.configuration.id)
+                } label: {
+                    if style == selectedStyle {
+                        Label(style.title(for: metric), systemImage: "checkmark")
+                    } else {
+                        Text(style.title(for: metric))
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: selectedStyle.systemImage(for: metric))
+                .font(.system(size: 14, weight: .medium))
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .help("菜单栏指标样式：\(selectedStyle.title(for: metric))")
+        .accessibilityLabel("菜单栏指标样式")
+    }
+
+    private func setMenuBarStyle(_ style: MenuBarIndicatorStyle, for id: UUID) {
+        var preferences = environment.settings.usagePreferences(for: id)
+        preferences.menuBarStyle = style
         environment.settings.setUsagePreferences(preferences, for: id)
     }
 

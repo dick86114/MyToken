@@ -14,6 +14,27 @@ final class MenuBarLabelViewTests: XCTestCase {
         XCTAssertEqual(MenuBarBalanceFormatter.compactText(Decimal(string: "-1500")), "-1k")
         XCTAssertEqual(MenuBarBalanceFormatter.compactText(nil), "--")
     }
+
+    func test余额紧凑货币文本包含币种且省略小数() {
+        XCTAssertEqual(
+            MenuBarBalanceFormatter.compactCurrencyText(
+                Decimal(string: "12.36"),
+                currencyCode: "CNY"
+            ),
+            "¥12"
+        )
+        XCTAssertEqual(
+            MenuBarBalanceFormatter.compactCurrencyText(
+                Decimal(string: "999"),
+                currencyCode: "$"
+            ),
+            "$999"
+        )
+        XCTAssertEqual(
+            MenuBarBalanceFormatter.compactCurrencyText(nil, currencyCode: "USD"),
+            "--"
+        )
+    }
     func test多指标悬停提示按凭证换行() {
         let indicators = [
             MenuBarIndicatorModel(

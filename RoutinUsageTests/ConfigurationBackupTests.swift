@@ -28,6 +28,7 @@ final class ConfigurationBackupTests: XCTestCase {
         )
         var preferences = CredentialUsagePreferences.defaultValue
         preferences.menuBarMetricID = "weekly"
+        preferences.menuBarStyle = .stacked
         settings.setUsagePreferences(preferences, for: id)
 
         let backup = try ConfigurationBackupService.makeBackup(
@@ -48,6 +49,10 @@ final class ConfigurationBackupTests: XCTestCase {
         XCTAssertEqual(decoded.settings.updateChannel, .direct)
         XCTAssertEqual(decoded.settings.displayOrder.menuBarCredentialIDs, [id])
         XCTAssertEqual(decoded.settings.credentialUsagePreferences[id.uuidString]?.menuBarMetricID, "weekly")
+        XCTAssertEqual(
+            decoded.settings.credentialUsagePreferences[id.uuidString]?.menuBarStyle,
+            .stacked
+        )
     }
 
     @MainActor
