@@ -236,6 +236,7 @@ struct CommandCodeUsageProvider: UsageProvider {
                 used: totalUsed,
                 limit: totalPool,
                 remaining: totalRemaining,
+                windowEnd: Self.date(subscription?.currentPeriodEnd),
                 healthState: health
             ),
             valueMetric(id: "credit-balance", label: "剩余额度", value: totalRemaining, health: health),
@@ -357,6 +358,7 @@ struct CommandCodeUsageProvider: UsageProvider {
         used: Decimal,
         limit: Decimal,
         remaining: Decimal,
+        windowEnd: Date? = nil,
         healthState: UsageMetricHealthState
     ) -> NormalizedUsageMetric {
         NormalizedUsageMetric(
@@ -366,6 +368,7 @@ struct CommandCodeUsageProvider: UsageProvider {
             limit: limit,
             remaining: remaining,
             unit: .currency,
+            windowEnd: windowEnd,
             presentation: .progress,
             semantic: .usedQuota,
             currencyCode: "$",

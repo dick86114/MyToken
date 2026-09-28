@@ -64,6 +64,7 @@ final class CommandCodeUsageProviderTests: XCTestCase {
         XCTAssertEqual(snapshot.metrics[0].label, "月")
         XCTAssertEqual(snapshot.metrics[0].limit, 93)
         XCTAssertEqual(snapshot.metrics[0].remaining, 55)
+        XCTAssertEqual(snapshot.metrics[0].windowEnd, formatter.date(from: periodEnd))
         XCTAssertEqual(snapshot.metrics[0].currencyCode, "$")
         XCTAssertEqual(snapshot.metrics[0].healthState, .normal)
         XCTAssertEqual(snapshot.metrics[1].value, 55)

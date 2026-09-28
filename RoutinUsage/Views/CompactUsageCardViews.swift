@@ -298,9 +298,7 @@ struct CompactMetricGaugeTile: View {
         ) ?? .normal
         let subtitle = CompactUsageCardPresentation.subtitle(
             for: metric,
-            now: now,
-            style: style,
-            rules: menuBarColorRules
+            now: now
         )
         Group {
             if style == .horizontal {

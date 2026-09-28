@@ -208,7 +208,7 @@ final class UsagePresentationPolicyTests: XCTestCase {
         XCTAssertTrue(lines.last?.highlights == true)
     }
 
-    func testCommandCode摘要卡保留请求次数并改为左右布局() throws {
+    func testCommandCode摘要卡保留请求次数并使用详情行() throws {
         let source = try String(
             contentsOf: URL(fileURLWithPath: #filePath)
                 .deletingLastPathComponent()
@@ -228,9 +228,30 @@ final class UsagePresentationPolicyTests: XCTestCase {
         XCTAssertTrue(source.contains("valueCell(layout.purchasedRemaining, fallbackLabel: \"购买剩余\")"))
         XCTAssertTrue(source.contains("valueCell(layout.freeRemaining, fallbackLabel: \"赠送剩余\")"))
         XCTAssertTrue(source.contains("Text(metric.label.isEmpty ? \"累计请求\" : metric.label)"))
-        XCTAssertTrue(source.contains("UsageFormatter.currencyText(metric.used, currencyCode: metric.currencyCode)"))
-        XCTAssertTrue(source.contains("UsageFormatter.currencyText(metric.remaining, currencyCode: metric.currencyCode)"))
+        XCTAssertTrue(source.contains("progressDetailStack(metric)"))
         XCTAssertTrue(source.contains("UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode)"))
+    }
+
+    func testCommandCode月卡片复用重置和剩余时长详情() throws {
+        let source = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage")
+                .appendingPathComponent("Views")
+                .appendingPathComponent("CommandCodeUsageMetricsView.swift"),
+            encoding: .utf8
+        )
+        let monthlyStart = try XCTUnwrap(source.range(of: "private func monthlyCell("))
+        let monthlyEnd = try XCTUnwrap(
+            source.range(
+                of: "private func requestCountCell(",
+                range: monthlyStart.lowerBound..<source.endIndex
+            )
+        )
+        let monthly = source[monthlyStart.lowerBound..<monthlyEnd.lowerBound]
+
+        XCTAssertTrue(monthly.contains("progressDetailStack(metric)"))
     }
 
     func testCommandCode金额四舍五入保留两位小数() {

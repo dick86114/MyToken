@@ -61,22 +61,10 @@ enum CompactUsageCardPresentation {
     static func subtitle(
         for metric: NormalizedUsageMetric,
         now: Date,
-        style: CompactGaugeStyle,
-        timeZone: TimeZone = .current,
-        rules: MenuBarColorRules = .standard
+        timeZone: TimeZone = .current
     ) -> String {
         if metric.presentation != .progress {
             return ""
-        }
-
-        let tone = metric.displayedPercent.map { UsageMetricPresentation.tone(for: $0, rules: rules) }
-        if style == .vertical {
-            if tone == .critical || metric.healthState == .critical {
-                return "即将耗尽"
-            }
-            if tone == .warning || metric.healthState == .warning {
-                return "用量偏高"
-            }
         }
 
         guard let windowEnd = metric.windowEnd else {

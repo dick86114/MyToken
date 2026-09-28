@@ -204,14 +204,7 @@ struct CommandCodeUsageMetricsView: View {
             VStack(alignment: .leading, spacing: 5) {
                 cellHeader(metric, fallbackLabel: fallbackLabel)
                 UsageMetricProgressBar(percent: metric.displayedPercent ?? 0)
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(CommandCodeMetricLayoutPolicy.progressDetailLines(for: metric, now: now), id: \.text) { line in
-                        Text(line.text)
-                            .foregroundStyle(line.highlights ? CompactPopoverPalette.positive(colorScheme) : Color.secondary)
-                    }
-                }
-                .font(.system(size: 10))
-                .monospacedDigit()
+                progressDetailStack(metric)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         } else {
@@ -225,14 +218,7 @@ struct CommandCodeUsageMetricsView: View {
             VStack(alignment: .leading, spacing: 5) {
                 cellHeader(metric, fallbackLabel: "月")
                 UsageMetricProgressBar(percent: metric.displayedPercent ?? 0)
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text("已用 \(UsageFormatter.currencyText(metric.used, currencyCode: metric.currencyCode))")
-                    Spacer(minLength: 12)
-                    Text("剩余 \(UsageFormatter.currencyText(metric.remaining, currencyCode: metric.currencyCode))")
-                }
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
+                progressDetailStack(metric)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         } else {
@@ -260,6 +246,27 @@ struct CommandCodeUsageMetricsView: View {
         } else {
             placeholderCell(label: "累计请求")
         }
+    }
+
+    private func progressDetailStack(_ metric: NormalizedUsageMetric) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(
+                CommandCodeMetricLayoutPolicy.progressDetailLines(
+                    for: metric,
+                    now: now
+                ),
+                id: \.text
+            ) { line in
+                Text(line.text)
+                    .foregroundStyle(
+                        line.highlights
+                            ? CompactPopoverPalette.positive(colorScheme)
+                            : Color.secondary
+                    )
+            }
+        }
+        .font(.system(size: 10))
+        .monospacedDigit()
     }
 
     @ViewBuilder

@@ -103,19 +103,19 @@ final class CompactUsageCardPresentationTests: XCTestCase {
 
         let zone = TimeZone(secondsFromGMT: 8 * 3600)!
         XCTAssertEqual(
-            CompactUsageCardPresentation.subtitle(for: sameDay, now: now, style: .horizontal, timeZone: zone),
+            CompactUsageCardPresentation.subtitle(for: sameDay, now: now, timeZone: zone),
             "重置 17:22"
         )
         XCTAssertEqual(
-            CompactUsageCardPresentation.subtitle(for: nextDay, now: now, style: .vertical, timeZone: zone),
+            CompactUsageCardPresentation.subtitle(for: nextDay, now: now, timeZone: zone),
             "09-28 00:00"
         )
         XCTAssertEqual(
-            CompactUsageCardPresentation.subtitle(for: warning, now: now, style: .vertical, timeZone: zone),
-            "用量偏高"
+            CompactUsageCardPresentation.subtitle(for: warning, now: now, timeZone: zone),
+            "09-24 18:29"
         )
         XCTAssertEqual(
-            CompactUsageCardPresentation.subtitle(for: idle, now: now, style: .horizontal, timeZone: zone),
+            CompactUsageCardPresentation.subtitle(for: idle, now: now, timeZone: zone),
             "待命中"
         )
     }
