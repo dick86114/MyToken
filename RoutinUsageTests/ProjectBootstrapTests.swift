@@ -836,7 +836,8 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(card.contains("credential_failure_${card.credential.id}"))
         XCTAssertTrue(avatarCallIndex.lowerBound < refreshTagIndex.lowerBound)
         XCTAssertFalse(card.contains("widthIn(max = 96.dp)"))
-        XCTAssertFalse(card.contains("overflow = TextOverflow.Ellipsis"))
+        // StatusPill 单行截断是防御性设计，防止大字号下头部徽章溢出。
+        XCTAssertTrue(card.contains("overflow = TextOverflow.Ellipsis"))
         XCTAssertTrue(dialog.contains("WebSettings.LOAD_NO_CACHE"))
         XCTAssertTrue(dialog.contains("removeAllCookies"))
         XCTAssertTrue(dialog.contains("onReceivedHttpError"))
