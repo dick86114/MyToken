@@ -209,19 +209,6 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.weight(1f))
 
                         IconButton(
-                            onClick = onLoadReleaseHistory,
-                            modifier = Modifier
-                                .size(44.dp)
-                                .testTag("release_notes_refresh_button"),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Refresh,
-                                contentDescription = "获取当前版本日志",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-
-                        IconButton(
                             onClick = {
                                 uriHandler.openUri(
                                     currentRelease?.releaseUrl
@@ -241,21 +228,21 @@ fun SettingsScreen(
                     }
                     Spacer(modifier = Modifier.height(14.dp))
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     CurrentReleaseNotesSection(
                         state = releaseHistoryState,
                         currentVersion = appVersion,
                         onRetry = onLoadReleaseHistory,
                         onShowHistory = { showReleaseHistory = true },
                     )
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     UpdateChannelSection(
                         mirrorBase = state.update.mirrorBase,
                         onMirrorBaseChange = onMirrorBaseChange,
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     UpdateSection(
                         state = updateState,
                         currentVersion = appVersion,
@@ -297,6 +284,19 @@ private fun CurrentReleaseNotesSection(
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            IconButton(
+                onClick = onRetry,
+                modifier = Modifier
+                    .size(28.dp)
+                    .testTag("release_notes_refresh_button"),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Refresh,
+                    contentDescription = "获取当前版本日志",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Spacer(modifier = Modifier.weight(1f))
             IconButton(
                 onClick = onShowHistory,
@@ -738,16 +738,15 @@ private fun UpdateChannelSection(
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        SingleChoiceSegmentedButtonRow(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("update_channel_selector"),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            SegmentedButton(
+            FilterChip(
                 selected = mirrorBase.isEmpty(),
                 onClick = { onMirrorBaseChange("") },
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                icon = {},
                 label = {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -761,16 +760,16 @@ private fun UpdateChannelSection(
                         Text("GitHub")
                     }
                 },
+                colors = glassFilterChipColors(selected = mirrorBase.isEmpty()),
+                border = glassFilterChipBorder(selected = mirrorBase.isEmpty()),
             )
-            SegmentedButton(
+            FilterChip(
                 selected = mirrorBase.isNotEmpty(),
                 onClick = {
                     if (mirrorBase.isEmpty()) {
                         onMirrorBaseChange(DEFAULT_UPDATE_CDN_BASES.first())
                     }
                 },
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                icon = {},
                 label = {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -784,6 +783,8 @@ private fun UpdateChannelSection(
                         Text("CDN")
                     }
                 },
+                colors = glassFilterChipColors(selected = mirrorBase.isNotEmpty()),
+                border = glassFilterChipBorder(selected = mirrorBase.isNotEmpty()),
             )
         }
         if (mirrorBase.isNotEmpty()) {
