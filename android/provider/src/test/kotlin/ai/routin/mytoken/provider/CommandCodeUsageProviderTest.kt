@@ -96,6 +96,7 @@ class CommandCodeUsageProviderTest {
         assertEquals(UsageMetricUnit.Currency, monthly.unit)
         assertEquals(UsageMetricPresentation.Progress, monthly.presentation)
         assertEquals(UsageMetricSemantic.UsedQuota, monthly.semantic)
+        assertEquals(Instant.parse("2026-10-01T00:00:00Z"), monthly.windowEnd)
 
         val fiveHour = snapshot.metrics.single { it.id == "five-hour" }
         assertEquals(0, fiveHour.used!!.compareTo(BigDecimal("7")))

@@ -176,6 +176,7 @@ class CommandCodeUsageProvider(
                     presentation = UsageMetricPresentation.Progress,
                     semantic = UsageMetricSemantic.UsedQuota,
                     currencyCode = "$",
+                    windowEnd = subscription?.stringOrNull("currentPeriodEnd")?.let(Instant::parse),
                     healthState = health,
                 )
             )
