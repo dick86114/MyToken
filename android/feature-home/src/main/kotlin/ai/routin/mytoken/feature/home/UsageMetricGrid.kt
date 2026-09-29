@@ -536,7 +536,11 @@ internal fun NewAPIMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modi
 
 @Composable
 private fun TokenCell(metric: UsageMetric, cost: UsageMetric?, modifier: Modifier = Modifier) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
         Text(metric.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(formatGrouped(metric.value), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         Text("≈ ${formatCurrency(cost?.value, cost?.currencyCode)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -649,6 +653,13 @@ private fun CommandCodeMonthlyMetric(
             )
             Text(
                 text = "剩余 ${formatCurrency(metric.remaining, metric.currencyCode)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        metric.windowEnd?.let { end ->
+            Text(
+                text = formatResetTime(end),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

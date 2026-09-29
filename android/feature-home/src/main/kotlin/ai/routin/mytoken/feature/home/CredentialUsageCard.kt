@@ -569,6 +569,8 @@ private fun CompactUsageCardBody(card: CredentialCardUi, isDark: Boolean) {
                             } else {
                                 toneColor
                             },
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 }
@@ -681,7 +683,7 @@ private fun BalanceStrip(metric: UsageMetric, isDark: Boolean) {
 
 private fun ringSubtitle(metric: UsageMetric, vertical: Boolean): String {
     val end = metric.windowEnd ?: return if ((progressPercent(metric) ?: 0.0) <= 0.0) "待命中" else "--"
-    return "重置 ${formatResetTime(end)}"
+    return formatResetTime(end)
 }
 
 @Composable

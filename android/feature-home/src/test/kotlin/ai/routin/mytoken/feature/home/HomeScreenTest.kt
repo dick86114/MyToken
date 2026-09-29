@@ -166,7 +166,7 @@ class HomeScreenTest {
 
         composeRule.onNodeWithText("即将耗尽", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithText("用量偏高", useUnmergedTree = true).assertDoesNotExist()
-        composeRule.onAllNodesWithText("重置", substring = true, useUnmergedTree = true)
+        composeRule.onAllNodesWithText(formatResetTime(resetAt), substring = true, useUnmergedTree = true)
             .onFirst()
             .assertIsDisplayed()
     }
