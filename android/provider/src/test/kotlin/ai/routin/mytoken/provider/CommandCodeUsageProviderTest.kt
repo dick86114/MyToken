@@ -21,6 +21,7 @@ import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 
@@ -121,6 +122,37 @@ class CommandCodeUsageProviderTest {
         assertEquals(2, transport.requests.count { it.url.contains("/alpha/whoami") })
         assertEquals(2, transport.requests.count { it.url.contains("/alpha/usage/summary") })
         assertEquals(1, transport.requests.count { it.url.contains("/provider/v1/models") })
+    }
+
+    @Test
+    fun fetchUsageIgnoresInvalidEpochZeroWindowReset() = runTest {
+        val transport = HttpTransport { request ->
+            val body = when (request.url.substringBefore("?")) {
+                "https://api.commandcode.ai/alpha/whoami" ->
+                    """{"success":true,"org":{"id":"org-1"},"user":{"id":"u1"}}"""
+                "https://api.commandcode.ai/alpha/billing/credits" ->
+                    """{"credits":{"planId":"individual-goat","monthlyCredits":42},"windowLimits":{"limited":true,"fiveHour":{"used":0,"cap":16,"resetAt":0},"weekly":{"used":1,"cap":16,"resetAt":1789646400000}}}"""
+                "https://api.commandcode.ai/alpha/billing/subscriptions" ->
+                    """{"data":{"planId":"individual-goat","status":"active","currentPeriodStart":"2026-09-01T00:00:00Z","currentPeriodEnd":"2026-10-01T00:00:00Z"}}"""
+                "https://api.commandcode.ai/alpha/usage/summary" ->
+                    """{"totalCost":0,"totalCount":0}"""
+                "https://api.commandcode.ai/provider/v1/models" ->
+                    """{"object":"list","data":[]}"""
+                else -> error("unexpected url: ${request.url}")
+            }
+            ProviderHttpResponse(200, body.toByteArray())
+        }
+        val provider = CommandCodeUsageProvider(transport, fixedClock)
+
+        val snapshot = provider.fetchUsage(
+            credential(),
+            CredentialSecret.BearerToken("cmd-token"),
+        ).getOrThrow()
+
+        val fiveHour = snapshot.metrics.single { it.id == "five-hour" }
+        assertNull(fiveHour.windowEnd)
+        val weekly = snapshot.metrics.single { it.id == "weekly" }
+        assertEquals(Instant.parse("2026-09-17T12:00:00Z"), weekly.windowEnd)
     }
 
     @Test
