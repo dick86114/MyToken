@@ -317,6 +317,29 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `re-enabling a disabled credential triggers automatic refresh`() = runTest {
+        val credential = credential("RE-ENABLED", ProviderId.Routin)
+        addCredential(credential.copy(isEnabled = false))
+        providers[ProviderId.Routin] = FakeUsageProvider(
+            ProviderId.Routin,
+            Result.success(snapshot(credential.id, balanceMetric(20.0))),
+        )
+
+        val vm = viewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        vm.refreshAll()
+        advanceUntilIdle()
+        assertEquals(RefreshStatus.Disabled, vm.state.value.groups.single().cards.single().status)
+
+        repository.credentials[credential.id] = credential.copy(isEnabled = true)
+        repository.emit()
+        advanceUntilIdle()
+
+        assertEquals(RefreshStatus.Ready, vm.state.value.groups.single().cards.single().status)
+        assertNotNull(vm.state.value.groups.single().cards.single().snapshot)
+    }
+
+    @Test
     fun `refresh retries once when enabled and failure can recover`() = runTest {
         val credential = credential("RETRY", ProviderId.Routin)
         addCredential(credential)

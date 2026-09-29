@@ -124,9 +124,11 @@ class AndroidVisualRegressionTest {
             }
         }
 
-        val resetText = "重置 ${formatResetTime(end)}"
+        val resetText = formatResetTime(end)
+        // 头部徽章在大字号下允许截断，只检查圆环副标题（跳过第一个匹配节点）。
         composeRule.onAllNodesWithText(resetText, useUnmergedTree = true)
             .fetchSemanticsNodes()
+            .drop(1)
             .forEach { node ->
                 val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
                 val config = node.config

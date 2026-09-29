@@ -28,8 +28,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
@@ -156,6 +158,7 @@ class HomeViewModel(
     /** Credential IDs whose refresh is currently in flight (guarded by [inFlightMutex]). */
     private val inFlight = mutableSetOf<UUID>()
     private val inFlightMutex = Mutex()
+    private val lastKnownEnabled = mutableMapOf<UUID, Boolean>()
 
     /** Atomically claims [id]; returns false when a refresh for it is already running. */
     private suspend fun tryBeginRefresh(id: UUID): Boolean = inFlightMutex.withLock {
@@ -185,6 +188,33 @@ class HomeViewModel(
             if (refreshOnStart) {
                 refreshAll(retryOnFailure)
             }
+        }
+        // Re-enabled credentials auto-refresh: the credential page toggles
+        // isEnabled but nobody triggers a network round trip on the way back.
+        viewModelScope.launch {
+            var initial = true
+            orderedCredentialsFlow
+                .map { credentials -> credentials.associate { it.id to it.isEnabled } }
+                .distinctUntilChanged()
+                .collect { enabledMap ->
+                    val previous = lastKnownEnabled.toMap()
+                    lastKnownEnabled.putAll(enabledMap)
+                    if (initial) {
+                        initial = false
+                        return@collect
+                    }
+                    val reEnabledIds = enabledMap
+                        .filter { (id, enabled) -> enabled && previous[id] == false }
+                        .keys
+                    if (reEnabledIds.isEmpty()) return@collect
+                    val reEnabled = repository.observeCredentials().first()
+                        .filter { it.id in reEnabledIds }
+                    reEnabled.forEach { credential ->
+                        launch {
+                            refreshCredentialAndAwait(credential)
+                        }
+                    }
+                }
         }
     }
 
