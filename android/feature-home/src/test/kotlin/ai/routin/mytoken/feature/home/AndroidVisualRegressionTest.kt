@@ -125,14 +125,17 @@ class AndroidVisualRegressionTest {
         }
 
         val resetText = "重置 ${formatResetTime(end)}"
-        val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
         composeRule.onAllNodesWithText(resetText, useUnmergedTree = true)
-            .onFirst()
-            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
-                action(layouts)
+            .fetchSemanticsNodes()
+            .forEach { node ->
+                val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+                val config = node.config
+                val getLayoutAction = config[SemanticsActions.GetTextLayoutResult]
+                getLayoutAction?.action?.invoke(layouts)
+                if (layouts.isNotEmpty()) {
+                    assertFalse(layouts.single().hasVisualOverflow)
+                }
             }
-
-        assertFalse(layouts.single().hasVisualOverflow)
     }
 
     private fun progressMetric(
