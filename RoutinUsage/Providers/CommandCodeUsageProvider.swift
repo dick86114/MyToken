@@ -478,7 +478,7 @@ struct CommandCodeUsageProvider: UsageProvider {
     }
 
     private static func date(fromMilliseconds value: Double?) -> Date? {
-        guard let value else { return nil }
+        guard let value, value > 0 else { return nil }
         return Date(timeIntervalSince1970: value / 1_000)
     }
 }

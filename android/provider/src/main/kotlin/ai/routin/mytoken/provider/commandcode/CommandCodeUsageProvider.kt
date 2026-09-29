@@ -228,7 +228,7 @@ class CommandCodeUsageProvider(
             limit = cap,
             remaining = (cap - used).max(BigDecimal.ZERO),
             unit = UsageMetricUnit.Currency,
-            windowEnd = data.longOrNull("resetAt")?.let(Instant::ofEpochMilli),
+            windowEnd = data.longOrNull("resetAt")?.takeIf { it > 0 }?.let(Instant::ofEpochMilli),
             presentation = UsageMetricPresentation.Progress,
             semantic = UsageMetricSemantic.UsedQuota,
             currencyCode = "$",

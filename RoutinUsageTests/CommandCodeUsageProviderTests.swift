@@ -102,6 +102,53 @@ final class CommandCodeUsageProviderTests: XCTestCase {
         XCTAssertNotNil(requests.request(path: "/provider/v1/models"))
     }
 
+    func test五小时重置时间为零时忽略无效纪元时间() async throws {
+        let now = Date(timeIntervalSince1970: 1_789_000_000)
+        let weeklyReset = Int64((now.addingTimeInterval(86_400)).timeIntervalSince1970 * 1_000)
+        let stub = URLProtocolStub.makeSession { request in
+            let path = request.url?.path ?? ""
+            let body: String
+            switch path {
+            case "/alpha/whoami":
+                body = #"{"success":true,"user":{"id":"user-1"},"org":{"id":"org-1"}}"#
+            case "/alpha/billing/credits":
+                body = """
+                {"credits":{"planId":"individual-goat","monthlyCredits":42},"windowLimits":{"limited":true,"fiveHour":{"used":0,"cap":16,"resetAt":0},"weekly":{"used":1,"cap":16,"resetAt":\(weeklyReset)}}}
+                """
+            case "/alpha/billing/subscriptions":
+                body = #"{"data":{"planId":"individual-goat","status":"active","currentPeriodStart":"2026-09-01T00:00:00Z","currentPeriodEnd":"2026-10-01T00:00:00Z"}}"#
+            case "/alpha/usage/summary":
+                body = #"{"totalCost":0,"totalCount":0}"#
+            case "/provider/v1/models":
+                body = #"{"object":"list","data":[]}"#
+            default:
+                XCTFail("意外请求：\(path)")
+                body = "{}"
+            }
+            let response = try XCTUnwrap(HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            ))
+            return (response, Data(body.utf8))
+        }
+        let provider = CommandCodeUsageProvider(session: stub.session)
+        let credential = ProviderCredential(
+            providerID: .commandCode,
+            kind: .bearerAPIKey,
+            secret: "cmd-api-key"
+        )
+
+        let fetched = try await provider.fetchUsage(credential, now: now)
+        let snapshot = try XCTUnwrap(fetched)
+
+        let fiveHour = try XCTUnwrap(snapshot.metrics.first { $0.id == "five-hour" })
+        XCTAssertNil(fiveHour.windowEnd)
+        let weekly = try XCTUnwrap(snapshot.metrics.first { $0.id == "weekly" })
+        XCTAssertEqual(weekly.windowEnd, now.addingTimeInterval(86_400))
+    }
+
     func test缓存模型与周期后第二次刷新复用低频请求() async throws {
         let requests = RequestRecorder()
         let stub = URLProtocolStub.makeSession { request in

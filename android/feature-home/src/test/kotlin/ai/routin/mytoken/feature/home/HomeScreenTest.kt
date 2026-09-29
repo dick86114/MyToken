@@ -5,6 +5,7 @@ import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.model.CredentialKind
 import ai.routin.mytoken.domain.model.ProviderId
+import ai.routin.mytoken.domain.model.UsageCardDensity
 import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
@@ -124,6 +125,87 @@ class HomeScreenTest {
         composeRule.onNodeWithText("Routin · 成长版").assertIsDisplayed()
         composeRule.onAllNodesWithText("已用", substring = true, useUnmergedTree = true).onFirst().assertIsDisplayed()
         composeRule.onAllNodesWithText("剩余", substring = true, useUnmergedTree = true).onFirst().assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h1100dp")
+    fun highUsageCardShowsResetTimeInsteadOfEmotionalCopy() {
+        val resetAt = now.plusSeconds(3_600)
+        fun urgentMetric(id: String, label: String) = UsageMetric(
+            id = id,
+            label = label,
+            used = BigDecimal.valueOf(95),
+            limit = BigDecimal.valueOf(100),
+            remaining = BigDecimal.valueOf(5),
+            unit = UsageMetricUnit.Currency,
+            windowEnd = resetAt,
+            presentation = UsageMetricPresentation.Progress,
+            semantic = UsageMetricSemantic.UsedQuota,
+            currencyCode = "USD",
+            healthState = UsageMetricHealthState.Normal,
+        )
+        val credential = credential("高用量")
+        val testCard = card(
+            credential,
+            metrics = listOf(
+                urgentMetric("five-hour", "5 小时"),
+                urgentMetric("weekly", "周"),
+                urgentMetric("monthly", "月"),
+            ),
+        )
+        composeRule.setContent {
+            MaterialTheme {
+                CredentialUsageCard(
+                    testCard,
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.COMPACT,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("即将耗尽", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithText("用量偏高", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onAllNodesWithText("重置", substring = true, useUnmergedTree = true)
+            .onFirst()
+            .assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h1100dp")
+    fun balanceStripShowsResetTimeInsteadOfHealthCopy() {
+        val resetAt = now.plusSeconds(86_400)
+        val credential = credential("余额账户", ProviderId.DeepSeek)
+        val balanceMetric = UsageMetric(
+            id = "balance",
+            label = "余额",
+            value = BigDecimal.valueOf(38.42),
+            unit = UsageMetricUnit.Currency,
+            windowEnd = resetAt,
+            presentation = UsageMetricPresentation.Balance,
+            semantic = UsageMetricSemantic.Balance,
+            currencyCode = "CNY",
+            healthState = UsageMetricHealthState.Normal,
+        )
+        val testCard = card(credential, metrics = listOf(balanceMetric))
+        composeRule.setContent {
+            MaterialTheme {
+                CredentialUsageCard(
+                    testCard,
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.COMPACT,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("余额账户").assertExists()
+        composeRule.onNodeWithText("充足", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithText("偏低", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithText("不足", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onAllNodesWithText("重置", substring = true, useUnmergedTree = true)
+            .onFirst()
+            .assertExists()
     }
 
     @Test

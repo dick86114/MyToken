@@ -9,6 +9,7 @@ import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import ai.routin.mytoken.domain.model.UsageMetricUnit
+import java.time.Instant
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -63,6 +64,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.testTag
@@ -287,10 +289,11 @@ private fun CredentialCardHeader(
     onRefresh: () -> Unit,
 ) {
     val metrics = card.snapshot?.metrics.orEmpty()
-    val nearlyExhausted = metrics.any { metric ->
-        val percent = progressPercent(metric)
-        (percent != null && percent >= 80.0) || metric.healthState == UsageMetricHealthState.Critical
-    }
+    val nearestReset = metrics
+        .filter { it.presentation == UsageMetricPresentation.Progress }
+        .mapNotNull { it.windowEnd }
+        .filter { it.isAfter(Instant.now()) }
+        .minOrNull()
 
     Row(verticalAlignment = Alignment.CenterVertically) {
         AvatarWithFailureBadge(card = card, isDark = isDark, onClick = onShowFailure)
@@ -306,8 +309,12 @@ private fun CredentialCardHeader(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
-                if (nearlyExhausted) {
-                    StatusPill(text = "即将耗尽", color = statusColors().critical, isDark = isDark)
+                if (nearestReset != null) {
+                    StatusPill(
+                        text = formatResetTime(nearestReset),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        isDark = isDark,
+                    )
                 }
             }
             Text(
@@ -451,6 +458,8 @@ private fun StatusPill(text: String, color: Color, isDark: Boolean) {
         text = text,
         style = MaterialTheme.typography.labelSmall,
         fontWeight = FontWeight.SemiBold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
         color = color,
         modifier = Modifier
             .padding(start = 6.dp)
@@ -605,11 +614,7 @@ private fun Modifier.ringTileBackground(isDark: Boolean, tone: UsageMetricTone):
 private fun BalanceStrip(metric: UsageMetric, isDark: Boolean) {
     val colors = statusColors()
     val statusColor = statusColor(metric, null, colors)
-    val statusText = when (metric.healthState) {
-        UsageMetricHealthState.Warning -> "偏低"
-        UsageMetricHealthState.Critical, UsageMetricHealthState.Unavailable -> "不足"
-        else -> "充足"
-    }
+    val resetText = metric.windowEnd?.let { "重置 ${formatResetTime(it)}" }
 
     Box(
         modifier = Modifier
@@ -667,17 +672,14 @@ private fun BalanceStrip(metric: UsageMetric, isDark: Boolean) {
                     color = statusColor(metric, null, colors),
                 )
             }
-            StatusPill(text = statusText, color = statusColor, isDark = isDark)
+            if (resetText != null) {
+                StatusPill(text = resetText, color = statusColor, isDark = isDark)
+            }
         }
     }
 }
 
 private fun ringSubtitle(metric: UsageMetric, vertical: Boolean): String {
-    val tone = CompactUsageCardPresentation.tone(metric)
-    if (vertical && metric.presentation == UsageMetricPresentation.Progress) {
-        if (tone == UsageMetricTone.Critical) return "即将耗尽"
-        if (tone == UsageMetricTone.Warning) return "用量偏高"
-    }
     val end = metric.windowEnd ?: return if ((progressPercent(metric) ?: 0.0) <= 0.0) "待命中" else "--"
     return "重置 ${formatResetTime(end)}"
 }
