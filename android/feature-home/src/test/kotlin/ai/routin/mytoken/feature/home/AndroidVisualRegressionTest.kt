@@ -22,7 +22,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.Density
 import java.math.BigDecimal
@@ -82,6 +82,7 @@ class AndroidVisualRegressionTest {
     @Config(qualifiers = "w240dp-h640dp")
     fun 窄屏简洁卡片完整展示长重置信息() {
         val end = Instant.now().plus(Duration.ofDays(365))
+        val expiry = Instant.now().plus(Duration.ofDays(45))
         val metrics = listOf(
             progressMetric("fiveHour", "5 小时", end),
             progressMetric("weekly", "周", end),
@@ -99,6 +100,7 @@ class AndroidVisualRegressionTest {
                 fetchedAt = Instant.now(),
                 metrics = metrics,
                 planName = "长周期套餐",
+                subscriptionEndAt = expiry,
             ),
             isStale = false,
             error = null,
@@ -125,10 +127,9 @@ class AndroidVisualRegressionTest {
         }
 
         val resetText = formatResetTime(end)
-        // 头部徽章在大字号下允许截断，只检查圆环副标题（跳过第一个匹配节点）。
+        composeRule.onNodeWithText("到期 ${formatSubscriptionTime(expiry)}").assertExists()
         composeRule.onAllNodesWithText(resetText, useUnmergedTree = true)
             .fetchSemanticsNodes()
-            .drop(1)
             .forEach { node ->
                 val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
                 val config = node.config

@@ -79,6 +79,16 @@ class HomeScreenTest {
         healthState = UsageMetricHealthState.Normal,
     )
 
+    private fun token(id: String, label: String, value: Double) = UsageMetric(
+        id = id,
+        label = label,
+        value = BigDecimal.valueOf(value),
+        unit = UsageMetricUnit.Token,
+        presentation = UsageMetricPresentation.Value,
+        semantic = UsageMetricSemantic.UsedQuota,
+        healthState = UsageMetricHealthState.Normal,
+    )
+
     private fun card(
         credential: Credential,
         status: RefreshStatus = RefreshStatus.Ready,
@@ -100,6 +110,36 @@ class HomeScreenTest {
         isCollapsed = false,
         cards = cards,
     )
+
+    @Test
+    fun newApiTokenColumnsAreCenteredInTheirCells() {
+        composeRule.setContent {
+            MaterialTheme {
+                NewAPIMetrics(
+                    metrics = listOf(
+                        token("today-token", "今日 Token", 14_873_680.0),
+                        token("one-day-token", "近 24 小时 Token", 15_123_456.0),
+                        token("seven-day-token", "近 7 天 Token", 139_735_349.0),
+                        token("thirty-day-token", "近 30 天 Token", 1_100_848_403.0),
+                    ),
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        val rootBounds = composeRule.onRoot().getUnclippedBoundsInRoot()
+        fun centerRatio(label: String): Float {
+            val bounds = composeRule.onNodeWithText(label).getUnclippedBoundsInRoot()
+            return (bounds.left + bounds.right) / 2f / (rootBounds.right - rootBounds.left)
+        }
+
+        assertEquals(0.25f, centerRatio("今日 Token"), 0.015f)
+        assertEquals(0.25f, centerRatio("14,873,680"), 0.015f)
+        assertEquals(0.75f, centerRatio("近 24 小时 Token"), 0.015f)
+        assertEquals(0.75f, centerRatio("15,123,456"), 0.015f)
+        assertEquals(0.25f, centerRatio("近 7 天 Token"), 0.015f)
+        assertEquals(0.75f, centerRatio("近 30 天 Token"), 0.015f)
+    }
 
     @Test
     fun showsStandardCardWithMacStyleFields() {
@@ -168,6 +208,30 @@ class HomeScreenTest {
         composeRule.onNodeWithText("用量偏高", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onAllNodesWithText(formatResetTime(resetAt), substring = true, useUnmergedTree = true)
             .onFirst()
+            .assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h1100dp")
+    fun highUsageCardHeaderShowsSubscriptionExpiry() {
+        val resetAt = now.plusSeconds(3_600)
+        val credential = credential("高用量")
+        val testCard = card(
+            credential,
+            metrics = listOf(progress(used = 95.0, limit = 100.0).copy(id = "five-hour", windowEnd = resetAt)),
+        )
+        composeRule.setContent {
+            MaterialTheme {
+                CredentialUsageCard(
+                    testCard,
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.COMPACT,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("到期 ${formatSubscriptionTime(now.plusSeconds(86_400))}")
             .assertIsDisplayed()
     }
 

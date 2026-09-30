@@ -9,7 +9,6 @@ import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import ai.routin.mytoken.domain.model.UsageMetricUnit
-import java.time.Instant
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -288,12 +287,7 @@ private fun CredentialCardHeader(
     onShare: () -> Unit,
     onRefresh: () -> Unit,
 ) {
-    val metrics = card.snapshot?.metrics.orEmpty()
-    val nearestReset = metrics
-        .filter { it.presentation == UsageMetricPresentation.Progress }
-        .mapNotNull { it.windowEnd }
-        .filter { it.isAfter(Instant.now()) }
-        .minOrNull()
+    val subscriptionExpiry = card.snapshot?.subscriptionEndAt
 
     Row(verticalAlignment = Alignment.CenterVertically) {
         AvatarWithFailureBadge(card = card, isDark = isDark, onClick = onShowFailure)
@@ -309,9 +303,9 @@ private fun CredentialCardHeader(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
-                if (nearestReset != null) {
+                if (subscriptionExpiry != null) {
                     StatusPill(
-                        text = formatResetTime(nearestReset),
+                        text = "到期 ${formatSubscriptionTime(subscriptionExpiry)}",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         isDark = isDark,
                     )
