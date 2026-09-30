@@ -436,6 +436,31 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `xiaomi retry treats cookie reader failure as failed`() = runTest {
+        val credential = credential("MIMO", ProviderId.Xiaomi).copy(
+            credentialKind = CredentialKind.BearerApiKey,
+            metadata = mapOf(ai.routin.mytoken.domain.model.CredentialMetadataKey.UsageKind to "api"),
+        )
+        addXiaomiCredential(credential)
+        val provider = FakeUsageProvider(
+            ProviderId.Xiaomi,
+            Result.success(snapshot(credential.id, balanceMetric(12.0))),
+        )
+        providers[ProviderId.Xiaomi] = provider
+
+        val vm = viewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        val result = vm.retryCredentialAndAwait(credential) {
+            throw IllegalStateException("CookieManager unavailable")
+        }
+        advanceUntilIdle()
+
+        assertEquals(CredentialRetryResult.Failed, result)
+        assertEquals(0, provider.fetchCalls)
+        assertEquals("old-cookie", (repository.secrets[credential.id] as CredentialSecret.BearerToken).token)
+    }
+
+    @Test
     fun `refreshOnStart triggers initial refresh`() = runTest {
         val credential = credential("RT-1", ProviderId.Routin)
         addCredential(credential)

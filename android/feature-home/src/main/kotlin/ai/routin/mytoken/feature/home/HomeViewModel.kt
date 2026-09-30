@@ -324,7 +324,13 @@ class HomeViewModel(
             return CredentialRetryResult.Completed
         }
 
-        val cookie = cookieReader()?.trim().orEmpty()
+        val cookie = try {
+            cookieReader()?.trim().orEmpty()
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
+        } catch (_: Throwable) {
+            return CredentialRetryResult.Failed
+        }
         if (cookie.isEmpty()) {
             return CredentialRetryResult.NeedsLogin
         }
