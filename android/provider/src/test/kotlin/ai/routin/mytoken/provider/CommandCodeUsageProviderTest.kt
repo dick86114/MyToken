@@ -107,6 +107,8 @@ class CommandCodeUsageProviderTest {
             assertFalse(request.url.contains("orgId="))
             assertEquals("Bearer cmd-token", request.headers["Authorization"])
         }
+        val subscriptions = transport.requests.first { it.url.contains("/alpha/billing/subscriptions") }
+        assertEquals<Int?>(30_000, subscriptions.timeoutMillis)
         assertTrue(
             transport.requests.any { it.url == "https://api.commandcode.ai/provider/v1/models" },
         )

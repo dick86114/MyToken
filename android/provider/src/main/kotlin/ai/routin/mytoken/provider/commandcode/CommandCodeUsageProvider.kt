@@ -86,7 +86,12 @@ class CommandCodeUsageProvider(
             requestResult("/alpha/billing/credits", token, query = mapOf("orgId" to cached.orgId))
         }
         val subscriptionsRequest = async {
-            requestResult("/alpha/billing/subscriptions", token, query = mapOf("orgId" to cached.orgId))
+            requestResult(
+                "/alpha/billing/subscriptions",
+                token,
+                query = mapOf("orgId" to cached.orgId),
+                timeoutMillis = SUBSCRIPTION_TIMEOUT_MILLIS,
+            )
         }
         val modelsRequest = async {
             fetchAllowedModels(cacheKey, token, now)
@@ -112,7 +117,12 @@ class CommandCodeUsageProvider(
             creditsRequest.cancel()
             subscriptionsRequest.cancel()
             requestObject("/alpha/billing/credits", token, query = mapOf("orgId" to actualOrgID)) to
-                requestObject("/alpha/billing/subscriptions", token, query = mapOf("orgId" to actualOrgID))
+                requestObject(
+                    "/alpha/billing/subscriptions",
+                    token,
+                    query = mapOf("orgId" to actualOrgID),
+                    timeoutMillis = SUBSCRIPTION_TIMEOUT_MILLIS,
+                )
         }
         val creditsRoot = creditsPair.first
         val creditsData = creditsRoot.objOrNull("credits")
@@ -257,8 +267,9 @@ class CommandCodeUsageProvider(
         path: String,
         token: String,
         query: Map<String, String?> = emptyMap(),
+        timeoutMillis: Int? = null,
     ): Result<JsonObject> = try {
-        Result.success(requestObject(path, token, query))
+        Result.success(requestObject(path, token, query, timeoutMillis))
     } catch (error: kotlinx.coroutines.CancellationException) {
         throw error
     } catch (error: Throwable) {
@@ -297,6 +308,7 @@ class CommandCodeUsageProvider(
         path: String,
         token: String,
         query: Map<String, String?> = emptyMap(),
+        timeoutMillis: Int? = null,
     ): JsonObject {
         val queryString = query
             .filterValues { it != null }
@@ -318,6 +330,7 @@ class CommandCodeUsageProvider(
                         "Authorization" to "Bearer $token",
                         "Accept" to "application/json",
                     ),
+                    timeoutMillis = timeoutMillis,
                 )
             )
         } catch (error: Exception) {
@@ -359,6 +372,7 @@ class CommandCodeUsageProvider(
 
     private companion object {
         const val MODELS_CACHE_SECONDS = 24 * 60 * 60
+        const val SUBSCRIPTION_TIMEOUT_MILLIS = 30_000
     }
 
     private data class PlanInfo(

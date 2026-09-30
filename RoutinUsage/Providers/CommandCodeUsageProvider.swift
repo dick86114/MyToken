@@ -97,7 +97,8 @@ struct CommandCodeUsageProvider: UsageProvider {
                     try await request(
                         "/alpha/billing/subscriptions",
                         query: [URLQueryItem(name: "orgId", value: cached.orgID)],
-                        credential: credential
+                        credential: credential,
+                        timeoutInterval: 30
                     )
                 )
             } catch {
@@ -165,7 +166,8 @@ struct CommandCodeUsageProvider: UsageProvider {
                 subscriptionResponse = try await request(
                     "/alpha/billing/subscriptions",
                     query: [URLQueryItem(name: "orgId", value: actualOrgID)],
-                    credential: credential
+                    credential: credential,
+                    timeoutInterval: 30
                 )
             }
         } catch let error as UsageProviderError {

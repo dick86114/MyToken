@@ -99,6 +99,8 @@ final class CommandCodeUsageProviderTests: XCTestCase {
             periodStart
         )
         XCTAssertEqual(summaryRequest.value(forHTTPHeaderField: "Authorization"), "Bearer cmd-api-key")
+        let subscriptionRequest = try XCTUnwrap(requests.request(path: "/alpha/billing/subscriptions"))
+        XCTAssertEqual(subscriptionRequest.timeoutInterval, 30)
         XCTAssertNotNil(requests.request(path: "/provider/v1/models"))
     }
 

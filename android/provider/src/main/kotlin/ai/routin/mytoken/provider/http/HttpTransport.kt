@@ -14,6 +14,7 @@ class ProviderHttpRequest(
     val url: String,
     val headers: Map<String, String> = emptyMap(),
     val body: ByteArray? = null,
+    val timeoutMillis: Int? = null,
 ) {
     override fun toString(): String =
         "ProviderHttpRequest(method=$method, url=$url, headers=${headers.keys}, bodyBytes=${body?.size})"

@@ -20,7 +20,8 @@ class JavaHttpTransport(
 
     override suspend fun execute(request: ProviderHttpRequest): ProviderHttpResponse =
         try {
-            withTimeout(requestTimeoutMillis + TIMEOUT_GRACE_MILLIS) {
+            val requestTimeout = request.timeoutMillis ?: requestTimeoutMillis
+            withTimeout(requestTimeout.toLong() + TIMEOUT_GRACE_MILLIS) {
                 runInterruptible(Dispatchers.IO) {
                     val method = when (request.method.uppercase()) {
                         "POST" -> "POST"
@@ -31,7 +32,7 @@ class JavaHttpTransport(
                     try {
                         connection.apply {
                             connectTimeout = connectTimeoutMillis
-                            readTimeout = requestTimeoutMillis
+                            readTimeout = requestTimeout
                             requestMethod = method
                             for ((name, value) in request.headers) {
                                 addRequestProperty(name, value)
