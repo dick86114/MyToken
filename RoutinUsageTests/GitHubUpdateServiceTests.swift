@@ -142,6 +142,25 @@ final class GitHubUpdateServiceTests: XCTestCase {
         XCTAssertFalse(update?.notes.contains("旧版本日志") == true)
     }
 
+    func test网络失败时保留底层原因() async throws {
+        struct NetworkUnavailable: Error {}
+        let stub = URLProtocolStub.makeSession { _ in
+            throw NetworkUnavailable()
+        }
+        let service = GitHubUpdateService(session: stub.session, currentVersion: "5.1.0")
+
+        do {
+            _ = try await service.checkForUpdate()
+            XCTFail("网络失败时检测更新应当抛出错误")
+        } catch let error as UpdateServiceError {
+            guard case let .unavailable(reason) = error else {
+                return XCTFail("网络失败应映射为 unavailable，实际为 \(error)")
+            }
+            XCTAssertTrue(reason.hasPrefix("Atom Feed 网络请求失败："))
+            XCTAssertTrue(reason.contains("NetworkUnavailable"))
+        }
+    }
+
     func testAtom回退在版本化安装包缺失时使用旧固定文件名() async throws {
         let atom = """
         <?xml version="1.0" encoding="UTF-8"?>

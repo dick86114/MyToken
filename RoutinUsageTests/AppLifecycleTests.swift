@@ -708,7 +708,7 @@ final class AppLifecycleTests: XCTestCase {
         )
         let service = LifecycleUpdateService(results: [
             .available(update),
-            .failure(.unavailable)
+            .failure(.unavailable("GitHub API 返回 HTTP 502"))
         ])
         let scheduler = LifecycleUpdateSchedulerSpy()
         let environment = context.makeEnvironment(
@@ -762,7 +762,7 @@ final class AppLifecycleTests: XCTestCase {
         defer { context.cleanUp() }
         let logger = LifecycleLogWriter()
         let environment = context.makeEnvironment(
-            updateService: LifecycleUpdateService(result: .failure(.unavailable)),
+            updateService: LifecycleUpdateService(result: .failure(.unavailable("GitHub API 返回 HTTP 502"))),
             updateCheckScheduler: LifecycleUpdateSchedulerSpy(),
             logWriter: logger
         )
@@ -777,6 +777,27 @@ final class AppLifecycleTests: XCTestCase {
 
         let events = await logger.events
         XCTAssertTrue(events.contains { $0.event == "update_check_failed" })
+    }
+
+    func test更新检查失败时展示具体原因() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let environment = context.makeEnvironment(
+            updateService: LifecycleUpdateService(
+                result: .failure(.unavailable("GitHub API 返回 HTTP 502"))
+            ),
+            updateCheckScheduler: LifecycleUpdateSchedulerSpy()
+        )
+
+        await environment.start()
+        await 等待条件 {
+            environment.updateStatus == .failed("检测更新失败：GitHub API 返回 HTTP 502")
+        }
+
+        XCTAssertEqual(
+            environment.updateStatus,
+            .failed("检测更新失败：GitHub API 返回 HTTP 502")
+        )
     }
 
     func test更新安装失败会写入诊断日志() async throws {
@@ -1282,7 +1303,7 @@ private actor LifecycleUpdateService: UpdateChecking {
         _: AppUpdate,
         progress: @escaping @Sendable (Double?) async -> Void
     ) async throws -> URL {
-        throw UpdateServiceError.unavailable
+        throw UpdateServiceError.unavailable("更新服务未配置")
     }
 
     func fetchReleaseHistory() async throws -> [AppReleaseHistoryItem] { [] }
@@ -1334,7 +1355,7 @@ private actor LifecycleControllableUpdateService: UpdateChecking {
         _: AppUpdate,
         progress: @escaping @Sendable (Double?) async -> Void
     ) async throws -> URL {
-        throw UpdateServiceError.unavailable
+        throw UpdateServiceError.unavailable("更新服务未配置")
     }
 
     func fetchReleaseHistory() async throws -> [AppReleaseHistoryItem] { [] }
