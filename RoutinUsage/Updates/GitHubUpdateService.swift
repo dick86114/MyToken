@@ -54,9 +54,9 @@ enum UpdateCompletionNotice {
 }
 
 enum UpdateServiceError: Error, Equatable, Sendable {
-    case unavailable
-    case invalidResponse
-    case downloadFailed
+    case unavailable(String)
+    case invalidResponse(String)
+    case downloadFailed(String)
     case installFailed(String)
 }
 
@@ -77,7 +77,7 @@ struct NoUpdateService: UpdateChecking {
         _ update: AppUpdate,
         progress: @escaping @Sendable (Double?) async -> Void
     ) async throws -> URL {
-        throw UpdateServiceError.unavailable
+        throw UpdateServiceError.unavailable("更新服务未配置")
     }
 }
 
@@ -121,6 +121,20 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
     private func rewrittenString(_ value: String, mirror: String?) -> String {
         guard let url = URL(string: value) else { return value }
         return rewritten(url, mirror: mirror).absoluteString
+    }
+
+    static func errorReason(for error: Error) -> String {
+        if let urlError = error as? URLError {
+            return urlError.localizedDescription
+        }
+        return String(describing: error)
+    }
+
+    static func decodeErrorReason(_ error: Error) -> String {
+        if let decodingError = error as? DecodingError {
+            return String(describing: decodingError)
+        }
+        return String(describing: error)
     }
 
     private static func releasesURL(page: Int) -> URL {
@@ -176,11 +190,11 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
         guard let asset = release.assets.first(where: { $0.name.hasSuffix(".dmg") }),
               let downloadURL = URL(string: rewrittenString(asset.browserDownloadURL, mirror: mirror)) else {
             await logWriter.log(level: .error, event: "update_check_asset_missing", details: "version=\(version)")
-            throw UpdateServiceError.invalidResponse
+            throw UpdateServiceError.invalidResponse("版本 \(version) 未提供可安装的 DMG 安装包")
         }
         guard let releaseURL = URL(string: rewrittenString(release.htmlURL ?? "", mirror: mirror)) else {
             await logWriter.log(level: .error, event: "update_check_release_url_invalid", details: "version=\(version)")
-            throw UpdateServiceError.invalidResponse
+            throw UpdateServiceError.invalidResponse("版本 \(version) 的发布页地址无效")
         }
         await logWriter.log(level: .info, event: "update_check_succeeded", details: "version=\(version)")
         return AppUpdate(
@@ -281,11 +295,11 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
                 event: "update_check_network_failed",
                 details: String(describing: error)
             )
-            throw UpdateServiceError.unavailable
+            throw UpdateServiceError.unavailable("GitHub API 网络请求失败：\(Self.errorReason(for: error))")
         }
         guard let http = response as? HTTPURLResponse else {
             await logWriter.log(level: .error, event: "update_check_invalid_response", details: "source=api")
-            throw UpdateServiceError.unavailable
+            throw UpdateServiceError.unavailable("GitHub API 返回了非 HTTP 响应")
         }
         await logWriter.log(
             level: .info,
@@ -298,10 +312,10 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
                 event: "update_check_rate_limited",
                 details: "status=\(http.statusCode)"
             )
-            throw UpdateServiceError.unavailable
+            throw UpdateServiceError.unavailable("GitHub API 请求被限流（HTTP \(http.statusCode)）")
         }
         guard (200..<300).contains(http.statusCode) else {
-            throw UpdateServiceError.unavailable
+            throw UpdateServiceError.unavailable("GitHub API 返回 HTTP \(http.statusCode)")
         }
         do {
             if data.first == 91 {
@@ -314,7 +328,7 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
                 event: "update_check_decode_failed",
                 details: String(describing: error)
             )
-            throw UpdateServiceError.invalidResponse
+            throw UpdateServiceError.invalidResponse("GitHub API 更新数据解析失败：\(Self.decodeErrorReason(error))")
         }
     }
 
@@ -322,7 +336,7 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
         let releases = try await fetchAtomReleases(mirror: mirror)
         guard let release = releases.first(where: { Self.isMacOSRelease(tagName: $0.version) }) else {
             await logWriter.log(level: .error, event: "update_check_atom_decode_failed", details: nil)
-            throw UpdateServiceError.invalidResponse
+            throw UpdateServiceError.invalidResponse("Atom Feed 中没有 macOS 版本")
         }
         let version = Self.normalize(release.version)
         guard Self.compare(version, currentVersion) == .orderedDescending else {
@@ -349,7 +363,7 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
                 event: "update_check_atom_asset_missing",
                 details: "version=\(version)"
             )
-            throw UpdateServiceError.invalidResponse
+            throw UpdateServiceError.invalidResponse("版本 \(version) 在 Atom 回退中未找到可安装的 DMG 安装包")
         }
         await logWriter.log(
             level: .info,
@@ -386,11 +400,14 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
-                throw UpdateServiceError.unavailable
+                throw UpdateServiceError.unavailable("GitHub 发布页网络请求失败：\(Self.errorReason(for: error))")
             }
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
                   let html = String(data: data, encoding: .utf8) else {
-                throw UpdateServiceError.unavailable
+                if let http = response as? HTTPURLResponse {
+                    throw UpdateServiceError.unavailable("GitHub 发布页返回 HTTP \(http.statusCode)")
+                }
+                throw UpdateServiceError.unavailable("GitHub 发布页返回了非 HTTP 响应或内容不是 UTF-8 文本")
             }
 
             let releases = Self.parseReleaseHistoryHTML(html)
@@ -399,7 +416,7 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
             guard html.contains("rel=\"next\"") else { break }
             page += 1
         }
-        guard !parsedReleases.isEmpty else { throw UpdateServiceError.invalidResponse }
+        guard !parsedReleases.isEmpty else { throw UpdateServiceError.invalidResponse("GitHub 发布页中没有可解析的版本") }
 
         var seen = Set<String>()
         let history = parsedReleases
@@ -545,11 +562,14 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
                 event: "update_check_atom_network_failed",
                 details: String(describing: error)
             )
-            throw UpdateServiceError.unavailable
+            throw UpdateServiceError.unavailable("Atom Feed 网络请求失败：\(Self.errorReason(for: error))")
         }
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             await logWriter.log(level: .error, event: "update_check_atom_failed", details: "response=invalid")
-            throw UpdateServiceError.unavailable
+            if let http = response as? HTTPURLResponse {
+                throw UpdateServiceError.unavailable("Atom Feed 返回 HTTP \(http.statusCode)")
+            }
+            throw UpdateServiceError.unavailable("Atom Feed 返回了非 HTTP 响应或请求失败")
         }
         await logWriter.log(
             level: .info,
@@ -560,7 +580,7 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
         let releases = AtomReleaseParser().parseAll(data: data)
         guard !releases.isEmpty else {
             await logWriter.log(level: .error, event: "update_check_atom_decode_failed", details: nil)
-            throw UpdateServiceError.invalidResponse
+            throw UpdateServiceError.invalidResponse("Atom Feed 数据为空或格式无效")
         }
         return releases
     }
@@ -620,7 +640,10 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
                     event: "update_download_failed",
                     details: "version=\(update.version) response=invalid"
                 )
-                throw UpdateServiceError.downloadFailed
+                if let http = response as? HTTPURLResponse {
+                    throw UpdateServiceError.downloadFailed("下载地址返回 HTTP \(http.statusCode)")
+                }
+                throw UpdateServiceError.downloadFailed("下载地址返回了非 HTTP 响应")
             }
 
             let totalBytes = response.expectedContentLength > 0 ? response.expectedContentLength : nil
@@ -653,7 +676,7 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
                     event: "update_download_failed",
                     details: "version=\(update.version) response=empty"
                 )
-                throw UpdateServiceError.downloadFailed
+                throw UpdateServiceError.downloadFailed("更新包下载内容为空")
             }
             let url = FileManager.default.temporaryDirectory.appendingPathComponent("MyToken-\(update.version).dmg")
             try data.write(to: url, options: .atomic)
@@ -679,7 +702,7 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
                 event: "update_download_failed",
                 details: "version=\(update.version) error=\(String(describing: error))"
             )
-            throw UpdateServiceError.downloadFailed
+            throw UpdateServiceError.downloadFailed("网络传输失败：\(Self.errorReason(for: error))")
         }
     }
 

@@ -367,7 +367,7 @@ final class AppEnvironment {
                 event: "update_install_failed",
                 details: String(describing: error)
             )
-            updateStatus = .failed(updateErrorDescription(error))
+            updateStatus = .failed(Self.updateErrorDescription(error))
         } catch {
             await logWriter.log(
                 level: .error,
@@ -704,7 +704,7 @@ private extension AppEnvironment {
     enum UpdateCheckOutcome {
         case success(AppUpdate?)
         case cancelled
-        case failed
+        case failed(String)
     }
 
     @discardableResult
@@ -735,14 +735,14 @@ private extension AppEnvironment {
                     event: "update_check_failed",
                     details: String(describing: error)
                 )
-                outcome = .failed
+                outcome = .failed(Self.updateErrorDescription(error))
             } catch {
                 await logWriter.log(
                     level: .error,
                     event: "update_check_failed",
                     details: String(describing: error)
                 )
-                outcome = .failed
+                outcome = .failed("检测更新失败：\(GitHubUpdateService.errorReason(for: error))")
             }
             guard let self else { return }
             self.finishUpdateCheck(
@@ -775,11 +775,11 @@ private extension AppEnvironment {
             }
         case .cancelled:
             updateStatus = previousStatus
-        case .failed:
+        case let .failed(message):
             if case .available = previousStatus {
                 updateStatus = previousStatus
             } else {
-                updateStatus = .failed("检查更新失败，请稍后重试")
+                updateStatus = .failed(message)
             }
         }
     }
@@ -851,14 +851,14 @@ private extension AppEnvironment {
         }
     }
 
-    func updateErrorDescription(_ error: UpdateServiceError) -> String {
+    static func updateErrorDescription(_ error: UpdateServiceError) -> String {
         switch error {
-        case .unavailable:
-            return "更新服务暂时不可用，请稍后重试"
-        case .invalidResponse:
-            return "更新信息不完整，请前往 GitHub 手动下载"
-        case .downloadFailed:
-            return "下载更新失败，请检查网络后重试"
+        case let .unavailable(reason):
+            return "检测更新失败：\(reason)"
+        case let .invalidResponse(reason):
+            return "更新信息无效：\(reason)。请前往 GitHub 手动下载"
+        case let .downloadFailed(reason):
+            return "下载更新失败：\(reason)"
         case let .installFailed(message):
             return "安装更新失败：\(message)。请从 GitHub 手动安装"
         }
