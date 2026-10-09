@@ -83,7 +83,7 @@ final class ProviderModelsTests: XCTestCase {
 
         XCTAssertEqual(
             descriptors.map(\.id),
-            [.routin, .deepseek, .glm, .volcengine, .newAPI, .commandCode, .xiaomi]
+            [.routin, .deepseek, .glm, .volcengine, .newAPI, .commandCode, .xiaomi, .opencode]
         )
         XCTAssertEqual(descriptors.first(where: { $0.id == .deepseek })?.shortCode, "DS")
         XCTAssertEqual(descriptors.first(where: { $0.id == .glm })?.shortCode, "GLM")
@@ -97,6 +97,9 @@ final class ProviderModelsTests: XCTestCase {
         XCTAssertEqual(descriptors.first(where: { $0.id == .xiaomi })?.shortCode, "MIMO")
         XCTAssertTrue(descriptors.first(where: { $0.id == .xiaomi })?.capabilities.contains(.balance) == true)
         XCTAssertTrue(descriptors.first(where: { $0.id == .xiaomi })?.capabilities.contains(.quotaWindow) == true)
+        XCTAssertEqual(descriptors.first(where: { $0.id == .opencode })?.shortCode, "OC")
+        XCTAssertTrue(descriptors.first(where: { $0.id == .opencode })?.capabilities.contains(.quotaWindow) == true)
+        XCTAssertTrue(descriptors.first(where: { $0.id == .opencode })?.capabilities.contains(.resetTime) == true)
     }
 
     func test旧KeyConfiguration默认映射为Routin凭证() throws {

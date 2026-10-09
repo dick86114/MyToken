@@ -26,6 +26,8 @@ enum UsageMetricGridPolicy {
             )
         case .volcengine:
             return UsageMetricGridLayout(metrics: metrics, columns: 2)
+        case .opencode:
+            return UsageMetricGridLayout(metrics: metrics, columns: 2)
         case .deepseek:
             return UsageMetricGridLayout(metrics: metrics, columns: 2)
         case .routin:

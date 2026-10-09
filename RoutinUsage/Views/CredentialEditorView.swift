@@ -120,6 +120,16 @@ enum CredentialEditorValidation {
                 secret: secret,
                 metadata: websiteMetadata
             )
+        case .opencode:
+            let secret = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !secret.isEmpty else { throw UsageStoreError.invalidSecret }
+            return ValidatedCredentialInput(
+                providerID: .opencode,
+                credentialKind: .bearerAPIKey,
+                name: normalizedName,
+                secret: secret,
+                metadata: websiteMetadata
+            )
         case .xiaomi:
             let cookie = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !cookie.isEmpty else { throw UsageStoreError.invalidSecret }

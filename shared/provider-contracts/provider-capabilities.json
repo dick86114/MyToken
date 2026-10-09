@@ -18,6 +18,7 @@
     { "providerId": "xiaomi", "credentialKinds": ["bearerAPIKey"], "variants": [
         { "variantId": "api", "displayName": "API 按量", "capabilities": { "fiveHour": false, "weekly": false, "balance": true, "remainingQuota": true, "resetTime": false } },
         { "variantId": "plan", "displayName": "Token Plan", "capabilities": { "fiveHour": true, "weekly": false, "balance": false, "remainingQuota": true, "resetTime": true } }
-    ], "capabilities": { "fiveHour": true, "weekly": false, "balance": true, "remainingQuota": true, "resetTime": true } }
+    ], "capabilities": { "fiveHour": true, "weekly": false, "balance": true, "remainingQuota": true, "resetTime": true } },
+    { "providerId": "opencode", "credentialKinds": ["bearerAPIKey"], "capabilities": { "fiveHour": true, "weekly": true, "balance": false, "remainingQuota": true, "resetTime": true } }
   ]
 }
