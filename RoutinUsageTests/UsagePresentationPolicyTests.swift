@@ -84,6 +84,13 @@ final class UsagePresentationPolicyTests: XCTestCase {
             UsageCardDensityPolicy.compactSpec(providerID: .commandCode, metadata: [:]).metricIDs,
             ["five-hour", "weekly", "credit-progress"]
         )
+        XCTAssertEqual(
+            UsageCardDensityPolicy.compactSpec(providerID: .opencode, metadata: [:]).metricIDs,
+            ["fiveHour", "weekly", "monthly"]
+        )
+        XCTAssertTrue(
+            UsageCardDensityPolicy.compactSpec(providerID: .opencode, metadata: [:]).showsResetTime
+        )
         XCTAssertTrue(
             UsageCardDensityPolicy.compactSpec(providerID: .glm, metadata: [:]).showsResetTime
         )
@@ -124,6 +131,58 @@ final class UsagePresentationPolicyTests: XCTestCase {
         )
 
         XCTAssertEqual(volcengine.map(\.id), ["fiveHour", "weekly", "monthly"])
+    }
+
+    func testOpenCodeMetricsUseDollarFormattingAndResetTime() throws {
+        let metrics = [
+            "fiveHour", "weekly", "monthly"
+        ].map { id in
+            NormalizedUsageMetric(
+                id: id,
+                label: id,
+                used: 1,
+                limit: 4,
+                remaining: 3,
+                unit: .currency,
+                windowEnd: Date(timeIntervalSince1970: 1_000),
+                presentation: .progress,
+                semantic: .usedQuota,
+                currencyCode: "$"
+            )
+        }
+
+        let layout = UsageMetricGridPolicy.layout(providerID: .opencode, metrics: metrics)
+
+        XCTAssertEqual(layout.metrics.map(\.id), ["fiveHour", "weekly", "monthly"])
+        XCTAssertEqual(layout.columns, 2)
+        XCTAssertTrue(layout.metrics.allSatisfy { $0.currencyCode == "$" })
+        XCTAssertTrue(layout.metrics.allSatisfy { $0.windowEnd != nil })
+
+        let source = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage")
+                .appendingPathComponent("Views")
+                .appendingPathComponent("NormalizedUsageMetricGrid.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(source.contains("case .opencode:"))
+    }
+
+    func testOpenCodeCredentialFormUsesConsoleAPIKeyLabel() throws {
+        let source = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage")
+                .appendingPathComponent("Views")
+                .appendingPathComponent("CredentialEditorView.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(source.contains(#"TextField("OpenCode Console API Key""#))
+        XCTAssertTrue(source.contains(#"SecureField("OpenCode Console API Key""#))
     }
 
     func test弹窗为CommandCode接入专用指标视图() throws {

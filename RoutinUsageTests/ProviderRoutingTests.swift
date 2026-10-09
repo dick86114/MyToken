@@ -29,7 +29,8 @@ final class ProviderRoutingTests: XCTestCase {
             GLMUsageProvider(),
             NewAPIUsageProvider(),
             VolcenginePlanUsageProvider(),
-            CommandCodeUsageProvider()
+            CommandCodeUsageProvider(),
+            OpenCodeUsageProvider()
         ])
         let cases: [(
             name: String,
@@ -134,6 +135,19 @@ final class ProviderRoutingTests: XCTestCase {
                     providerID: .volcengine,
                     credentialKind: .accessKeyPair,
                     metadata: ["planType": "coding"]
+                ),
+                ["fiveHour", "weekly", "monthly"],
+                [0, 1, 2]
+            ),
+            (
+                "OpenCode Go",
+                KeyConfiguration(
+                    id: UUID(),
+                    name: "OpenCode",
+                    keySuffix: "",
+                    sortOrder: 0,
+                    providerID: .opencode,
+                    credentialKind: .bearerAPIKey
                 ),
                 ["fiveHour", "weekly", "monthly"],
                 [0, 1, 2]
