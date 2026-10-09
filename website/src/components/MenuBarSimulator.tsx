@@ -730,6 +730,9 @@ export const MenuBarSimulator: React.FC<MenuBarSimulatorProps> = ({
             const tones = metricTones(card);
             const isBalanceCard = card.metricsType === 'balance_grid' || card.metricsType === 'xiaomi_grid';
             const nearly = nearlyExhausted(card);
+            const criticalMetric = [card.metric1, card.metric2, card.metric3].find(
+              (metric) => metric && toneOf(parsePct(metric.percent)) === 'critical'
+            );
             const accent = ProviderAccent[card.providerCode] || '#10b981';
 
             return (
@@ -774,7 +777,7 @@ export const MenuBarSimulator: React.FC<MenuBarSimulatorProps> = ({
                         </span>
                         {nearly && (
                           <span className="text-[10px] font-medium text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/25 rounded px-1.5 leading-4">
-                            即将耗尽
+                            {criticalMetric?.countdownText ?? criticalMetric?.resetTime}
                           </span>
                         )}
                       </div>
@@ -871,11 +874,7 @@ export const MenuBarSimulator: React.FC<MenuBarSimulatorProps> = ({
                                 ? '#f59e0b'
                                 : null;
                           const subtitle =
-                            tone === 'critical'
-                              ? '即将耗尽'
-                              : tone === 'warning'
-                                ? '用量偏高'
-                                : metric.resetTime;
+                            metric.countdownText ?? metric.resetTime;
                           return (
                             <div
                               key={metric.title}
