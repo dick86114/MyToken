@@ -212,4 +212,18 @@ class CredentialEditorValidationTest {
             (input.secret as CredentialSecret.BearerToken).token,
         )
     }
+
+    @Test
+    fun opencodeRequiresConsoleBearerKey() {
+        assertEquals("请输入 Console API Key", failure(ProviderId.OpenCode, name = "OpenCode"))
+        val input = validate(
+            ProviderId.OpenCode,
+            name = "OpenCode",
+            apiKey = "  oc_sk_test  ",
+            websiteURL = "https://opencode.ai/",
+        )
+        assertEquals(CredentialKind.BearerApiKey, input.credentialKind)
+        assertEquals("oc_sk_test", (input.secret as CredentialSecret.BearerToken).token)
+        assertEquals("https://opencode.ai/", input.metadata[CredentialMetadataKey.WebsiteURL])
+    }
 }

@@ -428,6 +428,7 @@ private fun planName(card: CredentialCardUi): String {
         ai.routin.mytoken.domain.model.ProviderId.CommandCode -> "Command Code"
         ai.routin.mytoken.domain.model.ProviderId.Xiaomi ->
             if (card.credential.metadata[CredentialMetadataKey.UsageKind] == "plan") "Token Plan" else "API 按量"
+        ai.routin.mytoken.domain.model.ProviderId.OpenCode -> "OpenCode Go"
     }
 }
 

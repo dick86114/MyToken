@@ -38,6 +38,7 @@ internal object UsageCardCompactSpec {
                 "thirty-day-token",
             )
             ProviderId.CommandCode -> listOf("five-hour", "weekly", "credit-progress")
+            ProviderId.OpenCode -> listOf("fiveHour", "weekly", "monthly")
         }
         val byId = metrics.associateBy { it.id }
         return ids.mapNotNull { byId[it] }

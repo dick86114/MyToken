@@ -229,7 +229,8 @@ class CredentialEditorViewModel(
     }
 
     private fun defaultKind(providerId: ProviderId): CredentialKind = when (providerId) {
-        ProviderId.Routin, ProviderId.NewAPI, ProviderId.CommandCode -> CredentialKind.BearerApiKey
+        ProviderId.Routin, ProviderId.NewAPI, ProviderId.CommandCode, ProviderId.OpenCode ->
+            CredentialKind.BearerApiKey
         ProviderId.DeepSeek, ProviderId.Glm -> CredentialKind.ApiKey
         ProviderId.Volcengine -> CredentialKind.AccessKeyPair
         ProviderId.Xiaomi -> CredentialKind.BearerApiKey
