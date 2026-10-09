@@ -134,7 +134,7 @@ enum ProviderTheme {
         case .xiaomi:
             return .pink
         case .opencode:
-            return .yellow
+            return Color(red: 0.80, green: 0.91, blue: 0.20)
         }
     }
 

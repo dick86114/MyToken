@@ -54,7 +54,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         NEW: { color: '#34D399', badge: 'rgba(52, 211, 153, 0.1)' },
         CMD: { color: '#22D3EE', badge: 'rgba(34, 211, 238, 0.1)' },
         MIMO: { color: '#00856F', badge: 'rgba(0, 133, 111, 0.12)' },
-        OC: { color: '#F2B705', badge: 'rgba(242, 183, 5, 0.12)' },
+        OC: { color: '#CCE833', badge: 'rgba(204, 232, 51, 0.12)' },
       };
 
       const masked = `${newKeyValue.slice(0, 3)}***${newKeyValue.slice(-4)}`;

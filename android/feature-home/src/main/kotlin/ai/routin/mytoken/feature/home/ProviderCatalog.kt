@@ -27,6 +27,6 @@ object ProviderCatalog {
         ProviderId.NewAPI -> Color(0xFF6A1B9A)
         ProviderId.CommandCode -> Color(0xFF00897B)
         ProviderId.Xiaomi -> Color(0xFFAD1457)
-        ProviderId.OpenCode -> Color(0xFFF2B705)
+        ProviderId.OpenCode -> Color(0xFFCCE833)
     }
 }

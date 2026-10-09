@@ -433,7 +433,7 @@ const ProviderAccent: Record<string, string> = {
   NEW: '#a855f7',
   CMD: '#22d3ee',
   MIMO: '#ec4899',
-  OC: '#f2b705',
+  OC: '#cce833',
 };
 
 const metricTones = (card: RealAccountCard): Tone[] => {

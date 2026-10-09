@@ -55,7 +55,7 @@ export const CapabilitiesSection: React.FC<CapabilitiesSectionProps> = ({
                 <span className="text-[#A78BFA] font-mono font-medium">GLM</span>、
                 <span className="text-[#FB923C] font-mono font-medium">VOL</span>、
                 <span className="text-[#34D399] font-mono font-medium">NEW</span>、<span className="text-[#22D3EE] font-mono font-medium">CMD</span>、<span className="text-[#00856F] font-mono font-medium">MIMO</span>、
-                <span className="text-[#F2B705] font-mono font-medium">OC</span>。进度条真实映射各供应商的有上限额度，余额健康状态精确显示，绝不伪造百分比。
+                <span className="text-[#CCE833] font-mono font-medium">OC</span>。进度条真实映射各供应商的有上限额度，余额健康状态精确显示，绝不伪造百分比。
               </p>
             </div>
 

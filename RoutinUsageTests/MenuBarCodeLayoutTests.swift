@@ -39,6 +39,38 @@ final class MenuBarCodeLayoutTests: XCTestCase {
         )
     }
 
+    func test两字母短码以右侧进度条为视觉中心() throws {
+        let indicator = MenuBarIndicatorModel(
+            shortCode: "OC",
+            percent: 17,
+            healthState: .normal,
+            accessibilityLabel: "OpenCode，已使用 17%",
+            content: .progress(17)
+        )
+        let image = MenuBarMultiUsageIcon.image(indicators: [indicator])
+        let bitmap = try XCTUnwrap(
+            NSBitmapImageRep(data: XCTUnwrap(image.tiffRepresentation))
+        )
+        let scale = Double(bitmap.pixelsWide)
+            / MenuBarMultiUsageIcon.imageWidth(for: [indicator])
+        let textXRange = 0..<Int(((MenuBarMultiUsageIcon.outerPadding + 8) * scale).rounded())
+        let trackStart = Int(((MenuBarMultiUsageIcon.outerPadding + 9) * scale).rounded())
+
+        let textCenter = try verticalCenter(in: bitmap, xRange: textXRange, scale: scale)
+        let trackCenter = try verticalCenter(
+            in: bitmap,
+            xRange: trackStart..<bitmap.pixelsWide,
+            scale: scale
+        )
+
+        XCTAssertEqual(
+            textCenter,
+            trackCenter,
+            accuracy: 0.5,
+            "两字母短码中心 \(textCenter)，进度条中心 \(trackCenter)"
+        )
+    }
+
     private func verticalCenter(
         in bitmap: NSBitmapImageRep,
         xRange: Range<Int>,
@@ -114,7 +146,9 @@ final class MenuBarCodeLayoutTests: XCTestCase {
                 XCTAssertEqual(baselines[0], expectedBaseline, accuracy: 0.01)
             } else if characters.count == 2 {
                 let glyphSpan = MenuBarMultiUsageIcon.twoLetterSlotHeight + font.capHeight
-                let lowerBaseline = MenuBarMultiUsageIcon.size.height / 2 - glyphSpan / 2
+                let lowerBaseline = MenuBarMultiUsageIcon.size.height / 2
+                    - glyphSpan / 2
+                    + MenuBarMultiUsageIcon.twoLetterOpticalOffset
                 XCTAssertEqual(baselines[0], lowerBaseline, accuracy: 0.01)
                 XCTAssertEqual(baselines[1], lowerBaseline + MenuBarMultiUsageIcon.twoLetterSlotHeight, accuracy: 0.01)
             } else {
@@ -157,11 +191,12 @@ final class MenuBarCodeLayoutTests: XCTestCase {
                 + twoLetterBaselines[1]
                 + twoLetterFont.capHeight
         ) / 2
+        let trackCenter = MenuBarMultiUsageIcon.size.height / 2
         XCTAssertEqual(
-            letterCenter,
-            MenuBarMultiUsageIcon.size.height / 2,
+            letterCenter + MenuBarMultiUsageIcon.twoLetterOpticalOffset * -1,
+            trackCenter,
             accuracy: 0.01,
-            "两字母短码应围绕菜单栏视觉中心"
+            "两字母短码应以进度条视觉中心为参考"
         )
     }
 

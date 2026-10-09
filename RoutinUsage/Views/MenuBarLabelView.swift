@@ -188,6 +188,7 @@ enum MenuBarMultiUsageIcon {
     static let progressFillInset: CGFloat = 1
     static let codeVerticalOffset: CGFloat = 2
     static let twoLetterSlotHeight: CGFloat = 7.4
+    static let twoLetterOpticalOffset: CGFloat = -1.5
     static let stackedProgressUnitWidth: CGFloat = 38
     static let stackedBalanceHorizontalPadding: CGFloat = 2.5
     static let stackedBalanceMinimumUnitWidth: CGFloat = 24
@@ -272,7 +273,10 @@ enum MenuBarMultiUsageIcon {
     ) -> CGFloat {
         if characterCount == 2 {
             let glyphSpan = codeSlotHeight(for: characterCount) + font.capHeight
-            return size.height / 2 - glyphSpan / 2 + CGFloat(index) * codeSlotHeight(for: characterCount)
+            let lowerBaseline = size.height / 2
+                - glyphSpan / 2
+                + twoLetterOpticalOffset
+            return lowerBaseline + CGFloat(index) * codeSlotHeight(for: characterCount)
         }
         guard characterCount > 1 else {
             return size.height / 2 + font.capHeight / 2 - codeVerticalOffset

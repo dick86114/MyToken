@@ -311,7 +311,7 @@ export const MATRIX_DATA: MatrixRow[] = [
   {
     provider: 'OpenCode',
     code: 'OC',
-    color: '#F2B705',
+    color: '#CCE833',
     credential: 'Console Service API Key (Bearer)',
     credentialFormat: 'oc_sk_xxxxxxxxxxxxxxxx',
     metrics: [
