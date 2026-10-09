@@ -395,7 +395,12 @@ enum UsageRowAccessibility {
             details.append("订阅开始 " + UsageFormatter.subscriptionDateText(snapshot.subscriptionStartAt))
         }
         if snapshot.subscriptionEndAt != nil {
-            details.append("订阅结束 " + UsageFormatter.subscriptionDateText(snapshot.subscriptionEndAt))
+            details.append(
+                UsageRowPresentation.subscriptionEndLabel(
+                    providerID: state.configuration.providerID,
+                    billingMode: snapshot.billingMode
+                ) + " " + UsageFormatter.subscriptionDateText(snapshot.subscriptionEndAt)
+            )
         }
         if let expiryText = UsageFormatter.subscriptionExpiryText(
             until: snapshot.subscriptionEndAt,
@@ -430,6 +435,14 @@ enum UsageRowPresentation {
             return providerName
         }
         return "\(providerName) · \(planName)"
+    }
+
+    static func subscriptionEndLabel(
+        providerID: ProviderID,
+        billingMode: String?
+    ) -> String {
+        guard providerID == .opencode else { return "订阅结束" }
+        return billingMode == "取消续订" ? "到期" : "续费"
     }
 }
 
@@ -494,7 +507,12 @@ private extension UsageRowView {
                     Text("开始 " + UsageFormatter.subscriptionDateText(snapshot.subscriptionStartAt))
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    Text("结束 " + UsageFormatter.subscriptionDateText(snapshot.subscriptionEndAt))
+                    Text(
+                        UsageRowPresentation.subscriptionEndLabel(
+                            providerID: state.configuration.providerID,
+                            billingMode: snapshot.billingMode
+                        ) + " " + UsageFormatter.subscriptionDateText(snapshot.subscriptionEndAt)
+                    )
                         .fixedSize(horizontal: false, vertical: true)
                         .multilineTextAlignment(.trailing)
                         .frame(maxWidth: .infinity, alignment: .trailing)

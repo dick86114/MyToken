@@ -185,6 +185,30 @@ final class UsagePresentationPolicyTests: XCTestCase {
         XCTAssertTrue(source.contains(#"SecureField("OpenCode Console API Key""#))
     }
 
+    func testOpenCodeSubscriptionEndLabelDistinguishesRenewalAndExpiry() {
+        XCTAssertEqual(
+            UsageRowPresentation.subscriptionEndLabel(
+                providerID: .opencode,
+                billingMode: "自动续费"
+            ),
+            "续费"
+        )
+        XCTAssertEqual(
+            UsageRowPresentation.subscriptionEndLabel(
+                providerID: .opencode,
+                billingMode: "取消续订"
+            ),
+            "到期"
+        )
+        XCTAssertEqual(
+            UsageRowPresentation.subscriptionEndLabel(
+                providerID: .routin,
+                billingMode: "自动续费"
+            ),
+            "订阅结束"
+        )
+    }
+
     func test弹窗为CommandCode接入专用指标视图() throws {
         let source = try String(
             contentsOf: URL(fileURLWithPath: #filePath)
