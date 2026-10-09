@@ -45,12 +45,16 @@ struct UsageRowView: View {
     private func compactCard(now: Date) -> some View {
         let metrics = compactOrderedMetrics
         let arrangement = CompactUsageCardPresentation.arrangement(for: metrics)
+        let remainingText = CompactUsageCardPresentation.nearlyExhaustedRemainingText(
+            metrics: metrics,
+            now: now
+        )
 
         return Group {
             if arrangement == .balance, let metric = metrics.first {
-                compactBalanceCard(metric: metric)
+                compactBalanceCard(metric: metric, remainingText: remainingText)
             } else {
-                compactStandardCard(now: now)
+                compactStandardCard(now: now, remainingText: remainingText)
             }
         }
         .padding(14)
@@ -61,9 +65,9 @@ struct UsageRowView: View {
         .accessibilityHint(accessibilityHint)
     }
 
-    private func compactStandardCard(now: Date) -> some View {
+    private func compactStandardCard(now: Date, remainingText: String?) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            compactHeader()
+            compactHeader(remainingText: remainingText)
 
             if let snapshot = state.snapshot {
                 compactMetrics(snapshot: snapshot, now: now)
@@ -73,9 +77,12 @@ struct UsageRowView: View {
         }
     }
 
-    private func compactBalanceCard(metric: NormalizedUsageMetric) -> some View {
+    private func compactBalanceCard(
+        metric: NormalizedUsageMetric,
+        remainingText: String?
+    ) -> some View {
         HStack(alignment: .center, spacing: 10) {
-            compactIdentity(showsPlanBelowProvider: true)
+            compactIdentity(showsPlanBelowProvider: true, remainingText: remainingText)
             Spacer(minLength: 8)
             CompactBalanceStrip(metric: metric)
             Spacer(minLength: 8)
@@ -104,16 +111,19 @@ struct UsageRowView: View {
         }
     }
 
-    private func compactHeader() -> some View {
+    private func compactHeader(remainingText: String?) -> some View {
         HStack(alignment: .center, spacing: 10) {
-            compactIdentity(showsPlanBelowProvider: false)
+            compactIdentity(showsPlanBelowProvider: false, remainingText: remainingText)
             Spacer(minLength: 8)
             compactActionButtons
         }
         .padding(.bottom, 10)
     }
 
-    private func compactIdentity(showsPlanBelowProvider: Bool) -> some View {
+    private func compactIdentity(
+        showsPlanBelowProvider: Bool,
+        remainingText: String? = nil
+    ) -> some View {
         HStack(alignment: .center, spacing: 10) {
             avatarWithStatus
 
@@ -123,11 +133,8 @@ struct UsageRowView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .lineLimit(1)
 
-                    if CompactUsageCardPresentation.isNearlyExhausted(
-                        metrics: compactOrderedMetrics,
-                        rules: menuBarColorRules
-                    ) {
-                        Text("即将耗尽")
+                    if let remainingText {
+                        Text(remainingText)
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(CompactPopoverPalette.criticalColor)
                             .padding(.horizontal, 6)
@@ -395,7 +402,12 @@ enum UsageRowAccessibility {
             details.append("订阅开始 " + UsageFormatter.subscriptionDateText(snapshot.subscriptionStartAt))
         }
         if snapshot.subscriptionEndAt != nil {
-            details.append("订阅结束 " + UsageFormatter.subscriptionDateText(snapshot.subscriptionEndAt))
+            details.append(
+                UsageRowPresentation.subscriptionEndLabel(
+                    providerID: state.configuration.providerID,
+                    billingMode: snapshot.billingMode
+                ) + " " + UsageFormatter.subscriptionDateText(snapshot.subscriptionEndAt)
+            )
         }
         if let expiryText = UsageFormatter.subscriptionExpiryText(
             until: snapshot.subscriptionEndAt,
@@ -430,6 +442,14 @@ enum UsageRowPresentation {
             return providerName
         }
         return "\(providerName) · \(planName)"
+    }
+
+    static func subscriptionEndLabel(
+        providerID: ProviderID,
+        billingMode: String?
+    ) -> String {
+        guard providerID == .opencode else { return "订阅结束" }
+        return billingMode == "取消续订" ? "到期" : "续费"
     }
 }
 
@@ -494,7 +514,12 @@ private extension UsageRowView {
                     Text("开始 " + UsageFormatter.subscriptionDateText(snapshot.subscriptionStartAt))
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    Text("结束 " + UsageFormatter.subscriptionDateText(snapshot.subscriptionEndAt))
+                    Text(
+                        UsageRowPresentation.subscriptionEndLabel(
+                            providerID: state.configuration.providerID,
+                            billingMode: snapshot.billingMode
+                        ) + " " + UsageFormatter.subscriptionDateText(snapshot.subscriptionEndAt)
+                    )
                         .fixedSize(horizontal: false, vertical: true)
                         .multilineTextAlignment(.trailing)
                         .frame(maxWidth: .infinity, alignment: .trailing)

@@ -7,6 +7,7 @@ import ai.routin.mytoken.provider.commandcode.CommandCodeUsageProvider
 import ai.routin.mytoken.provider.glm.GLMUsageProvider
 import ai.routin.mytoken.provider.http.JavaHttpTransport
 import ai.routin.mytoken.provider.newapi.NewAPIUsageProvider
+import ai.routin.mytoken.provider.opencode.OpenCodeUsageProvider
 import ai.routin.mytoken.provider.routin.RoutinUsageProvider
 import ai.routin.mytoken.provider.volcengine.VolcengineUsageProvider
 import ai.routin.mytoken.provider.xiaomi.XiaomiUsageProvider
@@ -26,5 +27,6 @@ fun defaultUsageProviders(): Map<ProviderId, UsageProvider> {
         ProviderId.NewAPI to NewAPIUsageProvider(transport),
         ProviderId.CommandCode to CommandCodeUsageProvider(transport),
         ProviderId.Xiaomi to XiaomiUsageProvider(transport),
+        ProviderId.OpenCode to OpenCodeUsageProvider(transport),
     )
 }

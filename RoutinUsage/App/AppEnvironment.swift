@@ -175,7 +175,8 @@ final class AppEnvironment {
             VolcenginePlanUsageProvider(session: .shared),
             NewAPIUsageProvider(session: .shared),
             CommandCodeUsageProvider(session: .shared),
-            XiaomiMiMoUsageProvider(session: .shared)
+            XiaomiMiMoUsageProvider(session: .shared),
+            OpenCodeUsageProvider(session: .shared)
         ])
         let store = UsageStore(
             keyRepository: keyRepository,

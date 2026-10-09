@@ -134,5 +134,6 @@ object ProviderNames {
         ProviderId.NewAPI -> "New API"
         ProviderId.CommandCode -> "Command Code"
         ProviderId.Xiaomi -> "小米 MiMo"
+        ProviderId.OpenCode -> "OpenCode"
     }
 }

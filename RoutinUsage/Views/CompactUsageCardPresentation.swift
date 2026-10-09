@@ -48,6 +48,22 @@ enum CompactUsageCardPresentation {
         }
     }
 
+    static func nearlyExhaustedRemainingText(
+        metrics: [NormalizedUsageMetric],
+        now: Date
+    ) -> String? {
+        guard isNearlyExhausted(metrics: metrics) else { return nil }
+
+        let criticalMetric = metrics.first { metric in
+            metric.presentation == .progress &&
+                metric.windowEnd != nil &&
+                gaugeTone(for: metric) == .critical
+        }
+
+        guard let windowEnd = criticalMetric?.windowEnd else { return nil }
+        return "剩余 \(UsageFormatter.remainingDurationText(until: windowEnd, now: now))"
+    }
+
     static func compactPercentText(_ value: Double?) -> String {
         UsageFormatter.displayPercentText(value)
     }

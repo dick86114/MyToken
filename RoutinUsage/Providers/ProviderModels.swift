@@ -8,6 +8,7 @@ enum ProviderID: String, Codable, CaseIterable, Identifiable, Sendable {
     case newAPI
     case commandCode
     case xiaomi
+    case opencode
 
     var id: String { rawValue }
 }

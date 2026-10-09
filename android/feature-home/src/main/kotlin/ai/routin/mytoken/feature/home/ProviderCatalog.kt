@@ -16,6 +16,7 @@ object ProviderCatalog {
         ProviderId.NewAPI -> "New API"
         ProviderId.CommandCode -> "Command Code"
         ProviderId.Xiaomi -> "小米 MiMo"
+        ProviderId.OpenCode -> "OpenCode"
     }
 
     fun accentColor(providerId: ProviderId): Color = when (providerId) {
@@ -26,5 +27,6 @@ object ProviderCatalog {
         ProviderId.NewAPI -> Color(0xFF6A1B9A)
         ProviderId.CommandCode -> Color(0xFF00897B)
         ProviderId.Xiaomi -> Color(0xFFAD1457)
+        ProviderId.OpenCode -> Color(0xFFF2B705)
     }
 }

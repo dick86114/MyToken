@@ -41,6 +41,11 @@ enum UsageCardDensityPolicy {
                 metricIDs: ["five-hour", "weekly", "credit-progress"],
                 showsResetTime: true
             )
+        case .opencode:
+            return UsageCardCompactSpec(
+                metricIDs: ["fiveHour", "weekly", "monthly"],
+                showsResetTime: true
+            )
         }
     }
 

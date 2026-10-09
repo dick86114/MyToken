@@ -71,6 +71,42 @@ final class CompactUsageCardPresentationTests: XCTestCase {
         )
     }
 
+    func test高占用徽章使用剩余时间且非高占用不显示() {
+        let now = date("2026-09-22 17:00:00")
+
+        XCTAssertEqual(
+            CompactUsageCardPresentation.nearlyExhaustedRemainingText(
+                metrics: [
+                    progressMetric(
+                        id: "five-hour",
+                        percent: 96,
+                        health: .critical,
+                        windowEnd: date("2026-09-22 17:23:00")
+                    )
+                ],
+                now: now
+            ),
+            "剩余 23分钟"
+        )
+        XCTAssertNil(
+            CompactUsageCardPresentation.nearlyExhaustedRemainingText(
+                metrics: [progressMetric(id: "five-hour", percent: 19)],
+                now: now
+            )
+        )
+    }
+
+    func test高占用但没有剩余时间时隐藏徽章() {
+        XCTAssertNil(
+            CompactUsageCardPresentation.nearlyExhaustedRemainingText(
+                metrics: [
+                    progressMetric(id: "five-hour", percent: 96, health: .critical)
+                ],
+                now: date("2026-09-22 17:00:00")
+            )
+        )
+    }
+
     func test环形百分比最多一位小数() {
         XCTAssertEqual(CompactUsageCardPresentation.compactPercentText(96), "96%")
         XCTAssertEqual(CompactUsageCardPresentation.compactPercentText(21.34), "21%")

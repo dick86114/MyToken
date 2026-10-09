@@ -36,6 +36,8 @@ enum UsageMetricGridPolicy {
             return UsageMetricGridLayout(metrics: metrics, columns: 2)
         case .xiaomi:
             return UsageMetricGridLayout(metrics: metrics, columns: 2)
+        case .opencode:
+            return UsageMetricGridLayout(metrics: metrics, columns: 2)
         }
     }
 }

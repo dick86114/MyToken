@@ -177,6 +177,19 @@ internal fun formatCurrency(value: BigDecimal?, currencyCode: String?): String {
     }
 }
 
+/** OpenCode 卡片共用策略：固定三窗口顺序，并区分续费与到期时间。 */
+internal object OpenCodeCardPolicy {
+    private val metricOrder = listOf("fiveHour", "weekly", "monthly")
+
+    fun orderedMetrics(metrics: List<UsageMetric>): List<UsageMetric> {
+        val byID = metrics.associateBy(UsageMetric::id)
+        return metricOrder.mapNotNull(byID::get)
+    }
+
+    fun lifecyclePrefix(billingMode: String?): String =
+        if (billingMode == "取消续订") "到期" else "续费"
+}
+
 
 @Composable
 internal fun UsageProgressBar(

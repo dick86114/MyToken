@@ -176,6 +176,10 @@ fun CredentialUsageCard(
                     ai.routin.mytoken.domain.model.ProviderId.Glm -> GLMMetrics(metrics, columns = metricColumns)
                     ai.routin.mytoken.domain.model.ProviderId.NewAPI -> NewAPIMetrics(metrics, columns = metricColumns)
                     ai.routin.mytoken.domain.model.ProviderId.Volcengine -> VolcengineMetrics(metrics, columns = metricColumns)
+                    ai.routin.mytoken.domain.model.ProviderId.OpenCode -> UsageMetricGrid(
+                        metrics = OpenCodeCardPolicy.orderedMetrics(metrics),
+                        columns = metricColumns,
+                    )
                     ai.routin.mytoken.domain.model.ProviderId.CommandCode -> CommandCodeMetrics(
                         metrics = metrics,
                         columns = metricColumns,
@@ -304,8 +308,14 @@ private fun CredentialCardHeader(
                     fontWeight = FontWeight.SemiBold,
                 )
                 if (subscriptionExpiry != null) {
+                    val lifecyclePrefix =
+                        if (card.credential.providerId == ai.routin.mytoken.domain.model.ProviderId.OpenCode) {
+                            OpenCodeCardPolicy.lifecyclePrefix(card.snapshot?.billingMode)
+                        } else {
+                            "到期"
+                        }
                     StatusPill(
-                        text = "到期 ${formatSubscriptionTime(subscriptionExpiry)}",
+                        text = "$lifecyclePrefix ${formatSubscriptionTime(subscriptionExpiry)}",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         isDark = isDark,
                     )

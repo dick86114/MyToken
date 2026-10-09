@@ -92,4 +92,9 @@ class CredentialSecretCodecTest {
         val encoded = CredentialSecretCodec.encode(secret)
         check(!encoded.contains("fixture-plain-secret")) { "raw secret must not appear in encoded form" }
     }
+
+    @Test
+    fun opencodeUsesTransferSchemaProviderRawValue() {
+        assertEquals("opencode", ProviderId.OpenCode.rawValue)
+    }
 }

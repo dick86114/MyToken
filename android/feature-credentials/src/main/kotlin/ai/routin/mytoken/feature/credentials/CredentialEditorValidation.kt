@@ -124,6 +124,16 @@ object CredentialEditorValidation {
                     metadata = websiteMetadata,
                 )
             }
+            ProviderId.OpenCode -> {
+                val secret = fields.apiKey.trim()
+                if (secret.isEmpty()) throw CredentialValidationException("请输入 Console API Key")
+                ValidatedCredentialInput(
+                    credentialKind = CredentialKind.BearerApiKey,
+                    name = normalizedName,
+                    secret = CredentialSecret.BearerToken(secret),
+                    metadata = websiteMetadata,
+                )
+            }
             ProviderId.Xiaomi -> {
                 val cookie = fields.apiKey.trim()
                 if (cookie.isEmpty()) throw CredentialValidationException("请输入网页 Cookie")

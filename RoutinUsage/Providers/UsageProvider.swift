@@ -136,6 +136,16 @@ struct ProviderRegistry: Sendable {
             credentialSchemas: [
                 .bearerAPIKey: [CredentialField(id: "secret", label: "网页 Cookie", isSecret: true)]
             ]
+        ),
+        ProviderDescriptor(
+            id: .opencode,
+            displayName: "OpenCode",
+            shortCode: "OC",
+            iconName: "chevron.left.forwardslash.chevron.right",
+            capabilities: [.quotaWindow, .resetTime, .planDetection],
+            credentialSchemas: [
+                .bearerAPIKey: [CredentialField(id: "secret", label: "Console API Key", isSecret: true)]
+            ]
         )
     ]
 }

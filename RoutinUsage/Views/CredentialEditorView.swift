@@ -120,6 +120,16 @@ enum CredentialEditorValidation {
                 secret: secret,
                 metadata: websiteMetadata
             )
+        case .opencode:
+            let secret = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !secret.isEmpty else { throw UsageStoreError.invalidSecret }
+            return ValidatedCredentialInput(
+                providerID: .opencode,
+                credentialKind: .bearerAPIKey,
+                name: normalizedName,
+                secret: secret,
+                metadata: websiteMetadata
+            )
         case .xiaomi:
             let cookie = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !cookie.isEmpty else { throw UsageStoreError.invalidSecret }
@@ -374,13 +384,43 @@ struct CredentialEditorView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                } else if providerID == .opencode {
+                    HStack(spacing: 8) {
+                        if isSecretVisible {
+                            TextField("OpenCode Console API Key", text: $apiKey)
+                                .frame(minWidth: 360)
+                        } else {
+                            SecureField("OpenCode Console API Key", text: $apiKey)
+                                .frame(minWidth: 360)
+                        }
+                        Button {
+                            isSecretVisible.toggle()
+                        } label: {
+                            Image(systemName: CredentialVisibility.iconName(isVisible: isSecretVisible))
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(CredentialVisibility.canToggle(secret: apiKey) ? .primary : .tertiary)
+                        .disabled(!CredentialVisibility.canToggle(secret: apiKey))
+                        .help(isSecretVisible ? "隐藏 API Key" : "显示 API Key")
+                        .accessibilityLabel(isSecretVisible ? "隐藏 API Key" : "显示 API Key")
+                    }
                 } else {
                     HStack(spacing: 8) {
                         if isSecretVisible {
-                            TextField(providerID == .routin ? "plan-…" : "API Key", text: $apiKey)
+                            TextField(
+                                providerID == .opencode
+                                    ? "OpenCode Console API Key"
+                                    : providerID == .routin ? "plan-…" : "API Key",
+                                text: $apiKey
+                            )
                                 .frame(minWidth: 360)
                         } else {
-                            SecureField(providerID == .routin ? "plan-…" : "API Key", text: $apiKey)
+                            SecureField(
+                                providerID == .opencode
+                                    ? "OpenCode Console API Key"
+                                    : providerID == .routin ? "plan-…" : "API Key",
+                                text: $apiKey
+                            )
                                 .frame(minWidth: 360)
                         }
                         Button {
