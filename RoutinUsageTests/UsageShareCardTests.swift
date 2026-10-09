@@ -175,8 +175,8 @@ final class UsageShareCardTests: XCTestCase {
             UsageShareContentBuilder.build(state: state, now: now, timeZone: timeZone)
         )
         var draft = UsageShareDraft.make(from: content)
-        XCTAssertEqual(UsageShareTemplate.allCases.first, .ticket)
-        XCTAssertEqual(draft.template, .ticket)
+        XCTAssertEqual(UsageShareTemplate.allCases.first, .ticketLight)
+        XCTAssertEqual(draft.template, .ticketLight)
         draft.displayName = "对外别名"
         draft.note = "今天又肝完一轮"
         draft.showsAmounts = false
@@ -186,7 +186,7 @@ final class UsageShareCardTests: XCTestCase {
         XCTAssertEqual(rendered.note, "今天又肝完一轮")
         XCTAssertEqual(rendered.metrics[0].headline, "38%")
         XCTAssertTrue(rendered.metrics[0].amountDetails.isEmpty)
-        XCTAssertEqual(rendered.template, .ticket)
+        XCTAssertEqual(rendered.template, .ticketLight)
     }
 
     func test可以单独隐藏重置时间和单个指标() throws {

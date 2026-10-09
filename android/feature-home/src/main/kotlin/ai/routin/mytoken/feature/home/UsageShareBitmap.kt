@@ -13,9 +13,12 @@ import com.google.zxing.qrcode.QRCodeWriter
 import java.io.File
 
 internal object UsageShareBitmapFactory {
-    fun qrCode(size: Int): Bitmap {
+    fun qrCode(
+        size: Int,
+        content: String = "https://mytoken.idickies.cc/",
+    ): Bitmap {
         val matrix = QRCodeWriter().encode(
-            "https://mytoken.idickies.cc/",
+            content,
             BarcodeFormat.QR_CODE,
             size,
             size,
@@ -32,11 +35,15 @@ internal object UsageShareBitmapFactory {
     }
 }
 
-internal fun renderUsageShareBitmap(card: UsageShareRenderedCard, density: Float): Bitmap {
+internal fun renderUsageShareBitmap(
+    card: UsageShareRenderedCard,
+    density: Float,
+    context: Context? = null,
+): Bitmap {
     val width = (UsageShareCardRenderer.CANVAS_WIDTH * density).toInt()
     val height = UsageShareCardRenderer.height(card, width)
     return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { bitmap ->
-        UsageShareCardRenderer.draw(Canvas(bitmap), card, width)
+        UsageShareCardRenderer.draw(Canvas(bitmap), card, width, context)
     }
 }
 

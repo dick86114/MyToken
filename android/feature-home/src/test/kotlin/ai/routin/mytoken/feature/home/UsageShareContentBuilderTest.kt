@@ -48,6 +48,7 @@ class UsageShareContentBuilderTest {
         assertEquals("主", content?.avatarLetter)
         assertEquals(1, content?.metrics?.size)
         assertEquals("≈ $2.50", content?.metrics?.first()?.companionText)
+        assertNull(content?.websiteUrl)
     }
 
     @Test
@@ -81,6 +82,15 @@ class UsageShareContentBuilderTest {
 
     @Test
     fun `templates and file names mirror macOS labels`() {
+        assertEquals(
+            listOf(
+                UsageShareTemplate.TicketLight,
+                UsageShareTemplate.Ticket,
+                UsageShareTemplate.Light,
+                UsageShareTemplate.Dark,
+            ),
+            UsageShareTemplate.entries,
+        )
         assertEquals("深色票根", UsageShareTemplate.Ticket.title)
         assertEquals("浅色票根", UsageShareTemplate.TicketLight.title)
         assertEquals("暗色极客", UsageShareTemplate.Dark.title)
@@ -96,6 +106,7 @@ class UsageShareContentBuilderTest {
             groupMultiplierText = null,
             metrics = emptyList(),
             capturedAtText = "2026.09.20 16:30",
+            providerId = ProviderId.Routin,
             showsWatermark = true,
             showsStatus = true,
             template = UsageShareTemplate.Ticket,

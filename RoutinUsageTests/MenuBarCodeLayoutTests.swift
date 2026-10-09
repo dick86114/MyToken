@@ -75,8 +75,9 @@ final class MenuBarCodeLayoutTests: XCTestCase {
         let trackHeight = MenuBarMultiUsageIcon.size.height - 8
         for characterCount in 2...3 {
             let font = MenuBarMultiUsageIcon.codeFont(for: characterCount)
-            let expected = (trackHeight - font.capHeight)
-                / CGFloat(characterCount - 1)
+            let expected = characterCount == 2
+                ? MenuBarMultiUsageIcon.twoLetterSlotHeight
+                : (trackHeight - font.capHeight) / CGFloat(characterCount - 1)
             XCTAssertEqual(
                 MenuBarMultiUsageIcon.codeSlotHeight(for: characterCount),
                 expected,
@@ -84,6 +85,9 @@ final class MenuBarCodeLayoutTests: XCTestCase {
             )
             let letterGap = expected - font.capHeight
             XCTAssertGreaterThan(letterGap, characterCount == 3 ? 0.75 : 0)
+            if characterCount == 2 {
+                XCTAssertLessThanOrEqual(letterGap, 1.5)
+            }
         }
         XCTAssertEqual(MenuBarMultiUsageIcon.codeSlotHeight(for: 1), 0, accuracy: 0.01)
     }
@@ -108,6 +112,11 @@ final class MenuBarCodeLayoutTests: XCTestCase {
                     + font.capHeight / 2
                     - opticalOffset
                 XCTAssertEqual(baselines[0], expectedBaseline, accuracy: 0.01)
+            } else if characters.count == 2 {
+                let glyphSpan = MenuBarMultiUsageIcon.twoLetterSlotHeight + font.capHeight
+                let lowerBaseline = MenuBarMultiUsageIcon.size.height / 2 - glyphSpan / 2
+                XCTAssertEqual(baselines[0], lowerBaseline, accuracy: 0.01)
+                XCTAssertEqual(baselines[1], lowerBaseline + MenuBarMultiUsageIcon.twoLetterSlotHeight, accuracy: 0.01)
             } else {
                 XCTAssertEqual(
                     baselines[0] + font.capHeight,
@@ -129,6 +138,31 @@ final class MenuBarCodeLayoutTests: XCTestCase {
                 )
             }
         }
+
+        let twoLetterFont = MenuBarMultiUsageIcon.codeFont(for: 2)
+        let twoLetterBaselines = [
+            MenuBarMultiUsageIcon.codeBaselineY(
+                characterCount: 2,
+                index: 0,
+                font: twoLetterFont
+            ),
+            MenuBarMultiUsageIcon.codeBaselineY(
+                characterCount: 2,
+                index: 1,
+                font: twoLetterFont
+            ),
+        ]
+        let letterCenter = (
+            twoLetterBaselines[0]
+                + twoLetterBaselines[1]
+                + twoLetterFont.capHeight
+        ) / 2
+        XCTAssertEqual(
+            letterCenter,
+            MenuBarMultiUsageIcon.size.height / 2,
+            accuracy: 0.01,
+            "两字母短码应围绕菜单栏视觉中心"
+        )
     }
 
     func test上下样式使用放大的粗体数值和固定宽度() {

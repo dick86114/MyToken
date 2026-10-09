@@ -1,6 +1,7 @@
 package ai.routin.mytoken.feature.home
 
 import ai.routin.mytoken.domain.model.ProviderId
+import ai.routin.mytoken.domain.model.CredentialMetadataKey
 import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import ai.routin.mytoken.domain.model.UsageMetricSemantic
@@ -15,10 +16,10 @@ import java.util.Locale
 
 /** 与 macOS UsageShareTemplate 一一对应的四套分享模板。 */
 enum class UsageShareTemplate(val title: String, val previewTag: String) {
-    Ticket("深色票根", "深色票根模式"),
     TicketLight("浅色票根", "浅色票根模式"),
+    Ticket("深色票根", "深色票根模式"),
+    Light("雅致浅色", "雅致浅色模式"),
     Dark("暗色极客", "极客暗色模式"),
-    Light("雅致浅色", "雅致浅色模式");
 }
 
 enum class UsageShareAction { Copy, Save, Share }
@@ -52,6 +53,7 @@ data class UsageShareContent(
     val capturedAt: Instant,
     val capturedAtText: String,
     val providerId: ProviderId,
+    val websiteUrl: String? = null,
     val passCode: String,
     val avatarLetter: String,
     val isAvailable: Boolean,
@@ -71,7 +73,7 @@ data class UsageShareDraft(
     val showsStatus: Boolean = true,
     val showsNote: Boolean = true,
     val hiddenMetricIds: Set<String> = emptySet(),
-    val template: UsageShareTemplate = UsageShareTemplate.Ticket,
+    val template: UsageShareTemplate = UsageShareTemplate.TicketLight,
 ) {
     fun isMetricVisible(id: String): Boolean = id !in hiddenMetricIds
 
@@ -109,6 +111,8 @@ data class UsageShareRenderedCard(
     val groupMultiplierText: String?,
     val metrics: List<UsageShareMetricItem>,
     val capturedAtText: String,
+    val providerId: ProviderId,
+    val websiteUrl: String? = null,
     val showsWatermark: Boolean,
     val showsStatus: Boolean,
     val template: UsageShareTemplate,
@@ -159,6 +163,7 @@ object UsageShareContentBuilder {
                 .withZone(zone)
                 .format(now),
             providerId = providerId,
+            websiteUrl = card.credential.metadata[CredentialMetadataKey.WebsiteURL],
             passCode = "PASS #TK-${card.credential.id.toString().replace("-", "").take(4).uppercase(Locale.US)}",
             avatarLetter = card.credential.name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "M",
             isAvailable = card.error == null && !subscriptionExpired,
@@ -204,6 +209,8 @@ object UsageShareContentBuilder {
                     )
                 },
             capturedAtText = content.capturedAtText,
+            providerId = content.providerId,
+            websiteUrl = content.websiteUrl,
             showsWatermark = draft.showsWatermark,
             showsStatus = draft.showsStatus,
             template = draft.template,

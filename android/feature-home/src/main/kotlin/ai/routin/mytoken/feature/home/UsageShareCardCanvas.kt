@@ -1,5 +1,6 @@
 package ai.routin.mytoken.feature.home
 
+import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
@@ -12,6 +13,7 @@ import android.graphics.Typeface
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
+import androidx.core.content.ContextCompat
 
 /**
  * 分享图的唯一绘制实现：Compose 预览和 PNG 导出都通过这里渲染，
@@ -25,12 +27,17 @@ internal object UsageShareCardRenderer {
         return (RootPainter(Canvas(), card, 1f).measure() * (widthPx / CANVAS_WIDTH)).toInt()
     }
 
-    fun draw(canvas: Canvas, card: UsageShareRenderedCard, widthPx: Int) {
+    fun draw(
+        canvas: Canvas,
+        card: UsageShareRenderedCard,
+        widthPx: Int,
+        context: Context? = null,
+    ) {
         if (widthPx <= 0) return
         val save = canvas.save()
         val scale = widthPx / CANVAS_WIDTH
         canvas.scale(scale, scale)
-        RootPainter(canvas, card, 1f).draw()
+        RootPainter(canvas, card, 1f, context).draw()
         canvas.restoreToCount(save)
     }
 }
@@ -95,6 +102,7 @@ private class RootPainter(
     private val canvas: Canvas,
     private val card: UsageShareRenderedCard,
     private val d: Float,
+    private val context: Context? = null,
 ) {
     private val colors = when (card.template) {
         UsageShareTemplate.Ticket -> ShareColors.ticket(light = false)
@@ -474,6 +482,8 @@ private class RootPainter(
     private fun brandFooter(y: Float): Float {
         if (!card.showsWatermark) return y
         val top = y + 4f
+        val branding = ProviderShareBranding.make(card.providerId, card.websiteUrl)
+        val website = branding?.websiteUrl ?: MYTOKEN_WEBSITE_URL
         paint.shader = LinearGradient(
             left,
             top,
@@ -487,11 +497,18 @@ private class RootPainter(
         paint.shader = null
         paint.color = colors.brandBackground
         canvas.drawRect(left, top + d, left + contentWidth, top + 62f, paint)
-        drawBrandLogo(left + 16f, top + 20f, 22f)
+        drawBrandLogo(left + 16f, top + 20f, 22f, branding?.logoRes)
         drawText("MyToken", left + 48f, top + 27f, 11f, colors.brandTitle, bold = true)
         drawText("AI 用量，一目了然", left + 48f, top + 40f, 9f, colors.brandText)
-        drawText("https://mytoken.idickies.cc", left + 48f, top + 51f, 9f, colors.brandText, mono = true)
-        val qr = UsageShareBitmapFactory.qrCode(128)
+        drawText(
+            branding?.websiteDisplay ?: MYTOKEN_WEBSITE_DISPLAY,
+            left + 48f,
+            top + 51f,
+            9f,
+            colors.brandText,
+            mono = true,
+        )
+        val qr = UsageShareBitmapFactory.qrCode(128, website)
         canvas.drawBitmap(qr, null, RectF(left + contentWidth - 60f, top + 10f, left + contentWidth - 16f, top + 54f), paint)
         qr.recycle()
         return top + 62f
@@ -580,10 +597,34 @@ private class RootPainter(
         }
     }
 
-    private fun drawBrandLogo(cx: Float, cy: Float, size: Float) {
+    private fun drawBrandLogo(
+        cx: Float,
+        cy: Float,
+        size: Float,
+        logoRes: Int? = null,
+    ) {
+        if (logoRes != null) {
+            context?.let { context ->
+                ContextCompat.getDrawable(context, logoRes)?.let { drawable ->
+                    drawable.setBounds(
+                        cx.toInt(),
+                        cy.toInt(),
+                        (cx + size).toInt(),
+                        (cy + size).toInt(),
+                    )
+                    drawable.draw(canvas)
+                    return
+                }
+            }
+        }
         paint.color = 0xFFF59E0B.toInt()
         canvas.drawRoundRect(RectF(cx, cy, cx + size, cy + size), 6f * d, 6f * d, paint)
         drawText("M", cx + size / 2f, cy + size / 2f + 6f, 13f, Color.BLACK, bold = true, align = Paint.Align.CENTER)
+    }
+
+    private companion object {
+        const val MYTOKEN_WEBSITE_URL = "https://mytoken.idickies.cc/"
+        const val MYTOKEN_WEBSITE_DISPLAY = "https://mytoken.idickies.cc"
     }
 
     private fun drawHairline(y: Float, color: Int) {

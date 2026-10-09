@@ -33,7 +33,7 @@ internal class UsageShareCardRenderView(context: Context) : View(context) {
 
     override fun onDraw(canvas: android.graphics.Canvas) {
         val currentCard = card ?: return
-        UsageShareCardRenderer.draw(canvas, currentCard, width)
+        UsageShareCardRenderer.draw(canvas, currentCard, width, context)
     }
 }
 

@@ -1,10 +1,10 @@
 import Foundation
 
 enum UsageShareTemplate: String, CaseIterable, Identifiable, Equatable, Sendable {
-    case ticket
     case ticketLight
-    case dark
+    case ticket
     case light
+    case dark
 
     var id: String { rawValue }
 
@@ -58,6 +58,7 @@ struct UsageShareContent: Equatable, Sendable {
     let capturedAt: Date
     let capturedAtText: String
     let providerID: ProviderID
+    let websiteURL: URL?
     let passCode: String
     let avatarLetter: String
     let isAvailable: Bool
@@ -96,7 +97,7 @@ struct UsageShareDraft: Equatable, Sendable {
             showsStatus: true,
             showsNote: true,
             hiddenMetricIDs: [],
-            template: .ticket
+            template: .ticketLight
         )
     }
 
@@ -140,6 +141,8 @@ struct UsageShareRenderedCard: Equatable, Sendable {
     let groupMultiplierText: String?
     let metrics: [UsageShareMetricItem]
     let capturedAtText: String
+    let providerID: ProviderID
+    let websiteURL: URL?
     let showsWatermark: Bool
     let showsStatus: Bool
     let template: UsageShareTemplate
@@ -203,6 +206,7 @@ enum UsageShareContentBuilder {
             capturedAt: now,
             capturedAtText: timestampText(now, timeZone: timeZone),
             providerID: providerID,
+            websiteURL: state.configuration.websiteURL,
             passCode: passCode(for: credentialID),
             avatarLetter: avatarLetter(for: state.configuration.displayName, providerID: providerID),
             isAvailable: state.error == nil && !isExpired
@@ -244,6 +248,8 @@ enum UsageShareContentBuilder {
             groupMultiplierText: draft.showsGroupMultiplier ? content.groupMultiplierText : nil,
             metrics: metrics,
             capturedAtText: content.capturedAtText,
+            providerID: content.providerID,
+            websiteURL: content.websiteURL,
             showsWatermark: draft.showsWatermark,
             showsStatus: draft.showsStatus,
             template: draft.template,

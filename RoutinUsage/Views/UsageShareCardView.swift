@@ -892,19 +892,26 @@ struct UsageShareCardView: View {
         return .white
     }
 
-    private static let websiteURL = "https://mytoken.idickies.cc/"
-    private static let websiteDisplay = "https://mytoken.idickies.cc"
     private static let tagline = "AI 用量，一目了然"
 
     private var brandFooter: some View {
         Group {
             if card.showsWatermark {
+                let branding = ProviderShareBranding.make(
+                    providerID: card.providerID,
+                    websiteURL: card.websiteURL
+                )
+                let logoAssetName = branding?.logoAssetName
+                    ?? ProviderShareBranding.myTokenLogoAssetName
+                let websiteDisplay = branding?.websiteDisplay
+                    ?? ProviderShareBranding.myTokenWebsiteDisplay
+
                 VStack(spacing: 0) {
                     Rectangle()
                         .fill(LinearGradient(colors: shadowColors, startPoint: .leading, endPoint: .trailing))
                         .frame(height: 1)
                     HStack(spacing: 10) {
-                        Image(nsImage: NSImage(named: "PopoverColorBrandLogo") ?? NSApp.applicationIconImage)
+                        Image(nsImage: NSImage(named: logoAssetName) ?? NSApp.applicationIconImage)
                             .resizable()
                             .interpolation(.high)
                             .scaledToFit()
@@ -917,14 +924,17 @@ struct UsageShareCardView: View {
                             Text(Self.tagline)
                                 .font(.system(size: 9))
                                 .foregroundStyle(brandSubtext)
-                            Text(Self.websiteDisplay)
+                            Text(websiteDisplay)
                                 .font(.system(size: 9, design: .monospaced))
                                 .foregroundStyle(brandSubtext)
                         }
 
                         Spacer(minLength: 8)
 
-                        if let qr = Self.qrCodeImage {
+                        if let qr = Self.qrCodeImage(
+                            for: branding?.websiteURL
+                                ?? ProviderShareBranding.myTokenWebsiteURL
+                        ) {
                             Image(nsImage: qr)
                                 .resizable()
                                 .interpolation(.none)
@@ -967,9 +977,9 @@ struct UsageShareCardView: View {
         }
     }
 
-    private static var qrCodeImage: NSImage? {
+    private static func qrCodeImage(for url: URL) -> NSImage? {
         guard let filter = CIFilter(name: "CIQRCodeGenerator") else { return nil }
-        filter.setValue(Data(websiteURL.utf8), forKey: "inputMessage")
+        filter.setValue(Data(url.absoluteString.utf8), forKey: "inputMessage")
         filter.setValue("M", forKey: "inputCorrectionLevel")
         guard let output = filter.outputImage else { return nil }
         let scale = CGAffineTransform(scaleX: 8, y: 8)
