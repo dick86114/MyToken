@@ -9,7 +9,7 @@ MyToken 是一个 macOS 菜单栏用量监控工具，用于在本地查看多�
 - 高占用一目了然：≥80% 显示「即将耗尽」，50%–80% 显示「用量偏高」；刷新中卡片边框播放流星动效。
 - 刷新失败时头像右上角显示红色徽章，点击查看失败详情并一键重试。
 - 弹窗内百分比统一四舍五入为整数。
-- 支持 Routin、DeepSeek、GLM Coding Plan、火山方舟个人 Agent Plan/Coding Plan、New API、Command Code 和小米 MiMo。
+- 支持 Routin、DeepSeek、GLM Coding Plan、火山方舟个人 Agent Plan/Coding Plan、New API、Command Code、小米 MiMo 和 OpenCode Go / Go Plus。
 - 小米 MiMo 可分别查询 API 按量余额/消费或 Token Plan 订阅 Credits，额度与余额不会混算。
 - 小米 MiMo API 卡片按“账户余额、累计消费、现金余额、赠送余额”和“历史消耗、输出、命中缓存、未命中缓存”两行展示，Token 数值使用千分位格式。
 - 右键菜单支持切换账号、打开设置、检查更新和退出应用。
@@ -54,6 +54,7 @@ Android 端凭证密钥经 Android Keystore 加密保存在本机（不进入云
 2. 打开 DMG，将 `MyToken` 拖入“应用程序”文件夹。
 3. 启动应用，在设置中选择供应商并手动添加 API Key 或 Access Key/SecretAccessKey。
    小米 MiMo 当前需要从官方控制台复制网页 Cookie 或 `api-platform_serviceToken` 值，并选择 API 按量或 Token Plan。
+   OpenCode 需要创建 Console service account API Key；应用读取账户级订阅状态，因此同一订阅在多台设备上的消耗都会计入。
 4. 点击菜单栏中的 MyToken 图标查看用量。
 
 首次运行的未签名版本可能会被 macOS Gatekeeper 拦截。请前往“系统设置 → 隐私与安全性”，选择“仍要打开”，然后确认启动应用。
@@ -73,6 +74,8 @@ Android 端凭证密钥经 Android Keystore 加密保存在本机（不进入云
 升级过程中如果检测到上一轮测试版本遗留的 Keychain 项，应用只会尝试一次回迁到本地存储，成功后不再访问 Keychain。
 
 小米 MiMo 用量查询使用用户手动提供的网页 Cookie 或 `api-platform_serviceToken`。该值作为秘密凭证保存在本地存储中，仅用于直接请求小米官方平台，不会写入诊断日志。
+
+OpenCode Go / Go Plus 用量查询使用用户手动提供的 Console service account API Key。该 Key 作为秘密凭证保存在本地存储中，仅用于直接请求 OpenCode Console 状态接口，不会写入诊断日志。OpenCode 的该接口当前属于内部 API，若供应商调整结构，应用会显示具体诊断错误。
 
 卸载应用不会自动删除本地配置。如需彻底清除数据，请先在设置中删除所有凭证，再卸载应用。
 

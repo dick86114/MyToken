@@ -54,6 +54,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         NEW: { color: '#34D399', badge: 'rgba(52, 211, 153, 0.1)' },
         CMD: { color: '#22D3EE', badge: 'rgba(34, 211, 238, 0.1)' },
         MIMO: { color: '#00856F', badge: 'rgba(0, 133, 111, 0.12)' },
+        OC: { color: '#F2B705', badge: 'rgba(242, 183, 5, 0.12)' },
       };
 
       const masked = `${newKeyValue.slice(0, 3)}***${newKeyValue.slice(-4)}`;
@@ -205,6 +206,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <option value="NEW">New API</option>
                         <option value="CMD">Command Code</option>
                         <option value="MIMO">小米 MiMo</option>
+                        <option value="OC">OpenCode</option>
                       </select>
                     </div>
 

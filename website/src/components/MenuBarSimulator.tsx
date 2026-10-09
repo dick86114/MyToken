@@ -23,7 +23,7 @@ interface RealAccountCard {
   avatarChar: string;
   name: string;
   plan: string;
-  providerCode: 'GLM' | 'ROU' | 'DS' | 'VOL' | 'NEW' | 'CMD' | 'MIMO';
+  providerCode: 'GLM' | 'ROU' | 'DS' | 'VOL' | 'NEW' | 'CMD' | 'MIMO' | 'OC';
   overallStatus: string;
   overallStatusColor: string;
   startDate?: string;
@@ -422,6 +422,7 @@ const ProviderName: Record<string, string> = {
   NEW: 'New API',
   CMD: 'Command Code',
   MIMO: '小米 MiMo',
+  OC: 'OpenCode',
 };
 
 const ProviderAccent: Record<string, string> = {
@@ -432,6 +433,7 @@ const ProviderAccent: Record<string, string> = {
   NEW: '#a855f7',
   CMD: '#22d3ee',
   MIMO: '#ec4899',
+  OC: '#f2b705',
 };
 
 const metricTones = (card: RealAccountCard): Tone[] => {
@@ -705,6 +707,7 @@ export const MenuBarSimulator: React.FC<MenuBarSimulatorProps> = ({
             { label: 'New API', code: 'NEW' },
             { label: 'Command Code', code: 'CMD' },
             { label: '小米 MiMo', code: 'MIMO' },
+            { label: 'OpenCode', code: 'OC' },
           ].map((tab) => (
             <button
               key={tab.code}

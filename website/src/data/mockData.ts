@@ -137,6 +137,31 @@ export const INITIAL_PROVIDERS: ProviderItem[] = [
     detailPills: ['累计消费 ¥1.25', '命中缓存 2,695,553', '未命中 599,202'],
     lastUpdated: '10:42:18',
   },
+  {
+    id: 'oc-1',
+    code: 'OC',
+    name: 'OpenCode Go Plus',
+    keyMask: 'oc_sk_***d82a',
+    tagColor: '#F2B705',
+    badgeBg: 'rgba(242, 183, 5, 0.1)',
+    status: 'active',
+    statusLabel: '续费 2026-11-01 · 正常',
+    primaryMetric: '月度额度',
+    primaryValue: '37%',
+    progress1: {
+      label: '5 小时滚动',
+      value: 20,
+      display: '20%',
+    },
+    progress2: {
+      label: '周额度',
+      value: 33,
+      display: '33%',
+    },
+    subMetric: '月度剩余',
+    subValue: '$94.80 / $150.00',
+    lastUpdated: '10:42:18',
+  },
 ];
 
 export const MATRIX_DATA: MatrixRow[] = [
@@ -283,6 +308,26 @@ export const MATRIX_DATA: MatrixRow[] = [
     officialDocUrl: 'https://platform.xiaomimimo.com',
     sampleEndpoint: 'https://platform.xiaomimimo.com/api/v1/balance',
   },
+  {
+    provider: 'OpenCode',
+    code: 'OC',
+    color: '#F2B705',
+    credential: 'Console Service API Key (Bearer)',
+    credentialFormat: 'oc_sk_xxxxxxxxxxxxxxxx',
+    metrics: [
+      '5 小时滚动限额',
+      '周限额',
+      '月限额 / 剩余额度',
+      '续费 / 到期与支付状态',
+    ],
+    exclusiveFeatures: [
+      '账户级 Go / Go Plus 用量统计，覆盖多设备共享套餐',
+      '订阅周期与取消续订状态识别',
+      '续费处理中、重新授权等支付状态单独提示',
+    ],
+    officialDocUrl: 'https://opencode.ai/v2/docs/console/go',
+    sampleEndpoint: 'https://opencode.ai/console/api/go/status',
+  },
 ];
 
 export const FAQS: FaqItem[] = [
@@ -315,6 +360,12 @@ export const FAQS: FaqItem[] = [
     question: '小米 MiMo 支持哪些查询方式？',
     answer:
       '支持 API 按量和 Token Plan 两种模式。API 模式展示账户余额、累计消费、现金余额、赠送余额，以及历史消耗、输出、命中缓存和未命中缓存；Token Plan 模式展示套餐周期额度与订阅状态。',
+  },
+  {
+    id: 'faq-opencode',
+    question: 'OpenCode 需要哪种 API Key？',
+    answer:
+      '请使用 OpenCode Console 的 service account API Key。MyToken 会直接读取账户级 Go / Go Plus 状态，因此同一订阅在多台设备上的消耗都会计入；普通模型推理 Key 没有 Console 状态权限。',
   },
   {
     id: 'faq-5',
