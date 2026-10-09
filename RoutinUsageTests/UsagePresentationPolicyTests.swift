@@ -556,12 +556,16 @@ final class UsagePresentationPolicyTests: XCTestCase {
         let balanceStart = try XCTUnwrap(source.range(of: "private func compactBalanceCard"))
         let headerStart = try XCTUnwrap(source.range(of: "private func compactHeader"))
         let balanceCard = String(source[balanceStart.lowerBound..<headerStart.lowerBound])
-        XCTAssertTrue(balanceCard.contains("compactIdentity(showsPlanBelowProvider: true)"))
+        XCTAssertTrue(
+            balanceCard.contains(
+                "compactIdentity(showsPlanBelowProvider: true, remainingText: remainingText)"
+            )
+        )
         XCTAssertFalse(balanceCard.contains("compactIdentity(showsPlanBelowProvider: false)"))
 
         let standardStart = try XCTUnwrap(source.range(of: "private func compactStandardCard"))
         let standardCard = String(source[standardStart.lowerBound..<balanceStart.lowerBound])
-        XCTAssertTrue(standardCard.contains("compactHeader()"))
+        XCTAssertTrue(standardCard.contains("compactHeader(remainingText: remainingText)"))
 
         let headerEnd = try XCTUnwrap(
             source.range(
@@ -570,7 +574,11 @@ final class UsagePresentationPolicyTests: XCTestCase {
             )
         )
         let header = String(source[headerStart.lowerBound..<headerEnd.lowerBound])
-        XCTAssertTrue(header.contains("compactIdentity(showsPlanBelowProvider: false)"))
+        XCTAssertTrue(
+            header.contains(
+                "compactIdentity(showsPlanBelowProvider: false, remainingText: remainingText)"
+            )
+        )
         XCTAssertFalse(header.contains("compactIdentity(showsPlanBelowProvider: true)"))
 
         let componentStart = try XCTUnwrap(source.range(of: "private struct ProviderWebsiteLink"))
