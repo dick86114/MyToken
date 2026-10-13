@@ -28,7 +28,7 @@ class WidgetConfigurationUiStateTest {
             snapshots = emptyMap(),
         )
 
-        assertEquals(WidgetDisplayStyle.Auto, state.selectedStyle)
+        assertEquals(WidgetDisplayStyle.FocusRing, state.selectedStyle)
         assertEquals(WidgetOverviewSource.AllEnabled, state.selectedOverviewSource)
         assertEquals(listOf(enabled.id), state.overviewCredentials.map { it.id })
     }
@@ -61,7 +61,10 @@ class WidgetConfigurationUiStateTest {
             snapshots = emptyMap(),
         )
 
-        assertEquals(WidgetDisplayStyle.entries, state.allowedStyles)
+        assertEquals(
+            listOf(WidgetDisplayStyle.FocusRing, WidgetDisplayStyle.ScanBand, WidgetDisplayStyle.SignalTiles),
+            state.allowedStyles,
+        )
         assertEquals(WidgetOverviewSource.entries, state.allowedOverviewSources)
         assertFalse(state.supportsSecondaryMetricOrdering)
         assertFalse(state.supportsColorTheme)

@@ -164,7 +164,12 @@ private fun WidgetConfigurationScreen(
             cachedSnapshot = { id -> graph.credentialRepository.cachedSnapshot(id) },
         )
     }
-    var style by remember { mutableStateOf(initialConfig.style) }
+    var style by remember {
+        mutableStateOf(
+            initialConfig.style.takeIf { it in USER_SELECTABLE_STYLES }
+                ?: WidgetDisplayStyle.FocusRing
+        )
+    }
     var selectedCredentialId by remember { mutableStateOf(initialConfig.credentialId) }
     var overviewSource by remember { mutableStateOf(initialConfig.overviewSource) }
     var overviewIds by remember { mutableStateOf(initialConfig.limitedOverviewCredentialIds) }
@@ -196,7 +201,7 @@ private fun WidgetConfigurationScreen(
         )
         Text("视觉风格", style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            WidgetDisplayStyle.entries.forEach { option ->
+            USER_SELECTABLE_STYLES.forEach { option ->
                 FilterChip(
                     selected = style == option,
                     onClick = { style = option },
@@ -277,16 +282,17 @@ private fun ConfigurationPreview(preview: WidgetPresentation?) {
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         val credential = preview?.credentials?.firstOrNull()
-        val accent = WidgetProviderPalette.accentColor(credential?.providerId.orEmpty())
+        val progressColors = WidgetProgressColors(androidx.compose.ui.platform.LocalContext.current)
         Text(
             text = credential?.name ?: "暂无预览",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )
         when (preview?.style) {
-            WidgetDisplayStyle.ScanBand -> PreviewScanBand(credential, accent)
-            WidgetDisplayStyle.SignalTiles -> PreviewSignalTiles(credential, accent)
-            WidgetDisplayStyle.FocusRing, WidgetDisplayStyle.Auto, null -> PreviewFocusRing(credential, accent)
+            WidgetDisplayStyle.ScanBand -> PreviewScanBand(credential, progressColors)
+            WidgetDisplayStyle.SignalTiles -> PreviewSignalTiles(credential, progressColors)
+            WidgetDisplayStyle.FocusRing, WidgetDisplayStyle.Auto, null ->
+                PreviewFocusRing(credential, progressColors)
         }
         Text(
             text = preview?.style?.displayName() ?: "自动",
@@ -297,7 +303,10 @@ private fun ConfigurationPreview(preview: WidgetPresentation?) {
 }
 
 @Composable
-private fun PreviewFocusRing(credential: WidgetCredentialPresentation?, accent: androidx.compose.ui.graphics.Color) {
+private fun PreviewFocusRing(
+    credential: WidgetCredentialPresentation?,
+    progressColors: WidgetProgressColors,
+) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         credential?.let {
             WidgetFocusRingPolicy.metrics(it).forEach { metric ->
@@ -309,7 +318,7 @@ private fun PreviewFocusRing(credential: WidgetCredentialPresentation?, accent: 
                     Column(
                         modifier = Modifier
                             .size(68.dp)
-                            .border(7.dp, accent, CircleShape),
+                            .border(7.dp, progressColors.composeColor(metric.severity), CircleShape),
                         horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
@@ -323,16 +332,22 @@ private fun PreviewFocusRing(credential: WidgetCredentialPresentation?, accent: 
 }
 
 @Composable
-private fun PreviewScanBand(credential: WidgetCredentialPresentation?, accent: androidx.compose.ui.graphics.Color) {
+private fun PreviewScanBand(
+    credential: WidgetCredentialPresentation?,
+    progressColors: WidgetProgressColors,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
         credential?.orderedMetrics?.take(3)?.forEach { metric ->
-            PreviewMetricRow(metric, accent)
+            PreviewMetricRow(metric, progressColors)
         }
     }
 }
 
 @Composable
-private fun PreviewSignalTiles(credential: WidgetCredentialPresentation?, accent: androidx.compose.ui.graphics.Color) {
+private fun PreviewSignalTiles(
+    credential: WidgetCredentialPresentation?,
+    progressColors: WidgetProgressColors,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         credential?.orderedMetrics?.take(6)?.chunked(3)?.forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -345,7 +360,7 @@ private fun PreviewSignalTiles(credential: WidgetCredentialPresentation?, accent
                     ) {
                         Text(metric.label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                         Text(metric.valueText, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        PreviewBar(metric.progressPercent, accent)
+                        PreviewBar(metric.progressPercent, progressColors.composeColor(metric.severity))
                     }
                 }
                 repeat(3 - row.size) { Spacer(modifier = Modifier.weight(1f)) }
@@ -357,14 +372,14 @@ private fun PreviewSignalTiles(credential: WidgetCredentialPresentation?, accent
 @Composable
 private fun PreviewMetricRow(
     metric: ai.routin.mytoken.widget.WidgetMetricPresentation,
-    accent: androidx.compose.ui.graphics.Color,
+    progressColors: WidgetProgressColors,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row {
             Text(metric.label, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f), maxLines = 1)
             Text(metric.valueText, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
         }
-        PreviewBar(metric.progressPercent, accent)
+        PreviewBar(metric.progressPercent, progressColors.composeColor(metric.severity))
     }
 }
 

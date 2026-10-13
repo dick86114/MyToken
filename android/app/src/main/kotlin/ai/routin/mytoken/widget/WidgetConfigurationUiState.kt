@@ -25,6 +25,8 @@ fun resolveConfigurationUiState(
     snapshots: Map<UUID, UsageSnapshot?>,
     size: WidgetSizeKind = WidgetSizeKind.Standard,
 ): WidgetConfigurationUiState {
+    val effectiveStyle = config.style.takeIf { it in USER_SELECTABLE_STYLES }
+        ?: WidgetDisplayStyle.FocusRing
     val enabledCredentials = credentials.filter(Credential::isEnabled)
     val overviewCredentials = when (config.overviewSource) {
         WidgetOverviewSource.AllEnabled -> enabledCredentials.sortedBy(Credential::sortOrder)
@@ -42,26 +44,32 @@ fun resolveConfigurationUiState(
                 WidgetPresentationBuilder.makeCredentialPresentation(
                     credential = credential,
                     snapshot = snapshots[credential.id],
-                    style = config.style,
+                    style = effectiveStyle,
                     size = size,
                     fixedMetricId = config.primaryMetricId,
                 )
             }
         WidgetKind.Overview -> WidgetPresentationBuilder.makeOverviewPresentation(
             entries = overviewCredentials.map { it to snapshots[it.id] },
-            style = config.style,
+            style = effectiveStyle,
             size = size,
         )
     }
     return WidgetConfigurationUiState(
-        selectedStyle = config.style,
+        selectedStyle = effectiveStyle,
         selectedOverviewSource = config.overviewSource,
         selectedCredentialId = config.credentialId,
         selectedPrimaryMetricId = config.primaryMetricId,
-        allowedStyles = WidgetDisplayStyle.entries,
+        allowedStyles = USER_SELECTABLE_STYLES,
         allowedOverviewSources = WidgetOverviewSource.entries,
         selectableCredentials = enabledCredentials.sortedBy(Credential::sortOrder),
         overviewCredentials = overviewCredentials,
         preview = preview,
     )
 }
+
+internal val USER_SELECTABLE_STYLES = listOf(
+    WidgetDisplayStyle.FocusRing,
+    WidgetDisplayStyle.ScanBand,
+    WidgetDisplayStyle.SignalTiles,
+)

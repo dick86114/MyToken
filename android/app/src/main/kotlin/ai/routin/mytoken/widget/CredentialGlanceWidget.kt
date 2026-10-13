@@ -10,6 +10,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceModifier
+import androidx.glance.Image
+import androidx.glance.ImageProvider
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.LinearProgressIndicator
 import androidx.glance.appwidget.action.actionRunCallback
@@ -85,9 +87,7 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
         presentation: WidgetPresentation,
     ) {
         val credential = presentation.credential
-        val accent = ColorProvider(
-            WidgetProviderPalette.accentColor(credential?.providerId.orEmpty())
-        )
+        val progressColors = WidgetProgressColors(context)
         val openDetail = actionStartActivity(
             Intent(context, MainActivity::class.java)
                 .setAction(MainActivity.ACTION_OPEN_CREDENTIAL)
@@ -108,7 +108,7 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
                 Column(modifier = GlanceModifier.defaultWeight()) {
                     Text(
                         text = credential?.providerName?.uppercase() ?: "MYTOKEN",
-                        style = providerStyle(accent),
+                        style = labelStyle(),
                         maxLines = WidgetTextLayoutPolicy.lineLimit(WidgetTextRole.ProviderName),
                     )
                     Text(
@@ -143,9 +143,10 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
                     StatusMessage("该套餐暂无可用指标")
                 } else {
                     when (presentation.style) {
-                        WidgetDisplayStyle.ScanBand -> ScanBandContent(credential, accent)
-                        WidgetDisplayStyle.SignalTiles -> SignalTilesContent(credential, accent)
-                        WidgetDisplayStyle.FocusRing, WidgetDisplayStyle.Auto -> FocusRings(credential, accent)
+                        WidgetDisplayStyle.ScanBand -> ScanBandContent(credential, progressColors)
+                        WidgetDisplayStyle.SignalTiles -> SignalTilesContent(credential, progressColors)
+                        WidgetDisplayStyle.FocusRing, WidgetDisplayStyle.Auto ->
+                            FocusRings(credential, progressColors)
                     }
                 }
                 Spacer(modifier = GlanceModifier.defaultWeight())
@@ -192,7 +193,7 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
     @Composable
     private fun FocusRings(
         credential: WidgetCredentialPresentation,
-        accent: ColorProvider,
+        colors: WidgetProgressColors,
     ) {
         Row(
             modifier = GlanceModifier.fillMaxWidth(),
@@ -205,31 +206,26 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
                         .padding(3.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Box(
+                    Image(
+                        provider = ImageProvider(
+                            WidgetRingRenderer.bitmap(
+                                percent = metric.progressPercent,
+                                color = colors.colorInt(metric.severity),
+                                trackColor = colors.trackColorInt,
+                            )
+                        ),
+                        contentDescription = null,
                         modifier = GlanceModifier
                             .width(68.dp)
-                            .height(68.dp)
-                            .background(metricColor(metric, accent))
-                            .cornerRadius(34.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Box(
-                            modifier = GlanceModifier
-                                .width(50.dp)
-                                .height(50.dp)
-                                .background(ColorProvider(R.color.widget_glance_surface))
-                                .cornerRadius(25.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(text = metric.valueText, style = valueStyle(), maxLines = 1)
-                                Text(
-                                    text = metric.label,
-                                    style = labelStyle(),
-                                    maxLines = WidgetTextLayoutPolicy.lineLimit(WidgetTextRole.MetricLabel),
-                                )
-                            }
-                        }
+                            .height(68.dp),
+                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(text = metric.valueText, style = valueStyle(), maxLines = 1)
+                        Text(
+                            text = metric.label,
+                            style = labelStyle(),
+                            maxLines = WidgetTextLayoutPolicy.lineLimit(WidgetTextRole.MetricLabel),
+                        )
                     }
                 }
             }
@@ -239,7 +235,7 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
     @Composable
     private fun ScanBandContent(
         credential: WidgetCredentialPresentation,
-        accent: ColorProvider,
+        colors: WidgetProgressColors,
     ) {
         Column {
             credential.orderedMetrics.take(3).forEach { metric ->
@@ -253,7 +249,7 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
                     Text(text = metric.valueText, style = valueStyle(), maxLines = 1)
                 }
                 Spacer(modifier = GlanceModifier.height(3.dp))
-                MetricBar(metric, accent)
+                MetricBar(metric, colors, thicknessDp = 6)
                 Spacer(modifier = GlanceModifier.height(7.dp))
             }
         }
@@ -262,28 +258,22 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
     @Composable
     private fun SignalTilesContent(
         credential: WidgetCredentialPresentation,
-        accent: ColorProvider,
+        colors: WidgetProgressColors,
     ) {
         Column {
-            credential.orderedMetrics.take(6).chunked(3).forEach { row ->
-                Row(modifier = GlanceModifier.fillMaxWidth()) {
-                    row.forEach { metric ->
-                        Column(
-                            modifier = GlanceModifier
-                                .defaultWeight()
-                                .padding(3.dp),
-                        ) {
-                            Text(
-                                text = metric.label,
-                                style = labelStyle(),
-                                maxLines = 1,
-                            )
-                            Text(text = metric.valueText, style = valueStyle(), maxLines = 1)
-                            MetricBar(metric, accent)
-                        }
-                    }
+            credential.orderedMetrics.take(6).forEach { metric ->
+                Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
+                    Text(
+                        text = metric.label,
+                        modifier = GlanceModifier.defaultWeight(),
+                        style = labelStyle(),
+                        maxLines = 1,
+                    )
+                    Text(text = metric.valueText, style = valueStyle(), maxLines = 1)
                 }
-                Spacer(modifier = GlanceModifier.height(5.dp))
+                Spacer(modifier = GlanceModifier.height(3.dp))
+                MetricBar(metric, colors, thicknessDp = 12)
+                Spacer(modifier = GlanceModifier.height(7.dp))
             }
         }
     }
@@ -291,41 +281,21 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
     @Composable
     private fun MetricBar(
         metric: WidgetMetricPresentation,
-        accent: ColorProvider,
+        colors: WidgetProgressColors,
+        thicknessDp: Int,
     ) {
         LinearProgressIndicator(
             progress = (metric.progressPercent ?: 0).coerceIn(0, 100) / 100f,
             modifier = GlanceModifier
                 .fillMaxWidth()
-                .height(4.dp),
-            color = metricColor(metric, accent),
+                .height(thicknessDp.dp),
+            color = colors.provider(metric.severity),
         )
-    }
-
-    private fun metricColor(
-        metric: WidgetMetricPresentation,
-        accent: ColorProvider,
-    ): ColorProvider = when (metric.severity) {
-        WidgetMetricSeverity.Normal -> accent
-        else -> severityColor(metric.severity)
-    }
-
-    private fun severityColor(severity: WidgetMetricSeverity?): ColorProvider = when (severity) {
-        WidgetMetricSeverity.Warning -> ColorProvider(R.color.widget_glance_warning)
-        WidgetMetricSeverity.Critical -> ColorProvider(R.color.widget_glance_critical)
-        WidgetMetricSeverity.Unavailable -> ColorProvider(R.color.widget_glance_unavailable)
-        WidgetMetricSeverity.Normal, null -> ColorProvider(R.color.widget_glance_accent)
     }
 
     private fun labelStyle() = TextStyle(
         color = ColorProvider(R.color.widget_glance_label),
         fontSize = 10.sp,
-    )
-
-    private fun providerStyle(accent: ColorProvider) = TextStyle(
-        color = accent,
-        fontSize = 10.sp,
-        fontWeight = FontWeight.Bold,
     )
 
     private fun titleStyle() = TextStyle(
