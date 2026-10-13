@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_glance_surface">#172033</color>
+    <color name="widget_glance_track">#33E2E8F0</color>
+    <color name="widget_glance_label">#CBD5E1</color>
+    <color name="widget_glance_title">#F8FAFC</color>
+    <color name="widget_glance_accent">#60A5FA</color>
+    <color name="widget_glance_warning">#F59E0B</color>
+    <color name="widget_glance_critical">#F87171</color>
+    <color name="widget_glance_unavailable">#64748B</color>
+</resources>

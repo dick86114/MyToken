@@ -2,11 +2,11 @@ package ai.routin.mytoken.widget
 
 import ai.routin.mytoken.MainActivity
 import ai.routin.mytoken.MyTokenApplication
+import ai.routin.mytoken.R
 import ai.routin.mytoken.domain.model.AppError
 import android.content.Context
 import android.content.Intent
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceModifier
@@ -93,7 +93,7 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
-                .background(ColorProvider(Color(0xFFF8FAFC)))
+                .background(ColorProvider(R.color.widget_glance_surface))
                 .cornerRadius(22.dp)
                 .clickable(openDetail)
                 .padding(14.dp),
@@ -162,7 +162,7 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
                 modifier = GlanceModifier
                     .fillMaxWidth()
                     .height(12.dp)
-                    .background(ColorProvider(Color(0x1F64748B)))
+                    .background(ColorProvider(R.color.widget_glance_track))
                     .cornerRadius(6.dp),
             ) {}
             Spacer(modifier = GlanceModifier.height(8.dp))
@@ -170,7 +170,7 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
                 modifier = GlanceModifier
                     .fillMaxWidth()
                     .height(48.dp)
-                    .background(ColorProvider(Color(0x1F64748B)))
+                    .background(ColorProvider(R.color.widget_glance_track))
                     .cornerRadius(10.dp),
             ) {}
         }
@@ -268,25 +268,25 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
     }
 
     private fun severityColor(severity: WidgetMetricSeverity?): ColorProvider = when (severity) {
-        WidgetMetricSeverity.Warning -> ColorProvider(Color(0xFFD97706))
-        WidgetMetricSeverity.Critical -> ColorProvider(Color(0xFFDC2626))
-        WidgetMetricSeverity.Unavailable -> ColorProvider(Color(0xFF94A3B8))
-        WidgetMetricSeverity.Normal, null -> ColorProvider(Color(0xFF2563EB))
+        WidgetMetricSeverity.Warning -> ColorProvider(R.color.widget_glance_warning)
+        WidgetMetricSeverity.Critical -> ColorProvider(R.color.widget_glance_critical)
+        WidgetMetricSeverity.Unavailable -> ColorProvider(R.color.widget_glance_unavailable)
+        WidgetMetricSeverity.Normal, null -> ColorProvider(R.color.widget_glance_accent)
     }
 
     private fun labelStyle() = TextStyle(
-        color = ColorProvider(Color(0xFF64748B)),
+        color = ColorProvider(R.color.widget_glance_label),
         fontSize = 10.sp,
     )
 
     private fun titleStyle() = TextStyle(
-        color = ColorProvider(Color(0xFF0F172A)),
+        color = ColorProvider(R.color.widget_glance_title),
         fontSize = 14.sp,
         fontWeight = FontWeight.Bold,
     )
 
     private fun valueStyle() = TextStyle(
-        color = ColorProvider(Color(0xFF0F172A)),
+        color = ColorProvider(R.color.widget_glance_title),
         fontSize = 13.sp,
         fontWeight = FontWeight.Medium,
         textAlign = TextAlign.Center,
