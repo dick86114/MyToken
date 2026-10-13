@@ -37,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import java.util.UUID
 import kotlinx.coroutines.launch
 
@@ -55,7 +56,7 @@ class CredentialWidgetConfigActivity : ComponentActivity() {
         }
 
         val graph = (application as MyTokenApplication).graph
-        val store = WidgetSelectionStore(this)
+        val store = WidgetConfigStore(this)
         setContent {
             val displaySettings by graph.displaySettingsStore.settings
                 .collectAsState(initial = DisplaySettings())
@@ -73,12 +74,22 @@ class CredentialWidgetConfigActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     CredentialSelector(
                         title = if (intent?.action == ACTION_EDIT_WIDGET) "更换凭证" else "选择小组件凭证",
-                        selectedId = store.selectedCredentialId(appWidgetId),
+                        selectedId = store.load(appWidgetId, WidgetKind.Credential).credentialId,
                         credentials = selectableCredentials,
                         onSelect = { credential ->
                             scope.launch {
-                                store.setSelectedCredential(appWidgetId, credential.id)
-                                CredentialWidgetUpdater.update(this@CredentialWidgetConfigActivity, graph, appWidgetId)
+                                store.save(
+                                    appWidgetId,
+                                    WidgetConfig(
+                                        kind = WidgetKind.Credential,
+                                        credentialId = credential.id,
+                                    ),
+                                )
+                                CredentialGlanceWidget().update(
+                                    this@CredentialWidgetConfigActivity,
+                                    GlanceAppWidgetManager(this@CredentialWidgetConfigActivity)
+                                        .getGlanceIdBy(appWidgetId),
+                                )
                                 setResult(
                                     Activity.RESULT_OK,
                                     Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId),

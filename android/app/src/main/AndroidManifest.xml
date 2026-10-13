@@ -57,7 +57,7 @@
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/credential_widget_info" />
+                android:resource="@xml/credential_widget_info_v2" />
         </receiver>
 
         <service
