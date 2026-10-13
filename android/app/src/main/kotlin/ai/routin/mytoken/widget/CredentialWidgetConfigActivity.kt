@@ -52,7 +52,6 @@ import ai.routin.mytoken.domain.model.UsageSnapshot
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 
 class CredentialWidgetConfigActivity : ComponentActivity() {
 
@@ -96,16 +95,6 @@ class CredentialWidgetConfigActivity : ComponentActivity() {
                     save = store::save,
                     enqueueRefresh = {
                         WidgetRefresher.enqueue(this@CredentialWidgetConfigActivity)
-                    },
-                    refreshNow = { config ->
-                        withTimeoutOrNull(15_000) {
-                            when (kind) {
-                                WidgetKind.Credential -> config.credentialId
-                                    ?.let { id -> credentials.firstOrNull { it.id == id } }
-                                    ?.let { credential -> graph.refreshUseCase.refresh(credential) }
-                                WidgetKind.Overview -> graph.refreshUseCase.refreshAll()
-                            }
-                        }
                     },
                     updateWidget = { widgetId ->
                         val widget: GlanceAppWidget = when (kind) {

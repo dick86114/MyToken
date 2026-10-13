@@ -13,6 +13,8 @@ import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.LinearProgressIndicator
+import androidx.glance.appwidget.CircularProgressIndicator
+import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.background
@@ -74,8 +76,17 @@ class OverviewGlanceWidget : MyTokenGlanceWidget() {
                 .cornerRadius(22.dp)
                 .padding(14.dp),
         ) {
-            Row(modifier = GlanceModifier.fillMaxWidth()) {
-                Text(text = "MyToken 总览", style = labelStyle(), maxLines = 1)
+            Row(
+                modifier = GlanceModifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Vertical.CenterVertically,
+            ) {
+                Text(
+                    text = "MyToken 总览",
+                    modifier = GlanceModifier.defaultWeight(),
+                    style = labelStyle(),
+                    maxLines = 1,
+                )
+                RefreshControl(context)
             }
             Spacer(modifier = GlanceModifier.height(7.dp))
             if (presentation.credentials.isEmpty()) {
@@ -99,6 +110,29 @@ class OverviewGlanceWidget : MyTokenGlanceWidget() {
                         OverviewSignalTiles(context, presentation.credentials, progressColors)
                 }
             }
+        }
+    }
+
+    @Composable
+    private fun RefreshControl(context: Context) {
+        if (WidgetRefreshStateStore(context).isRefreshing()) {
+            CircularProgressIndicator(
+                modifier = GlanceModifier
+                    .width(20.dp)
+                    .height(20.dp)
+                    .padding(2.dp),
+                color = ColorProvider(R.color.widget_glance_accent),
+            )
+        } else {
+            Image(
+                provider = ImageProvider(android.R.drawable.ic_popup_sync),
+                contentDescription = "刷新",
+                modifier = GlanceModifier
+                    .width(20.dp)
+                    .height(20.dp)
+                    .clickable(actionRunCallback<WidgetRefreshAction>())
+                    .padding(2.dp),
+            )
         }
     }
 

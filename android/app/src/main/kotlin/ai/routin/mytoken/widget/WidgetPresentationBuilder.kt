@@ -124,7 +124,7 @@ object WidgetPresentationBuilder {
         val percent = progressPercent(metric)
         return WidgetMetricPresentation(
             id = metric.id,
-            label = metric.label,
+            label = displayLabel(metric),
             valueText = valueText(metric, percent),
             detailText = detailText(metric, providerId),
             resetText = metric.windowEnd?.let {
@@ -163,6 +163,16 @@ object WidgetPresentationBuilder {
             }
         }
         else -> ""
+    }
+
+    private fun displayLabel(metric: UsageMetric): String = when {
+        metric.id == "five-hour" || metric.id == "fiveHour" -> "5h"
+        metric.id == "weekly" -> "周"
+        metric.id == "monthly" -> "月"
+        metric.label.contains("5 小时") || metric.label.contains("5小时") -> "5h"
+        metric.label.contains("每周") || metric.label.contains("周用量") -> "周"
+        metric.label.contains("每月") || metric.label.contains("月用量") -> "月"
+        else -> metric.label
     }
 
     private fun progressPercent(metric: UsageMetric): Double? {

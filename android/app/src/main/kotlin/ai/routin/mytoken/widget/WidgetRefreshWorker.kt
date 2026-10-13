@@ -14,6 +14,7 @@ class WidgetRefreshWorker(
 
     override suspend fun doWork(): Result {
         val graph = (applicationContext as MyTokenApplication).graph
+        val refreshStateStore = WidgetRefreshStateStore(applicationContext)
         val store = WidgetConfigStore(applicationContext)
         val requiredIds = store.requiredCredentialIds()
         val enabledCredentials = graph.credentialRepository.observeCredentials()
@@ -35,6 +36,11 @@ class WidgetRefreshWorker(
                 CredentialWidgetUpdater.updateAll(applicationContext, graph)
             },
         )
-        return if (coordinator.refresh(credentials)) Result.success() else Result.retry()
+        return try {
+            if (coordinator.refresh(credentials)) Result.success() else Result.retry()
+        } finally {
+            refreshStateStore.setRefreshing(false)
+            runCatching { CredentialWidgetUpdater.updateAll(applicationContext, graph) }
+        }
     }
 }

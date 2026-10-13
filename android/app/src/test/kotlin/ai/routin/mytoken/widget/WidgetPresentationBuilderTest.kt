@@ -97,10 +97,10 @@ class WidgetPresentationBuilderTest {
         )
 
         assertEquals(
-            listOf("five-hour", "weekly", "monthly", "model-calls"),
+            listOf("five-hour", "weekly", "monthly"),
             presentation.credential?.orderedMetrics?.map { it.id },
         )
-        assertEquals("5 小时用量", presentation.credential?.primary?.label)
+        assertEquals("5h", presentation.credential?.primary?.label)
         assertEquals("", presentation.credential?.primary?.detailText)
         assertEquals("重置 14:00", presentation.credential?.primary?.resetText)
     }

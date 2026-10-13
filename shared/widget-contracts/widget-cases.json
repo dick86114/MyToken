@@ -70,12 +70,11 @@
         "sortOrder": 2,
         "isStale": false,
         "metrics": [
-          {"id":"model-calls","label":"模型调用量","presentation":"value","semantic":"value","unit":"request","value":12},
           {"id":"five-hour","label":"五小时用量","presentation":"progress","semantic":"usedQuota","unit":"token","used":20,"limit":100,"remaining":80}
         ]
       },
       "expectedPrimaryMetricID": "five-hour",
-      "expectedMetricIDs": ["five-hour", "model-calls"],
+      "expectedMetricIDs": ["five-hour"],
       "expectedFixedMetricUnavailable": false,
       "expectedValueTexts": {"five-hour": "20%"}
     },

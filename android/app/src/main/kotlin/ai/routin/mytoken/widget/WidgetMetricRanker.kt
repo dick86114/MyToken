@@ -25,13 +25,22 @@ object WidgetMetricRanker {
     }
 
     private fun orderedMetrics(providerId: ProviderId?, metrics: List<UsageMetric>): List<UsageMetric> =
-        orderedByPriority(metrics, WINDOW_PRIORITY + providerPriority(providerId))
+        orderedByPriority(
+            if (providerId == ProviderId.Glm) {
+                metrics.filter {
+                    it.presentation == ai.routin.mytoken.domain.model.UsageMetricPresentation.Progress
+                }
+            } else {
+                metrics
+            },
+            WINDOW_PRIORITY + providerPriority(providerId),
+        )
 
     private fun providerPriority(providerId: ProviderId?): List<String> =
         when (providerId) {
             ProviderId.Routin -> listOf("token")
             ProviderId.DeepSeek -> listOf("balance", "grantedBalance", "toppedUpBalance", "availability")
-            ProviderId.Glm -> listOf("model-calls", "zcode-mcp")
+            ProviderId.Glm -> emptyList()
             ProviderId.NewAPI -> listOf(
                     "quota-progress",
                     "today-token",

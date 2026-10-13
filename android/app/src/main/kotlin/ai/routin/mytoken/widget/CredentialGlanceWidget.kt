@@ -14,6 +14,7 @@ import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.LinearProgressIndicator
+import androidx.glance.appwidget.CircularProgressIndicator
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
@@ -118,14 +119,7 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
                     )
                 }
                 if (credential != null) {
-                    Text(
-                        text = "刷新",
-                        modifier = GlanceModifier
-                            .clickable(actionRunCallback<WidgetRefreshAction>())
-                            .padding(4.dp),
-                        style = labelStyle(),
-                        maxLines = 1,
-                    )
+                    RefreshControl(context)
                 }
             }
             Spacer(modifier = GlanceModifier.height(8.dp))
@@ -156,6 +150,29 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
                     maxLines = WidgetTextLayoutPolicy.lineLimit(WidgetTextRole.StatusText),
                 )
             }
+        }
+    }
+
+    @Composable
+    private fun RefreshControl(context: Context) {
+        if (WidgetRefreshStateStore(context).isRefreshing()) {
+            CircularProgressIndicator(
+                modifier = GlanceModifier
+                    .width(20.dp)
+                    .height(20.dp)
+                    .padding(2.dp),
+                color = ColorProvider(R.color.widget_glance_accent),
+            )
+        } else {
+            Image(
+                provider = ImageProvider(android.R.drawable.ic_popup_sync),
+                contentDescription = "刷新",
+                modifier = GlanceModifier
+                    .width(20.dp)
+                    .height(20.dp)
+                    .clickable(actionRunCallback<WidgetRefreshAction>())
+                    .padding(2.dp),
+            )
         }
     }
 
