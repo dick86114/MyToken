@@ -1,5 +1,7 @@
 # 桌面小组件重做实施计划
 
+> **执行状态（2026-10-13）：** Task 1-10 已完成；Task 11 的自动化测试与 Release 构建已完成。真实 macOS 桌面拖放截图和 Android 真机截图因缺少签名产物/设备会话未执行，详见 `docs/superpowers/verification/2026-10-13-desktop-widgets-release.md`。
+
 > **给代理执行者：** 必须使用 `superpowers:subagent-driven-development`（推荐）或 `superpowers:executing-plans` 按任务逐项执行。步骤使用复选框（`- [ ]`）跟踪。
 
 **目标：** 实现 macOS 与 Android 的 MyToken 总览/单凭证桌面小组件，支持四种视觉风格、按套餐动态选指标、共享安全快照和真实 Release 验收。
