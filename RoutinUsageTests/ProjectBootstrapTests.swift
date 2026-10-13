@@ -3,6 +3,29 @@ import XCTest
 @testable import RoutinUsage
 
 final class ProjectBootstrapTests: XCTestCase {
+    func test_project_defines_embedded_widget_extension_and_matching_app_group() throws {
+        let project = try sourceText(at: "project.yml")
+        let projectRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let appEntitlements = try String(
+            contentsOf: projectRoot.appendingPathComponent("RoutinUsage/RoutinUsage.entitlements"),
+            encoding: .utf8
+        )
+        let widgetEntitlements = try String(
+            contentsOf: projectRoot.appendingPathComponent("RoutinUsageWidget/RoutinUsageWidget.entitlements"),
+            encoding: .utf8
+        )
+        let app = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
+
+        XCTAssertTrue(project.contains("RoutinUsageWidget:"))
+        XCTAssertTrue(project.contains("com.apple.widgetkit-extension"))
+        XCTAssertTrue(project.contains("cc.idickies.mytoken.widget"))
+        XCTAssertTrue(appEntitlements.contains("group.cc.idickies.mytoken.widgets"))
+        XCTAssertTrue(widgetEntitlements.contains("group.cc.idickies.mytoken.widgets"))
+        XCTAssertTrue(app.contains("application(_ application: NSApplication, open urls: [URL])"))
+    }
+
     func test应用标识稳定() {
         XCTAssertEqual(RoutinUsageApp.applicationName, "MyToken")
     }

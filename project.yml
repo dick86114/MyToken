@@ -18,13 +18,56 @@ targets:
     type: application
     platform: macOS
     sources: [RoutinUsage]
+    info:
+      path: RoutinUsage/Info.plist
+      properties:
+        CFBundleDisplayName: MyToken
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSUIElement: true
+        NSLocalNetworkUsageDescription: "MyToken 需要访问本地网络，以便向 Android 客户端一次性加密迁移凭证。"
+        CFBundleURLTypes:
+          - CFBundleURLName: cc.idickies.mytoken
+            CFBundleURLSchemes:
+              - mytoken
     settings:
       base:
         PRODUCT_NAME: "MyToken"
         PRODUCT_MODULE_NAME: RoutinUsage
+        CODE_SIGN_ENTITLEMENTS: RoutinUsage/RoutinUsage.entitlements
       configs:
         debug:
           PRODUCT_BUNDLE_IDENTIFIER: ai.routin.mytoken.debug.v3
+    dependencies:
+      - target: RoutinUsageWidget
+        embed: true
+        configs: [Release]
+  RoutinUsageWidget:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: RoutinUsageWidget
+      - path: RoutinUsage/WidgetShared/WidgetSnapshotModels.swift
+      - path: RoutinUsage/WidgetShared/WidgetMetricRanker.swift
+      - path: RoutinUsage/WidgetShared/WidgetPresentationBuilder.swift
+      - path: RoutinUsage/WidgetShared/WidgetSnapshotStore.swift
+    info:
+      path: RoutinUsageWidget/Info.plist
+      properties:
+        CFBundleDisplayName: MyToken
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: cc.idickies.mytoken.widget
+        PRODUCT_NAME: RoutinUsageWidget
+        CODE_SIGN_ENTITLEMENTS: RoutinUsageWidget/RoutinUsageWidget.entitlements
+        APPLICATION_EXTENSION_API_ONLY: YES
+      configs:
+        debug:
+          PRODUCT_BUNDLE_IDENTIFIER: ai.routin.mytoken.debug.v3.widget
   RoutinUsageTests:
     type: bundle.unit-test
     platform: macOS
@@ -94,6 +137,7 @@ targets:
         BUNDLE_LOADER: "$(TEST_HOST)"
     dependencies:
       - target: RoutinUsage
+      - target: RoutinUsageWidget
 schemes:
   RoutinUsage:
     build:
