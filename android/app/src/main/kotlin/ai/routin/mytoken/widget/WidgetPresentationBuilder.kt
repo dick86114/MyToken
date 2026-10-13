@@ -76,8 +76,8 @@ object WidgetPresentationBuilder {
             name = credential.name,
             planName = snapshot?.planName.orEmpty(),
             isStale = false,
-            primary = selection.primary?.let(::metricDisplay),
-            secondary = selection.secondary.map(::metricDisplay),
+            primary = selection.primary?.let { metricDisplay(it, credential.providerId) },
+            secondary = selection.secondary.map { metricDisplay(it, credential.providerId) },
             fixedMetricUnavailable = selection.fixedMetricUnavailable,
             status = WidgetPresentationStateResolver.resolve(
                 isEnabled = credential.isEnabled,
@@ -112,13 +112,16 @@ object WidgetPresentationBuilder {
         return 4
     }
 
-    private fun metricDisplay(metric: UsageMetric): WidgetMetricPresentation {
+    private fun metricDisplay(
+        metric: UsageMetric,
+        providerId: ProviderId,
+    ): WidgetMetricPresentation {
         val percent = progressPercent(metric)
         return WidgetMetricPresentation(
             id = metric.id,
             label = metric.label,
             valueText = valueText(metric, percent),
-            detailText = detailText(metric),
+            detailText = detailText(metric, providerId),
             resetText = metric.windowEnd?.let {
                 "重置 " + DateTimeFormatter.ofPattern("HH:mm")
                     .format(it.atZone(ZoneId.systemDefault()))
@@ -144,11 +147,15 @@ object WidgetPresentationBuilder {
         }
     }
 
-    private fun detailText(metric: UsageMetric): String = when (metric.presentation) {
+    private fun detailText(metric: UsageMetric, providerId: ProviderId): String = when (metric.presentation) {
         UsageMetricPresentation.Progress -> {
-            val used = metric.used
-            val limit = metric.limit
-            if (used == null || limit == null) "" else "已用 ${plain(used)} / ${plain(limit)}"
+            if (providerId == ProviderId.Glm) {
+                ""
+            } else {
+                val used = metric.used
+                val limit = metric.limit
+                if (used == null || limit == null) "" else "已用 ${plain(used)} / ${plain(limit)}"
+            }
         }
         else -> ""
     }

@@ -33,7 +33,7 @@ object WidgetMetricRanker {
             )
             ProviderId.Glm -> orderedByPriority(
                 metrics,
-                listOf("five-hour", "weekly", "model-calls", "zcode-mcp"),
+                listOf("five-hour", "weekly", "monthly", "model-calls", "zcode-mcp"),
             )
             ProviderId.NewAPI -> orderedByPriority(
                 metrics,

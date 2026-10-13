@@ -73,6 +73,38 @@ class WidgetPresentationBuilderTest {
         )
     }
 
+    @Test
+    fun `glm follows main card progress order and omits amounts`() {
+        val credential = credential(ProviderId.Glm)
+        val resetAt = Instant.parse("2026-01-01T06:00:00Z")
+        val snapshot = UsageSnapshot(
+            credentialId = credential.id,
+            fetchedAt = Instant.parse("2026-01-01T00:00:00Z"),
+            metrics = listOf(
+                requestMetric("model-calls", "模型调用量", "12"),
+                requestMetric("zcode-mcp", "MCP 调用量", "3"),
+                progress("monthly", "每月用量", 31).copy(windowEnd = resetAt),
+                progress("weekly", "每周用量", 42).copy(windowEnd = resetAt),
+                progress("five-hour", "5 小时用量", 20).copy(windowEnd = resetAt),
+            ),
+        )
+
+        val presentation = WidgetPresentationBuilder.makeCredentialPresentation(
+            credential,
+            snapshot,
+            WidgetDisplayStyle.Auto,
+            WidgetSizeKind.Standard,
+        )
+
+        assertEquals(
+            listOf("five-hour", "weekly", "monthly", "model-calls"),
+            presentation.credential?.orderedMetrics?.map { it.id },
+        )
+        assertEquals("5 小时用量", presentation.credential?.primary?.label)
+        assertEquals("", presentation.credential?.primary?.detailText)
+        assertEquals("重置 14:00", presentation.credential?.primary?.resetText)
+    }
+
     private fun credential(providerId: ProviderId) = Credential(
         id = UUID.randomUUID(),
         providerId = providerId,
@@ -97,6 +129,16 @@ class WidgetPresentationBuilderTest {
         label = label,
         value = raw.toBigDecimal(),
         unit = UsageMetricUnit.Token,
+        presentation = UsageMetricPresentation.Value,
+        semantic = UsageMetricSemantic.Value,
+        healthState = UsageMetricHealthState.Normal,
+    )
+
+    private fun requestMetric(id: String, label: String, raw: String) = UsageMetric(
+        id = id,
+        label = label,
+        value = raw.toBigDecimal(),
+        unit = UsageMetricUnit.Request,
         presentation = UsageMetricPresentation.Value,
         semantic = UsageMetricSemantic.Value,
         healthState = UsageMetricHealthState.Normal,

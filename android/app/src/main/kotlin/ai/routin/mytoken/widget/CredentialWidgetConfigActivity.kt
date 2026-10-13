@@ -13,18 +13,24 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -244,7 +250,6 @@ private fun WidgetConfigurationScreen(
 
 @Composable
 private fun ConfigurationPreview(preview: WidgetPresentation?) {
-    val first = preview?.credentials?.firstOrNull()
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -253,20 +258,103 @@ private fun ConfigurationPreview(preview: WidgetPresentation?) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
+        val credential = preview?.credentials?.firstOrNull()
         Text(
-            text = first?.name ?: "暂无预览",
+            text = credential?.name ?: "暂无预览",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )
-        Text(
-            text = first?.primary?.valueText ?: "—",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-        )
+        when (preview?.style) {
+            WidgetDisplayStyle.ScanBand -> PreviewScanBand(credential)
+            WidgetDisplayStyle.SignalTiles -> PreviewSignalTiles(credential)
+            WidgetDisplayStyle.FocusRing, WidgetDisplayStyle.Auto, null -> PreviewFocusRing(credential)
+        }
         Text(
             text = preview?.style?.displayName() ?: "自动",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun PreviewFocusRing(credential: WidgetCredentialPresentation?) {
+    val primary = credential?.primary
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(
+            modifier = Modifier
+                .size(72.dp)
+                .border(6.dp, MaterialTheme.colorScheme.primary, CircleShape),
+            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(primary?.valueText ?: "—", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(primary?.label ?: "", style = MaterialTheme.typography.labelSmall)
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            credential?.orderedMetrics?.drop(1)?.take(3)?.forEach { metric ->
+                PreviewMetricRow(metric)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PreviewScanBand(credential: WidgetCredentialPresentation?) {
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        credential?.orderedMetrics?.take(3)?.forEach { metric ->
+            PreviewMetricRow(metric)
+        }
+    }
+}
+
+@Composable
+private fun PreviewSignalTiles(credential: WidgetCredentialPresentation?) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        credential?.orderedMetrics?.take(6)?.chunked(3)?.forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                row.forEach { metric ->
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+                            .padding(6.dp),
+                    ) {
+                        Text(metric.label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                        Text(metric.valueText, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        PreviewBar(metric.progressPercent)
+                    }
+                }
+                repeat(3 - row.size) { Spacer(modifier = Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PreviewMetricRow(metric: ai.routin.mytoken.widget.WidgetMetricPresentation) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row {
+            Text(metric.label, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f), maxLines = 1)
+            Text(metric.valueText, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+        }
+        PreviewBar(metric.progressPercent)
+    }
+}
+
+@Composable
+private fun PreviewBar(percent: Int?) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(4.dp)
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), RoundedCornerShape(2.dp)),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(((percent ?: 0).coerceIn(0, 100)) / 100f)
+                .height(4.dp)
+                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)),
         )
     }
 }

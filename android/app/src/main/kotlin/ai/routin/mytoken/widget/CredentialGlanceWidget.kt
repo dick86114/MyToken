@@ -198,13 +198,30 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
                     .cornerRadius(36.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(text = primary?.valueText ?: "-", style = valueStyle(), maxLines = 1)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(text = primary?.valueText ?: "-", style = valueStyle(), maxLines = 1)
+                    Text(
+                        text = primary?.label ?: "",
+                        style = labelStyle(),
+                        maxLines = WidgetTextLayoutPolicy.lineLimit(WidgetTextRole.MetricLabel),
+                    )
+                }
             }
             Spacer(modifier = GlanceModifier.width(10.dp))
             Column(modifier = GlanceModifier.defaultWeight()) {
-                credential.secondary.take(2).forEach { metric ->
+                credential.orderedMetrics.drop(1).take(3).forEach { metric ->
+                    Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
+                        Text(
+                            text = metric.label,
+                            modifier = GlanceModifier.defaultWeight(),
+                            style = labelStyle(),
+                            maxLines = WidgetTextLayoutPolicy.lineLimit(WidgetTextRole.MetricLabel),
+                        )
+                        Text(text = metric.valueText, style = valueStyle(), maxLines = 1)
+                    }
+                    Spacer(modifier = GlanceModifier.height(2.dp))
                     MetricBar(metric)
-                    Spacer(modifier = GlanceModifier.height(6.dp))
+                    Spacer(modifier = GlanceModifier.height(5.dp))
                 }
             }
         }
