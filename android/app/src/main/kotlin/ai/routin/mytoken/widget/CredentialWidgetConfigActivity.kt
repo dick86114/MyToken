@@ -82,6 +82,25 @@ class CredentialWidgetConfigActivity : ComponentActivity() {
             val credentials by remember { graph.credentialRepository.observeCredentials() }
                 .collectAsState(initial = emptyList())
             val scope = rememberCoroutineScope()
+            val saveUseCase = remember(kind, appWidgetId) {
+                WidgetConfigurationSaveUseCase(
+                    save = store::save,
+                    enqueueRefresh = {
+                        WidgetRefresher.enqueue(this@CredentialWidgetConfigActivity)
+                    },
+                    updateWidget = { widgetId ->
+                        val widget: GlanceAppWidget = when (kind) {
+                            WidgetKind.Credential -> CredentialGlanceWidget()
+                            WidgetKind.Overview -> OverviewGlanceWidget()
+                        }
+                        widget.update(
+                            this@CredentialWidgetConfigActivity,
+                            GlanceAppWidgetManager(this@CredentialWidgetConfigActivity)
+                                .getGlanceIdBy(widgetId),
+                        )
+                    },
+                )
+            }
 
             MyTokenTheme(darkTheme = darkTheme) {
                 Surface(modifier = Modifier.fillMaxSize()) {
@@ -91,16 +110,7 @@ class CredentialWidgetConfigActivity : ComponentActivity() {
                         credentials = credentials.filter(Credential::isEnabled),
                         onSave = { config ->
                             scope.launch {
-                                store.save(appWidgetId, config)
-                                val widget: GlanceAppWidget = when (kind) {
-                                    WidgetKind.Credential -> CredentialGlanceWidget()
-                                    WidgetKind.Overview -> OverviewGlanceWidget()
-                                }
-                                widget.update(
-                                    this@CredentialWidgetConfigActivity,
-                                    GlanceAppWidgetManager(this@CredentialWidgetConfigActivity)
-                                        .getGlanceIdBy(appWidgetId),
-                                )
+                                saveUseCase.apply(appWidgetId, config)
                                 setResult(
                                     Activity.RESULT_OK,
                                     Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId),
