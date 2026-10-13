@@ -16,6 +16,7 @@
 - `9db4639` 重做 Android 单凭证小组件
 - `e3128f3` 支持 Android 总览小组件配置
 - `3e9a51e` 清理 Android 小组件旧渲染路径
+- `c7918e8` 适配 Android 小组件深浅色
 
 ## macOS 验证
 
@@ -105,6 +106,7 @@
 - Android 同凭证并发刷新只请求上游一次
 - Android 单凭证、总览和刷新动作构建
 - Android 状态文案、单行文本策略和旧 RemoteViews 路径移除
+- Android 小组件日夜资源颜色
 
 ## 结论
 
