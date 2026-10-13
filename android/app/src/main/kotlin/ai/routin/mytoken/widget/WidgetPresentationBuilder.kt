@@ -26,11 +26,13 @@ object WidgetPresentationBuilder {
     ): WidgetPresentation = WidgetPresentation(
         style = resolveStyle(style, size, overview = false),
         size = size,
-        credential = credentialPresentation(
-            credential = credential,
-            snapshot = snapshot,
-            capacity = size.metricCapacity(),
-            fixedMetricId = fixedMetricId,
+        credentials = listOf(
+            credentialPresentation(
+                credential = credential,
+                snapshot = snapshot,
+                capacity = size.metricCapacity(),
+                fixedMetricId = fixedMetricId,
+            )
         ),
     )
 
@@ -41,12 +43,11 @@ object WidgetPresentationBuilder {
     ): WidgetPresentation = WidgetPresentation(
         style = resolveStyle(style, size, overview = true),
         size = size,
-        credential = entries
+        credentials = entries
             .filter { it.first.isEnabled }
             .sortedWith(compareBy({ riskScore(it.second) }, { it.first.sortOrder }))
             .take(size.overviewCapacity())
-            .firstOrNull()
-            ?.let { (credential, snapshot) ->
+            .map { (credential, snapshot) ->
                 credentialPresentation(
                     credential = credential,
                     snapshot = snapshot,

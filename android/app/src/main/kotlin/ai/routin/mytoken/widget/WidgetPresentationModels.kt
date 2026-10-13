@@ -45,8 +45,10 @@ data class WidgetCredentialPresentation(
 data class WidgetPresentation(
     val style: WidgetDisplayStyle,
     val size: WidgetSizeKind,
-    val credential: WidgetCredentialPresentation?,
-)
+    val credentials: List<WidgetCredentialPresentation>,
+) {
+    val credential: WidgetCredentialPresentation? get() = credentials.firstOrNull()
+}
 
 internal fun WidgetSizeKind.metricCapacity(): Int = when (this) {
     WidgetSizeKind.Compact -> 2

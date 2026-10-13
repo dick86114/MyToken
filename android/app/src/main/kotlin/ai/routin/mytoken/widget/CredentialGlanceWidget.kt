@@ -41,12 +41,12 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
         size: WidgetSizeKind,
     ): WidgetPresentation {
         val credentialId = config.credentialId
-            ?: return WidgetPresentation(config.style, size, null)
+            ?: return WidgetPresentation(config.style, size, emptyList())
         val graph = (context.applicationContext as MyTokenApplication).graph
         val credential = graph.credentialRepository.observeCredentials()
             .first()
             .firstOrNull { it.id == credentialId }
-            ?: return WidgetPresentation(config.style, size, null)
+            ?: return WidgetPresentation(config.style, size, emptyList())
         val snapshot = graph.refreshUseCase.states.value[credentialId]?.snapshot
             ?: graph.credentialRepository.cachedSnapshot(credentialId)
         return WidgetPresentationBuilder.makeCredentialPresentation(
