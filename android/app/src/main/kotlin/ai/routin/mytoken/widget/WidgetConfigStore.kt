@@ -63,6 +63,13 @@ class WidgetConfigStore(context: Context) {
         return result
     }
 
+    fun requiresAllEnabledCredentials(): Boolean =
+        preferences.all.any { (key, value) ->
+            if (!key.startsWith(CONFIG_PREFIX) || value !is String) return@any false
+            val config = runCatching { decode(JSONObject(value)) }.getOrNull() ?: return@any false
+            config.kind == WidgetKind.Overview && config.overviewSource == WidgetOverviewSource.AllEnabled
+        }
+
     private fun encode(config: WidgetConfig): JSONObject = JSONObject()
         .put("kind", config.kind.name)
         .put("credentialId", config.credentialId?.toString() ?: JSONObject.NULL)

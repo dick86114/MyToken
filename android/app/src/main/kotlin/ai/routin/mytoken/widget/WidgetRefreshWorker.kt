@@ -1,37 +1,40 @@
 package ai.routin.mytoken.widget
 
 import ai.routin.mytoken.MyTokenApplication
-import ai.routin.mytoken.domain.usage.RefreshStatus
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import kotlinx.coroutines.flow.first
 
-/** Refreshes only the credential selected by one home-screen widget instance. */
+/** Refreshes the union of credentials required by every installed widget once. */
 class WidgetRefreshWorker(
     appContext: Context,
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
-        val appWidgetId = inputData.getInt(
-            WidgetRefresher.EXTRA_WIDGET_ID,
-            -1,
-        )
-        if (appWidgetId < 0) return Result.failure()
-
         val graph = (applicationContext as MyTokenApplication).graph
-        val credentialId = WidgetSelectionStore(applicationContext)
-            .selectedCredentialId(appWidgetId)
-            ?: return Result.failure()
-        val credential = graph.credentialRepository.observeCredentials()
+        val store = WidgetConfigStore(applicationContext)
+        val requiredIds = store.requiredCredentialIds()
+        val enabledCredentials = graph.credentialRepository.observeCredentials()
             .first()
-            .firstOrNull { it.id == credentialId }
-            ?: return Result.failure()
+            .filter { it.isEnabled }
+        val credentials = if (store.requiresAllEnabledCredentials()) {
+            enabledCredentials
+        } else {
+            enabledCredentials.filter { it.id in requiredIds }
+        }
 
-        graph.refreshUseCase.refresh(credential)
-        val status = graph.refreshUseCase.states.value[credentialId]?.status
-        CredentialWidgetUpdater.update(applicationContext, graph, appWidgetId)
-        return if (status == RefreshStatus.Ready) Result.success() else Result.failure()
+        val coordinator = WidgetRefreshCoordinator(
+            refreshCredential = { credential ->
+                graph.refreshUseCase.refresh(credential)
+                graph.refreshUseCase.states.value[credential.id]?.status
+                    ?: ai.routin.mytoken.domain.usage.RefreshStatus.Failed
+            },
+            updateAll = {
+                CredentialWidgetUpdater.updateAll(applicationContext, graph)
+            },
+        )
+        return if (coordinator.refresh(credentials)) Result.success() else Result.retry()
     }
 }

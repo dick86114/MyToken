@@ -9,14 +9,13 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
-import androidx.work.workDataOf
 
 /** User-initiated widget refreshes reuse the app's single background refresh delegate. */
 internal object WidgetRefresher {
 
     const val ACTION_REFRESH = "ai.routin.mytoken.action.WIDGET_REFRESH"
     const val EXTRA_WIDGET_ID = "appWidgetId"
-    private const val UNIQUE_WORK_NAME = "mytoken-widget-refresh"
+    private const val UNIQUE_WORK_NAME = "mytoken-widget-refresh-all"
 
     fun refreshPendingIntent(context: Context, appWidgetId: Int): PendingIntent {
         val intent = Intent(context, CredentialWidgetProvider::class.java)
@@ -30,13 +29,12 @@ internal object WidgetRefresher {
         )
     }
 
-    fun enqueue(context: Context, appWidgetId: Int) {
+    fun enqueue(context: Context) {
         val request = OneTimeWorkRequestBuilder<WidgetRefreshWorker>()
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
-            .setInputData(workDataOf(EXTRA_WIDGET_ID to appWidgetId))
             .build()
         WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
-            "$UNIQUE_WORK_NAME-$appWidgetId",
+            UNIQUE_WORK_NAME,
             ExistingWorkPolicy.REPLACE,
             request,
         )

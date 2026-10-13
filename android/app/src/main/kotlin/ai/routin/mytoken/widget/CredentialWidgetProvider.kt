@@ -65,7 +65,6 @@ class CredentialWidgetProvider : AppWidgetProvider() {
             }
             WidgetRefresher.enqueue(
                 context,
-                appWidgetId,
             )
             return
         }
