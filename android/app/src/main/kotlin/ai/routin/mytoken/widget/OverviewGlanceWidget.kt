@@ -83,13 +83,131 @@ class OverviewGlanceWidget : MyTokenGlanceWidget() {
                     Text(text = "打开应用添加凭证", style = titleStyle(), maxLines = 1)
                 }
             } else {
-                presentation.credentials.forEach { credential ->
-                    OverviewRow(context, credential)
-                    Spacer(modifier = GlanceModifier.height(7.dp))
+                when (OverviewStyleLayoutPolicy.layout(presentation.style)) {
+                    OverviewStyleLayout.ScanRows -> {
+                        presentation.credentials.forEach { credential ->
+                            OverviewRow(context, credential)
+                            Spacer(modifier = GlanceModifier.height(7.dp))
+                        }
+                    }
+                    OverviewStyleLayout.FocusRings -> OverviewFocusRings(context, presentation.credentials)
+                    OverviewStyleLayout.SignalTiles -> OverviewSignalTiles(context, presentation.credentials)
                 }
             }
         }
     }
+
+    @Composable
+    private fun OverviewFocusRings(
+        context: Context,
+        credentials: List<WidgetCredentialPresentation>,
+    ) {
+        Column {
+            credentials.chunked(3).forEach { row ->
+                Row(modifier = GlanceModifier.fillMaxWidth()) {
+                    row.forEach { credential ->
+                        val accent = ColorProvider(WidgetProviderPalette.accentColor(credential.providerId))
+                        Column(
+                            modifier = GlanceModifier
+                                .defaultWeight()
+                                .clickable(actionStartActivity(credentialIntent(context, credential)))
+                                .padding(4.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Box(
+                                modifier = GlanceModifier
+                                    .width(58.dp)
+                                    .height(58.dp)
+                                    .background(metricColor(credential.primary, accent))
+                                    .cornerRadius(29.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Box(
+                                    modifier = GlanceModifier
+                                        .width(42.dp)
+                                        .height(42.dp)
+                                        .background(ColorProvider(R.color.widget_glance_surface))
+                                        .cornerRadius(21.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        text = credential.primary?.valueText ?: "-",
+                                        style = valueStyle(),
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+                            Spacer(modifier = GlanceModifier.height(3.dp))
+                            Text(
+                                text = credential.name,
+                                style = labelStyle(),
+                                maxLines = WidgetTextLayoutPolicy.lineLimit(WidgetTextRole.CredentialName),
+                            )
+                        }
+                    }
+                    repeat(3 - row.size) {
+                        Spacer(modifier = GlanceModifier.defaultWeight())
+                    }
+                }
+                Spacer(modifier = GlanceModifier.height(6.dp))
+            }
+        }
+    }
+
+    @Composable
+    private fun OverviewSignalTiles(
+        context: Context,
+        credentials: List<WidgetCredentialPresentation>,
+    ) {
+        Column {
+            credentials.chunked(2).forEach { row ->
+                Row(modifier = GlanceModifier.fillMaxWidth()) {
+                    row.forEach { credential ->
+                        val accent = ColorProvider(WidgetProviderPalette.accentColor(credential.providerId))
+                        Column(
+                            modifier = GlanceModifier
+                                .defaultWeight()
+                                .padding(4.dp)
+                                .background(ColorProvider(R.color.widget_glance_track))
+                                .cornerRadius(10.dp)
+                                .clickable(actionStartActivity(credentialIntent(context, credential)))
+                                .padding(8.dp),
+                        ) {
+                            Text(
+                                text = credential.name,
+                                style = titleStyle(),
+                                maxLines = WidgetTextLayoutPolicy.lineLimit(WidgetTextRole.CredentialName),
+                            )
+                            Text(
+                                text = credential.primary?.valueText ?: "-",
+                                style = valueStyle(),
+                                maxLines = 1,
+                            )
+                            LinearProgressIndicator(
+                                progress = (credential.primary?.progressPercent ?: 0)
+                                    .coerceIn(0, 100) / 100f,
+                                modifier = GlanceModifier
+                                    .fillMaxWidth()
+                                    .height(4.dp),
+                                color = metricColor(credential.primary, accent),
+                            )
+                        }
+                    }
+                    if (row.size == 1) {
+                        Spacer(modifier = GlanceModifier.defaultWeight())
+                    }
+                }
+                Spacer(modifier = GlanceModifier.height(6.dp))
+            }
+        }
+    }
+
+    private fun credentialIntent(
+        context: Context,
+        credential: WidgetCredentialPresentation,
+    ): Intent = Intent(context, MainActivity::class.java)
+        .setAction(MainActivity.ACTION_OPEN_CREDENTIAL)
+        .putExtra(MainActivity.EXTRA_CREDENTIAL_ID, credential.id.toString())
 
     @Composable
     private fun OverviewRow(
@@ -97,9 +215,7 @@ class OverviewGlanceWidget : MyTokenGlanceWidget() {
         credential: WidgetCredentialPresentation,
     ) {
         val accent = ColorProvider(WidgetProviderPalette.accentColor(credential.providerId))
-        val intent = Intent(context, MainActivity::class.java)
-            .setAction(MainActivity.ACTION_OPEN_CREDENTIAL)
-            .putExtra(MainActivity.EXTRA_CREDENTIAL_ID, credential.id.toString())
+        val intent = credentialIntent(context, credential)
         Row(
             modifier = GlanceModifier
                 .fillMaxWidth()
@@ -124,10 +240,7 @@ class OverviewGlanceWidget : MyTokenGlanceWidget() {
                     modifier = GlanceModifier
                         .fillMaxWidth()
                         .height(4.dp),
-                    color = when (credential.primary?.severity) {
-                        WidgetMetricSeverity.Normal, null -> accent
-                        else -> severityColor(credential.primary?.severity)
-                    },
+                    color = metricColor(credential.primary, accent),
                 )
             }
             Spacer(modifier = GlanceModifier.width(8.dp))
@@ -151,6 +264,14 @@ class OverviewGlanceWidget : MyTokenGlanceWidget() {
         WidgetMetricSeverity.Critical -> ColorProvider(R.color.widget_glance_critical)
         WidgetMetricSeverity.Unavailable -> ColorProvider(R.color.widget_glance_unavailable)
         WidgetMetricSeverity.Normal, null -> ColorProvider(R.color.widget_glance_accent)
+    }
+
+    private fun metricColor(
+        metric: WidgetMetricPresentation?,
+        accent: ColorProvider,
+    ): ColorProvider = when (metric?.severity) {
+        WidgetMetricSeverity.Normal, null -> accent
+        else -> severityColor(metric.severity)
     }
 
     private fun labelStyle() = TextStyle(
