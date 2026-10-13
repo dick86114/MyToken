@@ -1,0 +1,241 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "command-code-priority",
+      "providerID": "commandCode",
+      "fixedMetricID": null,
+      "capacity": 6,
+      "credential": {
+        "id": "11111111-1111-1111-1111-111111111111",
+        "providerID": "commandCode",
+        "providerName": "Command Code",
+        "name": "开发窗口",
+        "planName": "Pro",
+        "isEnabled": true,
+        "sortOrder": 0,
+        "isStale": false,
+        "metrics": [
+          {"id":"weekly","label":"周额度","presentation":"progress","semantic":"usedQuota","unit":"token","used":43,"limit":100,"remaining":57},
+          {"id":"five-hour","label":"五小时窗口","presentation":"progress","semantic":"usedQuota","unit":"token","used":86,"limit":100,"remaining":14},
+          {"id":"free-remaining","label":"免费额度","presentation":"value","semantic":"value","unit":"currency","value":18,"currencyCode":"CNY"},
+          {"id":"credit-progress","label":"购买额度","presentation":"progress","semantic":"usedQuota","unit":"currency","used":48,"limit":100,"remaining":52},
+          {"id":"request-count","label":"请求数","presentation":"value","semantic":"value","unit":"request","value":210},
+          {"id":"purchased-remaining","label":"剩余购买额度","presentation":"value","semantic":"value","unit":"currency","value":52,"currencyCode":"CNY"}
+        ]
+      },
+      "expectedPrimaryMetricID": "five-hour",
+      "expectedMetricIDs": ["five-hour", "weekly", "credit-progress", "request-count", "purchased-remaining", "free-remaining"],
+      "expectedFixedMetricUnavailable": false,
+      "expectedValueTexts": {}
+    },
+    {
+      "id": "deepseek-balance-first",
+      "providerID": "deepseek",
+      "fixedMetricID": null,
+      "capacity": 4,
+      "credential": {
+        "id": "22222222-2222-2222-2222-222222222222",
+        "providerID": "deepseek",
+        "providerName": "DeepSeek",
+        "name": "按量余额",
+        "planName": "API 余额",
+        "isEnabled": true,
+        "sortOrder": 1,
+        "isStale": false,
+        "metrics": [
+          {"id":"availability","label":"账户状态","presentation":"status","semantic":"status","unit":"boolean","value":1},
+          {"id":"toppedUpBalance","label":"充值余额","presentation":"value","semantic":"value","unit":"currency","value":6,"currencyCode":"CNY"},
+          {"id":"balance","label":"账户余额","presentation":"balance","semantic":"balance","unit":"currency","value":10,"currencyCode":"CNY"},
+          {"id":"grantedBalance","label":"赠金余额","presentation":"value","semantic":"value","unit":"currency","value":4,"currencyCode":"CNY"}
+        ]
+      },
+      "expectedPrimaryMetricID": "balance",
+      "expectedMetricIDs": ["balance", "grantedBalance", "toppedUpBalance", "availability"],
+      "expectedFixedMetricUnavailable": false,
+      "expectedValueTexts": {"balance": "¥10.00"}
+    },
+    {
+      "id": "glm-window-first",
+      "providerID": "glm",
+      "fixedMetricID": null,
+      "capacity": 3,
+      "credential": {
+        "id": "33333333-3333-3333-3333-333333333333",
+        "providerID": "glm",
+        "providerName": "GLM",
+        "name": "GLM Coding",
+        "planName": "Coding Plan",
+        "isEnabled": true,
+        "sortOrder": 2,
+        "isStale": false,
+        "metrics": [
+          {"id":"model-calls","label":"模型调用量","presentation":"value","semantic":"value","unit":"request","value":12},
+          {"id":"five-hour","label":"五小时用量","presentation":"progress","semantic":"usedQuota","unit":"token","used":20,"limit":100,"remaining":80}
+        ]
+      },
+      "expectedPrimaryMetricID": "five-hour",
+      "expectedMetricIDs": ["five-hour", "model-calls"],
+      "expectedFixedMetricUnavailable": false,
+      "expectedValueTexts": {"five-hour": "20%"}
+    },
+    {
+      "id": "volcengine-window-plus-monthly",
+      "providerID": "volcengine",
+      "fixedMetricID": null,
+      "capacity": 4,
+      "credential": {
+        "id": "44444444-4444-4444-4444-444444444444",
+        "providerID": "volcengine",
+        "providerName": "火山引擎",
+        "name": "个人版",
+        "planName": "Personal Agent Plan",
+        "isEnabled": true,
+        "sortOrder": 3,
+        "isStale": false,
+        "metrics": [
+          {"id":"five-hour","label":"五小时","presentation":"progress","semantic":"usedQuota","unit":"token","used":30,"limit":100,"remaining":70},
+          {"id":"weekly","label":"本周","presentation":"progress","semantic":"usedQuota","unit":"token","used":40,"limit":100,"remaining":60},
+          {"id":"monthly","label":"近一月","presentation":"progress","semantic":"usedQuota","unit":"token","used":50,"limit":100,"remaining":50},
+          {"id":"request-count","label":"请求数","presentation":"value","semantic":"value","unit":"request","value":80}
+        ]
+      },
+      "expectedPrimaryMetricID": "five-hour",
+      "expectedMetricIDs": ["five-hour", "weekly", "monthly", "request-count"],
+      "expectedFixedMetricUnavailable": false,
+      "expectedValueTexts": {}
+    },
+    {
+      "id": "newapi-quota-and-token-dedupe",
+      "providerID": "newAPI",
+      "fixedMetricID": null,
+      "capacity": 6,
+      "credential": {
+        "id": "55555555-5555-5555-5555-555555555555",
+        "providerID": "newAPI",
+        "providerName": "NewAPI",
+        "name": "聚合站",
+        "planName": "NewAPI",
+        "isEnabled": true,
+        "sortOrder": 4,
+        "isStale": false,
+        "metrics": [
+          {"id":"today-token-cost","label":"今日费用","presentation":"value","semantic":"value","unit":"currency","value":1.25,"currencyCode":"CNY"},
+          {"id":"today-token","label":"今日 Token","presentation":"value","semantic":"value","unit":"token","value":12000},
+          {"id":"thirty-day-token-cost","label":"近三十天费用","presentation":"value","semantic":"value","unit":"currency","value":18.5,"currencyCode":"CNY"},
+          {"id":"thirty-day-token","label":"近三十天 Token","presentation":"value","semantic":"value","unit":"token","value":333333},
+          {"id":"quota-progress","label":"额度使用","presentation":"progress","semantic":"usedQuota","unit":"currency","used":25,"limit":100,"remaining":75,"currencyCode":"CNY"},
+          {"id":"rpm","label":"RPM","presentation":"value","semantic":"value","unit":"request","value":3},
+          {"id":"tpm","label":"TPM","presentation":"value","semantic":"value","unit":"token","value":4500},
+          {"id":"request-count","label":"请求总数","presentation":"value","semantic":"value","unit":"request","value":9012}
+        ]
+      },
+      "expectedPrimaryMetricID": "quota-progress",
+      "expectedMetricIDs": ["quota-progress", "today-token", "thirty-day-token", "rpm", "tpm", "request-count"],
+      "expectedFixedMetricUnavailable": false,
+      "expectedValueTexts": {"today-token": "12,000"}
+    },
+    {
+      "id": "xiaomi-preserves-order-and-full-token-text",
+      "providerID": "xiaomi",
+      "fixedMetricID": null,
+      "capacity": 6,
+      "credential": {
+        "id": "66666666-6666-6666-6666-666666666666",
+        "providerID": "xiaomi",
+        "providerName": "小米 MiMo",
+        "name": "按量账号",
+        "planName": "API 按量",
+        "isEnabled": true,
+        "sortOrder": 5,
+        "isStale": false,
+        "metrics": [
+          {"id":"history","label":"历史消耗","presentation":"value","semantic":"value","unit":"token","value":3323413},
+          {"id":"output","label":"输出","presentation":"value","semantic":"value","unit":"token","value":120000},
+          {"id":"cache-hit","label":"命中缓存","presentation":"value","semantic":"value","unit":"token","value":800000},
+          {"id":"cache-miss","label":"未命中缓存","presentation":"value","semantic":"value","unit":"token","value":1200000}
+        ]
+      },
+      "expectedPrimaryMetricID": "history",
+      "expectedMetricIDs": ["history", "output", "cache-hit", "cache-miss"],
+      "expectedFixedMetricUnavailable": false,
+      "expectedValueTexts": {"history": "3,323,413", "cache-miss": "1,200,000"}
+    },
+    {
+      "id": "opencode-window-default",
+      "providerID": "opencode",
+      "fixedMetricID": null,
+      "capacity": 4,
+      "credential": {
+        "id": "77777777-7777-7777-7777-777777777777",
+        "providerID": "opencode",
+        "providerName": "OpenCode Go",
+        "name": "Go 套餐",
+        "planName": "Go",
+        "isEnabled": true,
+        "sortOrder": 6,
+        "isStale": false,
+        "metrics": [
+          {"id":"weekly","label":"本周","presentation":"progress","semantic":"usedQuota","unit":"token","used":18,"limit":100,"remaining":82},
+          {"id":"five-hour","label":"五小时","presentation":"progress","semantic":"usedQuota","unit":"token","used":42,"limit":100,"remaining":58}
+        ]
+      },
+      "expectedPrimaryMetricID": "five-hour",
+      "expectedMetricIDs": ["five-hour", "weekly"],
+      "expectedFixedMetricUnavailable": false,
+      "expectedValueTexts": {}
+    },
+    {
+      "id": "routin-fixed-present",
+      "providerID": "routin",
+      "fixedMetricID": "weekly",
+      "capacity": 3,
+      "credential": {
+        "id": "88888888-8888-8888-8888-888888888888",
+        "providerID": "routin",
+        "providerName": "Routin",
+        "name": "主力账号",
+        "planName": "Team Max",
+        "isEnabled": true,
+        "sortOrder": 7,
+        "isStale": false,
+        "metrics": [
+          {"id":"five-hour","label":"五小时","presentation":"progress","semantic":"usedQuota","unit":"token","used":32,"limit":100,"remaining":68},
+          {"id":"weekly","label":"本周","presentation":"progress","semantic":"usedQuota","unit":"token","used":61,"limit":100,"remaining":39},
+          {"id":"token","label":"Token","presentation":"progress","semantic":"usedQuota","unit":"token","used":24,"limit":100,"remaining":76}
+        ]
+      },
+      "expectedPrimaryMetricID": "weekly",
+      "expectedMetricIDs": ["weekly", "five-hour", "token"],
+      "expectedFixedMetricUnavailable": false,
+      "expectedValueTexts": {}
+    },
+    {
+      "id": "command-code-fixed-missing",
+      "providerID": "commandCode",
+      "fixedMetricID": "not-present",
+      "capacity": 4,
+      "credential": {
+        "id": "99999999-9999-9999-9999-999999999999",
+        "providerID": "commandCode",
+        "providerName": "Command Code",
+        "name": "开发窗口",
+        "planName": "Pro",
+        "isEnabled": true,
+        "sortOrder": 8,
+        "isStale": false,
+        "metrics": [
+          {"id":"weekly","label":"周额度","presentation":"progress","semantic":"usedQuota","unit":"token","used":43,"limit":100,"remaining":57},
+          {"id":"five-hour","label":"五小时窗口","presentation":"progress","semantic":"usedQuota","unit":"token","used":86,"limit":100,"remaining":14},
+          {"id":"request-count","label":"请求数","presentation":"value","semantic":"value","unit":"request","value":210},
+          {"id":"free-remaining","label":"免费额度","presentation":"value","semantic":"value","unit":"currency","value":18,"currencyCode":"CNY"},
+          {"id":"purchased-remaining","label":"剩余购买额度","presentation":"value","semantic":"value","unit":"currency","value":52,"currencyCode":"CNY"}
+        ]
+      },
+      "expectedPrimaryMetricID": "five-hour",
+      "expectedMetricIDs": ["five-hour", "weekly", "request-count", "purchased-remaining"],
+      "expectedFixedMetricUnavailable": true,
+      "expectedValueTexts": {}
+    }
+  ]
+}

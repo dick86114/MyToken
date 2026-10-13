@@ -48,6 +48,8 @@ targets:
         buildPhase: resources
       - path: shared/provider-contracts
         buildPhase: resources
+      - path: shared/widget-contracts
+        buildPhase: resources
     preBuildScripts:
       - name: 同步静态源码测试资源
         basedOnDependencyAnalysis: false
