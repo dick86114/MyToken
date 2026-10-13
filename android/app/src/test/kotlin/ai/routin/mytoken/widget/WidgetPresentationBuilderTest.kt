@@ -10,6 +10,8 @@ import ai.routin.mytoken.domain.model.UsageMetricSemantic
 import ai.routin.mytoken.domain.model.UsageMetricUnit
 import ai.routin.mytoken.domain.model.UsageSnapshot
 import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.UUID
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -102,7 +104,11 @@ class WidgetPresentationBuilderTest {
         )
         assertEquals("5h", presentation.credential?.primary?.label)
         assertEquals("", presentation.credential?.primary?.detailText)
-        assertEquals("重置 14:00", presentation.credential?.primary?.resetText)
+        assertEquals(
+            "重置 " + DateTimeFormatter.ofPattern("HH:mm")
+                .format(resetAt.atZone(ZoneId.systemDefault())),
+            presentation.credential?.primary?.resetText,
+        )
     }
 
     @Test
