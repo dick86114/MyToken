@@ -2,6 +2,7 @@ package ai.routin.mytoken.widget
 
 import ai.routin.mytoken.MainActivity
 import ai.routin.mytoken.MyTokenApplication
+import ai.routin.mytoken.domain.model.AppError
 import android.content.Context
 import android.content.Intent
 import androidx.compose.runtime.Composable
@@ -47,14 +48,33 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
             .first()
             .firstOrNull { it.id == credentialId }
             ?: return WidgetPresentation(config.style, size, emptyList())
-        val snapshot = graph.refreshUseCase.states.value[credentialId]?.snapshot
+        val usageState = graph.refreshUseCase.states.value[credentialId]
+        val snapshot = usageState?.snapshot
             ?: graph.credentialRepository.cachedSnapshot(credentialId)
-        return WidgetPresentationBuilder.makeCredentialPresentation(
+        val base = WidgetPresentationBuilder.makeCredentialPresentation(
             credential = credential,
             snapshot = snapshot,
             style = config.style,
             size = size,
             fixedMetricId = config.primaryMetricId,
+        )
+        val failure = when {
+            usageState?.error is AppError.Authentication ->
+                WidgetFailureKind.Authentication
+            usageState?.error != null -> WidgetFailureKind.Other
+            else -> null
+        }
+        val status = WidgetPresentationStateResolver.resolve(
+            isEnabled = credential.isEnabled,
+            hasSnapshot = snapshot != null,
+            isStale = usageState?.isStale == true,
+            isRefreshing = usageState?.status == ai.routin.mytoken.domain.usage.RefreshStatus.Loading,
+            failure = failure,
+            metricCount = snapshot?.metrics?.size ?: 0,
+            fixedMetricUnavailable = base.credential?.fixedMetricUnavailable == true,
+        )
+        return base.copy(
+            credentials = base.credentials.map { it.copy(status = status) },
         )
     }
 
@@ -114,19 +134,55 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
                     Text(text = "打开应用添加凭证", style = titleStyle(), maxLines = 1)
                 }
             } else {
-                when (presentation.style) {
-                    WidgetDisplayStyle.ScanBand -> ScanBandContent(credential)
-                    WidgetDisplayStyle.SignalTiles -> SignalTilesContent(credential)
-                    WidgetDisplayStyle.FocusRing, WidgetDisplayStyle.Auto -> FocusContent(credential)
+                if (credential.status == WidgetPresentationStatus.Loading && credential.primary == null) {
+                    LoadingContent()
+                } else if (credential.status == WidgetPresentationStatus.NoMetrics) {
+                    StatusMessage("该套餐暂无可用指标")
+                } else {
+                    when (presentation.style) {
+                        WidgetDisplayStyle.ScanBand -> ScanBandContent(credential)
+                        WidgetDisplayStyle.SignalTiles -> SignalTilesContent(credential)
+                        WidgetDisplayStyle.FocusRing, WidgetDisplayStyle.Auto -> FocusContent(credential)
+                    }
                 }
                 Spacer(modifier = GlanceModifier.defaultWeight())
                 Text(
-                    text = credential.orderedMetrics.firstOrNull()?.resetText
-                        ?: credential.planName.ifBlank { "MyToken" },
+                    text = WidgetPresentationStateResolver.copy(credential.status),
                     style = labelStyle(),
                     maxLines = WidgetTextLayoutPolicy.lineLimit(WidgetTextRole.StatusText),
                 )
             }
+        }
+    }
+
+    @Composable
+    private fun LoadingContent() {
+        Column {
+            Box(
+                modifier = GlanceModifier
+                    .fillMaxWidth()
+                    .height(12.dp)
+                    .background(ColorProvider(Color(0x1F64748B)))
+                    .cornerRadius(6.dp),
+            ) {}
+            Spacer(modifier = GlanceModifier.height(8.dp))
+            Box(
+                modifier = GlanceModifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .background(ColorProvider(Color(0x1F64748B)))
+                    .cornerRadius(10.dp),
+            ) {}
+        }
+    }
+
+    @Composable
+    private fun StatusMessage(message: String) {
+        Box(
+            modifier = GlanceModifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(text = message, style = titleStyle(), maxLines = 1)
         }
     }
 

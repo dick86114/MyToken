@@ -79,6 +79,15 @@ object WidgetPresentationBuilder {
             primary = selection.primary?.let(::metricDisplay),
             secondary = selection.secondary.map(::metricDisplay),
             fixedMetricUnavailable = selection.fixedMetricUnavailable,
+            status = WidgetPresentationStateResolver.resolve(
+                isEnabled = credential.isEnabled,
+                hasSnapshot = snapshot != null,
+                isStale = false,
+                isRefreshing = false,
+                failure = null,
+                metricCount = snapshot?.metrics?.size ?: 0,
+                fixedMetricUnavailable = selection.fixedMetricUnavailable,
+            ),
         )
     }
 

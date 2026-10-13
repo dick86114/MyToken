@@ -38,6 +38,7 @@ data class WidgetCredentialPresentation(
     val primary: WidgetMetricPresentation?,
     val secondary: List<WidgetMetricPresentation>,
     val fixedMetricUnavailable: Boolean,
+    val status: WidgetPresentationStatus = WidgetPresentationStatus.Ready,
 ) {
     val orderedMetrics: List<WidgetMetricPresentation> = listOfNotNull(primary) + secondary
 }
