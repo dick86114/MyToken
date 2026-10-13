@@ -205,32 +205,40 @@ class OverviewGlanceWidget : MyTokenGlanceWidget() {
     ) {
         Column {
             credentials.forEach { credential ->
-                Column(
-                    modifier = GlanceModifier
-                        .fillMaxWidth()
-                        .clickable(actionStartActivity(credentialIntent(context, credential))),
-                ) {
-                    Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
-                        Text(
-                            text = credential.name,
-                            modifier = GlanceModifier.defaultWeight(),
-                            style = titleStyle(),
-                            maxLines = WidgetTextLayoutPolicy.lineLimit(WidgetTextRole.CredentialName),
-                        )
-                        Text(
-                            text = credential.primary?.valueText ?: "-",
-                            style = valueStyle(),
-                            maxLines = 1,
-                        )
-                    }
-                    Spacer(modifier = GlanceModifier.height(4.dp))
-                    LinearProgressIndicator(
-                        progress = (credential.primary?.progressPercent ?: 0).coerceIn(0, 100) / 100f,
-                        modifier = GlanceModifier
-                            .fillMaxWidth()
-                            .height(12.dp),
-                        color = colors.provider(credential.primary?.severity),
+                Column(modifier = GlanceModifier.fillMaxWidth()) {
+                    Text(
+                        text = credential.name,
+                        style = titleStyle(),
+                        maxLines = WidgetTextLayoutPolicy.lineLimit(WidgetTextRole.CredentialName),
                     )
+                    Spacer(modifier = GlanceModifier.height(4.dp))
+                    Row(modifier = GlanceModifier.fillMaxWidth()) {
+                        credential.orderedMetrics.take(3).forEach { metric ->
+                            Column(
+                                modifier = GlanceModifier
+                                    .defaultWeight()
+                                    .padding(3.dp)
+                                    .background(ColorProvider(R.color.widget_glance_track))
+                                    .cornerRadius(10.dp)
+                                    .clickable(actionStartActivity(credentialIntent(context, credential)))
+                                    .padding(7.dp),
+                            ) {
+                                Text(text = metric.label, style = labelStyle(), maxLines = 1)
+                                Text(text = metric.valueText, style = valueStyle(), maxLines = 1)
+                                Spacer(modifier = GlanceModifier.height(4.dp))
+                                LinearProgressIndicator(
+                                    progress = (metric.progressPercent ?: 0).coerceIn(0, 100) / 100f,
+                                    modifier = GlanceModifier
+                                        .fillMaxWidth()
+                                        .height(6.dp),
+                                    color = colors.provider(metric.severity),
+                                )
+                            }
+                        }
+                        repeat(3 - credential.orderedMetrics.take(3).size) {
+                            Spacer(modifier = GlanceModifier.defaultWeight())
+                        }
+                    }
                 }
                 Spacer(modifier = GlanceModifier.height(8.dp))
             }

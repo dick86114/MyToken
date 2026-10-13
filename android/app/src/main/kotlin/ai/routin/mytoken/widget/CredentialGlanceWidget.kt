@@ -277,20 +277,21 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
         credential: WidgetCredentialPresentation,
         colors: WidgetProgressColors,
     ) {
-        Column {
-            credential.orderedMetrics.take(6).forEach { metric ->
-                Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
-                    Text(
-                        text = metric.label,
-                        modifier = GlanceModifier.defaultWeight(),
-                        style = labelStyle(),
-                        maxLines = 1,
-                    )
+        Row(modifier = GlanceModifier.fillMaxWidth()) {
+            credential.orderedMetrics.take(3).forEach { metric ->
+                Column(
+                    modifier = GlanceModifier
+                        .defaultWeight()
+                        .padding(3.dp)
+                        .background(ColorProvider(R.color.widget_glance_track))
+                        .cornerRadius(10.dp)
+                        .padding(7.dp),
+                ) {
+                    Text(text = metric.label, style = labelStyle(), maxLines = 1)
                     Text(text = metric.valueText, style = valueStyle(), maxLines = 1)
+                    Spacer(modifier = GlanceModifier.height(4.dp))
+                    MetricBar(metric, colors, thicknessDp = 6)
                 }
-                Spacer(modifier = GlanceModifier.height(3.dp))
-                MetricBar(metric, colors, thicknessDp = 12)
-                Spacer(modifier = GlanceModifier.height(7.dp))
             }
         }
     }
