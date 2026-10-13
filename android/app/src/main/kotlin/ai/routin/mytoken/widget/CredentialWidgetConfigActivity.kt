@@ -37,6 +37,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ai.routin.mytoken.domain.model.UsageSnapshot
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import kotlinx.coroutines.launch
@@ -154,8 +156,13 @@ private fun WidgetConfigurationScreen(
     onSave: (WidgetConfig) -> Unit,
 ) {
     val graph = (androidx.compose.ui.platform.LocalContext.current.applicationContext as MyTokenApplication).graph
-    val snapshots = credentials.associate {
-        it.id to graph.refreshUseCase.states.value[it.id]?.snapshot
+    var snapshots by remember { mutableStateOf<Map<java.util.UUID, UsageSnapshot?>>(emptyMap()) }
+    LaunchedEffect(credentials) {
+        snapshots = loadWidgetConfigurationSnapshots(
+            credentialIds = credentials.map { it.id },
+            stateSnapshot = { id -> graph.refreshUseCase.states.value[id]?.snapshot },
+            cachedSnapshot = { id -> graph.credentialRepository.cachedSnapshot(id) },
+        )
     }
     var style by remember { mutableStateOf(initialConfig.style) }
     var selectedCredentialId by remember { mutableStateOf(initialConfig.credentialId) }
