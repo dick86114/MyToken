@@ -74,6 +74,7 @@ dependencies {
     testImplementation("androidx.test:core-ktx:1.6.1")
     testImplementation("androidx.compose.ui:ui-test-junit4")
     testImplementation("androidx.compose.ui:ui-test-manifest")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     androidTestImplementation(project(":feature-transfer"))
     androidTestImplementation(project(":core"))
@@ -84,4 +85,11 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+}
+
+tasks.withType<Test>().configureEach {
+    systemProperty(
+        "widget.contracts.dir",
+        rootProject.file("../shared/widget-contracts").absolutePath,
+    )
 }
