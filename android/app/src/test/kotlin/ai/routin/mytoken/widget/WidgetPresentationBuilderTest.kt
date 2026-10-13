@@ -105,6 +105,29 @@ class WidgetPresentationBuilderTest {
         assertEquals("重置 14:00", presentation.credential?.primary?.resetText)
     }
 
+    @Test
+    fun `balance providers only keep the balance metric`() {
+        val credential = credential(ProviderId.DeepSeek)
+        val snapshot = UsageSnapshot(
+            credentialId = credential.id,
+            fetchedAt = Instant.parse("2026-01-01T00:00:00Z"),
+            metrics = listOf(
+                value("grantedBalance", "赠金余额", "4"),
+                value("toppedUpBalance", "充值余额", "6"),
+                balance("balance", "账户余额", "10"),
+            ),
+        )
+
+        val presentation = WidgetPresentationBuilder.makeCredentialPresentation(
+            credential,
+            snapshot,
+            WidgetDisplayStyle.Auto,
+            WidgetSizeKind.Standard,
+        )
+
+        assertEquals(listOf("balance"), presentation.credential?.orderedMetrics?.map { it.id })
+    }
+
     private fun credential(providerId: ProviderId) = Credential(
         id = UUID.randomUUID(),
         providerId = providerId,
@@ -141,6 +164,17 @@ class WidgetPresentationBuilderTest {
         unit = UsageMetricUnit.Request,
         presentation = UsageMetricPresentation.Value,
         semantic = UsageMetricSemantic.Value,
+        healthState = UsageMetricHealthState.Normal,
+    )
+
+    private fun balance(id: String, label: String, raw: String) = UsageMetric(
+        id = id,
+        label = label,
+        value = raw.toBigDecimal(),
+        unit = UsageMetricUnit.Currency,
+        presentation = UsageMetricPresentation.Balance,
+        semantic = UsageMetricSemantic.Balance,
+        currencyCode = "CNY",
         healthState = UsageMetricHealthState.Normal,
     )
 }

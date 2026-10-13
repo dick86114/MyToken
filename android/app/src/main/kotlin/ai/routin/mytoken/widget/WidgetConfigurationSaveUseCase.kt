@@ -4,11 +4,13 @@ package ai.routin.mytoken.widget
 internal class WidgetConfigurationSaveUseCase(
     private val save: (Int, WidgetConfig) -> Unit,
     private val enqueueRefresh: () -> Unit,
+    private val refreshNow: suspend (WidgetConfig) -> Unit,
     private val updateWidget: suspend (Int) -> Unit,
 ) {
     suspend fun apply(appWidgetId: Int, config: WidgetConfig) {
         save(appWidgetId, config)
         enqueueRefresh()
+        refreshNow(config)
         updateWidget(appWidgetId)
     }
 }

@@ -21,6 +21,10 @@ class WidgetConfigurationSaveUseCaseTest {
                 calls += "save"
             },
             enqueueRefresh = { calls += "refresh" },
+            refreshNow = { config ->
+                assertEquals(WidgetKind.Credential, config.kind)
+                calls += "refresh-now"
+            },
             updateWidget = { appWidgetId ->
                 assertEquals(7, appWidgetId)
                 calls += "update"
@@ -29,6 +33,6 @@ class WidgetConfigurationSaveUseCaseTest {
 
         useCase.apply(7, config)
 
-        assertEquals(listOf("save", "refresh", "update"), calls)
+        assertEquals(listOf("save", "refresh", "refresh-now", "update"), calls)
     }
 }

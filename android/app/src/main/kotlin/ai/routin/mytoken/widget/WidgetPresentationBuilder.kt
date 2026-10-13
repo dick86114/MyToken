@@ -69,6 +69,11 @@ object WidgetPresentationBuilder {
             fixedMetricId = fixedMetricId,
             capacity = capacity,
         )
+        val secondary = if (selection.primary?.presentation == UsageMetricPresentation.Balance) {
+            emptyList()
+        } else {
+            selection.secondary
+        }
         return WidgetCredentialPresentation(
             id = credential.id,
             providerId = credential.providerId.rawValue,
@@ -77,7 +82,7 @@ object WidgetPresentationBuilder {
             planName = snapshot?.planName.orEmpty(),
             isStale = false,
             primary = selection.primary?.let { metricDisplay(it, credential.providerId) },
-            secondary = selection.secondary.map { metricDisplay(it, credential.providerId) },
+            secondary = secondary.map { metricDisplay(it, credential.providerId) },
             fixedMetricUnavailable = selection.fixedMetricUnavailable,
             status = WidgetPresentationStateResolver.resolve(
                 isEnabled = credential.isEnabled,

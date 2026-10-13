@@ -25,19 +25,14 @@ object WidgetMetricRanker {
     }
 
     private fun orderedMetrics(providerId: ProviderId?, metrics: List<UsageMetric>): List<UsageMetric> =
+        orderedByPriority(metrics, WINDOW_PRIORITY + providerPriority(providerId))
+
+    private fun providerPriority(providerId: ProviderId?): List<String> =
         when (providerId) {
-            ProviderId.Routin -> orderedByPriority(metrics, listOf("five-hour", "weekly", "token"))
-            ProviderId.DeepSeek -> orderedByPriority(
-                metrics,
-                listOf("balance", "grantedBalance", "toppedUpBalance", "availability"),
-            )
-            ProviderId.Glm -> orderedByPriority(
-                metrics,
-                listOf("five-hour", "weekly", "monthly", "model-calls", "zcode-mcp"),
-            )
-            ProviderId.NewAPI -> orderedByPriority(
-                metrics,
-                listOf(
+            ProviderId.Routin -> listOf("token")
+            ProviderId.DeepSeek -> listOf("balance", "grantedBalance", "toppedUpBalance", "availability")
+            ProviderId.Glm -> listOf("model-calls", "zcode-mcp")
+            ProviderId.NewAPI -> listOf(
                     "quota-progress",
                     "today-token",
                     "one-day-token",
@@ -46,22 +41,25 @@ object WidgetMetricRanker {
                     "rpm",
                     "tpm",
                     "request-count",
-                ),
-            )
-            ProviderId.CommandCode -> orderedByPriority(
-                metrics,
-                listOf(
-                    "five-hour",
-                    "weekly",
+                )
+            ProviderId.CommandCode -> listOf(
                     "credit-progress",
                     "request-count",
                     "purchased-remaining",
                     "free-remaining",
-                ),
-            )
-            ProviderId.OpenCode -> orderedByPriority(metrics, listOf("five-hour", "weekly"))
-            ProviderId.Volcengine, ProviderId.Xiaomi, null -> metrics
+                )
+            ProviderId.OpenCode -> emptyList()
+            ProviderId.Volcengine, ProviderId.Xiaomi, null -> emptyList()
         }
+
+    private val WINDOW_PRIORITY = listOf(
+        "five-hour",
+        "fiveHour",
+        "weekly",
+        "7-day",
+        "monthly",
+        "month",
+    )
 
     private fun orderedByPriority(
         metrics: List<UsageMetric>,

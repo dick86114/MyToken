@@ -96,6 +96,7 @@ class OverviewGlanceWidget : MyTokenGlanceWidget() {
         context: Context,
         credential: WidgetCredentialPresentation,
     ) {
+        val accent = ColorProvider(WidgetProviderPalette.accentColor(credential.providerId))
         val intent = Intent(context, MainActivity::class.java)
             .setAction(MainActivity.ACTION_OPEN_CREDENTIAL)
             .putExtra(MainActivity.EXTRA_CREDENTIAL_ID, credential.id.toString())
@@ -123,7 +124,10 @@ class OverviewGlanceWidget : MyTokenGlanceWidget() {
                     modifier = GlanceModifier
                         .fillMaxWidth()
                         .height(4.dp),
-                    color = severityColor(credential.primary?.severity),
+                    color = when (credential.primary?.severity) {
+                        WidgetMetricSeverity.Normal, null -> accent
+                        else -> severityColor(credential.primary?.severity)
+                    },
                 )
             }
             Spacer(modifier = GlanceModifier.width(8.dp))
