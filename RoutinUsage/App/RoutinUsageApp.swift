@@ -1,8 +1,10 @@
 import AppKit
 import SwiftUI
 
+@MainActor
 final class RoutinUsageAppDelegate: NSObject, NSApplicationDelegate {
     static var didFinishLaunchingHandler: (() -> Void)?
+    static var openURLsHandler: (([URL]) -> Void)?
     static let statusItemPositionCacheKey = "NSStatusItem Preferred Position Item-0"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -23,6 +25,10 @@ final class RoutinUsageAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return false
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        Self.openURLsHandler?(urls)
     }
 
     @MainActor
@@ -59,6 +65,11 @@ struct RoutinUsageApp: App {
         let environment = AppEnvironment.live()
         _environment = State(initialValue: environment)
         _statusBarController = State(initialValue: nil)
+        RoutinUsageAppDelegate.openURLsHandler = { urls in
+            Task { @MainActor in
+                urls.forEach { _ = environment.openCredentialDeepLink($0) }
+            }
+        }
 
         guard !Self.isRunningUnitTests else {
             return

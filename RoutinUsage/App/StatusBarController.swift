@@ -4,6 +4,8 @@ import SwiftUI
 
 @MainActor
 final class StatusBarController: NSObject {
+    static weak var shared: StatusBarController?
+
     private let environment: AppEnvironment
     private var statusItem: NSStatusItem?
     private let popover = NSPopover()
@@ -18,7 +20,23 @@ final class StatusBarController: NSObject {
         refreshMinutes = environment.settings.refreshMinutes
         notificationsEnabled = environment.settings.notificationsEnabled
         super.init()
+        Self.shared = self
+    }
 
+    func presentCredential(_ keyID: UUID) {
+        openSettingsWindow()
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            NotificationCenter.default.post(
+                name: .myTokenPresentCredential,
+                object: self,
+                userInfo: ["credentialID": keyID]
+            )
+        }
+    }
+
+    func presentSettings() {
+        openSettingsWindow()
     }
 
     func start() {
@@ -426,6 +444,10 @@ enum PopoverWindowPlacement {
         let y = visibleFrame.maxY - popoverSize.height
         return NSPoint(x: x, y: y)
     }
+}
+
+extension Notification.Name {
+    static let myTokenPresentCredential = Notification.Name("myTokenPresentCredential")
 }
 
 @MainActor

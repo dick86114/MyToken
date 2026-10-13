@@ -82,6 +82,7 @@ final class UsageStore {
     @ObservationIgnored private let usagePreferencesProvider: @MainActor @Sendable (UUID) -> CredentialUsagePreferences
     @ObservationIgnored private let setUsagePreferencesHandler: @MainActor @Sendable (CredentialUsagePreferences, UUID) -> Void
     @ObservationIgnored private let metricCapabilitiesProvider: @MainActor @Sendable (KeyConfiguration) -> [UsageMetricCapability]
+    @ObservationIgnored private let widgetPublisher: (@MainActor @Sendable ([UUID: KeyUsageState], [UUID]) -> Void)?
     @ObservationIgnored private let now: @Sendable () -> Date
     @ObservationIgnored private var refreshingKeyIDs: Set<UUID> = []
     @ObservationIgnored private var refreshGenerationByKeyID: [UUID: UUID] = [:]
@@ -101,6 +102,7 @@ final class UsageStore {
         setUsagePreferencesHandler: @escaping @MainActor @Sendable (CredentialUsagePreferences, UUID) -> Void = { _, _ in },
         metricCapabilitiesProvider: @escaping @MainActor @Sendable (KeyConfiguration) -> [UsageMetricCapability] = { _ in [] },
         providerRegistry: ProviderRegistry? = nil,
+        widgetPublisher: (@MainActor @Sendable ([UUID: KeyUsageState], [UUID]) -> Void)? = nil,
         now: @escaping @Sendable () -> Date = Date.init
     ) {
         self.keyRepository = keyRepository
@@ -116,6 +118,7 @@ final class UsageStore {
         self.usagePreferencesProvider = usagePreferencesProvider
         self.setUsagePreferencesHandler = setUsagePreferencesHandler
         self.metricCapabilitiesProvider = metricCapabilitiesProvider
+        self.widgetPublisher = widgetPublisher
         self.now = now
 
         restoreState()
@@ -134,14 +137,17 @@ final class UsageStore {
             return prepareRefreshRequest(for: keyID)
         }
         await perform(requests)
+        publishWidgetSnapshot()
     }
 
     func refresh(keyID: UUID) async {
         synchronizeConfigurations()
         guard let request = prepareRefreshRequest(for: keyID) else {
+            publishWidgetSnapshot()
             return
         }
         await perform([request])
+        publishWidgetSnapshot()
     }
 
     func updateSettings(
@@ -164,10 +170,12 @@ final class UsageStore {
             } == true
             states[keyID] = state
         }
+        publishWidgetSnapshot()
     }
 
     func reloadConfigurations() {
         synchronizeConfigurations()
+        publishWidgetSnapshot()
     }
 
     func applyValidatedSnapshot(
@@ -210,6 +218,7 @@ final class UsageStore {
         } else {
             try? cache.delete(for: keyID)
         }
+        publishWidgetSnapshot()
     }
 
     func setKeyEnabled(_ id: UUID, enabled: Bool) throws {
@@ -219,6 +228,7 @@ final class UsageStore {
             throw Self.storeError(from: error)
         }
         synchronizeConfigurations()
+        publishWidgetSnapshot()
     }
 
     func addValidatedKey(name: String, secret: String) async throws {
@@ -288,6 +298,7 @@ final class UsageStore {
         } else {
             try? cache.delete(for: configuration.id)
         }
+        publishWidgetSnapshot()
     }
 
     func deleteKey(_ id: UUID) throws {
@@ -310,6 +321,7 @@ final class UsageStore {
         states.removeValue(forKey: id)
         orderedKeyIDs.removeAll { $0 == id }
         isRefreshing = !refreshingKeyIDs.isEmpty
+        publishWidgetSnapshot()
         if cacheDeletionFailed {
             throw UsageStoreError.cacheCleanupFailed
         }
@@ -339,6 +351,7 @@ final class UsageStore {
                 )
             )
         })
+        publishWidgetSnapshot()
     }
 
     private func synchronizeConfigurations() {
@@ -371,6 +384,10 @@ final class UsageStore {
                 )
             }
         }
+    }
+
+    private func publishWidgetSnapshot() {
+        widgetPublisher?(states, orderedKeyIDs)
     }
 
     private func prepareRefreshRequest(for keyID: UUID) -> RefreshRequest? {

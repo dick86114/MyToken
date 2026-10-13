@@ -16,6 +16,7 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -502,5 +503,26 @@ class RefreshCredentialsUseCaseTest {
         useCase.restoreFromCache()
 
         assertTrue(useCase.states.value.isEmpty())
+    }
+
+    @Test
+    fun `concurrent refresh of same credential invokes provider once and shares result`() = runTest {
+        val cred = credential("11111111-1111-4111-8111-111111111111", ProviderId.Routin)
+        val secret = CredentialSecret.BearerToken("token")
+        val provider = FakeProvider(ProviderId.Routin, delayMs = 1_000) {
+            Result.success(snapshot(cred.id, used = 7))
+        }
+        val useCase = RefreshCredentialsUseCase(
+            repository = FakeCredentialRepository(listOf(cred), mapOf(cred.id to secret)),
+            providers = mapOf(ProviderId.Routin to provider),
+        )
+
+        val first = async { useCase.refresh(cred) }
+        val second = async { useCase.refresh(cred) }
+        first.await()
+        second.await()
+
+        assertEquals(1, provider.calls.get())
+        assertEquals(snapshot(cred.id, used = 7), useCase.states.value.getValue(cred.id).snapshot)
     }
 }

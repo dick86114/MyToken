@@ -69,6 +69,7 @@ final class AppEnvironment {
     let providerRegistry: ProviderRegistry?
     let xiaomiWebSession: XiaomiWebSession?
     var showsOnboarding = false
+    var pendingSettingsCredentialID: UUID?
     var xiaomiLoginRequest: XiaomiLoginRequest?
     private(set) var updateStatus: AppUpdateStatus = .idle
     private(set) var releaseHistoryState: AppReleaseHistoryState = .idle
@@ -178,6 +179,37 @@ final class AppEnvironment {
             XiaomiMiMoUsageProvider(session: .shared),
             OpenCodeUsageProvider(session: .shared)
         ])
+        let widgetSnapshotSynchronizer: WidgetSnapshotSynchronizer?
+        let widgetGroupID = "cc.idickies.mytoken.widgets"
+        if let widgetDirectory = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: widgetGroupID
+        ) {
+            widgetSnapshotSynchronizer = WidgetSnapshotSynchronizer(
+                store: WidgetSnapshotStore(directory: widgetDirectory),
+                reloader: WidgetCenterReloader(),
+                logWriter: logWriter
+            )
+        } else {
+            widgetSnapshotSynchronizer = nil
+            Task {
+                await logWriter.log(
+                    level: .warning,
+                    event: "widget_group_unavailable",
+                    details: nil
+                )
+            }
+        }
+        let widgetPublisher: (@MainActor @Sendable ([UUID: KeyUsageState], [UUID]) -> Void)?
+        if let widgetSnapshotSynchronizer {
+            widgetPublisher = { states, orderedKeyIDs in
+                widgetSnapshotSynchronizer.publish(
+                    states: states,
+                    orderedKeyIDs: orderedKeyIDs
+                )
+            }
+        } else {
+            widgetPublisher = nil
+        }
         let store = UsageStore(
             keyRepository: keyRepository,
             localStore: localStore,
@@ -197,7 +229,8 @@ final class AppEnvironment {
             metricCapabilitiesProvider: { configuration in
                 providerRegistry.metricCapabilities(for: configuration)
             },
-            providerRegistry: providerRegistry
+            providerRegistry: providerRegistry,
+            widgetPublisher: widgetPublisher
         )
 
         for configuration in keyRepository.list() {
@@ -590,6 +623,51 @@ final class AppEnvironment {
 
     func refreshCredential(_ keyID: UUID) async {
         await store.refresh(keyID: keyID)
+    }
+
+    @discardableResult
+    func openCredentialDeepLink(_ url: URL) -> Bool {
+        if url.scheme?.lowercased() == "mytoken", url.host?.lowercased() == "open" {
+            StatusBarController.shared?.presentSettings()
+            return true
+        }
+        guard
+            let request = Self.credentialDeepLink(from: url),
+            store.state(for: request.credentialID) != nil
+        else {
+            return false
+        }
+        pendingSettingsCredentialID = request.credentialID
+        StatusBarController.shared?.presentCredential(request.credentialID)
+        if request.refreshes {
+            Task { [weak self] in
+                await self?.store.refresh(keyID: request.credentialID)
+            }
+        }
+        return true
+    }
+
+    func consumePendingSettingsCredentialID(_ keyID: UUID) {
+        guard pendingSettingsCredentialID == keyID else { return }
+        pendingSettingsCredentialID = nil
+    }
+
+    static func credentialDeepLink(from url: URL) -> (credentialID: UUID, refreshes: Bool)? {
+        guard
+            url.scheme?.lowercased() == "mytoken",
+            url.host?.lowercased() == "credential"
+        else {
+            return nil
+        }
+        let rawID = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard let credentialID = UUID(uuidString: rawID) else {
+            return nil
+        }
+        let refreshes = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?
+            .first { $0.name == "refresh" }?
+            .value == "1"
+        return (credentialID, refreshes)
     }
 
     func retryCredential(_ keyID: UUID) async {

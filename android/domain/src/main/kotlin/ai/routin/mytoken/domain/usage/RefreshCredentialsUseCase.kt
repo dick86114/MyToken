@@ -8,6 +8,7 @@ import ai.routin.mytoken.domain.repository.CredentialRepository
 import java.time.Clock
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,6 +17,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 
 /** Per-credential refresh status. */
@@ -47,6 +50,8 @@ class RefreshCredentialsUseCase(
     }
 
     private val semaphore = Semaphore(maxConcurrency)
+    private val inFlightMutex = Mutex()
+    private val inFlight = mutableMapOf<UUID, CompletableDeferred<Unit>>()
     private val _states = MutableStateFlow<Map<UUID, CredentialUsageState>>(emptyMap())
     val states: StateFlow<Map<UUID, CredentialUsageState>> = _states.asStateFlow()
 
@@ -102,6 +107,31 @@ class RefreshCredentialsUseCase(
 
     /** Refreshes a single credential, preserving the previous snapshot on failure. */
     suspend fun refresh(credential: Credential) {
+        if (!credential.isEnabled) {
+            setDisabled(credential.id)
+            return
+        }
+        val (deferred, isOwner) = inFlightMutex.withLock {
+            inFlight[credential.id]?.let { return@withLock it to false }
+            CompletableDeferred<Unit>().also { inFlight[credential.id] = it } to true
+        }
+        if (!isOwner) {
+            deferred.join()
+            return
+        }
+        try {
+            performRefresh(credential)
+        } finally {
+            inFlightMutex.withLock {
+                if (inFlight[credential.id] === deferred) {
+                    inFlight.remove(credential.id)
+                }
+            }
+            deferred.complete(Unit)
+        }
+    }
+
+    private suspend fun performRefresh(credential: Credential) {
         if (!credential.isEnabled) {
             setDisabled(credential.id)
             return

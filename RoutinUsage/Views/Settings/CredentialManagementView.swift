@@ -101,6 +101,16 @@ struct CredentialManagementView: View {
                 .frame(width: 640)
                 .frame(minHeight: 500, maxHeight: 720)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .myTokenPresentCredential)) { notification in
+            guard
+                let keyID = notification.userInfo?["credentialID"] as? UUID,
+                let state = environment.store.state(for: keyID)
+            else {
+                return
+            }
+            detailsState = state
+            environment.consumePendingSettingsCredentialID(keyID)
+        }
     }
 
     private var addButton: some View {

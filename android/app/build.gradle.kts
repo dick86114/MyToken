@@ -60,6 +60,7 @@ dependencies {
     // AppGraph 构造 Room 数据库时直接引用 androidx.room.Room，app 需要该依赖。
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+    implementation("androidx.glance:glance-appwidget:1.1.0")
 
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
@@ -74,6 +75,7 @@ dependencies {
     testImplementation("androidx.test:core-ktx:1.6.1")
     testImplementation("androidx.compose.ui:ui-test-junit4")
     testImplementation("androidx.compose.ui:ui-test-manifest")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     androidTestImplementation(project(":feature-transfer"))
     androidTestImplementation(project(":core"))
@@ -84,4 +86,11 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+}
+
+tasks.withType<Test>().configureEach {
+    systemProperty(
+        "widget.contracts.dir",
+        rootProject.file("../shared/widget-contracts").absolutePath,
+    )
 }
