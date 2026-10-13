@@ -3,6 +3,8 @@ import WidgetKit
 struct CredentialWidgetEntry: TimelineEntry {
     let date: Date
     let credential: WidgetSnapshotCredential?
+    let style: WidgetDisplayStyleIntentEnum
+    let primaryMetricID: String?
     let deepLinkURL: URL?
 
     static let placeholder = CredentialWidgetEntry(
@@ -44,53 +46,112 @@ struct CredentialWidgetEntry: TimelineEntry {
                 )
             ]
         ),
+        style: .automatic,
+        primaryMetricID: nil,
         deepLinkURL: URL(string: "mytoken://credential/AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA?refresh=1")
     )
 }
 
-struct WidgetSnapshotProvider: TimelineProvider {
+struct OverviewWidgetEntry: TimelineEntry {
+    let date: Date
+    let credentials: [WidgetSnapshotCredential]
+    let style: WidgetDisplayStyleIntentEnum
+
+    static let placeholder = OverviewWidgetEntry(
+        date: Date(),
+        credentials: [CredentialWidgetEntry.placeholder.credential].compactMap { $0 },
+        style: .automatic
+    )
+}
+
+struct CredentialWidgetIntentProvider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> CredentialWidgetEntry {
         .placeholder
     }
 
-    func getSnapshot(
-        in context: Context,
-        completion: @escaping (CredentialWidgetEntry) -> Void
-    ) {
-        completion(makeEntry())
+    func snapshot(
+        for configuration: CredentialWidgetConfigurationIntent,
+        in context: Context
+    ) async -> CredentialWidgetEntry {
+        makeEntry(configuration: configuration)
     }
 
-    func getTimeline(
-        in context: Context,
-        completion: @escaping (Timeline<CredentialWidgetEntry>) -> Void
-    ) {
-        let entry = makeEntry()
-        completion(
-            Timeline(
-                entries: [entry],
-                policy: .after(Date().addingTimeInterval(30 * 60))
-            )
+    func timeline(
+        for configuration: CredentialWidgetConfigurationIntent,
+        in context: Context
+    ) async -> Timeline<CredentialWidgetEntry> {
+        makeTimeline(entry: makeEntry(configuration: configuration))
+    }
+
+    private func makeEntry(
+        configuration: CredentialWidgetConfigurationIntent
+    ) -> CredentialWidgetEntry {
+        let bundle = try? WidgetSharedSnapshotLoader.load()
+        let credentials = bundle?.credentials ?? []
+        let configuredID = configuration.credential.flatMap {
+            UUID(uuidString: $0.id)
+        }
+        let credential = credentials.first { $0.id == configuredID }
+            ?? credentials.first(where: \.isEnabled)
+            ?? credentials.first
+
+        return CredentialWidgetEntry(
+            date: bundle?.generatedAt ?? Date(),
+            credential: credential,
+            style: configuration.style,
+            primaryMetricID: configuration.primaryMetric?.id,
+            deepLinkURL: credential.map {
+                URL(string: "mytoken://credential/\($0.id.uuidString)?refresh=1")
+            } ?? nil
         )
     }
 
-    private func makeEntry() -> CredentialWidgetEntry {
-        guard
-            let directory = FileManager.default.containerURL(
-                forSecurityApplicationGroupIdentifier: "group.cc.idickies.mytoken.widgets"
-            ),
-            let bundle = try? WidgetSnapshotStore(directory: directory).load(),
-            let credential = bundle.credentials.first(where: \.isEnabled)
-                ?? bundle.credentials.first
-        else {
-            return CredentialWidgetEntry(date: Date(), credential: nil, deepLinkURL: nil)
-        }
+    private func makeTimeline(
+        entry: CredentialWidgetEntry
+    ) -> Timeline<CredentialWidgetEntry> {
+        Timeline(
+            entries: [entry],
+            policy: .after(Date().addingTimeInterval(30 * 60))
+        )
+    }
+}
 
-        return CredentialWidgetEntry(
-            date: bundle.generatedAt,
-            credential: credential,
-            deepLinkURL: URL(
-                string: "mytoken://credential/\(credential.id.uuidString)?refresh=1"
-            )
+struct OverviewWidgetIntentProvider: AppIntentTimelineProvider {
+    func placeholder(in context: Context) -> OverviewWidgetEntry {
+        .placeholder
+    }
+
+    func snapshot(
+        for configuration: OverviewWidgetConfigurationIntent,
+        in context: Context
+    ) async -> OverviewWidgetEntry {
+        makeEntry(configuration: configuration)
+    }
+
+    func timeline(
+        for configuration: OverviewWidgetConfigurationIntent,
+        in context: Context
+    ) async -> Timeline<OverviewWidgetEntry> {
+        let entry = makeEntry(configuration: configuration)
+        return Timeline(
+            entries: [entry],
+            policy: .after(Date().addingTimeInterval(30 * 60))
+        )
+    }
+
+    private func makeEntry(
+        configuration: OverviewWidgetConfigurationIntent
+    ) -> OverviewWidgetEntry {
+        let bundle = try? WidgetSharedSnapshotLoader.load()
+        let allCredentials = bundle?.credentials.filter(\.isEnabled) ?? []
+        let selectedIDs = Set(configuration.manualCredentialIDs)
+        let credentials = configuration.source == .manual
+            ? allCredentials.filter { selectedIDs.contains($0.id.uuidString) }
+            : allCredentials
+        return OverviewWidgetEntry(
+            date: bundle?.generatedAt ?? Date(),
+            credentials: credentials,
+            style: configuration.style
         )
     }
 }

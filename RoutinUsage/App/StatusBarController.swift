@@ -35,6 +35,10 @@ final class StatusBarController: NSObject {
         }
     }
 
+    func presentSettings() {
+        openSettingsWindow()
+    }
+
     func start() {
         guard statusItem == nil else { return }
         registerStatusItem()

@@ -17,6 +17,10 @@ final class ProjectBootstrapTests: XCTestCase {
             encoding: .utf8
         )
         let app = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
+        let widgetBundle = try String(
+            contentsOf: projectRoot.appendingPathComponent("RoutinUsageWidget/RoutinUsageWidgetBundle.swift"),
+            encoding: .utf8
+        )
 
         XCTAssertTrue(project.contains("RoutinUsageWidget:"))
         XCTAssertTrue(project.contains("com.apple.widgetkit-extension"))
@@ -24,6 +28,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(appEntitlements.contains("group.cc.idickies.mytoken.widgets"))
         XCTAssertTrue(widgetEntitlements.contains("group.cc.idickies.mytoken.widgets"))
         XCTAssertTrue(app.contains("application(_ application: NSApplication, open urls: [URL])"))
+        XCTAssertTrue(widgetBundle.contains("MyTokenOverviewWidget()"))
     }
 
     func test应用标识稳定() {

@@ -5,5 +5,6 @@ import WidgetKit
 struct RoutinUsageWidgetBundle: WidgetBundle {
     var body: some Widget {
         MyTokenCredentialWidget()
+        MyTokenOverviewWidget()
     }
 }

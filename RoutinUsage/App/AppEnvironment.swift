@@ -627,6 +627,10 @@ final class AppEnvironment {
 
     @discardableResult
     func openCredentialDeepLink(_ url: URL) -> Bool {
+        if url.scheme?.lowercased() == "mytoken", url.host?.lowercased() == "open" {
+            StatusBarController.shared?.presentSettings()
+            return true
+        }
         guard
             let request = Self.credentialDeepLink(from: url),
             store.state(for: request.credentialID) != nil

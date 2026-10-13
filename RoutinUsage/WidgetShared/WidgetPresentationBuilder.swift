@@ -4,7 +4,8 @@ enum WidgetPresentationBuilder {
     static func makeCredentialPresentation(
         credential: WidgetSnapshotCredential,
         style: WidgetDisplayStyle,
-        size: WidgetSizeKind
+        size: WidgetSizeKind,
+        fixedMetricID: String? = nil
     ) -> WidgetPresentation {
         let resolvedStyle = resolveStyle(
             style,
@@ -14,7 +15,13 @@ enum WidgetPresentationBuilder {
         return WidgetPresentation(
             style: resolvedStyle,
             size: size,
-            credentials: [makeCredential(credential, capacity: size.credentialMetricCapacity)]
+            credentials: [
+                makeCredential(
+                    credential,
+                    capacity: size.credentialMetricCapacity,
+                    fixedMetricID: fixedMetricID
+                )
+            ]
         )
     }
 
@@ -61,12 +68,13 @@ enum WidgetPresentationBuilder {
 
     private static func makeCredential(
         _ credential: WidgetSnapshotCredential,
-        capacity: Int
+        capacity: Int,
+        fixedMetricID: String? = nil
     ) -> WidgetCredentialPresentation {
         let selection = WidgetMetricRanker.rank(
             providerID: credential.providerID,
             metrics: credential.metrics,
-            fixedMetricID: nil,
+            fixedMetricID: fixedMetricID,
             capacity: capacity
         )
         return WidgetCredentialPresentation(
