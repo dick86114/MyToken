@@ -32,6 +32,14 @@ enum WidgetSnapshotMetricHealthState: String, Codable, Equatable, Sendable {
     case unknown
 }
 
+enum WidgetSnapshotFailure: String, Codable, Equatable, Sendable {
+    case authentication
+    case network
+    case invalidResponse
+    case server
+    case unknown
+}
+
 struct WidgetSnapshotMetric: Codable, Equatable, Sendable, Identifiable {
     let id: String
     let label: String
@@ -146,6 +154,75 @@ struct WidgetSnapshotCredential: Codable, Equatable, Sendable, Identifiable {
     let isStale: Bool
     let subscriptionEndAt: Date?
     let metrics: [WidgetSnapshotMetric]
+    var failure: WidgetSnapshotFailure? = nil
+    var isRefreshing: Bool = false
+
+    init(
+        id: UUID,
+        providerID: String,
+        providerName: String,
+        name: String,
+        planName: String,
+        isEnabled: Bool,
+        sortOrder: Int,
+        fetchedAt: Date?,
+        lastSuccessAt: Date?,
+        isStale: Bool,
+        subscriptionEndAt: Date?,
+        metrics: [WidgetSnapshotMetric],
+        failure: WidgetSnapshotFailure? = nil,
+        isRefreshing: Bool = false
+    ) {
+        self.id = id
+        self.providerID = providerID
+        self.providerName = providerName
+        self.name = name
+        self.planName = planName
+        self.isEnabled = isEnabled
+        self.sortOrder = sortOrder
+        self.fetchedAt = fetchedAt
+        self.lastSuccessAt = lastSuccessAt
+        self.isStale = isStale
+        self.subscriptionEndAt = subscriptionEndAt
+        self.metrics = metrics
+        self.failure = failure
+        self.isRefreshing = isRefreshing
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case providerID
+        case providerName
+        case name
+        case planName
+        case isEnabled
+        case sortOrder
+        case fetchedAt
+        case lastSuccessAt
+        case isStale
+        case subscriptionEndAt
+        case metrics
+        case failure
+        case isRefreshing
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        providerID = try container.decode(String.self, forKey: .providerID)
+        providerName = try container.decode(String.self, forKey: .providerName)
+        name = try container.decode(String.self, forKey: .name)
+        planName = try container.decode(String.self, forKey: .planName)
+        isEnabled = try container.decode(Bool.self, forKey: .isEnabled)
+        sortOrder = try container.decode(Int.self, forKey: .sortOrder)
+        fetchedAt = try container.decodeIfPresent(Date.self, forKey: .fetchedAt)
+        lastSuccessAt = try container.decodeIfPresent(Date.self, forKey: .lastSuccessAt)
+        isStale = try container.decode(Bool.self, forKey: .isStale)
+        subscriptionEndAt = try container.decodeIfPresent(Date.self, forKey: .subscriptionEndAt)
+        metrics = try container.decode([WidgetSnapshotMetric].self, forKey: .metrics)
+        failure = try container.decodeIfPresent(WidgetSnapshotFailure.self, forKey: .failure)
+        isRefreshing = try container.decodeIfPresent(Bool.self, forKey: .isRefreshing) ?? false
+    }
 }
 
 struct WidgetSnapshotBundle: Codable, Equatable, Sendable {
@@ -213,6 +290,7 @@ struct WidgetCredentialPresentation: Equatable, Sendable, Identifiable {
     let primary: WidgetMetricPresentation?
     let secondary: [WidgetMetricPresentation]
     let fixedMetricUnavailable: Bool
+    let status: WidgetPresentationStatus
 
     var orderedMetrics: [WidgetMetricPresentation] {
         [primary].compactMap { $0 } + secondary

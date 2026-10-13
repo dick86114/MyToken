@@ -24,14 +24,22 @@ private struct CredentialWidgetEntryView: View {
 
     var body: some View {
         Group {
-            if let credential = entry.credential {
+            if entry.missingCredential {
+                WidgetStatusMessageView(
+                    symbol: "exclamationmark.triangle",
+                    text: WidgetPresentationStateResolver.copy(for: .missingCredential)
+                )
+            } else if let credential = entry.credential {
                 let presentation = WidgetPresentationBuilder.makeCredentialPresentation(
                     credential: credential,
                     style: entry.style.displayStyle,
                     size: WidgetSizeKind(family: family),
                     fixedMetricID: entry.primaryMetricID
                 )
-                if let item = presentation.credentials.first {
+                if presentation.credentials.first?.status == .loading,
+                   presentation.credentials.first?.primary == nil {
+                    WidgetLoadingView()
+                } else if let item = presentation.credentials.first {
                     WidgetCredentialContent(item: item, style: presentation.style)
                 } else {
                     WidgetEmptyView()

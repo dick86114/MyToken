@@ -6,6 +6,7 @@ struct CredentialWidgetEntry: TimelineEntry {
     let style: WidgetDisplayStyleIntentEnum
     let primaryMetricID: String?
     let deepLinkURL: URL?
+    let missingCredential: Bool
 
     static let placeholder = CredentialWidgetEntry(
         date: Date(),
@@ -48,7 +49,8 @@ struct CredentialWidgetEntry: TimelineEntry {
         ),
         style: .automatic,
         primaryMetricID: nil,
-        deepLinkURL: URL(string: "mytoken://credential/AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA?refresh=1")
+        deepLinkURL: URL(string: "mytoken://credential/AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA?refresh=1"),
+        missingCredential: false
     )
 }
 
@@ -91,7 +93,11 @@ struct CredentialWidgetIntentProvider: AppIntentTimelineProvider {
         let configuredID = configuration.credential.flatMap {
             UUID(uuidString: $0.id)
         }
-        let credential = credentials.first { $0.id == configuredID }
+        let configuredCredential = configuredID.flatMap { id in
+            credentials.first { $0.id == id }
+        }
+        let missingCredential = configuredID != nil && configuredCredential == nil
+        let credential = configuredCredential
             ?? credentials.first(where: \.isEnabled)
             ?? credentials.first
 
@@ -102,15 +108,30 @@ struct CredentialWidgetIntentProvider: AppIntentTimelineProvider {
             primaryMetricID: configuration.primaryMetric?.id,
             deepLinkURL: credential.map {
                 URL(string: "mytoken://credential/\($0.id.uuidString)?refresh=1")
-            } ?? nil
+            } ?? nil,
+            missingCredential: missingCredential
         )
     }
 
     private func makeTimeline(
         entry: CredentialWidgetEntry
     ) -> Timeline<CredentialWidgetEntry> {
-        Timeline(
-            entries: [entry],
+        let timelineMoments = WidgetTimelineEntryFactory.makeEntries(
+            snapshot: try? WidgetSharedSnapshotLoader.load(),
+            now: entry.date
+        )
+        let entries = timelineMoments.map { moment in
+            CredentialWidgetEntry(
+                date: moment.date,
+                credential: entry.credential,
+                style: entry.style,
+                primaryMetricID: entry.primaryMetricID,
+                deepLinkURL: entry.deepLinkURL,
+                missingCredential: entry.missingCredential
+            )
+        }
+        return Timeline(
+            entries: entries,
             policy: .after(Date().addingTimeInterval(30 * 60))
         )
     }
@@ -133,8 +154,14 @@ struct OverviewWidgetIntentProvider: AppIntentTimelineProvider {
         in context: Context
     ) async -> Timeline<OverviewWidgetEntry> {
         let entry = makeEntry(configuration: configuration)
+        let moments = WidgetTimelineEntryFactory.makeEntries(
+            snapshot: try? WidgetSharedSnapshotLoader.load(),
+            now: entry.date
+        )
         return Timeline(
-            entries: [entry],
+            entries: moments.map {
+                OverviewWidgetEntry(date: $0.date, credentials: entry.credentials, style: entry.style)
+            },
             policy: .after(Date().addingTimeInterval(30 * 60))
         )
     }

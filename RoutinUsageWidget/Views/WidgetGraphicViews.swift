@@ -19,6 +19,7 @@ struct WidgetCredentialContent: View {
             footer
         }
         .padding(2)
+        .opacity(item.status == .disabled ? 0.65 : 1)
     }
 
     private var header: some View {
@@ -96,12 +97,10 @@ struct WidgetCredentialContent: View {
 
     private var footer: some View {
         HStack(spacing: 5) {
-            if item.fixedMetricUnavailable {
-                Text("主指标暂不可用")
-            } else if item.isStale {
-                Text("缓存数据")
-            } else if let fetchedAt = item.fetchedAt {
+            if item.status == .ready, let fetchedAt = item.fetchedAt {
                 Text(fetchedAt, style: .time)
+            } else {
+                Text(WidgetPresentationStateResolver.copy(for: item.status))
             }
             Spacer(minLength: 0)
             if let resetText = item.primary?.resetText {
@@ -191,6 +190,46 @@ struct WidgetEmptyView: View {
             Text("打开应用添加凭证")
                 .font(.system(size: 12, weight: .semibold))
                 .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+struct WidgetLoadingView: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            RoundedRectangle(cornerRadius: 6)
+                .fill(.primary.opacity(0.10))
+                .frame(height: 12)
+                .frame(maxWidth: 92)
+            RoundedRectangle(cornerRadius: 6)
+                .fill(.primary.opacity(0.08))
+                .frame(height: 48)
+            RoundedRectangle(cornerRadius: 4)
+                .fill(.primary.opacity(0.10))
+                .frame(height: 6)
+            Text(WidgetPresentationStateResolver.copy(for: .loading))
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
+}
+
+struct WidgetStatusMessageView: View {
+    let symbol: String
+    let text: String
+
+    var body: some View {
+        VStack(spacing: 7) {
+            Image(systemName: symbol)
+                .font(.system(size: 22))
+                .foregroundStyle(.secondary)
+            Text(text)
+                .font(.system(size: 11, weight: .semibold))
+                .lineLimit(1)
+                .truncationMode(.tail)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

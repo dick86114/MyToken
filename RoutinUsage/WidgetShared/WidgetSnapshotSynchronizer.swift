@@ -64,8 +64,27 @@ final class WidgetSnapshotSynchronizer {
             lastSuccessAt: state.lastSuccessAt,
             isStale: state.isStale,
             subscriptionEndAt: state.snapshot?.subscriptionEndAt,
-            metrics: state.snapshot?.normalizedMetrics.map(makeMetric) ?? []
+            metrics: state.snapshot?.normalizedMetrics.map(makeMetric) ?? [],
+            failure: makeFailure(state),
+            isRefreshing: state.isRefreshing
         )
+    }
+
+    private func makeFailure(_ state: KeyUsageState) -> WidgetSnapshotFailure? {
+        guard let error = state.error else { return nil }
+        if state.failureIsAuthentication { return .authentication }
+        switch error {
+        case .invalidKey:
+            return .authentication
+        case .network:
+            return .network
+        case .invalidResponse:
+            return .invalidResponse
+        case .server:
+            return .server
+        case .noSubscription:
+            return .unknown
+        }
     }
 
     private func makeMetric(_ metric: NormalizedUsageMetric) -> WidgetSnapshotMetric {

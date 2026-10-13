@@ -87,7 +87,16 @@ enum WidgetPresentationBuilder {
             isStale: credential.isStale,
             primary: selection.primary.map(WidgetMetricFormatter.makePresentation),
             secondary: selection.secondary.map(WidgetMetricFormatter.makePresentation),
-            fixedMetricUnavailable: selection.fixedMetricUnavailable
+            fixedMetricUnavailable: selection.fixedMetricUnavailable,
+            status: WidgetPresentationStateResolver.resolve(
+                isEnabled: credential.isEnabled,
+                hasSnapshot: credential.lastSuccessAt != nil || credential.fetchedAt != nil,
+                isStale: credential.isStale,
+                isRefreshing: credential.isRefreshing,
+                failure: credential.failure,
+                metricCount: credential.metrics.count,
+                fixedMetricUnavailable: selection.fixedMetricUnavailable
+            )
         )
     }
 

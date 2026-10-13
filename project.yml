@@ -51,6 +51,8 @@ targets:
       - path: RoutinUsage/WidgetShared/WidgetMetricRanker.swift
       - path: RoutinUsage/WidgetShared/WidgetPresentationBuilder.swift
       - path: RoutinUsage/WidgetShared/WidgetSnapshotStore.swift
+      - path: RoutinUsage/WidgetShared/WidgetPresentationState.swift
+      - path: RoutinUsage/WidgetShared/WidgetTimelineEntryFactory.swift
       - path: RoutinUsage/WidgetShared/Intents/CredentialEntity.swift
       - path: RoutinUsage/WidgetShared/Intents/PrimaryMetricEntity.swift
       - path: RoutinUsage/WidgetShared/Intents/WidgetDisplayStyleIntentEnum.swift
