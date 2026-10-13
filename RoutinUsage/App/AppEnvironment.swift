@@ -178,6 +178,37 @@ final class AppEnvironment {
             XiaomiMiMoUsageProvider(session: .shared),
             OpenCodeUsageProvider(session: .shared)
         ])
+        let widgetSnapshotSynchronizer: WidgetSnapshotSynchronizer?
+        let widgetGroupID = "cc.idickies.mytoken.widgets"
+        if let widgetDirectory = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: widgetGroupID
+        ) {
+            widgetSnapshotSynchronizer = WidgetSnapshotSynchronizer(
+                store: WidgetSnapshotStore(directory: widgetDirectory),
+                reloader: WidgetCenterReloader(),
+                logWriter: logWriter
+            )
+        } else {
+            widgetSnapshotSynchronizer = nil
+            Task {
+                await logWriter.log(
+                    level: .warning,
+                    event: "widget_group_unavailable",
+                    details: nil
+                )
+            }
+        }
+        let widgetPublisher: (@MainActor @Sendable ([UUID: KeyUsageState], [UUID]) -> Void)?
+        if let widgetSnapshotSynchronizer {
+            widgetPublisher = { states, orderedKeyIDs in
+                widgetSnapshotSynchronizer.publish(
+                    states: states,
+                    orderedKeyIDs: orderedKeyIDs
+                )
+            }
+        } else {
+            widgetPublisher = nil
+        }
         let store = UsageStore(
             keyRepository: keyRepository,
             localStore: localStore,
@@ -197,7 +228,8 @@ final class AppEnvironment {
             metricCapabilitiesProvider: { configuration in
                 providerRegistry.metricCapabilities(for: configuration)
             },
-            providerRegistry: providerRegistry
+            providerRegistry: providerRegistry,
+            widgetPublisher: widgetPublisher
         )
 
         for configuration in keyRepository.list() {
