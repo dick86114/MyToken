@@ -118,12 +118,15 @@ class CredentialWidgetConfigActivity : ComponentActivity() {
                         credentials = credentials.filter(Credential::isEnabled),
                         onSave = { config ->
                             scope.launch {
-                                saveUseCase.apply(appWidgetId, config)
-                                setResult(
-                                    Activity.RESULT_OK,
-                                    Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId),
-                                )
-                                finish()
+                                try {
+                                    saveUseCase.apply(appWidgetId, config)
+                                } finally {
+                                    setResult(
+                                        Activity.RESULT_OK,
+                                        Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId),
+                                    )
+                                    finish()
+                                }
                             }
                         },
                     )
@@ -200,15 +203,21 @@ private fun WidgetConfigurationScreen(
         }
         if (credentials.isEmpty()) {
             Text("打开应用添加凭证")
+            Spacer(modifier = Modifier.weight(1f))
         } else if (kind == WidgetKind.Credential) {
             Text("凭证", style = MaterialTheme.typography.titleMedium)
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(credentials, key = { it.id }) { credential ->
-                    CredentialOptionRow(
-                        credential = credential,
-                        selected = credential.id == selectedCredentialId,
-                        onClick = { selectedCredentialId = credential.id },
-                    )
+            Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(credentials, key = { it.id }) { credential ->
+                        CredentialOptionRow(
+                            credential = credential,
+                            selected = credential.id == selectedCredentialId,
+                            onClick = { selectedCredentialId = credential.id },
+                        )
+                    }
                 }
             }
         } else {
@@ -223,22 +232,29 @@ private fun WidgetConfigurationScreen(
                 }
             }
             if (overviewSource == WidgetOverviewSource.Manual) {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(credentials, key = { it.id }) { credential ->
-                        val selected = credential.id in overviewIds
-                        CredentialOptionRow(
-                            credential = credential,
-                            selected = selected,
-                            onClick = {
-                                overviewIds = if (selected) {
-                                    overviewIds - credential.id
-                                } else {
-                                    (overviewIds + credential.id).take(WidgetConfig.MAX_OVERVIEW_CREDENTIALS)
-                                }
-                            },
-                        )
+                Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(credentials, key = { it.id }) { credential ->
+                            val selected = credential.id in overviewIds
+                            CredentialOptionRow(
+                                credential = credential,
+                                selected = selected,
+                                onClick = {
+                                    overviewIds = if (selected) {
+                                        overviewIds - credential.id
+                                    } else {
+                                        (overviewIds + credential.id).take(WidgetConfig.MAX_OVERVIEW_CREDENTIALS)
+                                    }
+                                },
+                            )
+                        }
                     }
                 }
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
             }
         }
         Button(

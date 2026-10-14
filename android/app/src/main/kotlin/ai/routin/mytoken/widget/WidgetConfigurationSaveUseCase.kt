@@ -8,7 +8,9 @@ internal class WidgetConfigurationSaveUseCase(
 ) {
     suspend fun apply(appWidgetId: Int, config: WidgetConfig) {
         save(appWidgetId, config)
-        updateWidget(appWidgetId)
         enqueueRefresh()
+        // First-time widget registration can reject a direct Glance update on some
+        // launchers; the enqueued refresh remains the durable path and will redraw.
+        runCatching { updateWidget(appWidgetId) }
     }
 }

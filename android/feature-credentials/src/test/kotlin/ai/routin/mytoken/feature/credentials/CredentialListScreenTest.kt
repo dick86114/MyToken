@@ -8,9 +8,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -173,5 +175,35 @@ class CredentialListScreenTest {
         composeRule.onNodeWithText("尚未添加凭证").assertIsDisplayed()
         composeRule.onNodeWithText("从 Mac 导入").assertIsDisplayed()
         composeRule.onNodeWithText("手动添加").assertIsDisplayed()
+    }
+
+    @Test
+    fun editButtonIsAvailableAndKindDescriptionIsHidden() {
+        val key = credential("00000001", "主力 Key")
+        repository.credentials.value = listOf(key)
+        advanceVm()
+        var edited: UUID? = null
+        composeRule.setContent {
+            MaterialTheme {
+                val state by viewModel.state.collectAsState()
+                CredentialListScreen(
+                    state = state,
+                    onToggleEnabled = viewModel::toggleEnabled,
+                    onMove = viewModel::move,
+                    onEditCredential = { edited = it },
+                    onRequestDelete = viewModel::requestDelete,
+                    onDismissDelete = viewModel::dismissDelete,
+                    onConfirmDelete = viewModel::confirmDelete,
+                    onImportFromMac = {},
+                    onAddManually = {},
+                )
+            }
+        }
+        advanceVm()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithContentDescription("编辑 主力 Key").performClick()
+        assertEquals(key.id, edited)
+        composeRule.onAllNodesWithText("Bearer Token", substring = true).assertCountEquals(0)
     }
 }

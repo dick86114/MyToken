@@ -29,6 +29,20 @@ class WidgetConfigurationSaveUseCaseTest {
 
         useCase.apply(7, config)
 
-        assertEquals(listOf("save", "update", "refresh"), calls)
+        assertEquals(listOf("save", "refresh", "update"), calls)
+    }
+
+    @Test
+    fun `refresh still runs when direct redraw fails`() = runTest {
+        var refreshCalls = 0
+        val useCase = WidgetConfigurationSaveUseCase(
+            save = { _, _ -> Unit },
+            enqueueRefresh = { refreshCalls++ },
+            updateWidget = { error("launcher rejected first draw") },
+        )
+
+        useCase.apply(11, WidgetConfig())
+
+        assertEquals(1, refreshCalls)
     }
 }

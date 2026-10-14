@@ -1,7 +1,6 @@
 package ai.routin.mytoken.feature.credentials
 
 import ai.routin.mytoken.domain.model.Credential
-import ai.routin.mytoken.domain.model.CredentialKind
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.core.ui.LiquidGlassSurface
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
@@ -34,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -64,12 +64,6 @@ import java.util.UUID
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import sh.calvin.reorderable.rememberReorderableLazyGridState
-
-private fun kindLabel(kind: CredentialKind): String = when (kind) {
-    CredentialKind.BearerApiKey -> "Bearer Token"
-    CredentialKind.ApiKey -> "API Key"
-    CredentialKind.AccessKeyPair -> "Access Key Pair"
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -296,9 +290,15 @@ private fun CredentialRow(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = "$providerName · ${kindLabel(credential.credentialKind)}",
+                    text = providerName,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            IconButton(onClick = onEdit) {
+                Icon(
+                    imageVector = Icons.Filled.Edit,
+                    contentDescription = "编辑 ${credential.name}",
                 )
             }
             GlassSwitch(
