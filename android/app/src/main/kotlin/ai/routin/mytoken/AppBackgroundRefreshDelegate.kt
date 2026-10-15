@@ -37,7 +37,7 @@ class AppBackgroundRefreshDelegate(
         // Threshold / invalid-credential alerts are evaluated after every completed
         // background pass; notifications degrade silently without permission.
         graph.usageAlertDispatcher.dispatchAfterRefresh()
-        runCatching { ai.routin.mytoken.widget.CredentialWidgetUpdater.updateAll(context, graph) }
+        runCatching { ai.routin.mytoken.widget.CredentialWidgetUpdater.updateAll(context) }
 
         return if (anyFailed) RefreshOutcome.Failed else RefreshOutcome.Succeeded
     }

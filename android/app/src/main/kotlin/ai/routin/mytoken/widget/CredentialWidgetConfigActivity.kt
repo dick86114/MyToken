@@ -42,7 +42,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -89,14 +88,13 @@ class CredentialWidgetConfigActivity : ComponentActivity() {
             }
             val credentials by remember { graph.credentialRepository.observeCredentials() }
                 .collectAsState(initial = emptyList())
-            val scope = rememberCoroutineScope()
             val saveUseCase = remember(kind, appWidgetId) {
                 WidgetConfigurationSaveUseCase(
                     save = store::save,
                     enqueueRefresh = {
                         WidgetRefresher.enqueue(this@CredentialWidgetConfigActivity)
                     },
-                    updateWidget = { widgetId ->
+                    redrawWidget = { widgetId ->
                         val widget: GlanceAppWidget = when (kind) {
                             WidgetKind.Credential -> CredentialGlanceWidget()
                             WidgetKind.Overview -> OverviewGlanceWidget()
@@ -117,17 +115,21 @@ class CredentialWidgetConfigActivity : ComponentActivity() {
                         initialConfig = initialConfig,
                         credentials = credentials.filter(Credential::isEnabled),
                         onSave = { config ->
-                            scope.launch {
-                                try {
-                                    saveUseCase.apply(appWidgetId, config)
-                                } finally {
-                                    setResult(
-                                        Activity.RESULT_OK,
-                                        Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId),
-                                    )
-                                    finish()
-                                }
+                            // 先落盘并入队刷新，然后立刻返回桌面；直接重绘放到应用级作用域，
+                            // 这样即使 Glance 合成较慢也不会卡住保存按钮。
+                            saveUseCase.apply(appWidgetId, config)
+                            (application as MyTokenApplication).appScope.launch {
+                                saveUseCase.redraw(appWidgetId)
+                                // 首次添加时启动器可能还没登记组件 id，稍后补一次重绘，
+                                // 避免离线情况下只有刷新任务而组件保持空白。
+                                kotlinx.coroutines.delay(1_200)
+                                saveUseCase.redraw(appWidgetId)
                             }
+                            setResult(
+                                Activity.RESULT_OK,
+                                Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId),
+                            )
+                            finish()
                         },
                     )
                 }
@@ -156,12 +158,6 @@ private fun WidgetConfigurationScreen(
             cachedSnapshot = { id -> graph.credentialRepository.cachedSnapshot(id) },
         )
     }
-    var style by remember {
-        mutableStateOf(
-            initialConfig.style.takeIf { it in USER_SELECTABLE_STYLES }
-                ?: WidgetDisplayStyle.FocusRing
-        )
-    }
     var selectedCredentialId by remember { mutableStateOf(initialConfig.credentialId) }
     var overviewSource by remember { mutableStateOf(initialConfig.overviewSource) }
     var overviewIds by remember { mutableStateOf(initialConfig.limitedOverviewCredentialIds) }
@@ -184,23 +180,12 @@ private fun WidgetConfigurationScreen(
                     kind = kind,
                     credentialId = selectedCredentialId,
                     overviewCredentialIds = overviewIds,
-                    style = style,
                     overviewSource = overviewSource,
                 ),
                 credentials = credentials,
                 snapshots = snapshots,
             ).preview,
         )
-        Text("视觉风格", style = MaterialTheme.typography.titleMedium)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            USER_SELECTABLE_STYLES.forEach { option ->
-                FilterChip(
-                    selected = style == option,
-                    onClick = { style = option },
-                    label = { Text(option.displayName()) },
-                )
-            }
-        }
         if (credentials.isEmpty()) {
             Text("打开应用添加凭证")
             Spacer(modifier = Modifier.weight(1f))
@@ -264,11 +249,11 @@ private fun WidgetConfigurationScreen(
                         kind = kind,
                         credentialId = selectedCredentialId,
                         overviewCredentialIds = overviewIds,
-                        style = style,
                         overviewSource = overviewSource,
                     )
                 )
             },
+            enabled = kind == WidgetKind.Overview || selectedCredentialId != null,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text("保存")
@@ -293,16 +278,34 @@ private fun ConfigurationPreview(preview: WidgetPresentation?) {
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )
-        when (preview?.style) {
-            WidgetDisplayStyle.ScanBand -> PreviewScanBand(credential, progressColors)
-            WidgetDisplayStyle.SignalTiles -> PreviewSignalTiles(credential, progressColors)
-            WidgetDisplayStyle.FocusRing, WidgetDisplayStyle.Auto, null ->
-                PreviewFocusRing(credential, progressColors)
+        // 预览必须和真实组件保持一致：单凭证聚焦环、总览信号格、余额型直接显示余额。
+        if (credential?.isBalanceOnly == true) {
+            PreviewBalance(credential)
+        } else if (preview?.style == WidgetDisplayStyle.SignalTiles) {
+            PreviewSignalTiles(preview.credentials, progressColors)
+        } else {
+            PreviewFocusRing(credential, progressColors)
         }
         Text(
-            text = preview?.style?.displayName() ?: "自动",
+            text = preview?.style?.displayName() ?: "暂无预览",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun PreviewBalance(credential: WidgetCredentialPresentation) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = credential.primary?.label.orEmpty(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = credential.primary?.valueText ?: "-",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
         )
     }
 }
@@ -318,7 +321,7 @@ private fun PreviewFocusRing(
                 Column(
                     modifier = Modifier.weight(1f),
                     horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
                 ) {
                     Column(
                         modifier = Modifier
@@ -330,61 +333,75 @@ private fun PreviewFocusRing(
                         Text(metric.valueText, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         Text(metric.label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                     }
+                    Text(
+                        text = metric.resetClockText.orEmpty(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun PreviewScanBand(
-    credential: WidgetCredentialPresentation?,
-    progressColors: WidgetProgressColors,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-        credential?.orderedMetrics?.take(3)?.forEach { metric ->
-            PreviewMetricRow(metric, progressColors)
         }
     }
 }
 
 @Composable
 private fun PreviewSignalTiles(
-    credential: WidgetCredentialPresentation?,
+    credentials: List<WidgetCredentialPresentation>,
     progressColors: WidgetProgressColors,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        credential?.orderedMetrics?.take(6)?.chunked(3)?.forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                row.forEach { metric ->
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-                            .padding(6.dp),
-                    ) {
-                        Text(metric.label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
-                        Text(metric.valueText, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        PreviewBar(metric.progressPercent, progressColors.composeColor(metric.severity))
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        credentials.take(2).forEach { credential ->
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = credential.name,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    credential.orderedMetrics.take(3).forEach { metric ->
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+                                .padding(6.dp),
+                        ) {
+                            Row {
+                                Text(
+                                    text = metric.label,
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 1,
+                                )
+                                Text(
+                                    text = metric.valueText,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                )
+                            }
+                            metric.progressPercent?.let { percent ->
+                                Spacer(modifier = Modifier.height(3.dp))
+                                PreviewBar(percent, progressColors.composeColor(metric.severity))
+                            }
+                            metric.resetClockText?.let { clock ->
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "重置 $clock",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
+                    repeat((3 - credential.orderedMetrics.take(3).size).coerceAtLeast(0)) {
+                        Spacer(modifier = Modifier.weight(1f))
                     }
                 }
-                repeat(3 - row.size) { Spacer(modifier = Modifier.weight(1f)) }
             }
         }
-    }
-}
-
-@Composable
-private fun PreviewMetricRow(
-    metric: ai.routin.mytoken.widget.WidgetMetricPresentation,
-    progressColors: WidgetProgressColors,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Row {
-            Text(metric.label, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f), maxLines = 1)
-            Text(metric.valueText, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-        }
-        PreviewBar(metric.progressPercent, progressColors.composeColor(metric.severity))
     }
 }
 

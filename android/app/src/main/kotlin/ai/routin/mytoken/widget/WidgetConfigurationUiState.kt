@@ -5,18 +5,11 @@ import ai.routin.mytoken.domain.model.UsageSnapshot
 import java.util.UUID
 
 data class WidgetConfigurationUiState(
-    val selectedStyle: WidgetDisplayStyle,
-    val selectedOverviewSource: WidgetOverviewSource,
     val selectedCredentialId: UUID?,
-    val selectedPrimaryMetricId: String?,
-    val allowedStyles: List<WidgetDisplayStyle>,
-    val allowedOverviewSources: List<WidgetOverviewSource>,
+    val selectedOverviewSource: WidgetOverviewSource,
     val selectableCredentials: List<Credential>,
     val overviewCredentials: List<Credential>,
     val preview: WidgetPresentation?,
-    val supportsSecondaryMetricOrdering: Boolean = false,
-    val supportsColorTheme: Boolean = false,
-    val supportsRefreshInterval: Boolean = false,
 )
 
 fun resolveConfigurationUiState(
@@ -25,8 +18,6 @@ fun resolveConfigurationUiState(
     snapshots: Map<UUID, UsageSnapshot?>,
     size: WidgetSizeKind = WidgetSizeKind.Standard,
 ): WidgetConfigurationUiState {
-    val effectiveStyle = config.style.takeIf { it in USER_SELECTABLE_STYLES }
-        ?: WidgetDisplayStyle.FocusRing
     val enabledCredentials = credentials.filter(Credential::isEnabled)
     val overviewCredentials = when (config.overviewSource) {
         WidgetOverviewSource.AllEnabled -> enabledCredentials.sortedBy(Credential::sortOrder)
@@ -44,32 +35,19 @@ fun resolveConfigurationUiState(
                 WidgetPresentationBuilder.makeCredentialPresentation(
                     credential = credential,
                     snapshot = snapshots[credential.id],
-                    style = effectiveStyle,
                     size = size,
-                    fixedMetricId = config.primaryMetricId,
                 )
             }
         WidgetKind.Overview -> WidgetPresentationBuilder.makeOverviewPresentation(
             entries = overviewCredentials.map { it to snapshots[it.id] },
-            style = effectiveStyle,
             size = size,
         )
     }
     return WidgetConfigurationUiState(
-        selectedStyle = effectiveStyle,
-        selectedOverviewSource = config.overviewSource,
         selectedCredentialId = config.credentialId,
-        selectedPrimaryMetricId = config.primaryMetricId,
-        allowedStyles = USER_SELECTABLE_STYLES,
-        allowedOverviewSources = WidgetOverviewSource.entries,
+        selectedOverviewSource = config.overviewSource,
         selectableCredentials = enabledCredentials.sortedBy(Credential::sortOrder),
         overviewCredentials = overviewCredentials,
         preview = preview,
     )
 }
-
-internal val USER_SELECTABLE_STYLES = listOf(
-    WidgetDisplayStyle.FocusRing,
-    WidgetDisplayStyle.ScanBand,
-    WidgetDisplayStyle.SignalTiles,
-)

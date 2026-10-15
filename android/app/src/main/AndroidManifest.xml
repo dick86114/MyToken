@@ -50,6 +50,7 @@
 
         <receiver
             android:name=".widget.CredentialWidgetProvider"
+            android:label="@string/widget_credential_label"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -62,6 +63,7 @@
 
         <receiver
             android:name=".widget.OverviewWidgetProvider"
+            android:label="@string/widget_overview_label"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />

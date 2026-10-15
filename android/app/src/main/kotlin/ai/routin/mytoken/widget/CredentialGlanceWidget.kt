@@ -7,13 +7,13 @@ import ai.routin.mytoken.domain.model.AppError
 import android.content.Context
 import android.content.Intent
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.action.clickable
-import androidx.glance.appwidget.LinearProgressIndicator
 import androidx.glance.appwidget.CircularProgressIndicator
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.action.actionStartActivity
@@ -36,6 +36,10 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import kotlinx.coroutines.flow.first
 
+/**
+ * 单凭证组件：固定聚焦环。5 小时 / 周 / 月有几个画几个（最多三个），
+ * 每个环下面给出该周期的重置时间；只有余额的套餐直接展示余额。
+ */
 class CredentialGlanceWidget : MyTokenGlanceWidget() {
     override val widgetKind: WidgetKind = WidgetKind.Credential
 
@@ -44,22 +48,20 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
         config: WidgetConfig,
         size: WidgetSizeKind,
     ): WidgetPresentation {
-        val credentialId = config.credentialId
-            ?: return WidgetPresentation(config.style, size, emptyList())
+        val empty = WidgetPresentation(WidgetDisplayStyle.FocusRing, size, emptyList())
+        val credentialId = config.credentialId ?: return empty
         val graph = (context.applicationContext as MyTokenApplication).graph
         val credential = graph.credentialRepository.observeCredentials()
             .first()
             .firstOrNull { it.id == credentialId }
-            ?: return WidgetPresentation(config.style, size, emptyList())
+            ?: return empty
         val usageState = graph.refreshUseCase.states.value[credentialId]
         val snapshot = usageState?.snapshot
             ?: graph.credentialRepository.cachedSnapshot(credentialId)
         val base = WidgetPresentationBuilder.makeCredentialPresentation(
             credential = credential,
             snapshot = snapshot,
-            style = config.style,
             size = size,
-            fixedMetricId = config.primaryMetricId,
         )
         val failure = when {
             usageState?.error is AppError.Authentication ->
@@ -100,7 +102,7 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
                 .background(ColorProvider(R.color.widget_glance_surface))
                 .cornerRadius(22.dp)
                 .clickable(openDetail)
-                .padding(14.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp),
         ) {
             Row(
                 modifier = GlanceModifier.fillMaxWidth(),
@@ -122,7 +124,7 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
                     RefreshControl(context)
                 }
             }
-            Spacer(modifier = GlanceModifier.height(8.dp))
+            Spacer(modifier = GlanceModifier.height(6.dp))
             if (credential == null) {
                 Box(
                     modifier = GlanceModifier.fillMaxSize(),
@@ -131,17 +133,13 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
                     Text(text = "打开应用添加凭证", style = titleStyle(), maxLines = 1)
                 }
             } else {
-                if (credential.status == WidgetPresentationStatus.Loading && credential.primary == null) {
-                    LoadingContent()
-                } else if (credential.status == WidgetPresentationStatus.NoMetrics) {
-                    StatusMessage("该套餐暂无可用指标")
-                } else {
-                    when (presentation.style) {
-                        WidgetDisplayStyle.ScanBand -> ScanBandContent(credential, progressColors)
-                        WidgetDisplayStyle.SignalTiles -> SignalTilesContent(credential, progressColors)
-                        WidgetDisplayStyle.FocusRing, WidgetDisplayStyle.Auto ->
-                            FocusRings(credential, progressColors)
-                    }
+                when {
+                    credential.status == WidgetPresentationStatus.Loading && credential.primary == null ->
+                        LoadingContent()
+                    credential.status == WidgetPresentationStatus.NoMetrics ->
+                        StatusMessage("该套餐暂无可用指标")
+                    credential.isBalanceOnly -> BalanceContent(credential)
+                    else -> FocusRings(credential, progressColors, presentation.size)
                 }
                 Spacer(modifier = GlanceModifier.defaultWeight())
                 Text(
@@ -158,20 +156,20 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
         if (WidgetRefreshStateStore(context).isRefreshing()) {
             CircularProgressIndicator(
                 modifier = GlanceModifier
-                    .width(20.dp)
-                    .height(20.dp)
-                    .padding(2.dp),
+                    .width(24.dp)
+                    .height(24.dp)
+                    .padding(3.dp),
                 color = ColorProvider(R.color.widget_glance_accent),
             )
         } else {
             Image(
-                provider = ImageProvider(android.R.drawable.ic_popup_sync),
-                contentDescription = "刷新",
+                provider = ImageProvider(R.drawable.ic_widget_refresh),
+                contentDescription = context.getString(R.string.widget_refresh),
                 modifier = GlanceModifier
-                    .width(20.dp)
-                    .height(20.dp)
+                    .width(26.dp)
+                    .height(26.dp)
                     .clickable(actionRunCallback<WidgetRefreshAction>())
-                    .padding(2.dp),
+                    .padding(3.dp),
             )
         }
     }
@@ -207,113 +205,87 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
         }
     }
 
+    /** 余额型凭证不画进度环，直接把余额作为主信息。 */
+    @Composable
+    private fun BalanceContent(credential: WidgetCredentialPresentation) {
+        val metric = credential.primary ?: return
+        Column(
+            modifier = GlanceModifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.Horizontal.CenterHorizontally,
+        ) {
+            Spacer(modifier = GlanceModifier.height(6.dp))
+            Text(text = metric.label, style = labelStyle(), maxLines = 1)
+            Text(
+                text = metric.valueText,
+                style = TextStyle(
+                    color = ColorProvider(R.color.widget_glance_title),
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                ),
+                maxLines = 1,
+            )
+        }
+    }
+
     @Composable
     private fun FocusRings(
         credential: WidgetCredentialPresentation,
         colors: WidgetProgressColors,
+        size: WidgetSizeKind,
     ) {
+        val ringSize = when (size) {
+            WidgetSizeKind.Compact -> 42.dp
+            WidgetSizeKind.Standard -> 54.dp
+            WidgetSizeKind.Expanded -> 66.dp
+        }
+        val metrics = WidgetFocusRingPolicy.metrics(credential)
         Row(
             modifier = GlanceModifier.fillMaxWidth(),
             verticalAlignment = Alignment.Vertical.CenterVertically,
         ) {
-            WidgetFocusRingPolicy.metrics(credential).forEach { metric ->
-                Box(
-                    modifier = GlanceModifier
-                        .defaultWeight()
-                        .padding(3.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Image(
-                        provider = ImageProvider(
-                            WidgetRingRenderer.bitmap(
-                                percent = metric.progressPercent,
-                                color = colors.colorInt(metric.severity),
-                                trackColor = colors.trackColorInt,
-                            )
-                        ),
-                        contentDescription = null,
-                        modifier = GlanceModifier
-                            .width(68.dp)
-                            .height(68.dp),
-                    )
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(text = metric.valueText, style = valueStyle(), maxLines = 1)
-                        Text(
-                            text = metric.label,
-                            style = labelStyle(),
-                            maxLines = WidgetTextLayoutPolicy.lineLimit(WidgetTextRole.MetricLabel),
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    @Composable
-    private fun ScanBandContent(
-        credential: WidgetCredentialPresentation,
-        colors: WidgetProgressColors,
-    ) {
-        Column {
-            credential.orderedMetrics.take(3).forEach { metric ->
-                Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
-                    Text(
-                        text = metric.label,
-                        modifier = GlanceModifier.defaultWeight(),
-                        style = labelStyle(),
-                        maxLines = 1,
-                    )
-                    Text(text = metric.valueText, style = valueStyle(), maxLines = 1)
-                }
-                Spacer(modifier = GlanceModifier.height(3.dp))
-                MetricBar(metric, colors, thicknessDp = 6)
-                Spacer(modifier = GlanceModifier.height(7.dp))
-            }
-        }
-    }
-
-    @Composable
-    private fun SignalTilesContent(
-        credential: WidgetCredentialPresentation,
-        colors: WidgetProgressColors,
-    ) {
-        Row(modifier = GlanceModifier.fillMaxWidth()) {
-            credential.orderedMetrics.take(3).forEach { metric ->
+            metrics.forEach { metric ->
                 Column(
                     modifier = GlanceModifier
                         .defaultWeight()
-                        .padding(3.dp)
-                        .background(ColorProvider(R.color.widget_glance_track))
-                        .cornerRadius(10.dp)
-                        .padding(7.dp),
+                        .padding(horizontal = 2.dp),
+                    horizontalAlignment = Alignment.Horizontal.CenterHorizontally,
                 ) {
-                    Text(text = metric.label, style = labelStyle(), maxLines = 1)
-                    Text(text = metric.valueText, style = valueStyle(), maxLines = 1)
-                    Spacer(modifier = GlanceModifier.height(4.dp))
-                    MetricBar(metric, colors, thicknessDp = 6)
+                    Box(contentAlignment = Alignment.Center) {
+                        Image(
+                            provider = ImageProvider(
+                                WidgetRingRenderer.bitmap(
+                                    percent = metric.progressPercent,
+                                    color = colors.colorInt(metric.severity),
+                                    trackColor = colors.trackColorInt,
+                                )
+                            ),
+                            contentDescription = null,
+                            modifier = GlanceModifier
+                                .width(ringSize)
+                                .height(ringSize),
+                        )
+                        Column(horizontalAlignment = Alignment.Horizontal.CenterHorizontally) {
+                            Text(text = metric.valueText, style = ringValueStyle(size), maxLines = 1)
+                            Text(text = metric.label, style = ringLabelStyle(size), maxLines = 1)
+                        }
+                    }
+                    Spacer(modifier = GlanceModifier.height(3.dp))
+                    Text(
+                        text = metric.resetClockText.orEmpty(),
+                        style = ringResetStyle(size),
+                        maxLines = 1,
+                    )
                 }
+            }
+            repeat((WidgetFocusRingPolicy.MAX_RINGS - metrics.size).coerceAtLeast(0)) {
+                Spacer(modifier = GlanceModifier.defaultWeight())
             }
         }
     }
 
-    @Composable
-    private fun MetricBar(
-        metric: WidgetMetricPresentation,
-        colors: WidgetProgressColors,
-        thicknessDp: Int,
-    ) {
-        LinearProgressIndicator(
-            progress = (metric.progressPercent ?: 0).coerceIn(0, 100) / 100f,
-            modifier = GlanceModifier
-                .fillMaxWidth()
-                .height(thicknessDp.dp),
-            color = colors.provider(metric.severity),
-        )
-    }
-
-    private fun labelStyle() = TextStyle(
+    private fun labelStyle(fontSize: TextUnit = 10.sp) = TextStyle(
         color = ColorProvider(R.color.widget_glance_label),
-        fontSize = 10.sp,
+        fontSize = fontSize,
     )
 
     private fun titleStyle() = TextStyle(
@@ -322,10 +294,34 @@ class CredentialGlanceWidget : MyTokenGlanceWidget() {
         fontWeight = FontWeight.Bold,
     )
 
-    private fun valueStyle() = TextStyle(
+    private fun ringValueStyle(size: WidgetSizeKind) = TextStyle(
         color = ColorProvider(R.color.widget_glance_title),
-        fontSize = 13.sp,
-        fontWeight = FontWeight.Medium,
+        fontSize = when (size) {
+            WidgetSizeKind.Compact -> 11.sp
+            WidgetSizeKind.Standard -> 13.sp
+            WidgetSizeKind.Expanded -> 15.sp
+        },
+        fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.Center,
+    )
+
+    private fun ringLabelStyle(size: WidgetSizeKind) = TextStyle(
+        color = ColorProvider(R.color.widget_glance_label),
+        fontSize = when (size) {
+            WidgetSizeKind.Compact -> 8.sp
+            WidgetSizeKind.Standard -> 9.sp
+            WidgetSizeKind.Expanded -> 10.sp
+        },
+        textAlign = TextAlign.Center,
+    )
+
+    private fun ringResetStyle(size: WidgetSizeKind) = TextStyle(
+        color = ColorProvider(R.color.widget_glance_label),
+        fontSize = when (size) {
+            WidgetSizeKind.Compact -> 8.sp
+            WidgetSizeKind.Standard -> 9.sp
+            WidgetSizeKind.Expanded -> 10.sp
+        },
         textAlign = TextAlign.Center,
     )
 }

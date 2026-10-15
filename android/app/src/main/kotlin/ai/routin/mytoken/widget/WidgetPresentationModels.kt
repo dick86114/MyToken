@@ -16,6 +16,7 @@ data class WidgetMetricPresentation(
     val valueText: String,
     val detailText: String = "",
     val resetText: String? = null,
+    val resetClockText: String? = null,
     val progressPercent: Int? = null,
     val severity: WidgetMetricSeverity = WidgetMetricSeverity.Normal,
 )
@@ -39,6 +40,8 @@ data class WidgetCredentialPresentation(
     val secondary: List<WidgetMetricPresentation>,
     val fixedMetricUnavailable: Boolean,
     val status: WidgetPresentationStatus = WidgetPresentationStatus.Ready,
+    /** 只有余额的凭证不画进度，直接在组件里展示余额文本。 */
+    val isBalanceOnly: Boolean = false,
 ) {
     val orderedMetrics: List<WidgetMetricPresentation> = listOfNotNull(primary) + secondary
 }
@@ -51,14 +54,8 @@ data class WidgetPresentation(
     val credential: WidgetCredentialPresentation? get() = credentials.firstOrNull()
 }
 
-internal fun WidgetSizeKind.metricCapacity(): Int = when (this) {
-    WidgetSizeKind.Compact -> 2
-    WidgetSizeKind.Standard -> 4
-    WidgetSizeKind.Expanded -> 6
-}
-
 internal fun WidgetSizeKind.overviewCapacity(): Int = when (this) {
     WidgetSizeKind.Compact -> 1
-    WidgetSizeKind.Standard -> 3
-    WidgetSizeKind.Expanded -> 6
+    WidgetSizeKind.Standard -> 2
+    WidgetSizeKind.Expanded -> 4
 }

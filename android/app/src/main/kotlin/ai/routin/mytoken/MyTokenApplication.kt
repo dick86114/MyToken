@@ -2,6 +2,7 @@ package ai.routin.mytoken
 
 import ai.routin.mytoken.core.notifications.NotificationChannels
 import ai.routin.mytoken.core.refresh.RefreshScheduling
+import ai.routin.mytoken.widget.syncWidgetsOnUsageChanges
 import android.app.Application
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -13,7 +14,8 @@ class MyTokenApplication : Application() {
 
     val graph: AppGraph by lazy { AppGraph(this) }
 
-    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    /** 应用级作用域：配置组件后的重绘等收尾工作不绑定到 Activity 生命周期。 */
+    internal val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
         super.onCreate()
@@ -36,5 +38,10 @@ class MyTokenApplication : Application() {
         appScope.launch {
             runCatching { RefreshScheduling.apply(this@MyTokenApplication, null) }
         }
+        // 主应用刷新完成后同步重绘组件；组件自身的手动刷新仍走 WorkManager。
+        appScope.syncWidgetsOnUsageChanges(
+            states = graph.refreshUseCase.states,
+            redrawAll = { ai.routin.mytoken.widget.CredentialWidgetUpdater.updateAll(this@MyTokenApplication) },
+        )
     }
 }

@@ -1,16 +1,21 @@
 package ai.routin.mytoken.widget
 
-/** Applies a widget selection, schedules data refresh, then redraws the widget. */
+/**
+ * 保存组件配置：同步落盘并入队刷新后立即返回。
+ * 首次添加组件时 Glance 直接重绘可能被启动器拒绝，因此重绘是独立的尽力步骤，
+ * 由调用方放到应用级作用域执行，不阻塞配置页返回桌面。
+ */
 internal class WidgetConfigurationSaveUseCase(
     private val save: (Int, WidgetConfig) -> Unit,
     private val enqueueRefresh: () -> Unit,
-    private val updateWidget: suspend (Int) -> Unit,
+    private val redrawWidget: suspend (Int) -> Unit,
 ) {
-    suspend fun apply(appWidgetId: Int, config: WidgetConfig) {
+    fun apply(appWidgetId: Int, config: WidgetConfig) {
         save(appWidgetId, config)
         enqueueRefresh()
-        // First-time widget registration can reject a direct Glance update on some
-        // launchers; the enqueued refresh remains the durable path and will redraw.
-        runCatching { updateWidget(appWidgetId) }
+    }
+
+    suspend fun redraw(appWidgetId: Int) {
+        runCatching { redrawWidget(appWidgetId) }
     }
 }

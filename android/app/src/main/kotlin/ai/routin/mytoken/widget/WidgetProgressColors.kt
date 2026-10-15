@@ -18,7 +18,11 @@ class WidgetProgressColors(private val context: Context) {
         }
     )
 
-    fun provider(severity: WidgetMetricSeverity?): ColorProvider = ColorProvider(colorInt(severity))
+    /**
+     * RemoteViews 只能通过资源 id 或 ARGB 色值设置颜色。
+     * 这里必须传 [Color]（色值），传 [Int] 会被当成资源 id 解析并导致组件加载失败。
+     */
+    fun provider(severity: WidgetMetricSeverity?): ColorProvider = ColorProvider(composeColor(severity))
 
     fun composeColor(severity: WidgetMetricSeverity?): Color = Color(colorInt(severity))
 }

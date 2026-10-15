@@ -17,62 +17,51 @@ import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 
 object WidgetPresentationBuilder {
+    /** 单凭证组件固定聚焦环，只展示带进度的用量指标；余额型凭证单独处理。 */
     fun makeCredentialPresentation(
         credential: Credential,
         snapshot: UsageSnapshot?,
-        style: WidgetDisplayStyle,
         size: WidgetSizeKind,
-        fixedMetricId: String? = null,
     ): WidgetPresentation = WidgetPresentation(
-        style = resolveStyle(style, size, overview = false),
+        style = WidgetDisplayStyle.FocusRing,
         size = size,
         credentials = listOf(
-            credentialPresentation(
-                credential = credential,
-                snapshot = snapshot,
-                capacity = size.metricCapacity(),
-                fixedMetricId = fixedMetricId,
-            )
+            credentialPresentation(credential = credential, snapshot = snapshot),
         ),
     )
 
+    /** 总览组件固定信号格，凭证按风险排序后取当前尺寸能容纳的数量。 */
     fun makeOverviewPresentation(
         entries: List<Pair<Credential, UsageSnapshot?>>,
-        style: WidgetDisplayStyle,
         size: WidgetSizeKind,
     ): WidgetPresentation = WidgetPresentation(
-        style = resolveStyle(style, size, overview = true),
+        style = WidgetDisplayStyle.SignalTiles,
         size = size,
         credentials = entries
             .filter { it.first.isEnabled }
             .sortedWith(compareBy({ riskScore(it.second) }, { it.first.sortOrder }))
             .take(size.overviewCapacity())
-            .map { (credential, snapshot) ->
-                credentialPresentation(
-                    credential = credential,
-                    snapshot = snapshot,
-                    capacity = size.metricCapacity(),
-                    fixedMetricId = null,
-                )
-            },
+            .map { (credential, snapshot) -> credentialPresentation(credential, snapshot) },
     )
 
     private fun credentialPresentation(
         credential: Credential,
         snapshot: UsageSnapshot?,
-        capacity: Int,
-        fixedMetricId: String?,
     ): WidgetCredentialPresentation {
         val selection = WidgetMetricRanker.rank(
             providerId = credential.providerId,
             metrics = snapshot?.metrics.orEmpty(),
-            fixedMetricId = fixedMetricId,
-            capacity = capacity,
+            fixedMetricId = null,
+            capacity = METRIC_SCAN_CAPACITY,
         )
-        val secondary = if (selection.primary?.presentation == UsageMetricPresentation.Balance) {
-            emptyList()
+        val isBalanceOnly = selection.primary?.presentation == UsageMetricPresentation.Balance
+        val visibleMetrics = if (isBalanceOnly) {
+            listOfNotNull(selection.primary)
         } else {
-            selection.secondary
+            selection.orderedMetrics
+                .filter { it.presentation == UsageMetricPresentation.Progress }
+                .ifEmpty { selection.orderedMetrics }
+                .take(VISIBLE_METRIC_CAPACITY)
         }
         return WidgetCredentialPresentation(
             id = credential.id,
@@ -81,9 +70,10 @@ object WidgetPresentationBuilder {
             name = credential.name,
             planName = snapshot?.planName.orEmpty(),
             isStale = false,
-            primary = selection.primary?.let { metricDisplay(it, credential.providerId) },
-            secondary = secondary.map { metricDisplay(it, credential.providerId) },
+            primary = visibleMetrics.firstOrNull()?.let { metricDisplay(it, credential.providerId) },
+            secondary = visibleMetrics.drop(1).map { metricDisplay(it, credential.providerId) },
             fixedMetricUnavailable = selection.fixedMetricUnavailable,
+            isBalanceOnly = isBalanceOnly,
             status = WidgetPresentationStateResolver.resolve(
                 isEnabled = credential.isEnabled,
                 hasSnapshot = snapshot != null,
@@ -94,19 +84,6 @@ object WidgetPresentationBuilder {
                 fixedMetricUnavailable = selection.fixedMetricUnavailable,
             ),
         )
-    }
-
-    private fun resolveStyle(
-        style: WidgetDisplayStyle,
-        size: WidgetSizeKind,
-        overview: Boolean,
-    ): WidgetDisplayStyle {
-        if (style != WidgetDisplayStyle.Auto) return style
-        if (overview) return WidgetDisplayStyle.ScanBand
-        return when (size) {
-            WidgetSizeKind.Compact, WidgetSizeKind.Standard -> WidgetDisplayStyle.FocusRing
-            WidgetSizeKind.Expanded -> WidgetDisplayStyle.SignalTiles
-        }
     }
 
     private fun riskScore(snapshot: UsageSnapshot?): Int {
@@ -122,15 +99,14 @@ object WidgetPresentationBuilder {
         providerId: ProviderId,
     ): WidgetMetricPresentation {
         val percent = progressPercent(metric)
+        val resetAt = metric.windowEnd?.atZone(ZoneId.systemDefault())
         return WidgetMetricPresentation(
             id = metric.id,
             label = displayLabel(metric),
             valueText = valueText(metric, percent),
             detailText = detailText(metric, providerId),
-            resetText = metric.windowEnd?.let {
-                "重置 " + DateTimeFormatter.ofPattern("HH:mm")
-                    .format(it.atZone(ZoneId.systemDefault()))
-            },
+            resetText = resetAt?.let { "重置 " + RESET_CLOCK_FORMAT.format(it) },
+            resetClockText = resetAt?.let(RESET_CLOCK_FORMAT::format),
             progressPercent = percent?.roundToInt()?.coerceIn(0, 100),
             severity = severity(metric, percent),
         )
@@ -215,4 +191,10 @@ object WidgetPresentationBuilder {
     }
 
     private fun plain(value: BigDecimal): String = value.stripTrailingZeros().toPlainString()
+
+    /** 单凭证聚焦环最多三个；扫描额度更大的候选集再按进度过滤。 */
+    private const val VISIBLE_METRIC_CAPACITY = 3
+    private const val METRIC_SCAN_CAPACITY = 6
+
+    private val RESET_CLOCK_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 }

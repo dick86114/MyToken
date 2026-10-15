@@ -12,13 +12,12 @@ import ai.routin.mytoken.domain.model.UsageSnapshot
 import java.time.Instant
 import java.util.UUID
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class WidgetConfigurationUiStateTest {
 
     @Test
-    fun `overview configuration defaults to all enabled and auto style`() {
+    fun `overview configuration defaults to all enabled and signal tiles`() {
         val enabled = credential("11111111-1111-4111-8111-111111111111", sortOrder = 1)
         val disabled = credential("22222222-2222-4222-8222-222222222222", enabled = false)
 
@@ -28,9 +27,9 @@ class WidgetConfigurationUiStateTest {
             snapshots = emptyMap(),
         )
 
-        assertEquals(WidgetDisplayStyle.FocusRing, state.selectedStyle)
         assertEquals(WidgetOverviewSource.AllEnabled, state.selectedOverviewSource)
         assertEquals(listOf(enabled.id), state.overviewCredentials.map { it.id })
+        assertEquals(WidgetDisplayStyle.SignalTiles, state.preview?.style)
     }
 
     @Test
@@ -54,21 +53,22 @@ class WidgetConfigurationUiStateTest {
     }
 
     @Test
-    fun `configuration ui exposes only approved options`() {
+    fun `credential configuration preview always uses focus rings`() {
+        val credential = credential("44444444-4444-4444-8444-444444444444")
         val state = resolveConfigurationUiState(
-            config = WidgetConfig(),
-            credentials = emptyList(),
-            snapshots = emptyMap(),
+            config = WidgetConfig(
+                kind = WidgetKind.Credential,
+                credentialId = credential.id,
+                style = WidgetDisplayStyle.ScanBand,
+                primaryMetricId = "five-hour",
+            ),
+            credentials = listOf(credential),
+            snapshots = mapOf(credential.id to snapshot(credential.id, UsageMetricHealthState.Normal, 61)),
         )
 
-        assertEquals(
-            listOf(WidgetDisplayStyle.FocusRing, WidgetDisplayStyle.ScanBand, WidgetDisplayStyle.SignalTiles),
-            state.allowedStyles,
-        )
-        assertEquals(WidgetOverviewSource.entries, state.allowedOverviewSources)
-        assertFalse(state.supportsSecondaryMetricOrdering)
-        assertFalse(state.supportsColorTheme)
-        assertFalse(state.supportsRefreshInterval)
+        // 旧配置里保存的风格与主指标都不再生效。
+        assertEquals(WidgetDisplayStyle.FocusRing, state.preview?.style)
+        assertEquals(listOf("five-hour"), state.preview?.credential?.orderedMetrics?.map { it.id })
     }
 
     @Test

@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">MyToken</string>
+    <string name="widget_credential_label">MyToken 凭证</string>
+    <string name="widget_credential_description">聚焦环展示单个凭证的 5 小时 / 周 / 月额度与重置时间</string>
+    <string name="widget_overview_label">MyToken 总览</string>
+    <string name="widget_overview_description">信号格展示多个凭证的用量卡片，余额型凭证直接显示余额</string>
     <string name="widget_refresh">刷新用量</string>
     <string name="widget_choose">选择凭证</string>
 </resources>

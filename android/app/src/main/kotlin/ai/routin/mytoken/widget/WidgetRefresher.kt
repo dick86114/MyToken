@@ -18,6 +18,12 @@ internal object WidgetRefresher {
     const val EXTRA_WIDGET_ID = "appWidgetId"
     private const val UNIQUE_WORK_NAME = "mytoken-widget-refresh-all"
 
+    /**
+     * 同一时刻只保留一个全局刷新任务。KEEP 语义保证连点刷新不会取消正在进行的
+     * 网络请求，也不会重复排队，任务结束后再次点击即可重新入队。
+     */
+    val existingWorkPolicy: ExistingWorkPolicy = ExistingWorkPolicy.KEEP
+
     fun refreshPendingIntent(context: Context, appWidgetId: Int): PendingIntent {
         val intent = Intent(context, CredentialWidgetProvider::class.java)
             .setAction(ACTION_REFRESH)
@@ -37,7 +43,7 @@ internal object WidgetRefresher {
             .build()
         WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
             UNIQUE_WORK_NAME,
-            ExistingWorkPolicy.REPLACE,
+            existingWorkPolicy,
             request,
         )
     }

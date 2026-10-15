@@ -6,6 +6,7 @@ import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.usage.RefreshStatus
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import androidx.work.ExistingWorkPolicy
 import java.util.UUID
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -39,15 +40,13 @@ class WidgetRefreshWorkerTest {
     }
 
     @Test
-    fun `manual widget refresh updates every installed widget after one pass`() = runTest {
+    fun `manual widget refresh touches every credential only once`() = runTest {
         val refreshed = mutableListOf<UUID>()
-        var updateAllCalls = 0
         val coordinator = WidgetRefreshCoordinator(
             refreshCredential = { credential ->
                 refreshed += credential.id
                 RefreshStatus.Ready
             },
-            updateAll = { updateAllCalls++ },
         )
         val first = credential()
         val second = credential()
@@ -56,7 +55,45 @@ class WidgetRefreshWorkerTest {
 
         assertEquals(true, success)
         assertEquals(listOf(first.id, second.id), refreshed)
-        assertEquals(1, updateAllCalls)
+    }
+
+    @Test
+    fun `failed credential is reported so the worker can retry`() = runTest {
+        val coordinator = WidgetRefreshCoordinator(
+            refreshCredential = { RefreshStatus.Failed },
+        )
+
+        assertEquals(false, coordinator.refresh(listOf(credential())))
+    }
+
+    @Test
+    fun `manual refresh button marks state, enqueues once and redraws all widget kinds`() = runTest {
+        val calls = mutableListOf<String>()
+
+        WidgetRefreshTrigger.trigger(
+            setRefreshing = { refreshing -> calls += "refreshing=$refreshing" },
+            enqueueRefresh = { calls += "enqueue" },
+            redrawAll = { calls += "redrawAll" },
+        )
+
+        // 只走全量重绘入口，避免用点击组件的 glanceId 去重绘另一种组件。
+        assertEquals(listOf("refreshing=true", "enqueue", "redrawAll"), calls)
+    }
+
+    @Test
+    fun `refresh work is kept instead of replaced while a refresh is running`() {
+        assertEquals(ExistingWorkPolicy.KEEP, WidgetRefresher.existingWorkPolicy)
+    }
+
+    @Test
+    fun `refresh retries a few times and then gives up so new taps can enqueue`() {
+        assertEquals(WidgetRefreshOutcome.Success, widgetRefreshOutcome(succeeded = true, runAttemptCount = 0))
+        assertEquals(WidgetRefreshOutcome.Retry, widgetRefreshOutcome(succeeded = false, runAttemptCount = 0))
+        assertEquals(WidgetRefreshOutcome.Retry, widgetRefreshOutcome(succeeded = false, runAttemptCount = 1))
+        assertEquals(
+            WidgetRefreshOutcome.GiveUp,
+            widgetRefreshOutcome(succeeded = false, runAttemptCount = MAX_REFRESH_ATTEMPTS),
+        )
     }
 
     private fun credential() = Credential(
