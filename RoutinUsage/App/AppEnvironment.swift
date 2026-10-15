@@ -19,6 +19,12 @@ enum AppUpdateStatus: Equatable {
     case failed(String)
 }
 
+/// 更新检测来源：自动检测失败保持静默，只有用户手动检测才提示失败。
+enum UpdateCheckSource: Sendable {
+    case automatic
+    case user
+}
+
 struct XiaomiLoginRequest: Identifiable, Equatable, Sendable {
     let id = UUID()
     let credentialID: UUID
@@ -329,7 +335,7 @@ final class AppEnvironment {
 
     func checkForUpdates() async {
         await logWriter.log(level: .info, event: "update_check_requested", details: "source=user")
-        guard let task = beginUpdateCheckIfNeeded(requiresStarted: false) else { return }
+        guard let task = beginUpdateCheckIfNeeded(requiresStarted: false, source: .user) else { return }
         await task.value
     }
 
@@ -787,7 +793,10 @@ private extension AppEnvironment {
     }
 
     @discardableResult
-    func beginUpdateCheckIfNeeded(requiresStarted: Bool) -> Task<Void, Never>? {
+    func beginUpdateCheckIfNeeded(
+        requiresStarted: Bool,
+        source: UpdateCheckSource = .automatic
+    ) -> Task<Void, Never>? {
         guard !requiresStarted || isStarted else { return nil }
         if let updateCheckTask {
             return updateCheckTask
@@ -827,7 +836,8 @@ private extension AppEnvironment {
             self.finishUpdateCheck(
                 outcome,
                 generation: generation,
-                requiresStarted: requiresStarted
+                requiresStarted: requiresStarted,
+                source: source
             )
         }
         updateCheckTask = task
@@ -837,7 +847,8 @@ private extension AppEnvironment {
     private func finishUpdateCheck(
         _ outcome: UpdateCheckOutcome,
         generation: Int,
-        requiresStarted: Bool
+        requiresStarted: Bool,
+        source: UpdateCheckSource
     ) {
         guard generation == updateCheckGeneration else { return }
         updateCheckTask = nil
@@ -857,8 +868,12 @@ private extension AppEnvironment {
         case let .failed(message):
             if case .available = previousStatus {
                 updateStatus = previousStatus
-            } else {
+            } else if source == .user {
+                // 手动检测失败才提示，并保留具体原因。
                 updateStatus = .failed(message)
+            } else {
+                // 自动检测失败保持静默：沿用上一次状态，避免启动/周期检查弹红字。
+                updateStatus = previousStatus
             }
         }
     }

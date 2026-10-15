@@ -161,6 +161,49 @@ final class GitHubUpdateServiceTests: XCTestCase {
         }
     }
 
+    /// 手动检测失败要能看懂：断网、超时、TLS 拦截必须区分开。
+    func test网络错误映射为可读原因() {
+        XCTAssertEqual(
+            GitHubUpdateService.errorReason(for: URLError(.notConnectedToInternet)),
+            "当前无网络连接"
+        )
+        XCTAssertEqual(
+            GitHubUpdateService.errorReason(for: URLError(.timedOut)),
+            "网络请求超时"
+        )
+        XCTAssertEqual(
+            GitHubUpdateService.errorReason(for: URLError(.secureConnectionFailed)),
+            "TLS 安全连接失败（可能是网络代理或证书问题）"
+        )
+        XCTAssertEqual(
+            GitHubUpdateService.errorReason(for: URLError(.cannotFindHost)),
+            "无法解析 GitHub 域名（DNS 异常）"
+        )
+    }
+
+    func test限流原因说明可重试而不是只报状态码() async throws {
+        let stub = URLProtocolStub.makeSession { request in
+            let url = try XCTUnwrap(request.url)
+            let response = try XCTUnwrap(
+                HTTPURLResponse(url: url, statusCode: 403, httpVersion: nil, headerFields: nil)
+            )
+            return (response, Data(#"{"message":"API rate limit exceeded"}"#.utf8))
+        }
+        let service = GitHubUpdateService(session: stub.session, currentVersion: "5.6.4")
+
+        do {
+            _ = try await service.checkForUpdate()
+            XCTFail("限流时检测更新应当抛出错误")
+        } catch let error as UpdateServiceError {
+            guard case let .unavailable(reason) = error else {
+                return XCTFail("限流应映射为 unavailable，实际为 \(error)")
+            }
+            XCTAssertTrue(reason.contains("限流"))
+            XCTAssertTrue(reason.contains("HTTP 403"))
+            XCTAssertTrue(reason.contains("稍后重试"))
+        }
+    }
+
     func testAtom回退在版本化安装包缺失时使用旧固定文件名() async throws {
         let atom = """
         <?xml version="1.0" encoding="UTF-8"?>
@@ -203,6 +246,42 @@ final class GitHubUpdateServiceTests: XCTestCase {
             update?.downloadURL.absoluteString,
             "https://github.com/dick86114/MyToken/releases/download/v5.0.0/MyToken.dmg"
         )
+    }
+
+    /// 只发了 Android 包的主版本（无 DMG）不能算作 macOS 更新，更不能报失败。
+    func testAtom回退跳过没有安装包的更新版本() async throws {
+        let atom = Self.atomFeed(
+            versions: ["5.6.5", "5.6.4"],
+        )
+        let stub = URLProtocolStub.makeSession { request in
+            let url = try XCTUnwrap(request.url)
+            return try Self.stubbedReleaseResponse(url: url, atom: atom) { assetURL in
+                // 仅 v5.6.4 提供 DMG，v5.6.5 只有 Android 包。
+                assetURL.path.contains("/v5.6.4/") ? 200 : 404
+            }
+        }
+        let service = GitHubUpdateService(session: stub.session, currentVersion: "5.6.4")
+
+        let update = try await service.checkForUpdate()
+
+        XCTAssertNil(update, "较新版本没有可安装的 DMG 时应回退为“已是最新”，而不是失败")
+    }
+
+    func testAtom回退继续向下寻找可安装的版本() async throws {
+        let atom = Self.atomFeed(
+            versions: ["5.6.5", "5.6.4"],
+        )
+        let stub = URLProtocolStub.makeSession { request in
+            let url = try XCTUnwrap(request.url)
+            return try Self.stubbedReleaseResponse(url: url, atom: atom) { assetURL in
+                assetURL.path.contains("/v5.6.4/") ? 200 : 404
+            }
+        }
+        let service = GitHubUpdateService(session: stub.session, currentVersion: "5.6.3")
+
+        let update = try await service.checkForUpdate()
+
+        XCTAssertEqual(update?.version, "5.6.4")
     }
 
     func test下载更新逐步报告百分比并保存完整文件() async throws {
@@ -477,6 +556,58 @@ final class GitHubUpdateServiceTests: XCTestCase {
         XCTAssertEqual(update?.version, "5.2.0")
         XCTAssertTrue(update?.downloadURL.absoluteString.hasPrefix("\(mirror)/https://github.com/") == true)
         XCTAssertTrue(update?.releaseURL.absoluteString.hasPrefix("\(mirror)/https://github.com/") == true)
+    }
+
+    // MARK: - 测试夹具
+
+    /// Atom Feed 是按时间倒序的：只发 Android 包的主版本同样会出现在这里。
+    private static func atomFeed(versions: [String]) -> String {
+        let entries = versions.map { version in
+            """
+              <entry>
+                <id>tag:github.com,2008:Repository/1/v\(version)</id>
+                <updated>2026-10-14T05:24:07Z</updated>
+                <link rel="alternate" href="https://github.com/dick86114/MyToken/releases/tag/v\(version)" />
+                <title>MyToken v\(version)</title>
+                <content type="html">&lt;p&gt;版本 \(version)&lt;/p&gt;</content>
+              </entry>
+            """
+        }.joined(separator: "\n")
+        return """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <feed xmlns="http://www.w3.org/2005/Atom">
+        \(entries)
+        </feed>
+        """
+    }
+
+    /// API 固定返回限流 403，迫使检测走 Atom 回退；安装包状态由 `assetStatus` 决定。
+    private static func stubbedReleaseResponse(
+        url: URL,
+        atom: String,
+        assetStatus: (URL) -> Int
+    ) throws -> (HTTPURLResponse, Data) {
+        if url == GitHubUpdateService.releasesURL {
+            let response = try XCTUnwrap(
+                HTTPURLResponse(url: url, statusCode: 403, httpVersion: nil, headerFields: nil)
+            )
+            return (response, Data(#"{"message":"API rate limit exceeded"}"#.utf8))
+        }
+        if url == GitHubUpdateService.releasesAtomURL {
+            let response = try XCTUnwrap(
+                HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)
+            )
+            return (response, Data(atom.utf8))
+        }
+        let response = try XCTUnwrap(
+            HTTPURLResponse(
+                url: url,
+                statusCode: assetStatus(url),
+                httpVersion: nil,
+                headerFields: nil
+            )
+        )
+        return (response, Data())
     }
 }
 

@@ -23,8 +23,10 @@ final class ReleaseNotesAndUpdateFeedbackTests: XCTestCase {
         let toolbarStart = try XCTUnwrap(source.range(of: "var toolbar: some View"))
         let toolbar = String(source[toolbarStart.lowerBound...])
 
-        XCTAssertTrue(toolbar.contains("if case let .failed"))
-        XCTAssertTrue(toolbar.contains("检测更新失败，请稍后重试"))
+        // 提示必须显示具体失败原因，而不是写死的通用文案。
+        XCTAssertTrue(toolbar.contains("if case let .failed(message)"))
+        XCTAssertTrue(toolbar.contains("Label(message, systemImage:"))
         XCTAssertTrue(toolbar.contains("CompactPopoverPalette.criticalColor"))
+        XCTAssertFalse(toolbar.contains("检测更新失败，请稍后重试"))
     }
 }

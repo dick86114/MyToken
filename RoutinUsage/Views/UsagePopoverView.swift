@@ -235,10 +235,14 @@ private extension UsagePopoverView {
             .help("打开 MyToken 官网")
             .accessibilityLabel("打开 MyToken 官网")
         }
-        if case let .failed = updateStatus {
-            Label("检测更新失败，请稍后重试", systemImage: "exclamationmark.triangle.fill")
+        if case let .failed(message) = updateStatus {
+            // 失败只会在手动检测后出现，这里直接把具体原因交给用户。
+            Label(message, systemImage: "exclamationmark.triangle.fill")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(CompactPopoverPalette.criticalColor)
+                .multilineTextAlignment(.leading)
+                .lineLimit(2)
+                .help(message)
                 .accessibilityElement(children: .combine)
         }
     }

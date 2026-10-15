@@ -123,11 +123,33 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
         return rewritten(url, mirror: mirror).absoluteString
     }
 
+    /// 把底层网络错误翻译成用户能判断的原因；未覆盖的情况保留系统描述。
     static func errorReason(for error: Error) -> String {
-        if let urlError = error as? URLError {
+        guard let urlError = error as? URLError else {
+            return String(describing: error)
+        }
+        switch urlError.code {
+        case .notConnectedToInternet:
+            return "当前无网络连接"
+        case .timedOut:
+            return "网络请求超时"
+        case .cannotFindHost, .dnsLookupFailed:
+            return "无法解析 GitHub 域名（DNS 异常）"
+        case .cannotConnectToHost:
+            return "无法连接 GitHub 服务器"
+        case .networkConnectionLost:
+            return "网络连接中断"
+        case .secureConnectionFailed,
+             .serverCertificateHasBadDate,
+             .serverCertificateUntrusted,
+             .serverCertificateHasUnknownRoot,
+             .serverCertificateNotYetValid,
+             .clientCertificateRejected,
+             .clientCertificateRequired:
+            return "TLS 安全连接失败（可能是网络代理或证书问题）"
+        default:
             return urlError.localizedDescription
         }
-        return String(describing: error)
     }
 
     static func decodeErrorReason(_ error: Error) -> String {
@@ -135,6 +157,31 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
             return String(describing: decodingError)
         }
         return String(describing: error)
+    }
+
+    /// 取出 `UpdateServiceError` 里的原因文案，便于把两条通道的失败拼给用户看。
+    static func reasonDescription(_ error: Error) -> String {
+        guard let serviceError = error as? UpdateServiceError else {
+            return errorReason(for: error)
+        }
+        switch serviceError {
+        case let .unavailable(reason):
+            return reason
+        case let .invalidResponse(reason):
+            return reason
+        case let .downloadFailed(reason):
+            return reason
+        case let .installFailed(message):
+            return message
+        }
+    }
+
+    /// 两条通道都失败时的原因：纯网络问题只描述一次，其他情况以 API 侧为主并附带备用通道结果。
+    static func fallbackFailureReason(apiReason: String, atomReason: String) -> String {
+        if apiReason.contains("网络请求失败") || atomReason.contains("网络请求失败") {
+            return atomReason
+        }
+        return "\(apiReason)；备用通道失败：\(atomReason)"
     }
 
     private static func releasesURL(page: Int) -> URL {
@@ -167,8 +214,28 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
         let releases: [ReleaseDTO]
         do {
             releases = try await fetchReleases(mirror: mirror)
-        } catch {
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let apiError as UpdateServiceError {
             // GitHub API 可能限流，Atom 源无论是否启用镜像都应作为回退路径。
+            do {
+                return try await checkForUpdateFromAtom(mirror: mirror)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch let atomError as UpdateServiceError {
+                await logWriter.log(
+                    level: .error,
+                    event: "update_check_fallback_failed",
+                    details: "api=\(Self.reasonDescription(apiError)) atom=\(Self.reasonDescription(atomError))"
+                )
+                throw UpdateServiceError.unavailable(
+                    Self.fallbackFailureReason(
+                        apiReason: Self.reasonDescription(apiError),
+                        atomReason: Self.reasonDescription(atomError)
+                    )
+                )
+            }
+        } catch {
             return try await checkForUpdateFromAtom(mirror: mirror)
         }
         let macOSReleases = releases
@@ -312,7 +379,9 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
                 event: "update_check_rate_limited",
                 details: "status=\(http.statusCode)"
             )
-            throw UpdateServiceError.unavailable("GitHub API 请求被限流（HTTP \(http.statusCode)）")
+            throw UpdateServiceError.unavailable(
+                "GitHub 接口限流（HTTP \(http.statusCode)），请稍后重试"
+            )
         }
         guard (200..<300).contains(http.statusCode) else {
             throw UpdateServiceError.unavailable("GitHub API 返回 HTTP \(http.statusCode)")
@@ -334,49 +403,63 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
 
     private func checkForUpdateFromAtom(mirror: String?) async throws -> AppUpdate? {
         let releases = try await fetchAtomReleases(mirror: mirror)
-        guard let release = releases.first(where: { Self.isMacOSRelease(tagName: $0.version) }) else {
-            await logWriter.log(level: .error, event: "update_check_atom_decode_failed", details: nil)
-            throw UpdateServiceError.invalidResponse("Atom Feed 中没有 macOS 版本")
-        }
-        let version = Self.normalize(release.version)
-        guard Self.compare(version, currentVersion) == .orderedDescending else {
-            await logWriter.log(level: .info, event: "update_check_succeeded", details: "result=no_update source=atom")
-            return nil
+        // Atom 只给标题和链接，没有资产清单，所以按“新版本优先”逐个探测 DMG：
+        // 只发布了 Android 包的主版本（无 DMG）必须跳过，不能当作 macOS 更新或失败。
+        let candidates = releases
+            .filter { Self.isMacOSRelease(tagName: $0.version) }
+            .filter {
+                Self.compare(Self.normalize($0.version), currentVersion) == .orderedDescending
+            }
+            .sorted {
+                Self.compare(
+                    Self.normalize($0.version),
+                    Self.normalize($1.version)
+                ) == .orderedDescending
+            }
+
+        for release in candidates {
+            let version = Self.normalize(release.version)
+            let tag = release.version.hasPrefix("macos-") ? release.version : "v\(version)"
+            guard let assetName = try await Self.resolveDMGAssetName(
+                    version: version,
+                    tag: tag,
+                    session: session,
+                    mirror: mirror
+                  ),
+                  let downloadURL = URL(
+                    string: rewrittenString(
+                      "https://github.com/\(Self.repository)/releases/download/\(tag)/\(assetName)",
+                      mirror: mirror
+                    )
+                  ),
+                  let releaseURL = URL(string: rewrittenString(release.releaseURL, mirror: mirror)) else {
+                await logWriter.log(
+                    level: .warning,
+                    event: "update_check_atom_asset_missing",
+                    details: "version=\(version) action=skip"
+                )
+                continue
+            }
+            await logWriter.log(
+                level: .info,
+                event: "update_check_succeeded",
+                details: "version=\(version) source=atom"
+            )
+            return AppUpdate(
+                version: version,
+                releaseURL: releaseURL,
+                downloadURL: downloadURL,
+                notes: release.notes,
+                publishedAt: release.publishedAt
+            )
         }
 
-        let tag = release.version.hasPrefix("macos-") ? release.version : "v\(version)"
-        guard let assetName = try await Self.resolveDMGAssetName(
-                version: version,
-                tag: tag,
-                session: session,
-                mirror: mirror
-              ),
-              let downloadURL = URL(
-                string: rewrittenString(
-                  "https://github.com/\(Self.repository)/releases/download/\(tag)/\(assetName)",
-                  mirror: mirror
-                )
-              ),
-              let releaseURL = URL(string: rewrittenString(release.releaseURL, mirror: mirror)) else {
-            await logWriter.log(
-                level: .error,
-                event: "update_check_atom_asset_missing",
-                details: "version=\(version)"
-            )
-            throw UpdateServiceError.invalidResponse("版本 \(version) 在 Atom 回退中未找到可安装的 DMG 安装包")
-        }
         await logWriter.log(
             level: .info,
             event: "update_check_succeeded",
-            details: "version=\(version) source=atom"
+            details: "result=no_update source=atom candidates=\(candidates.count)"
         )
-        return AppUpdate(
-            version: version,
-            releaseURL: releaseURL,
-            downloadURL: downloadURL,
-            notes: release.notes,
-            publishedAt: release.publishedAt
-        )
+        return nil
     }
 
     /// GitHub Releases HTML 仍有分页；Atom 只给最近 10 条，不能作为完整历史来源。

@@ -769,17 +769,36 @@ final class AppLifecycleTests: XCTestCase {
 
         await environment.start()
         await 等待条件 {
-            if case .failed = environment.updateStatus {
-                return true
-            }
-            return false
+            await logger.events.contains { $0.event == "update_check_failed" }
         }
 
         let events = await logger.events
         XCTAssertTrue(events.contains { $0.event == "update_check_failed" })
     }
 
-    func test更新检查失败时展示具体原因() async throws {
+    /// 自动检测（启动与六小时调度）失败不能打扰用户，只在日志里留痕。
+    func test自动更新检查失败保持静默() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let logger = LifecycleLogWriter()
+        let environment = context.makeEnvironment(
+            updateService: LifecycleUpdateService(
+                result: .failure(.unavailable("GitHub API 返回 HTTP 502"))
+            ),
+            updateCheckScheduler: LifecycleUpdateSchedulerSpy(),
+            logWriter: logger
+        )
+
+        await environment.start()
+        await 等待条件 {
+            await logger.events.contains { $0.event == "update_check_failed" }
+        }
+
+        XCTAssertEqual(environment.updateStatus, .idle)
+    }
+
+    /// 手动检测失败必须给出具体原因，用户才知道是限流、断网还是服务端问题。
+    func test手动更新检查失败时展示具体原因() async throws {
         let context = try makeContext()
         defer { context.cleanUp() }
         let environment = context.makeEnvironment(
@@ -789,10 +808,44 @@ final class AppLifecycleTests: XCTestCase {
             updateCheckScheduler: LifecycleUpdateSchedulerSpy()
         )
 
+        await environment.checkForUpdates()
+
+        XCTAssertEqual(
+            environment.updateStatus,
+            .failed("检测更新失败：GitHub API 返回 HTTP 502")
+        )
+    }
+
+    /// 自动检测失败也不能覆盖用户上一次手动检测得到的原因。
+    func test自动更新检查失败保留手动检测的原因() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let failure = LifecycleUpdateService.Result.failure(
+            .unavailable("GitHub API 返回 HTTP 502")
+        )
+        let service = LifecycleUpdateService(results: [failure, failure, failure])
+        let scheduler = LifecycleUpdateSchedulerSpy()
+        let environment = context.makeEnvironment(
+            updateService: service,
+            updateCheckScheduler: scheduler
+        )
+
+        // 启动时的自动检测失败保持静默。
         await environment.start()
-        await 等待条件 {
-            environment.updateStatus == .failed("检测更新失败：GitHub API 返回 HTTP 502")
-        }
+        await 等待条件 { await service.checkCount == 1 }
+        XCTAssertEqual(environment.updateStatus, .idle)
+
+        // 手动检测失败把原因呈现给用户。
+        await environment.checkForUpdates()
+        await 等待条件 { await service.checkCount == 2 }
+        XCTAssertEqual(
+            environment.updateStatus,
+            .failed("检测更新失败：GitHub API 返回 HTTP 502")
+        )
+
+        // 随后的自动检测失败不能抹掉刚才的原因。
+        scheduler.fireTick()
+        await 等待条件 { await service.checkCount == 3 }
 
         XCTAssertEqual(
             environment.updateStatus,
