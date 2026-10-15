@@ -182,7 +182,24 @@ final class AppEnvironment {
             VolcenginePlanUsageProvider(session: .shared),
             NewAPIUsageProvider(session: .shared),
             CommandCodeUsageProvider(session: .shared),
-            XiaomiMiMoUsageProvider(session: .shared),
+            XiaomiMiMoUsageProvider(
+                session: .shared,
+                renewSession: { [weak xiaomiWebSession] credentialID, previousSecret in
+                    guard let xiaomiWebSession else { return nil }
+                    // 控制台票据过期时用持久登录态静默换发；换到新票据才落盘并重试。
+                    guard let renewed = await xiaomiWebSession.refreshSessionSilently(
+                        previousCookieHeader: previousSecret
+                    ), renewed != previousSecret else {
+                        return nil
+                    }
+                    do {
+                        try localStore.save(renewed, for: credentialID)
+                    } catch {
+                        return nil
+                    }
+                    return renewed
+                }
+            ),
             OpenCodeUsageProvider(session: .shared)
         ])
         let widgetSnapshotSynchronizer: WidgetSnapshotSynchronizer?

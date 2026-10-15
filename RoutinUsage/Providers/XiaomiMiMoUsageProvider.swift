@@ -6,10 +6,17 @@ struct XiaomiMiMoUsageProvider: UsageProvider {
     let descriptor: ProviderDescriptor
     private let session: URLSession
     private let baseURL: URL
+    /// 登录态过期时的静默续期钩子：(credentialID, 旧 Cookie) -> 新 Cookie。
+    private let renewSession: (@Sendable (UUID, String) async -> String?)?
 
-    init(session: URLSession = .shared, baseURL: URL = XiaomiMiMoUsageProvider.defaultBaseURL) {
+    init(
+        session: URLSession = .shared,
+        baseURL: URL = XiaomiMiMoUsageProvider.defaultBaseURL,
+        renewSession: (@Sendable (UUID, String) async -> String?)? = nil
+    ) {
         self.session = session
         self.baseURL = baseURL
+        self.renewSession = renewSession
         self.descriptor = ProviderRegistry.builtInDescriptors.first(where: { $0.id == .xiaomi })!
     }
 
@@ -98,6 +105,29 @@ struct XiaomiMiMoUsageProvider: UsageProvider {
             throw UsageProviderError.invalidCredential
         }
 
+        do {
+            return try await fetchUsageOnce(credential, now: now)
+        } catch let error as UsageProviderError where error.isAuthenticationFailure {
+            // 控制台票据通常只活 1-2 天；先用持久登录态静默续期，再重试一次。
+            guard let renewSession,
+                  let credentialID = credential.credentialID,
+                  let renewed = await renewSession(credentialID, credential.secret),
+                  renewed != credential.secret else {
+                throw error
+            }
+            let updated = ProviderCredential(
+                credentialID: credential.credentialID,
+                providerID: credential.providerID,
+                kind: credential.kind,
+                secret: renewed,
+                secondarySecret: credential.secondarySecret,
+                metadata: credential.metadata
+            )
+            return try await fetchUsageOnce(updated, now: now)
+        }
+    }
+
+    private func fetchUsageOnce(_ credential: ProviderCredential, now: Date) async throws -> UsageSnapshot? {
         let usageKind = credential.metadata["usageKind"] ?? "api"
         switch usageKind {
         case "plan":

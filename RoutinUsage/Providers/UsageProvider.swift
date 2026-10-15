@@ -41,6 +41,23 @@ enum UsageProviderError: LocalizedError, Equatable, Sendable {
             return message
         }
     }
+
+    /// 只有登录态问题才值得尝试静默续期或提示重新登录。
+    var isAuthenticationFailure: Bool {
+        switch self {
+        case .unauthorized:
+            return true
+        case let .providerMessage(message):
+            let normalized = message.lowercased()
+            return normalized.contains("未登录")
+                || normalized.contains("登录已失效")
+                || normalized.contains("unauthorized")
+                || normalized.contains("invalid token")
+                || normalized.contains("认证失败")
+        case .invalidCredential, .rateLimited, .transport, .timeout, .invalidResponse, .providerUnavailable:
+            return false
+        }
+    }
 }
 
 struct ProviderRegistry: Sendable {

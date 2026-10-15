@@ -1,4 +1,5 @@
 import XCTest
+import Foundation
 @testable import RoutinUsage
 
 final class XiaomiMiMoUsageProviderTests: XCTestCase {
@@ -165,6 +166,202 @@ final class XiaomiMiMoUsageProviderTests: XCTestCase {
             XCTAssertEqual(error as? UsageProviderError, .invalidCredential)
         }
     }
+
+    /// 控制台票据过期时用持久登录态静默续期，成功就重试一次，用户无感。
+    func test登录态过期时静默续期并重试一次() async throws {
+        let requests = RequestRecorder()
+        let expiredCookie = "api-platform_serviceToken=expired; userId=1"
+        let renewedCookie = "api-platform_serviceToken=fresh; userId=1"
+        let stub = URLProtocolStub.makeSession { request in
+            requests.append(request)
+            let url = try XCTUnwrap(request.url)
+            let cookie = request.value(forHTTPHeaderField: "Cookie")
+            guard cookie == renewedCookie else {
+                let response = try XCTUnwrap(HTTPURLResponse(
+                    url: url,
+                    statusCode: 401,
+                    httpVersion: nil,
+                    headerFields: nil
+                ))
+                return (response, Data(#"{"message":"未登录"}"#.utf8))
+            }
+            let body = url.path == "/api/v1/balance"
+                ? #"{"balance":12.5,"currency":"CNY"}"#
+                : #"{"costUsage":{"totalCost":3.25},"tokenUsage":{"inputToken":1000,"outputToken":250,"cacheToken":400}}"#
+            let response = try XCTUnwrap(HTTPURLResponse(
+                url: url,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            ))
+            return (response, Data(body.utf8))
+        }
+        let credentialID = UUID()
+        let renewalCalls = RenewalCallRecorder()
+        let provider = XiaomiMiMoUsageProvider(
+            session: stub.session,
+            baseURL: URL(string: "https://platform.test/api/v1")!,
+            renewSession: { id, previous in
+                renewalCalls.record(id: id, previous: previous)
+                return previous == expiredCookie ? renewedCookie : nil
+            }
+        )
+        let credential = ProviderCredential(
+            credentialID: credentialID,
+            providerID: .xiaomi,
+            kind: .bearerAPIKey,
+            secret: expiredCookie,
+            metadata: ["usageKind": "api"]
+        )
+
+        let fetched = try await provider.fetchUsage(credential, now: .now)
+
+        XCTAssertNotNil(fetched)
+        XCTAssertEqual(renewalCalls.calls, [RenewalCall(id: credentialID, previous: expiredCookie)])
+        // 先失败的一对请求 + 续期后重试的一对请求。
+        XCTAssertEqual(requests.count, 4)
+        XCTAssertEqual(
+            Set(requests.all.compactMap { $0.value(forHTTPHeaderField: "Cookie") }),
+            Set([expiredCookie, renewedCookie])
+        )
+    }
+
+    /// 静默续期拿不到新票据时，必须保留“需要重新登录”，并且不再重试。
+    func test续期失败时保留重新登录提示且不重试() async {
+        let requests = RequestRecorder()
+        let stub = URLProtocolStub.makeSession { request in
+            requests.append(request)
+            let response = try XCTUnwrap(HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 401,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            return (response, Data(#"{"message":"未登录"}"#.utf8))
+        }
+        var renewalCount = 0
+        let provider = XiaomiMiMoUsageProvider(
+            session: stub.session,
+            baseURL: URL(string: "https://platform.test/api/v1")!,
+            renewSession: { _, _ in
+                renewalCount += 1
+                // 兑换后票据没有变化，说明账号登录态也已失效。
+                return nil
+            }
+        )
+        let credential = ProviderCredential(
+            credentialID: UUID(),
+            providerID: .xiaomi,
+            kind: .bearerAPIKey,
+            secret: "api-platform_serviceToken=expired",
+            metadata: ["usageKind": "api"]
+        )
+
+        do {
+            _ = try await provider.fetchUsage(credential, now: .now)
+            XCTFail("预期仍然失败")
+        } catch {
+            XCTAssertEqual(error as? UsageProviderError, .providerMessage("小米 MiMo：未登录"))
+        }
+
+        XCTAssertEqual(renewalCount, 1)
+        XCTAssertEqual(requests.count, 2)
+    }
+
+    /// 兑换回来还是同一串票据时，不浪费一次必然失败的重试。
+    func test续期未换到新票据时不重试() async {
+        let requests = RequestRecorder()
+        let expiredCookie = "api-platform_serviceToken=expired"
+        let stub = URLProtocolStub.makeSession { request in
+            requests.append(request)
+            let response = try XCTUnwrap(HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 401,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            return (response, Data(#"{"message":"未登录"}"#.utf8))
+        }
+        let provider = XiaomiMiMoUsageProvider(
+            session: stub.session,
+            baseURL: URL(string: "https://platform.test/api/v1")!,
+            renewSession: { _, previous in previous }
+        )
+        let credential = ProviderCredential(
+            credentialID: UUID(),
+            providerID: .xiaomi,
+            kind: .bearerAPIKey,
+            secret: expiredCookie,
+            metadata: ["usageKind": "api"]
+        )
+
+        do {
+            _ = try await provider.fetchUsage(credential, now: .now)
+            XCTFail("预期仍然失败")
+        } catch {
+            XCTAssertEqual(error as? UsageProviderError, .providerMessage("小米 MiMo：未登录"))
+        }
+
+        XCTAssertEqual(requests.count, 2)
+    }
+
+    /// 普通网络故障与登录态无关，不该触发兑换。
+    func test网络故障不触发静默续期() async {
+        struct Offline: Error {}
+        let stub = URLProtocolStub.makeSession { _ in throw Offline() }
+        var renewalCount = 0
+        let provider = XiaomiMiMoUsageProvider(
+            session: stub.session,
+            baseURL: URL(string: "https://platform.test/api/v1")!,
+            renewSession: { _, _ in
+                renewalCount += 1
+                return "api-platform_serviceToken=fresh"
+            }
+        )
+        let credential = ProviderCredential(
+            credentialID: UUID(),
+            providerID: .xiaomi,
+            kind: .bearerAPIKey,
+            secret: "api-platform_serviceToken=ok",
+            metadata: ["usageKind": "api"]
+        )
+
+        do {
+            _ = try await provider.fetchUsage(credential, now: .now)
+            XCTFail("预期网络失败")
+        } catch {
+            XCTAssertEqual(error as? UsageProviderError, .transport)
+        }
+
+        XCTAssertEqual(renewalCount, 0)
+    }
+
+    func test登录态错误判定只覆盖认证类原因() {
+        XCTAssertTrue(UsageProviderError.unauthorized.isAuthenticationFailure)
+        XCTAssertTrue(UsageProviderError.providerMessage("小米 MiMo：未登录").isAuthenticationFailure)
+        XCTAssertTrue(UsageProviderError.providerMessage("登录已失效").isAuthenticationFailure)
+        XCTAssertFalse(UsageProviderError.rateLimited.isAuthenticationFailure)
+        XCTAssertFalse(UsageProviderError.transport.isAuthenticationFailure)
+        XCTAssertFalse(UsageProviderError.providerMessage("余额不足").isAuthenticationFailure)
+    }
+}
+
+private struct RenewalCall: Equatable {
+    let id: UUID
+    let previous: String
+}
+
+private final class RenewalCallRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recorded: [RenewalCall] = []
+
+    var calls: [RenewalCall] {
+        lock.withLock { recorded }
+    }
+
+    func record(id: UUID, previous: String) {
+        lock.withLock { recorded.append(RenewalCall(id: id, previous: previous)) }
+    }
 }
 
 private final class RequestRecorder: @unchecked Sendable {
@@ -173,6 +370,10 @@ private final class RequestRecorder: @unchecked Sendable {
 
     var count: Int {
         lock.withLock { requests.count }
+    }
+
+    var all: [URLRequest] {
+        lock.withLock { requests }
     }
 
     func append(_ request: URLRequest) {
