@@ -868,8 +868,13 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(card.contains("overflow = TextOverflow.Ellipsis"))
         XCTAssertTrue(dialog.contains("WebSettings.LOAD_NO_CACHE"))
         XCTAssertTrue(dialog.contains("removeAllCookies"))
-        XCTAssertTrue(dialog.contains("onReceivedHttpError"))
-        XCTAssertTrue(dialog.contains("/api/v1/userProfile"))
+        // 401 时清空 cookie 并重载会打断小米 SSO 的登录跳转（真机表现为一直白屏），
+        // 因此这里只保留手动重置会话时的清 cookie，并断言恢复逻辑已被移除。
+        XCTAssertFalse(dialog.contains("authRecoveryAttempted"))
+        // 移动 UA 会停在只显示 cookie 提示的中间页，登录页必须使用桌面 UA。
+        XCTAssertTrue(dialog.contains("CHROME_DESKTOP_UA"))
+        // 登录页流程写入可导出的诊断日志，便于真机排查。
+        XCTAssertTrue(dialog.contains("login_page_http_error"))
     }
 
     func test弹窗设置入口复用右键菜单设置逻辑() throws {
