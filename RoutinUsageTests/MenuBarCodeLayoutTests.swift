@@ -149,8 +149,18 @@ final class MenuBarCodeLayoutTests: XCTestCase {
                 let lowerBaseline = MenuBarMultiUsageIcon.size.height / 2
                     - glyphSpan / 2
                     + MenuBarMultiUsageIcon.twoLetterOpticalOffset
-                XCTAssertEqual(baselines[0], lowerBaseline, accuracy: 0.01)
-                XCTAssertEqual(baselines[1], lowerBaseline + MenuBarMultiUsageIcon.twoLetterSlotHeight, accuracy: 0.01)
+                // 两字母短码必须和三位短码一样自上而下阅读：首字母在上，次字母在下。
+                XCTAssertEqual(
+                    baselines[0],
+                    lowerBaseline + MenuBarMultiUsageIcon.twoLetterSlotHeight,
+                    accuracy: 0.01
+                )
+                XCTAssertEqual(baselines[1], lowerBaseline, accuracy: 0.01)
+                XCTAssertGreaterThan(
+                    baselines[0],
+                    baselines[1],
+                    "首字母基线必须高于次字母，否则短码会上下颠倒"
+                )
             } else {
                 XCTAssertEqual(
                     baselines[0] + font.capHeight,
@@ -198,6 +208,30 @@ final class MenuBarCodeLayoutTests: XCTestCase {
             accuracy: 0.01,
             "两字母短码应以进度条视觉中心为参考"
         )
+    }
+
+    /// 竖排短码必须自上而下阅读，覆盖真实内置短码里的两字母（DS、OC）与三字母（GLM…）。
+    func test所有内置短码都按自上而下顺序排布() {
+        for descriptor in ProviderRegistry.builtInDescriptors {
+            let characters = Array(descriptor.shortCode.prefix(3))
+            guard characters.count > 1 else { continue }
+            let font = MenuBarMultiUsageIcon.codeFont(for: characters.count)
+            let baselines = characters.indices.map { index in
+                MenuBarMultiUsageIcon.codeBaselineY(
+                    characterCount: characters.count,
+                    index: index,
+                    font: font
+                )
+            }
+
+            for index in 1..<baselines.count {
+                XCTAssertLessThan(
+                    baselines[index],
+                    baselines[index - 1],
+                    "\(descriptor.shortCode) 的竖排顺序被颠倒了"
+                )
+            }
+        }
     }
 
     func test上下样式使用放大的粗体数值和固定宽度() {

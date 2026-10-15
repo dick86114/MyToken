@@ -276,7 +276,9 @@ enum MenuBarMultiUsageIcon {
             let lowerBaseline = size.height / 2
                 - glyphSpan / 2
                 + twoLetterOpticalOffset
-            return lowerBaseline + CGFloat(index) * codeSlotHeight(for: characterCount)
+            // 与三位短码保持一致：首字母在上、次字母在下，否则 “OC/DS” 会被读成 “CO/SD”。
+            return lowerBaseline
+                + CGFloat(characterCount - 1 - index) * codeSlotHeight(for: characterCount)
         }
         guard characterCount > 1 else {
             return size.height / 2 + font.capHeight / 2 - codeVerticalOffset
