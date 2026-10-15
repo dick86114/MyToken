@@ -47,7 +47,10 @@ class RefreshCredentialsUseCaseTest {
         var failCacheWrites = false
 
         override fun observeCredentials(): Flow<List<Credential>> = flow
-        override suspend fun save(credential: Credential, secret: CredentialSecret) = Unit
+        val savedSecrets = LinkedHashMap<UUID, CredentialSecret>()
+        override suspend fun save(credential: Credential, secret: CredentialSecret) {
+            savedSecrets[credential.id] = secret
+        }
         override suspend fun delete(id: UUID) = Unit
         override suspend fun readSecret(id: UUID): CredentialSecret? = secrets[id]
 
@@ -106,6 +109,143 @@ class RefreshCredentialsUseCaseTest {
         name = "示例",
         isEnabled = enabled
     )
+
+    /** 只有拿到续期后的令牌才成功的供应商，用来验证“续期一次再重试”。 */
+    private inner class RenewalProvider(
+        override val providerId: ProviderId,
+        private val validToken: String,
+    ) : UsageProvider {
+        val calls = AtomicInteger(0)
+        val seenTokens = mutableListOf<String>()
+
+        override suspend fun fetchUsage(
+            credential: Credential,
+            secret: CredentialSecret,
+        ): Result<UsageSnapshot> {
+            calls.incrementAndGet()
+            val token = (secret as CredentialSecret.BearerToken).token
+            seenTokens += token
+            return if (token == validToken) {
+                Result.success(snapshot(credential.id))
+            } else {
+                Result.failure(UsageProviderException.Unauthorized("登录态已过期"))
+            }
+        }
+    }
+
+    @Test
+    fun refresh_renewsExpiredLoginStateAndRetriesOnce() = runTest {
+        val cred = credential("77777777-7777-4777-8777-777777777777", ProviderId.Xiaomi)
+        val expired = CredentialSecret.BearerToken("api-platform_serviceToken=old")
+        val renewed = CredentialSecret.BearerToken("api-platform_serviceToken=new")
+        val repository = FakeCredentialRepository(listOf(cred), mapOf(cred.id to expired))
+        val provider = RenewalProvider(ProviderId.Xiaomi, validToken = "api-platform_serviceToken=new")
+        var renewCalls = 0
+        val useCase = RefreshCredentialsUseCase(
+            repository = repository,
+            providers = mapOf(ProviderId.Xiaomi to provider),
+            sessionRenewer = CredentialSessionRenewer { _, previousSecret ->
+                renewCalls++
+                assertEquals(expired, previousSecret)
+                renewed
+            },
+        )
+
+        useCase.refresh(cred)
+
+        assertEquals(1, renewCalls)
+        assertEquals(
+            listOf("api-platform_serviceToken=old", "api-platform_serviceToken=new"),
+            provider.seenTokens,
+        )
+        // 续期后的密钥要落盘，后续刷新不必再兑换。
+        assertEquals(renewed, repository.savedSecrets[cred.id])
+        val state = useCase.states.value.getValue(cred.id)
+        assertEquals(RefreshStatus.Ready, state.status)
+        assertNull(state.error)
+    }
+
+    @Test
+    fun refresh_reportsAuthenticationFailureWhenRenewalUnavailable() = runTest {
+        val cred = credential("88888888-8888-4888-8888-888888888888", ProviderId.Xiaomi)
+        val expired = CredentialSecret.BearerToken("api-platform_serviceToken=old")
+        val repository = FakeCredentialRepository(listOf(cred), mapOf(cred.id to expired))
+        var renewCalls = 0
+        val provider = RenewalProvider(ProviderId.Xiaomi, validToken = "never")
+        val useCase = RefreshCredentialsUseCase(
+            repository = repository,
+            providers = mapOf(ProviderId.Xiaomi to provider),
+            sessionRenewer = CredentialSessionRenewer { _, _ ->
+                renewCalls++
+                null
+            },
+        )
+
+        useCase.refresh(cred)
+
+        assertEquals(1, renewCalls)
+        assertEquals(1, provider.calls.get())
+        assertTrue(repository.savedSecrets.isEmpty())
+        val state = useCase.states.value.getValue(cred.id)
+        assertEquals(RefreshStatus.Failed, state.status)
+        assertTrue(state.error is AppError.Authentication)
+    }
+
+    @Test
+    fun refresh_doesNotRenewOnTransportFailure() = runTest {
+        val cred = credential("99999999-9999-4999-8999-999999999999", ProviderId.Xiaomi)
+        val repository = FakeCredentialRepository(
+            listOf(cred),
+            mapOf(cred.id to CredentialSecret.BearerToken("token")),
+        )
+        var renewCalls = 0
+        val provider = FakeProvider(ProviderId.Xiaomi) {
+            Result.failure(UsageProviderException.Transport())
+        }
+        val useCase = RefreshCredentialsUseCase(
+            repository = repository,
+            providers = mapOf(ProviderId.Xiaomi to provider),
+            sessionRenewer = CredentialSessionRenewer { _, _ ->
+                renewCalls++
+                CredentialSecret.BearerToken("renewed")
+            },
+        )
+
+        useCase.refresh(cred)
+
+        // 只有登录态问题才值得走兑换；普通网络故障不该触发续期。
+        assertEquals(0, renewCalls)
+        assertEquals(1, provider.calls.get())
+        assertTrue(useCase.states.value.getValue(cred.id).error is AppError.Network)
+    }
+
+    @Test
+    fun refresh_givesUpAfterOneRenewalAttempt() = runTest {
+        val cred = credential("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", ProviderId.Xiaomi)
+        val repository = FakeCredentialRepository(
+            listOf(cred),
+            mapOf(cred.id to CredentialSecret.BearerToken("api-platform_serviceToken=old")),
+        )
+        var renewCalls = 0
+        val provider = RenewalProvider(ProviderId.Xiaomi, validToken = "never")
+        val useCase = RefreshCredentialsUseCase(
+            repository = repository,
+            providers = mapOf(ProviderId.Xiaomi to provider),
+            sessionRenewer = CredentialSessionRenewer { _, _ ->
+                renewCalls++
+                CredentialSecret.BearerToken("api-platform_serviceToken=still-bad")
+            },
+        )
+
+        useCase.refresh(cred)
+
+        // 只重试一次，避免续期失败时反复兑换打爆控制台。
+        assertEquals(1, renewCalls)
+        assertEquals(2, provider.calls.get())
+        val state = useCase.states.value.getValue(cred.id)
+        assertEquals(RefreshStatus.Failed, state.status)
+        assertTrue(state.error is AppError.Authentication)
+    }
 
     @Test
     fun refreshAll_marksReadyOnSuccess() = runTest {

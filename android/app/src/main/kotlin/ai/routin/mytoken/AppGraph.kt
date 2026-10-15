@@ -16,6 +16,7 @@ import ai.routin.mytoken.feature.transfer.TransferClient
 import ai.routin.mytoken.feature.transfer.TransferRepositoryImpl
 import ai.routin.mytoken.provider.defaultUsageProviders
 import ai.routin.mytoken.update.GitHubAppUpdateController
+import ai.routin.mytoken.feature.credentials.XiaomiSessionRenewer
 import android.content.Context
 import androidx.room.Room
 import kotlinx.coroutines.flow.first
@@ -41,7 +42,12 @@ class AppGraph(context: Context) {
     }
 
     val refreshUseCase: RefreshCredentialsUseCase by lazy {
-        RefreshCredentialsUseCase(credentialRepository, providers)
+        RefreshCredentialsUseCase(
+            repository = credentialRepository,
+            providers = providers,
+            // 小米 MiMo 的控制台票据通常只活 1-2 天，过期时用持久登录态静默续期。
+            sessionRenewer = XiaomiSessionRenewer(appContext),
+        )
     }
 
     val credentialOrderStore: DataStoreCredentialOrderStore by lazy {

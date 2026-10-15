@@ -2,6 +2,7 @@ package ai.routin.mytoken.domain.usage
 
 import ai.routin.mytoken.domain.model.AppError
 import ai.routin.mytoken.domain.model.Credential
+import ai.routin.mytoken.domain.model.CredentialSecret
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageSnapshot
 import ai.routin.mytoken.domain.repository.CredentialRepository
@@ -44,6 +45,8 @@ class RefreshCredentialsUseCase(
     private val providers: Map<ProviderId, UsageProvider>,
     private val clock: Clock = Clock.systemUTC(),
     private val maxConcurrency: Int = DEFAULT_MAX_CONCURRENCY,
+    /** 登录态过期时尝试静默续期；为空表示该平台不支持自动续期。 */
+    private val sessionRenewer: CredentialSessionRenewer? = null,
 ) {
     init {
         require(maxConcurrency >= 1) { "maxConcurrency must be positive" }
@@ -151,7 +154,7 @@ class RefreshCredentialsUseCase(
                     )
                 val secret = repository.readSecret(credential.id)
                     ?: throw AppError.Storage("凭证密钥缺失，请重新导入")
-                val snapshot = provider.fetchUsage(credential, secret).getOrThrow()
+                val snapshot = fetchUsageWithRenewal(provider, credential, secret)
                 // Best-effort cache write: a failed cache write must not turn a
                 // successful provider fetch into a refresh failure.
                 try {
@@ -181,6 +184,39 @@ class RefreshCredentialsUseCase(
                 }
             }
         }
+    }
+
+    /**
+     * 取一次用量；如果失败原因是登录态过期，则尝试静默续期并只重试一次。
+     * 续期成功时会把新密钥落盘，后续刷新无需再兑换。
+     */
+    private suspend fun fetchUsageWithRenewal(
+        provider: UsageProvider,
+        credential: Credential,
+        secret: CredentialSecret,
+    ): UsageSnapshot {
+        val firstAttempt = provider.fetchUsage(credential, secret)
+        val error = firstAttempt.exceptionOrNull() ?: return firstAttempt.getOrThrow()
+        if (error is CancellationException) throw error
+        if (mapError(error) !is AppError.Authentication) {
+            throw error
+        }
+
+        val renewed = try {
+            sessionRenewer?.renew(credential, secret)
+        } catch (renewalError: Throwable) {
+            if (renewalError is CancellationException) throw renewalError
+            null
+        } ?: throw error
+
+        try {
+            repository.save(credential, renewed)
+        } catch (saveError: Throwable) {
+            if (saveError is CancellationException) throw saveError
+            // 落盘失败不影响本次使用新密钥重试；下次刷新会再走一次兑换。
+            println("MyToken: failed to persist renewed credential: ${saveError.message}")
+        }
+        return provider.fetchUsage(credential, renewed).getOrThrow()
     }
 
     private fun setDisabled(id: UUID) {
