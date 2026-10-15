@@ -4,6 +4,8 @@ import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.model.CredentialSecret
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.usage.CredentialSessionRenewer
+import ai.routin.mytoken.core.diagnostics.AppLog
+import ai.routin.mytoken.core.diagnostics.AppLogLevel
 import android.content.Context
 import android.webkit.CookieManager
 import android.webkit.WebView
@@ -84,15 +86,24 @@ class XiaomiSessionRenewer(
     ): CredentialSecret? {
         if (credential.providerId != ProviderId.Xiaomi) return null
         // 账号登录态真失效时兑换必然失败；冷却期内直接放弃，避免每次刷新都拉一个 WebView。
-        if (failureCooldownActive(credential.id)) return null
+        if (failureCooldownActive(credential.id)) {
+            AppLog.log(AppLogLevel.Info, "xiaomi_renew_skipped", "冷却中")
+            return null
+        }
         val previous = (previousSecret as? CredentialSecret.BearerToken)?.token?.trim()
 
         val candidate = exchange.exchange(previous)?.trim()?.takeIf(String::isNotEmpty)
         if (candidate == null || candidate == previous) {
+            AppLog.log(
+                AppLogLevel.Warning,
+                "xiaomi_renew_failed",
+                if (candidate == null) "未换到新票据" else "票据未变化，账号登录态已失效",
+            )
             recordFailure(credential.id)
             return null
         }
         // 拿到的还是同一串票据说明账号登录态也已失效，交给用户重新登录。
+        AppLog.log(AppLogLevel.Info, "xiaomi_renew_succeeded", "已换发新的服务票据")
         clearFailure(credential.id)
         return CredentialSecret.BearerToken(candidate)
     }

@@ -2,6 +2,8 @@ package ai.routin.mytoken
 
 import ai.routin.mytoken.core.notifications.NotificationChannels
 import ai.routin.mytoken.core.refresh.RefreshScheduling
+import ai.routin.mytoken.core.diagnostics.AppLog
+import ai.routin.mytoken.core.diagnostics.AppLogLevel
 import ai.routin.mytoken.widget.syncWidgetsOnUsageChanges
 import android.app.Application
 import kotlinx.coroutines.CoroutineScope
@@ -20,9 +22,13 @@ class MyTokenApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
+        // 应用内日志：用户长按「关于」即可导出，交给开发者排查。
+        AppLog.init(this)
+
         // 崩溃日志写到外部文件，方便无 adb 时定位
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            AppLog.logThrowable("uncaught_exception", throwable)
             try {
                 val dir = getExternalFilesDir(null) ?: filesDir
                 val file = java.io.File(dir, "crash_log.txt")
@@ -35,6 +41,11 @@ class MyTokenApplication : Application() {
         }
 
         NotificationChannels.ensureChannels(this)
+        AppLog.log(
+            AppLogLevel.Info,
+            "app_started",
+            "package=${packageName}",
+        )
         appScope.launch {
             runCatching { RefreshScheduling.apply(this@MyTokenApplication, null) }
         }

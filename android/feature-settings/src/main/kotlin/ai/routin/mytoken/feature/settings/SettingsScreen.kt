@@ -24,6 +24,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Code
@@ -99,9 +101,18 @@ fun SettingsScreen(
     onOpenInstallPermissionSettings: () -> Unit = {},
     onInstallDownloadedUpdate: () -> Unit = {},
     onMirrorBaseChange: (String) -> Unit = {},
+    logExportState: LogExportUiState = LogExportUiState.Idle,
+    onExportLogs: () -> Unit = {},
+    onShareLogs: () -> Unit = {},
+    onDismissLogExport: () -> Unit = {},
     layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
 ) {
     var showReleaseHistory by remember { mutableStateOf(false) }
+    LogExportDialog(
+        state = logExportState,
+        onShare = onShareLogs,
+        onDismiss = onDismissLogExport,
+    )
     val uriHandler = LocalUriHandler.current
     val currentRelease = (releaseHistoryState as? AppReleaseHistoryUiState.Loaded)
         ?.releases
@@ -204,6 +215,12 @@ fun SettingsScreen(
                                 }
                             },
                             style = MaterialTheme.typography.titleMedium,
+                            // 长按版本号导出诊断日志：真机不方便连 adb 时也能把日志发给开发者。
+                            modifier = Modifier
+                                .testTag("settings_about_version")
+                                .pointerInput(Unit) {
+                                    detectTapGestures(onLongPress = { onExportLogs() })
+                                },
                         )
 
                         Spacer(modifier = Modifier.weight(1f))
@@ -346,6 +363,67 @@ private fun CurrentReleaseNotesSection(
             }
         }
     }
+}
+
+/** 「关于」长按导出的反馈：成功给出位置与分享入口，失败说明原因。 */
+@Composable
+private fun LogExportDialog(
+    state: LogExportUiState,
+    onShare: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    if (state is LogExportUiState.Idle) return
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                when (state) {
+                    is LogExportUiState.Working -> "正在导出日志"
+                    is LogExportUiState.Done -> "日志已导出"
+                    is LogExportUiState.Failed -> "导出失败"
+                    LogExportUiState.Idle -> ""
+                },
+            )
+        },
+        text = {
+            when (state) {
+                LogExportUiState.Idle -> Unit
+                LogExportUiState.Working -> Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                    Text("正在收集应用日志、设备信息与最近记录…")
+                }
+                is LogExportUiState.Done -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("把日志用任意方式发给开发者即可。")
+                    Text(
+                        text = "位置：${state.savedLocation}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "大小：${(state.sizeBytes / 1024.0).let { String.format("%.1f", it) }} KB",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                is LogExportUiState.Failed -> Text(state.message)
+            }
+        },
+        confirmButton = {
+            when (state) {
+                is LogExportUiState.Done -> TextButton(onClick = onShare) { Text("分享") }
+                is LogExportUiState.Failed -> TextButton(onClick = onDismiss) { Text("关闭") }
+                else -> Unit
+            }
+        },
+        dismissButton = {
+            if (state is LogExportUiState.Done) {
+                TextButton(onClick = onDismiss) { Text("关闭") }
+            }
+        },
+    )
 }
 
 @Composable

@@ -78,6 +78,11 @@ class GitHubAppUpdateController(
             }.onSuccess { nextState ->
                 _state.update { nextState }
             }.onFailure { error ->
+                ai.routin.mytoken.core.diagnostics.AppLog.log(
+                    ai.routin.mytoken.core.diagnostics.AppLogLevel.Warning,
+                    "update_check_failed",
+                    error.userMessage(),
+                )
                 _state.update { AppUpdateUiState.Error(error.userMessage()) }
             }
         }

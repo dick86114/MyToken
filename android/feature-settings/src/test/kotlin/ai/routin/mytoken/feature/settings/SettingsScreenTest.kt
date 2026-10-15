@@ -10,6 +10,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.platform.testTag
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -35,6 +37,9 @@ class SettingsScreenTest {
         updateState: AppUpdateUiState = AppUpdateUiState.Idle,
         mirrorBase: String = "",
         onOpenInstallPermissionSettings: () -> Unit = {},
+        logExportState: LogExportUiState = LogExportUiState.Idle,
+        onExportLogs: () -> Unit = {},
+        onShareLogs: () -> Unit = {},
     ) {
         val releaseHistoryState = AppReleaseHistoryUiState.Loaded(
             listOf(
@@ -69,6 +74,9 @@ class SettingsScreenTest {
                     onThemeModeChange = { displayStore.state.value = displayStore.state.value.copy(themeMode = it) },
                     onOpenTransfer = onOpenTransfer,
                     onOpenInstallPermissionSettings = onOpenInstallPermissionSettings,
+                    logExportState = logExportState,
+                    onExportLogs = onExportLogs,
+                    onShareLogs = onShareLogs,
                 )
             }
         }
@@ -105,6 +113,36 @@ class SettingsScreenTest {
         composeRule.onNodeWithText("从 Mac 导入").performClick()
 
         assertEquals(1, opened)
+    }
+
+    @Test
+    fun longPressAboutVersionExportsLogs() {
+        var exportCalls = 0
+        setContent(onExportLogs = { exportCalls++ })
+
+        composeRule.onNodeWithTag("settings_about_version")
+            .performScrollTo()
+            .performTouchInput { longClick() }
+
+        assertEquals(1, exportCalls)
+    }
+
+    @Test
+    fun exportedLogDialogOffersShare() {
+        var shareCalls = 0
+        setContent(
+            logExportState = LogExportUiState.Done(
+                fileName = "MyToken-logs-20261015-220000.zip",
+                savedLocation = "下载/MyToken/MyToken-logs-20261015-220000.zip",
+                sizeBytes = 2048,
+            ),
+            onShareLogs = { shareCalls++ },
+        )
+
+        composeRule.onNodeWithText("日志已导出").assertIsDisplayed()
+        composeRule.onNodeWithText("分享").performClick()
+
+        assertEquals(1, shareCalls)
     }
 
     @Test

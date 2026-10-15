@@ -52,6 +52,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.calculateStartPadding
@@ -95,6 +96,15 @@ fun MyTokenApp(
     var xiaomiLoginCredential by remember { mutableStateOf<Credential?>(null) }
     val backStack = remember { mutableStateListOf<AppScreen>() }
     val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    // 长按「关于」导出诊断日志：真机不方便连 adb 时也能把日志发出来。
+    val logExportController = remember {
+        ai.routin.mytoken.diagnostics.LogExportController(
+            context = context.applicationContext,
+            scope = scope,
+        )
+    }
+    val logExportState by logExportController.state.collectAsState()
 
     fun navigate(target: AppScreen) {
         backStack.add(screen)
@@ -309,6 +319,10 @@ fun MyTokenApp(
                                 onOpenInstallPermissionSettings = settingsViewModel::openInstallPermissionSettings,
                                 onInstallDownloadedUpdate = settingsViewModel::installDownloadedUpdate,
                                 onMirrorBaseChange = settingsViewModel::setUpdateMirrorBase,
+                                logExportState = logExportState,
+                                onExportLogs = logExportController::export,
+                                onShareLogs = logExportController::share,
+                                onDismissLogExport = logExportController::dismiss,
                             )
                         }
                     }

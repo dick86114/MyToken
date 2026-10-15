@@ -56,6 +56,7 @@ class WidgetRefreshWorker(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (failure: Throwable) {
+            ai.routin.mytoken.core.diagnostics.AppLog.logThrowable("widget_refresh_failed", failure)
             false
         }
 
@@ -63,7 +64,13 @@ class WidgetRefreshWorker(
         refreshStateStore.setRefreshing(false)
         runCatching { CredentialWidgetUpdater.updateAll(applicationContext) }
 
-        return when (widgetRefreshOutcome(succeeded, runAttemptCount)) {
+        val outcome = widgetRefreshOutcome(succeeded, runAttemptCount)
+        ai.routin.mytoken.core.diagnostics.AppLog.log(
+            ai.routin.mytoken.core.diagnostics.AppLogLevel.Info,
+            "widget_refresh_finished",
+            "credentials=${credentials.size} succeeded=$succeeded attempt=$runAttemptCount outcome=$outcome",
+        )
+        return when (outcome) {
             WidgetRefreshOutcome.Success -> Result.success()
             WidgetRefreshOutcome.Retry -> Result.retry()
             WidgetRefreshOutcome.GiveUp -> Result.failure()
