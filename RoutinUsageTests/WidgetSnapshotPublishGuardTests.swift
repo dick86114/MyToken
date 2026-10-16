@@ -2,6 +2,7 @@ import Foundation
 import XCTest
 @testable import RoutinUsage
 
+@MainActor
 final class WidgetSnapshotPublishGuardTests: XCTestCase {
     func testWidgetAppGroup常量与读取端一致() throws {
         XCTAssertEqual(WidgetSharedAppGroup.identifier, "group.cc.idickies.mytoken.widgets")
@@ -31,7 +32,34 @@ final class WidgetSnapshotPublishGuardTests: XCTestCase {
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path).count, 0)
     }
 
-    @MainActor
+    func test相同凭证明细不重复触发WidgetTimeline刷新() {
+        let keyID = UUID()
+        let reloader = WidgetReloaderSpy()
+        let synchronizer = WidgetSnapshotSynchronizer(
+            store: WidgetSnapshotStore(directory: FileManager.default.temporaryDirectory),
+            reloader: reloader
+        )
+
+        synchronizer.publish(states: [keyID: makeState(keyID: keyID)], orderedKeyIDs: [keyID])
+        synchronizer.publish(states: [keyID: makeState(keyID: keyID)], orderedKeyIDs: [keyID])
+
+        XCTAssertEqual(reloader.reloadCount, 1)
+    }
+
+    func test凭证明细变化会触发WidgetTimeline刷新() {
+        let keyID = UUID()
+        let reloader = WidgetReloaderSpy()
+        let synchronizer = WidgetSnapshotSynchronizer(
+            store: WidgetSnapshotStore(directory: FileManager.default.temporaryDirectory),
+            reloader: reloader
+        )
+
+        synchronizer.publish(states: [keyID: makeState(keyID: keyID)], orderedKeyIDs: [keyID])
+        synchronizer.publish(states: [keyID: makeState(keyID: keyID, planName: "新版套餐")], orderedKeyIDs: [keyID])
+
+        XCTAssertEqual(reloader.reloadCount, 2)
+    }
+
     func testWidget写入失败后禁用同步且只记录一次() async throws {
         let blockingFile = FileManager.default.temporaryDirectory
             .appendingPathComponent("widget-blocker-\(UUID().uuidString)")
@@ -121,4 +149,41 @@ private final class WidgetReloaderSpy: WidgetReloading, @unchecked Sendable {
     func reloadAllTimelines() {
         lock.withLock { storedReloadCount += 1 }
     }
+}
+
+private func makeState(keyID: UUID, planName: String = "原套餐") -> KeyUsageState {
+    let configuration = KeyConfiguration(
+        id: keyID,
+        name: "测试凭证",
+        keySuffix: "ZZZ9",
+        sortOrder: 0,
+        providerID: .deepseek,
+        credentialKind: .apiKey
+    )
+    let date = Date(timeIntervalSince1970: 100)
+    return KeyUsageState(
+        configuration: configuration,
+        snapshot: UsageSnapshot(
+            planName: planName,
+            kind: .tokenPack,
+            fiveHour: nil,
+            weekly: nil,
+            token: UsageMetric(
+                used: 25,
+                limit: 100,
+                remaining: 75,
+                percent: 25,
+                unit: .token,
+                windowEnd: nil
+            ),
+            allowedModels: [],
+            fetchedAt: date,
+            providerID: .deepseek,
+            credentialID: keyID
+        ),
+        lastSuccessAt: date,
+        isRefreshing: false,
+        isStale: false,
+        error: nil
+    )
 }

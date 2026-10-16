@@ -59,6 +59,21 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertFalse(store.isRefreshing)
     }
 
+    func test刷新全部时最多四个Key并发请求() async throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let secrets = (1...6).map { String(format: "plan-concurrency-%02d", $0) }
+        for (index, secret) in secrets.enumerated() {
+            _ = try context.addKey(name: "账号\(index)", secret: secret)
+        }
+        let fetcher = ConcurrencyTrackingUsageFetcher()
+        let store = context.makeStore(fetcher: fetcher)
+
+        await store.refreshAll()
+        let maximum = await fetcher.maximumConcurrentCount
+        XCTAssertEqual(maximum, 4)
+    }
+
     func test首个Key失效后批量刷新跳过该Key但继续刷新其他Key() async throws {
         let context = try makeContext()
         defer { context.cleanUp() }
@@ -907,5 +922,18 @@ private func XCTAssert抛出Store错误(
         XCTFail("预期抛出 UsageStore 错误", file: file, line: line)
     } catch {
         XCTAssertEqual(error as? UsageStoreError, expected, file: file, line: line)
+    }
+}
+
+private actor ConcurrencyTrackingUsageFetcher: UsageFetching {
+    private(set) var activeCount = 0
+    private(set) var maximumConcurrentCount = 0
+
+    func fetchUsage(apiKey: String, now: Date) async throws -> UsageSnapshot? {
+        activeCount += 1
+        maximumConcurrentCount = max(maximumConcurrentCount, activeCount)
+        try? await Task.sleep(nanoseconds: 30_000_000)
+        activeCount -= 1
+        return nil
     }
 }
