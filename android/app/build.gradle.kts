@@ -17,6 +17,14 @@ android {
     }
 
     buildTypes {
+        debug {
+            // 与正式版共存：debug 使用独立包名，可以在同一台设备上同时安装对比。
+            applicationIdSuffix = ".debug"
+            // 桌面名称与组件选择器加 Debug 后缀，便于区分两个版本。
+            resValue("string", "app_name", "MyToken Debug")
+            resValue("string", "widget_credential_label", "MyToken 凭证（Debug）")
+            resValue("string", "widget_overview_label", "MyToken 总览（Debug）")
+        }
         release {
             // R8/minification stays off until a full provider-signing keep pass
             // is verified on a real device; the release build contains no
