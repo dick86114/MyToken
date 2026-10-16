@@ -36,6 +36,7 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertTrue(settings.notificationsEnabled)
         XCTAssertEqual(settings.thresholds, AlertThresholds(low: 80, high: 95))
         XCTAssertFalse(settings.launchAtLogin)
+        XCTAssertFalse(settings.starPromptDismissed)
         XCTAssertEqual(settings.menuBarStyle, .aliasLogoProgress)
         XCTAssertEqual(settings.usageCardDensity, .compact)
     }
@@ -357,6 +358,19 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertFalse(reloaded.notificationsEnabled)
         XCTAssertEqual(reloaded.thresholds, AlertThresholds(low: 70, high: 90))
         XCTAssertTrue(reloaded.launchAtLogin)
+    }
+
+    func testStar引导关闭状态可持久化() throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+
+        let settings = AppSettings(defaults: context.defaults)
+        XCTAssertFalse(settings.starPromptDismissed)
+
+        settings.starPromptDismissed = true
+
+        let reloaded = AppSettings(defaults: context.defaults)
+        XCTAssertTrue(reloaded.starPromptDismissed)
     }
 
     func test更新通道和CDN源以备份往返() throws {
