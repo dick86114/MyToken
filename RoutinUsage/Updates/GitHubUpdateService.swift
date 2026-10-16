@@ -303,8 +303,13 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
             return try await fetchReleaseHistoryFromAtom(mirror: mirror)
         }
         var seen = Set<String>()
+        // 主发布 vX 由双端共用：仅 Android 单独发布过的 vX 没有 DMG，
+        // 不计入 macOS 历史，避免混入只属于 Android 的更新说明。
         let history = releases
-            .filter { Self.isMacOSRelease(tagName: $0.tagName) }
+            .filter {
+                Self.isMacOSRelease(tagName: $0.tagName)
+                    && $0.assets.contains { $0.name.hasSuffix(".dmg") }
+            }
             .compactMap { release -> AppReleaseHistoryItem? in
                 let version = Self.normalize(release.tagName)
                 guard !version.isEmpty, seen.insert(version).inserted,
