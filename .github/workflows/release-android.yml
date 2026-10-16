@@ -132,13 +132,15 @@ jobs:
           ./android/gradlew -p android "${args[@]}" --stacktrace
           mkdir -p android/build/dist
           cp "${apk_source}" "android/build/dist/${apk_name}"
-      # 发布时刻的空 commit：Release created_at 取自 tag 指向的 commit 时间，
-      # 保证“最后发布的客户端”在 Releases 页面排在最前。
+      # 把版本号写入发布时刻的发版 commit：Release created_at 取自 tag 指向的
+      # commit 时间，保证“最后发布的客户端”在 Releases 页面排在最前；
+      # versionCode/versionName 一并入库，master 上的 Android 版本号与发布保持一致。
       - name: 提交发版 commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit --allow-empty -m "chore(release): Android v${RELEASE_VERSION}"
+          git add android/app/build.gradle.kts
+          git diff --cached --quiet || git commit -m "chore(release): Android v${RELEASE_VERSION}"
           git push origin HEAD:master
       - name: 创建 / 追加 Android 资产到 vX Release
         uses: softprops/action-gh-release@v2
@@ -146,7 +148,11 @@ jobs:
           target_commitish: master
           tag_name: v${{ inputs.version }}
           name: MyToken v${{ inputs.version }}
-          body: ${{ inputs.release_notes }}
+          # 主发布 vX 双端共用：说明按平台分段追加，避免覆盖 macOS 的更新说明。
+          body: |
+            ## Android
+            ${{ inputs.release_notes }}
+          append_body: true
           generate_release_notes: false
           make_latest: true
           files: android/build/dist/*.apk
