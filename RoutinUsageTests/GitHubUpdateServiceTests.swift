@@ -322,9 +322,9 @@ final class GitHubUpdateServiceTests: XCTestCase {
         let body = """
         [
           {"tag_name":"android-v9.0.0","html_url":"https://github.com/dick86114/MyToken/releases/tag/android-v9.0.0","assets":[],"body":"Android"},
-          {"tag_name":"macos-v5.2.0","html_url":"https://github.com/dick86114/MyToken/releases/tag/macos-v5.2.0","assets":[],"body":"旧版本","published_at":"2026-08-01T10:00:00Z"},
-          {"tag_name":"v5.4.0","html_url":"https://github.com/dick86114/MyToken/releases/tag/v5.4.0","assets":[],"body":"主发布"},
-          {"tag_name":"macos-v5.3.0","html_url":"https://github.com/dick86114/MyToken/releases/tag/macos-v5.3.0","assets":[],"body":"中间版本"}
+          {"tag_name":"macos-v5.2.0","html_url":"https://github.com/dick86114/MyToken/releases/tag/macos-v5.2.0","assets":[{"name":"MyToken-5.2.0-arm64.dmg","browser_download_url":"https://example.com/MyToken-5.2.0.dmg"}],"body":"旧版本","published_at":"2026-08-01T10:00:00Z"},
+          {"tag_name":"v5.4.0","html_url":"https://github.com/dick86114/MyToken/releases/tag/v5.4.0","assets":[{"name":"MyToken-5.4.0-arm64.dmg","browser_download_url":"https://example.com/MyToken-5.4.0.dmg"}],"body":"主发布"},
+          {"tag_name":"macos-v5.3.0","html_url":"https://github.com/dick86114/MyToken/releases/tag/macos-v5.3.0","assets":[{"name":"MyToken-5.3.0-arm64.dmg","browser_download_url":"https://example.com/MyToken-5.3.0.dmg"}],"body":"中间版本"}
         ]
         """
         let stub = URLProtocolStub.makeSession { request in
@@ -343,9 +343,33 @@ final class GitHubUpdateServiceTests: XCTestCase {
         XCTAssertFalse(releases.contains { $0.notes == "Android" })
     }
 
+    func test更新历史跳过只有Android包的主发布版本() async throws {
+        // 主发布 vX 双端共用：Android 先发时同一 tag 只有 APK、没有 DMG，
+        // 这类版本不能出现在 macOS 历史里（线上例子：v5.6.1、v5.5.3）。
+        let body = """
+        [
+          {"tag_name":"android-v5.6.2","html_url":"https://github.com/dick86114/MyToken/releases/tag/android-v5.6.2","assets":[{"name":"MyToken-5.6.2-android.apk","browser_download_url":"https://example.com/app.apk"}],"body":"Android 兼容发布"},
+          {"tag_name":"v5.6.1","html_url":"https://github.com/dick86114/MyToken/releases/tag/v5.6.1","assets":[{"name":"MyToken-5.6.1-android.apk","browser_download_url":"https://example.com/app.apk"}],"body":"仅 Android 的说明"},
+          {"tag_name":"v5.6.0","html_url":"https://github.com/dick86114/MyToken/releases/tag/v5.6.0","assets":[{"name":"MyToken-5.6.0-arm64.dmg","browser_download_url":"https://example.com/app.dmg"}],"body":"macOS 说明"}
+        ]
+        """
+        let stub = URLProtocolStub.makeSession { request in
+            let response = try XCTUnwrap(
+                HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)
+            )
+            return (response, Data(body.utf8))
+        }
+        let service = GitHubUpdateService(session: stub.session, currentVersion: "5.6.0")
+
+        let releases = try await service.fetchReleaseHistory()
+
+        XCTAssertEqual(releases.map(\.version), ["5.6.0"])
+        XCTAssertFalse(releases.contains { $0.notes == "仅 Android 的说明" })
+    }
+
     func test协议调用使用真实历史实现() async throws {
         let body = """
-        [{"tag_name":"macos-v5.2.1","html_url":"https://github.com/dick86114/MyToken/releases/tag/macos-v5.2.1","assets":[],"body":"当前版本"}]
+        [{"tag_name":"macos-v5.2.1","html_url":"https://github.com/dick86114/MyToken/releases/tag/macos-v5.2.1","assets":[{"name":"MyToken-5.2.1-arm64.dmg","browser_download_url":"https://example.com/MyToken-5.2.1.dmg"}],"body":"当前版本"}]
         """
         let stub = URLProtocolStub.makeSession { request in
             let response = try XCTUnwrap(
