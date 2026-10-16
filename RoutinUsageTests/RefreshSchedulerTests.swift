@@ -7,7 +7,8 @@ final class RefreshSchedulerTests: XCTestCase {
     func test生产Timer取消并释放句柄后不再触发() {
         let tickCount = LockedCounter()
         var timer: (any CancellableTimer)? = MainRunLoopTimerScheduler().schedule(
-            every: 0.01
+            every: 0.01,
+            tolerance: 0
         ) {
             tickCount.increment()
         }
@@ -39,7 +40,8 @@ final class RefreshSchedulerTests: XCTestCase {
             refreshed.fulfill()
         }
 
-        XCTAssertEqual(timerScheduler.scheduledIntervals, [300])
+        XCTAssertEqual(timerScheduler.scheduledRequests.map(\.interval), [300])
+        XCTAssertEqual(timerScheduler.scheduledRequests.map(\.tolerance), [60])
         timerScheduler.timer(at: 0).fire()
         await fulfillment(of: [refreshed], timeout: 1)
         XCTAssertEqual(tickCount.value, 1)
@@ -74,6 +76,20 @@ final class RefreshSchedulerTests: XCTestCase {
 
         XCTAssertEqual(oldTimer.cancelCount, 1)
         XCTAssertEqual(timerScheduler.scheduledIntervals, [300, 900])
+    }
+
+    func test周期Timer使用间隔的两成作为tolerance() async {
+        let timerScheduler = TimerSchedulerSpy()
+        let scheduler = RefreshScheduler(
+            timerScheduler: timerScheduler,
+            workspaceNotificationCenter: NotificationCenter()
+        )
+
+        scheduler.start(minutes: 1) {}
+        scheduler.reschedule(minutes: 30)
+
+        XCTAssertEqual(timerScheduler.scheduledRequests.map(\.interval), [60, 1800])
+        XCTAssertEqual(timerScheduler.scheduledRequests.map(\.tolerance), [12, 360])
     }
 
     func test停止会取消周期和待处理唤醒且之后不再刷新() async {
@@ -111,11 +127,15 @@ final class RefreshSchedulerTests: XCTestCase {
         )
         let tickCount = LockedCounter()
         let refreshed = expectation(description: "完成一次唤醒补刷")
+        let periodicRefreshed = expectation(description: "唤醒后完成重置的周期刷新")
         let unexpectedRefresh = expectation(description: "不应重复唤醒补刷")
         unexpectedRefresh.isInverted = true
         scheduler.start(minutes: 5) {
-            if tickCount.increment() == 1 {
+            let count = tickCount.increment()
+            if count == 1 {
                 refreshed.fulfill()
+            } else if count == 2 {
+                periodicRefreshed.fulfill()
             } else {
                 unexpectedRefresh.fulfill()
             }
@@ -126,15 +146,27 @@ final class RefreshSchedulerTests: XCTestCase {
         scheduler.handleWake()
         let secondWakeTimer = timerScheduler.timer(at: 2)
 
-        XCTAssertEqual(timerScheduler.scheduledIntervals, [300, 2, 2])
+        XCTAssertEqual(timerScheduler.scheduledRequests.map(\.interval), [300, 2, 2])
+        XCTAssertEqual(timerScheduler.scheduledRequests.map(\.isOneShot), [false, true, true])
+        XCTAssertEqual(timerScheduler.scheduledRequests.map(\.tolerance), [60, 0, 0])
         XCTAssertEqual(firstWakeTimer.cancelCount, 1)
+
+        let oldPeriodicTimer = timerScheduler.timer(at: 0)
         firstWakeTimer.fire()
-        secondWakeTimer.fire()
+        XCTAssertEqual(tickCount.value, 0)
+
         secondWakeTimer.fire()
         await fulfillment(of: [refreshed], timeout: 1)
         await fulfillment(of: [unexpectedRefresh], timeout: 0.05)
         XCTAssertEqual(tickCount.value, 1)
         XCTAssertEqual(secondWakeTimer.cancelCount, 1)
+        XCTAssertEqual(oldPeriodicTimer.cancelCount, 1)
+        XCTAssertEqual(timerScheduler.scheduledRequests.count, 4)
+        XCTAssertEqual(timerScheduler.scheduledRequests.last?.interval, 300)
+
+        timerScheduler.timer(at: 3).fire()
+        await fulfillment(of: [periodicRefreshed], timeout: 1)
+        XCTAssertEqual(tickCount.value, 2)
     }
 
     func test后台触发唤醒回调会安全切换到主执行器补刷并取消定时器() async {
@@ -161,21 +193,54 @@ final class RefreshSchedulerTests: XCTestCase {
     }
 }
 
+private struct ScheduledTimerRequest {
+    let interval: TimeInterval
+    let tolerance: TimeInterval
+    let isOneShot: Bool
+    let timer: TimerSpy
+}
+
 private final class TimerSchedulerSpy: TimerScheduling, @unchecked Sendable {
     private let lock = NSLock()
-    private var scheduled: [(interval: TimeInterval, timer: TimerSpy)] = []
+    private var scheduled: [ScheduledTimerRequest] = []
+
+    var scheduledRequests: [ScheduledTimerRequest] {
+        lock.withLock { scheduled }
+    }
 
     var scheduledIntervals: [TimeInterval] {
-        lock.withLock { scheduled.map(\.interval) }
+        scheduledRequests.map(\.interval)
     }
 
     func schedule(
         every seconds: TimeInterval,
+        tolerance: TimeInterval,
         action: @escaping @Sendable () -> Void
     ) -> any CancellableTimer {
         let timer = TimerSpy(action: action)
         lock.withLock {
-            scheduled.append((seconds, timer))
+            scheduled.append(ScheduledTimerRequest(
+                interval: seconds,
+                tolerance: tolerance,
+                isOneShot: false,
+                timer: timer
+            ))
+        }
+        return timer
+    }
+
+    func scheduleOneShot(
+        after seconds: TimeInterval,
+        action: @escaping @Sendable () -> Void
+    ) -> any CancellableTimer {
+        let timer = TimerSpy(action: action)
+        lock.withLock {
+            scheduled.append(ScheduledTimerRequest(
+                interval: seconds,
+                tolerance: 0,
+                isOneShot: true,
+                timer: timer
+            ))
         }
         return timer
     }

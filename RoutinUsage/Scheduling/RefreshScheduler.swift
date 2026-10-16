@@ -8,6 +8,12 @@ protocol CancellableTimer: Sendable {
 protocol TimerScheduling: Sendable {
     func schedule(
         every seconds: TimeInterval,
+        tolerance: TimeInterval,
+        action: @escaping @Sendable () -> Void
+    ) -> any CancellableTimer
+
+    func scheduleOneShot(
+        after seconds: TimeInterval,
         action: @escaping @Sendable () -> Void
     ) -> any CancellableTimer
 }
@@ -15,11 +21,23 @@ protocol TimerScheduling: Sendable {
 struct MainRunLoopTimerScheduler: TimerScheduling {
     func schedule(
         every seconds: TimeInterval,
+        tolerance: TimeInterval,
         action: @escaping @Sendable () -> Void
     ) -> any CancellableTimer {
         let timer = MainRunLoopTimer()
         DispatchQueue.main.async {
-            timer.install(every: seconds, action: action)
+            timer.install(every: seconds, tolerance: tolerance, repeats: true, action: action)
+        }
+        return timer
+    }
+
+    func scheduleOneShot(
+        after seconds: TimeInterval,
+        action: @escaping @Sendable () -> Void
+    ) -> any CancellableTimer {
+        let timer = MainRunLoopTimer()
+        DispatchQueue.main.async {
+            timer.install(every: seconds, tolerance: 0, repeats: false, action: action)
         }
         return timer
     }
@@ -35,6 +53,7 @@ final class RefreshScheduler {
     private var onTick: (@Sendable () -> Void)?
     private var periodicGeneration = 0
     private var wakeGeneration = 0
+    private var activePeriodicMinutes: Int?
     private var wakeObservation: WakeNotificationObservation?
 
     init(
@@ -44,7 +63,6 @@ final class RefreshScheduler {
     ) {
         self.timerScheduler = timerScheduler
         self.wakeDebounceSeconds = wakeDebounceSeconds
-        wakeObservation = nil
         wakeObservation = WakeNotificationObservation(
             notificationCenter: workspaceNotificationCenter
         ) { [weak self] in
@@ -90,7 +108,7 @@ final class RefreshScheduler {
             return
         }
 
-        let newTimer = timerScheduler.schedule(every: wakeDebounceSeconds) { [weak self] in
+        let newTimer = timerScheduler.scheduleOneShot(after: wakeDebounceSeconds) { [weak self] in
             Task { @MainActor [weak self] in
                 self?.fireWake(generation: generation)
             }
@@ -106,6 +124,7 @@ final class RefreshScheduler {
         periodicGeneration += 1
         wakeGeneration += 1
         onTick = nil
+        activePeriodicMinutes = nil
         let timers = (periodicTimer, wakeTimer)
         periodicTimer = nil
         wakeTimer = nil
@@ -120,8 +139,11 @@ final class RefreshScheduler {
         periodicTimer = nil
         oldTimer?.cancel()
 
-        let newTimer = timerScheduler.schedule(every: TimeInterval(minutes * 60)) {
-            [weak self] in
+        let interval = TimeInterval(minutes * 60)
+        let newTimer = timerScheduler.schedule(
+            every: interval,
+            tolerance: interval * 0.2
+        ) { [weak self] in
             Task { @MainActor [weak self] in
                 self?.firePeriodic(generation: generation)
             }
@@ -130,6 +152,7 @@ final class RefreshScheduler {
             newTimer.cancel()
             return
         }
+        activePeriodicMinutes = minutes
         periodicTimer = newTimer
     }
 
@@ -149,6 +172,11 @@ final class RefreshScheduler {
         wakeTimer = nil
         timer?.cancel()
         onTick?()
+
+        // 唤醒补刷后重建周期 Timer，避免系统时钟追赶造成唤醒刷新和原周期刷新相邻触发。
+        if let minutes = activePeriodicMinutes {
+            installPeriodicTimer(minutes: minutes)
+        }
     }
 }
 
@@ -184,12 +212,15 @@ private final class MainRunLoopTimer: CancellableTimer, @unchecked Sendable {
 
     func install(
         every seconds: TimeInterval,
+        tolerance: TimeInterval,
+        repeats: Bool,
         action: @escaping @Sendable () -> Void
     ) {
         dispatchPrecondition(condition: .onQueue(.main))
-        let timer = Timer(timeInterval: seconds, repeats: true) { _ in
+        let timer = Timer(timeInterval: seconds, repeats: repeats) { _ in
             action()
         }
+        timer.tolerance = max(0, tolerance)
         let shouldInvalidate = lock.withLock { () -> Bool in
             guard !isCancelled else {
                 return true
@@ -215,22 +246,11 @@ private final class MainRunLoopTimer: CancellableTimer, @unchecked Sendable {
         guard shouldDispatch else {
             return
         }
-        if Thread.isMainThread {
-            invalidateOnMainRunLoop()
-        } else {
-            DispatchQueue.main.async {
-                self.invalidateOnMainRunLoop()
+        DispatchQueue.main.async { [self] in
+            timer?.invalidate()
+            lock.withLock {
+                timer = nil
             }
         }
-    }
-
-    private func invalidateOnMainRunLoop() {
-        dispatchPrecondition(condition: .onQueue(.main))
-        let timer = lock.withLock {
-            let timer = self.timer
-            self.timer = nil
-            return timer
-        }
-        timer?.invalidate()
     }
 }

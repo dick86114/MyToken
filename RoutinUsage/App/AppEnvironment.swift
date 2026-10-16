@@ -73,7 +73,7 @@ final class AppEnvironment {
     let store: UsageStore
     let loginItemManager: any LoginItemManaging
     let providerRegistry: ProviderRegistry?
-    let xiaomiWebSession: XiaomiWebSession?
+    let xiaomiWebSessionProvider: XiaomiWebSessionProvider
     let widgetSnapshotSynchronizer: WidgetSnapshotSynchronizer?
     var showsOnboarding = false
     var pendingSettingsCredentialID: UUID?
@@ -121,6 +121,7 @@ final class AppEnvironment {
         notificationTaskYield: @escaping @Sendable () async -> Void = { await Task.yield() },
         logWriter: any AppLogWriting = NoopAppLogWriter(),
         xiaomiWebSession: XiaomiWebSession? = nil,
+        xiaomiWebSessionProvider: XiaomiWebSessionProvider? = nil,
         xiaomiCookieReader: (@MainActor () async -> String?)? = nil,
         providerRegistry: ProviderRegistry? = nil,
         widgetSnapshotSynchronizer: WidgetSnapshotSynchronizer? = nil
@@ -140,9 +141,15 @@ final class AppEnvironment {
         self.logWriter = logWriter
         self.updateCheckScheduler = updateCheckScheduler ?? UpdateCheckScheduler()
         self.notificationTaskYield = notificationTaskYield
-        self.xiaomiWebSession = xiaomiWebSession
-        self.xiaomiCookieReader = xiaomiCookieReader ?? {
-            await xiaomiWebSession?.captureCookieHeader()
+        let resolvedXiaomiWebSessionProvider = xiaomiWebSessionProvider ?? XiaomiWebSessionProvider {
+            if let xiaomiWebSession {
+                return xiaomiWebSession
+            }
+            return XiaomiWebSession()
+        }
+        self.xiaomiWebSessionProvider = resolvedXiaomiWebSessionProvider
+        self.xiaomiCookieReader = xiaomiCookieReader ?? { [resolvedXiaomiWebSessionProvider] in
+            await resolvedXiaomiWebSessionProvider.existingSession?.captureCookieHeader()
         }
         self.providerRegistry = providerRegistry
         self.widgetSnapshotSynchronizer = widgetSnapshotSynchronizer
@@ -178,7 +185,10 @@ final class AppEnvironment {
         let notificationSender = AuthorizationCachingNotificationSender(
             sender: UserNotificationSender()
         )
-        let xiaomiWebSession = XiaomiWebSession()
+        let xiaomiWebSessionProvider = XiaomiWebSessionProvider {
+            XiaomiWebSession()
+        }
+        let xiaomiRenewCoordinator = XiaomiSilentRenewCoordinator()
         let providerRegistry = ProviderRegistry(providers: [
             RoutinUsageProvider(client: apiClient),
             DeepSeekUsageProvider(session: .shared),
@@ -188,12 +198,26 @@ final class AppEnvironment {
             CommandCodeUsageProvider(session: .shared),
             XiaomiMiMoUsageProvider(
                 session: .shared,
-                renewSession: { [weak xiaomiWebSession] credentialID, previousSecret in
-                    guard let xiaomiWebSession else { return nil }
-                    // 控制台票据过期时用持久登录态静默换发；换到新票据才落盘并重试。
-                    guard let renewed = await xiaomiWebSession.refreshSessionSilently(
-                        previousCookieHeader: previousSecret
-                    ), renewed != previousSecret else {
+                renewSession: { [weak xiaomiWebSessionProvider, weak xiaomiRenewCoordinator] credentialID, previousSecret in
+                    guard let xiaomiWebSessionProvider, let xiaomiRenewCoordinator else { return nil }
+                    // 控制台票据过期时用持久登录态静默换发；协调器负责串行化和失败退避。
+                    let renewed = await xiaomiRenewCoordinator.renew(
+                        credentialID: credentialID,
+                        previousSecret: previousSecret
+                    ) { [weak xiaomiWebSessionProvider] in
+                        guard let xiaomiWebSessionProvider else { return nil }
+                        let session = await MainActor.run {
+                            xiaomiWebSessionProvider.sessionForLogin()
+                        }
+                        let renewed = await session.refreshSessionSilently(
+                            previousCookieHeader: previousSecret
+                        )
+                        await MainActor.run {
+                            xiaomiWebSessionProvider.releaseSession(session)
+                        }
+                        return renewed
+                    }
+                    guard let renewed, renewed != previousSecret else {
                         return nil
                     }
                     do {
@@ -285,7 +309,7 @@ final class AppEnvironment {
             releaseHistoryAppVersion: RoutinUsageApp.currentVersion,
             updateCheckScheduler: UpdateCheckScheduler(),
             logWriter: logWriter,
-            xiaomiWebSession: xiaomiWebSession,
+            xiaomiWebSessionProvider: xiaomiWebSessionProvider,
             providerRegistry: providerRegistry,
             widgetSnapshotSynchronizer: widgetSnapshotSynchronizer
         )
@@ -795,7 +819,7 @@ final class AppEnvironment {
         xiaomiLoginRequest = request
         XiaomiLoginPanelController.shared.present(
             request: request,
-            session: xiaomiWebSession ?? XiaomiWebSession(),
+            session: xiaomiWebSessionProvider.sessionForLogin(),
             onCaptured: { [weak self] cookie in
                 await self?.completeXiaomiLogin(request, cookie: cookie)
             },
