@@ -677,11 +677,17 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(workflow.contains("run-name: 发布 macOS v${{ inputs.version }} · ${{ inputs.release_notes }}"))
         XCTAssertTrue(androidWorkflow.contains("run-name: 发布 Android v${{ inputs.version }} · ${{ inputs.release_notes }}"))
         XCTAssertTrue(workflow.contains("release_notes:"))
-        XCTAssertTrue(workflow.contains("body: ${{ inputs.release_notes }}"))
+        XCTAssertTrue(workflow.contains("body: |"))
+        XCTAssertTrue(workflow.contains("## macOS"))
+        XCTAssertTrue(workflow.contains("${{ inputs.release_notes }}"))
+        XCTAssertTrue(workflow.contains("append_body: true"))
         XCTAssertTrue(workflow.contains("generate_release_notes: false"))
         XCTAssertTrue(workflow.contains("GITHUB_STEP_SUMMARY"))
         XCTAssertTrue(androidWorkflow.contains("GITHUB_STEP_SUMMARY"))
-        XCTAssertTrue(androidWorkflow.contains("body: ${{ inputs.release_notes }}"))
+        XCTAssertTrue(androidWorkflow.contains("body: |"))
+        XCTAssertTrue(androidWorkflow.contains("## Android"))
+        XCTAssertTrue(androidWorkflow.contains("${{ inputs.release_notes }}"))
+        XCTAssertTrue(androidWorkflow.contains("append_body: true"))
     }
 
     func test发布工作流显式选择并校验Xcode() throws {
