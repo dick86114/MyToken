@@ -84,6 +84,7 @@ final class UsageStore {
     @ObservationIgnored private let metricCapabilitiesProvider: @MainActor @Sendable (KeyConfiguration) -> [UsageMetricCapability]
     @ObservationIgnored private let widgetPublisher: (@MainActor @Sendable ([UUID: KeyUsageState], [UUID]) -> Void)?
     @ObservationIgnored private let now: @Sendable () -> Date
+    @ObservationIgnored private static let maximumConcurrentRefreshes = 4
     @ObservationIgnored private var refreshingKeyIDs: Set<UUID> = []
     @ObservationIgnored private var refreshGenerationByKeyID: [UUID: UUID] = [:]
     @ObservationIgnored private var invalidKeyFingerprintsByKeyID: [UUID: CredentialFingerprint] = [:]
@@ -130,6 +131,13 @@ final class UsageStore {
 
     func refreshAll() async {
         synchronizeConfigurations()
+        let startedAt = now()
+        let configuredCount = orderedKeyIDs.count
+        let enabledCount = visibleKeyIDs.count
+        await EnergyDiagnosticsBuffer.shared.record(
+            name: "refresh_started",
+            details: ["scope": "all", "enabled_count": String(enabledCount)]
+        )
         let requests: [RefreshRequest] = visibleKeyIDs.compactMap { keyID -> RefreshRequest? in
             guard !shouldSkipBatchRefresh(for: keyID) else {
                 return nil
@@ -138,6 +146,17 @@ final class UsageStore {
         }
         await perform(requests)
         publishWidgetSnapshot()
+        let failureCount = states.values.count(where: { $0.error != nil })
+        await EnergyDiagnosticsBuffer.shared.record(
+            name: "refresh_completed",
+            details: [
+                "duration": String(format: "%.2f", now().timeIntervalSince(startedAt)),
+                "configured_count": String(configuredCount),
+                "enabled_count": String(enabledCount),
+                "requested_count": String(requests.count),
+                "failure_count": String(failureCount)
+            ]
+        )
     }
 
     func refresh(keyID: UUID) async {
@@ -146,8 +165,18 @@ final class UsageStore {
             publishWidgetSnapshot()
             return
         }
+        let startedAt = now()
+        await EnergyDiagnosticsBuffer.shared.record(name: "refresh_started", details: ["scope": "single"])
         await perform([request])
         publishWidgetSnapshot()
+        await EnergyDiagnosticsBuffer.shared.record(
+            name: "refresh_completed",
+            details: [
+                "duration": String(format: "%.2f", now().timeIntervalSince(startedAt)),
+                "scope": "single",
+                "failure_count": states[keyID]?.error == nil ? "0" : "1"
+            ]
+        )
     }
 
     func updateSettings(
@@ -436,91 +465,32 @@ final class UsageStore {
         let apiClient = apiClient
         let providerRegistry = providerRegistry
         var notificationWorks: [NotificationWork] = []
+        var pendingRequests = requests.makeIterator()
         await withTaskGroup(of: RefreshOutcome.self) { group in
-            for request in requests {
+            for _ in 0..<min(Self.maximumConcurrentRefreshes, requests.count) {
+                guard let request = pendingRequests.next() else { break }
                 group.addTask {
-                    do {
-                        let snapshot: UsageSnapshot?
-                        if let provider = providerRegistry?.provider(for: request.configuration.providerID) {
-                            let credential = ProviderCredential(
-                                credentialID: request.configuration.id,
-                                providerID: request.configuration.providerID,
-                                kind: request.configuration.credentialKind,
-                                secret: request.secret,
-                                metadata: request.configuration.metadata
-                            )
-                            snapshot = try await provider.fetchUsage(credential, now: request.requestedAt)
-                        } else {
-                            snapshot = try await apiClient.fetchUsage(
-                                apiKey: request.secret,
-                                now: request.requestedAt
-                            )
-                        }
-                        try Task.checkCancellation()
-                        return RefreshOutcome(
-                            keyID: request.keyID,
-                            credentialFingerprint: request.credentialFingerprint,
-                            refreshGeneration: request.refreshGeneration,
-                            requestedAt: request.requestedAt,
-                            result: .success(snapshot)
-                        )
-                    } catch is CancellationError {
-                        return RefreshOutcome(
-                            keyID: request.keyID,
-                            credentialFingerprint: request.credentialFingerprint,
-                            refreshGeneration: request.refreshGeneration,
-                            requestedAt: request.requestedAt,
-                            result: .cancelled
-                        )
-                    } catch let error as UsageAPIError {
-                        return RefreshOutcome(
-                            keyID: request.keyID,
-                            credentialFingerprint: request.credentialFingerprint,
-                            refreshGeneration: request.refreshGeneration,
-                            requestedAt: request.requestedAt,
-                            result: Task.isCancelled
-                                ? .cancelled
-                                : .failure(
-                                    error,
-                                    message: nil,
-                                    isAuthenticationFailure: Self.isAuthenticationFailure(error)
-                                )
-                        )
-                    } catch let error as UsageProviderError {
-                        return RefreshOutcome(
-                            keyID: request.keyID,
-                            credentialFingerprint: request.credentialFingerprint,
-                            refreshGeneration: request.refreshGeneration,
-                            requestedAt: request.requestedAt,
-                            result: Task.isCancelled
-                                ? .cancelled
-                                : .failure(
-                                    Self.apiError(from: error),
-                                    message: Self.failureMessage(from: error),
-                                    isAuthenticationFailure: Self.isAuthenticationFailure(error)
-                                )
-                        )
-                    } catch {
-                        return RefreshOutcome(
-                            keyID: request.keyID,
-                            credentialFingerprint: request.credentialFingerprint,
-                            refreshGeneration: request.refreshGeneration,
-                            requestedAt: request.requestedAt,
-                            result: Task.isCancelled
-                                ? .cancelled
-                                : .failure(
-                                    .invalidResponse,
-                                    message: nil,
-                                    isAuthenticationFailure: false
-                                )
-                        )
-                    }
+                    await Self.execute(
+                        request,
+                        apiClient: apiClient,
+                        providerRegistry: providerRegistry
+                    )
                 }
             }
 
             for await outcome in group {
                 if let notificationWork = merge(outcome) {
                     notificationWorks.append(notificationWork)
+                }
+
+                if let request = pendingRequests.next() {
+                    group.addTask {
+                        await Self.execute(
+                            request,
+                            apiClient: apiClient,
+                            providerRegistry: providerRegistry
+                        )
+                    }
                 }
             }
         }
@@ -533,6 +503,88 @@ final class UsageStore {
         }
     }
 
+    nonisolated private static func execute(
+        _ request: RefreshRequest,
+        apiClient: any UsageFetching,
+        providerRegistry: ProviderRegistry?
+    ) async -> RefreshOutcome {
+        do {
+            let snapshot: UsageSnapshot?
+            if let provider = providerRegistry?.provider(for: request.configuration.providerID) {
+                let credential = ProviderCredential(
+                    credentialID: request.configuration.id,
+                    providerID: request.configuration.providerID,
+                    kind: request.configuration.credentialKind,
+                    secret: request.secret,
+                    metadata: request.configuration.metadata
+                )
+                snapshot = try await provider.fetchUsage(credential, now: request.requestedAt)
+            } else {
+                snapshot = try await apiClient.fetchUsage(
+                    apiKey: request.secret,
+                    now: request.requestedAt
+                )
+            }
+            try Task.checkCancellation()
+            return RefreshOutcome(
+                keyID: request.keyID,
+                credentialFingerprint: request.credentialFingerprint,
+                refreshGeneration: request.refreshGeneration,
+                requestedAt: request.requestedAt,
+                result: .success(snapshot)
+            )
+        } catch is CancellationError {
+            return RefreshOutcome(
+                keyID: request.keyID,
+                credentialFingerprint: request.credentialFingerprint,
+                refreshGeneration: request.refreshGeneration,
+                requestedAt: request.requestedAt,
+                result: .cancelled
+            )
+        } catch let error as UsageAPIError {
+            return RefreshOutcome(
+                keyID: request.keyID,
+                credentialFingerprint: request.credentialFingerprint,
+                refreshGeneration: request.refreshGeneration,
+                requestedAt: request.requestedAt,
+                result: Task.isCancelled
+                    ? .cancelled
+                    : .failure(
+                        error,
+                        message: nil,
+                        isAuthenticationFailure: isAuthenticationFailure(error)
+                    )
+            )
+        } catch let error as UsageProviderError {
+            return RefreshOutcome(
+                keyID: request.keyID,
+                credentialFingerprint: request.credentialFingerprint,
+                refreshGeneration: request.refreshGeneration,
+                requestedAt: request.requestedAt,
+                result: Task.isCancelled
+                    ? .cancelled
+                    : .failure(
+                        apiError(from: error),
+                        message: failureMessage(from: error),
+                        isAuthenticationFailure: isAuthenticationFailure(error)
+                    )
+            )
+        } catch {
+            return RefreshOutcome(
+                keyID: request.keyID,
+                credentialFingerprint: request.credentialFingerprint,
+                refreshGeneration: request.refreshGeneration,
+                requestedAt: request.requestedAt,
+                result: Task.isCancelled
+                    ? .cancelled
+                    : .failure(
+                        .invalidResponse,
+                        message: nil,
+                        isAuthenticationFailure: false
+                    )
+            )
+        }
+    }
     private func isNotificationWorkCurrent(_ work: NotificationWork) -> Bool {
         refreshGenerationByKeyID[work.keyID] == work.refreshGeneration
             && states[work.keyID] != nil

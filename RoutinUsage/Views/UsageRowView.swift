@@ -219,15 +219,17 @@ private struct RefreshingCardBorder: View {
     private let orbitPeriod: Double = 2.4
     private let tailFraction: CGFloat = 0.22
     private let tailSegments = 4
+    private let isLowPowerModeEnabled = ProcessInfo.processInfo.isLowPowerModeEnabled
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 24.0, paused: reduceMotion)) { timeline in
-            let phase = reduceMotion
+        let isPaused = RefreshAnimationPolicy.isPaused(
+            reduceMotion: reduceMotion,
+            lowPowerModeEnabled: isLowPowerModeEnabled
+        )
+        TimelineView(.animation(minimumInterval: RefreshAnimationPolicy.minimumInterval, paused: isPaused)) { timeline in
+            let phase = isPaused
                 ? CGFloat(0.72)
-                : CGFloat(
-                    (timeline.date.timeIntervalSinceReferenceDate / orbitPeriod)
-                        .truncatingRemainder(dividingBy: 1)
-                )
+                : RefreshAnimationPolicy.phase(for: timeline.date, orbitPeriod: orbitPeriod)
 
             GeometryReader { geometry in
                 let path = RoundedRectangle(

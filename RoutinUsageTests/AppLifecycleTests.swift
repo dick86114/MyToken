@@ -1486,11 +1486,19 @@ private final class LifecycleTimerScheduler: TimerScheduling, @unchecked Sendabl
 
     func schedule(
         every seconds: TimeInterval,
+        tolerance: TimeInterval,
         action: @escaping @Sendable () -> Void
     ) -> any CancellableTimer {
         let timer = LifecycleTimer(action: action)
         lock.withLock { scheduled.append((seconds, timer)) }
         return timer
+    }
+
+    func scheduleOneShot(
+        after seconds: TimeInterval,
+        action: @escaping @Sendable () -> Void
+    ) -> any CancellableTimer {
+        schedule(every: seconds, tolerance: 0, action: action)
     }
 
     func timer(at index: Int) -> LifecycleTimer {

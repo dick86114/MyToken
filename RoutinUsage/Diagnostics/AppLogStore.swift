@@ -72,17 +72,6 @@ actor AppLogStore: AppLogWriting {
     }
 
     private static func sanitize(_ value: String) -> String {
-        let limited = String(value.prefix(2000))
-        var result = limited.replacingOccurrences(
-            of: #"(?i)plan-[A-Za-z0-9._-]+"#,
-            with: "plan-<redacted>",
-            options: .regularExpression
-        )
-        result = result.replacingOccurrences(
-            of: #"(?i)(api[_-]?key|token|secret|password)=([^&\s]+)"#,
-            with: "$1=<redacted>",
-            options: .regularExpression
-        )
-        return result
+        DiagnosticsRedactor.redact(value)
     }
 }

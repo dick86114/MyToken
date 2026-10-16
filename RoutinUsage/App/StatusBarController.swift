@@ -107,6 +107,13 @@ final class StatusBarController: NSObject {
 
     private func configurePopover() {
         popover.behavior = .transient
+    }
+
+    /// SwiftUI 弹窗内容只在首次打开时创建；关闭后释放，避免隐藏 TimelineView 持续唤醒。
+    private func ensurePopoverContent() {
+        guard popover.contentViewController == nil else {
+            return
+        }
         let hostingController = NSHostingController(
             rootView: StatusPopoverContent(
                 environment: environment,
@@ -119,6 +126,22 @@ final class StatusBarController: NSObject {
         // 避免后台数据变化后重新打开时窗口尺寸过期（内容居中、上下留白）。
         hostingController.sizingOptions = [.preferredContentSize]
         popover.contentViewController = hostingController
+    }
+
+    private func releasePopoverContent() {
+        popover.contentViewController = nil
+    }
+
+    private func closePopover() {
+        guard popover.isShown else {
+            releasePopoverContent()
+            return
+        }
+        Task {
+            await EnergyDiagnosticsBuffer.shared.record(name: "popover_closed")
+        }
+        popover.performClose(nil)
+        releasePopoverContent()
     }
 
     private func configureStatusButton() {
@@ -246,7 +269,7 @@ final class StatusBarController: NSObject {
 
     private func togglePopover(from button: NSStatusBarButton) {
         if popover.isShown {
-            popover.performClose(nil)
+            closePopover()
             return
         }
         guard !environment.store.orderedKeyIDs.isEmpty else {
@@ -254,11 +277,15 @@ final class StatusBarController: NSObject {
             openSettingsWindow()
             return
         }
+        ensurePopoverContent()
         let contentSize = popoverContentSize(for: button)
         popover.contentSize = contentSize
         // accessory 应用默认 inactive：首次点击 Menu 会被系统吞掉用于激活，
         // 导致供应商下拉需要点两次。展示弹窗前手动激活即可一次生效。
         NSApp.activate(ignoringOtherApps: true)
+        Task {
+            await EnergyDiagnosticsBuffer.shared.record(name: "popover_opened")
+        }
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         configurePopoverWindow(contentSize: contentSize, anchoredTo: button)
     }
@@ -294,7 +321,9 @@ final class StatusBarController: NSObject {
             object: window,
             queue: .main
         ) { [weak self] _ in
-            self?.popover.performClose(nil)
+            Task { @MainActor [weak self] in
+                self?.closePopover()
+            }
         }
     }
 
@@ -356,6 +385,14 @@ final class StatusBarController: NSObject {
         menu.addItem(checkForUpdatesItem)
         menu.addItem(.separator())
 
+        let exportDiagnosticsItem = NSMenuItem(
+            title: "导出诊断日志",
+            action: #selector(exportDiagnosticsLog),
+            keyEquivalent: ""
+        )
+        exportDiagnosticsItem.target = self
+        menu.addItem(exportDiagnosticsItem)
+
         let issueItem = NSMenuItem(
             title: "提交问题",
             action: #selector(submitIssueReport),
@@ -386,6 +423,10 @@ final class StatusBarController: NSObject {
         Task { await environment.openIssueReport() }
     }
 
+    @objc private func exportDiagnosticsLog() {
+        Task { await environment.exportDiagnosticsLog() }
+    }
+
     private var isDownloadingUpdate: Bool {
         if case .downloading = environment.updateStatus {
             return true
@@ -394,7 +435,7 @@ final class StatusBarController: NSObject {
     }
 
     @objc private func openSettingsWindow() {
-        popover.performClose(nil)
+        closePopover()
         let window = settingsWindow ?? makeSettingsWindow()
         settingsWindow = window
         NSApp.setActivationPolicy(.regular)

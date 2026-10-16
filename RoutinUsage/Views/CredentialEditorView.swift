@@ -181,7 +181,7 @@ struct CredentialEditorView: View {
     let initialName: String
     let initialSecret: String
     let initialMetadata: [String: String]
-    let xiaomiWebSession: XiaomiWebSession?
+    let xiaomiWebSessionProvider: XiaomiWebSessionProvider
     let save: @MainActor (ValidatedCredentialInput) async throws -> KeyEditorSaveResult
     let onSaved: @MainActor () -> Void
     let onClose: () -> Void
@@ -210,7 +210,7 @@ struct CredentialEditorView: View {
         initialName: String = "",
         initialSecret: String = "",
         initialMetadata: [String: String] = [:],
-        xiaomiWebSession: XiaomiWebSession? = nil,
+        xiaomiWebSessionProvider: XiaomiWebSessionProvider,
         save: @escaping @MainActor (ValidatedCredentialInput) async throws -> KeyEditorSaveResult,
         onSaved: @escaping @MainActor () -> Void = {},
         onClose: @escaping () -> Void = {}
@@ -220,7 +220,7 @@ struct CredentialEditorView: View {
         self.initialName = initialName
         self.initialSecret = initialSecret
         self.initialMetadata = initialMetadata
-        self.xiaomiWebSession = xiaomiWebSession
+        self.xiaomiWebSessionProvider = xiaomiWebSessionProvider
         self.save = save
         self.onSaved = onSaved
         self.onClose = onClose
@@ -369,7 +369,7 @@ struct CredentialEditorView: View {
                             showsXiaomiLogin = true
                         }
                         .buttonStyle(.borderless)
-                        .disabled(xiaomiWebSession == nil)
+                        .disabled(false)
                         Button("打开控制台") {
                             if let url = URL(string: "https://platform.xiaomimimo.com/console/balance") {
                                 openURL(url)
@@ -488,10 +488,10 @@ struct CredentialEditorView: View {
             }
         }
         .onChange(of: showsXiaomiLogin) { _, isShown in
-            guard isShown, let xiaomiWebSession else { return }
+            guard isShown else { return }
             XiaomiLoginPanelController.shared.present(
                 content: XiaomiLoginWindow(
-                    session: xiaomiWebSession,
+                    session: xiaomiWebSessionProvider.sessionForLogin(),
                     resetSession: false,
                     onCaptured: { cookie in
                         apiKey = cookie

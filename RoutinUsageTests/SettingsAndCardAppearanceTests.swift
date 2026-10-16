@@ -14,7 +14,7 @@ final class SettingsAndCardAppearanceTests: XCTestCase {
         )
         let body = source[functionStart.lowerBound..<functionEnd.lowerBound]
 
-        let closeIndex = try XCTUnwrap(body.range(of: "popover.performClose(nil)"))
+        let closeIndex = try XCTUnwrap(body.range(of: "closePopover()"))
         let policyIndex = try XCTUnwrap(
             body.range(of: "NSApp.setActivationPolicy(.regular)")
         )
