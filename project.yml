@@ -48,6 +48,7 @@ targets:
     sources:
       - path: RoutinUsageWidget
       - path: RoutinUsage/WidgetShared/WidgetSnapshotModels.swift
+      - path: RoutinUsage/WidgetShared/WidgetSharedAppGroup.swift
       - path: RoutinUsage/WidgetShared/WidgetMetricRanker.swift
       - path: RoutinUsage/WidgetShared/WidgetPresentationBuilder.swift
       - path: RoutinUsage/WidgetShared/WidgetSnapshotStore.swift

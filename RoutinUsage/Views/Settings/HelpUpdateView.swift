@@ -256,11 +256,23 @@ struct HelpUpdateView: View {
 
                 Spacer(minLength: 16)
 
+                Button("导出诊断日志") {
+                    Task { await environment.exportDiagnosticsLog() }
+                }
+                .liquidGlassButton()
+                .accessibilityLabel("导出诊断日志")
+
                 Button("提交问题") {
                     Task { await environment.openIssueReport() }
                 }
                 .liquidGlassButton()
                 .accessibilityLabel("提交问题")
+            }
+
+            if let message = environment.diagnosticsExportMessage {
+                Text(message)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
             }
         }
     }

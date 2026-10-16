@@ -74,12 +74,14 @@ final class AppEnvironment {
     let loginItemManager: any LoginItemManaging
     let providerRegistry: ProviderRegistry?
     let xiaomiWebSession: XiaomiWebSession?
+    let widgetSnapshotSynchronizer: WidgetSnapshotSynchronizer?
     var showsOnboarding = false
     var pendingSettingsCredentialID: UUID?
     var xiaomiLoginRequest: XiaomiLoginRequest?
     private(set) var updateStatus: AppUpdateStatus = .idle
     private(set) var releaseHistoryState: AppReleaseHistoryState = .idle
     private(set) var updateCompletionNotice: String?
+    private(set) var diagnosticsExportMessage: String?
 
     @ObservationIgnored private let refreshScheduler: any RefreshScheduling
     @ObservationIgnored private let keyRepository: KeyRepository
@@ -120,7 +122,8 @@ final class AppEnvironment {
         logWriter: any AppLogWriting = NoopAppLogWriter(),
         xiaomiWebSession: XiaomiWebSession? = nil,
         xiaomiCookieReader: (@MainActor () async -> String?)? = nil,
-        providerRegistry: ProviderRegistry? = nil
+        providerRegistry: ProviderRegistry? = nil,
+        widgetSnapshotSynchronizer: WidgetSnapshotSynchronizer? = nil
     ) {
         self.settings = settings
         self.store = store
@@ -142,6 +145,7 @@ final class AppEnvironment {
             await xiaomiWebSession?.captureCookieHeader()
         }
         self.providerRegistry = providerRegistry
+        self.widgetSnapshotSynchronizer = widgetSnapshotSynchronizer
         updateCompletionNotice = UpdateCompletionNotice.consume()
     }
 
@@ -203,10 +207,10 @@ final class AppEnvironment {
             OpenCodeUsageProvider(session: .shared)
         ])
         let widgetSnapshotSynchronizer: WidgetSnapshotSynchronizer?
-        let widgetGroupID = "cc.idickies.mytoken.widgets"
-        if let widgetDirectory = FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: widgetGroupID
-        ) {
+        let widgetDirectory = WidgetSnapshotAvailability.validateDirectory(
+            FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: WidgetSharedAppGroup.identifier)
+        )
+        if let widgetDirectory {
             widgetSnapshotSynchronizer = WidgetSnapshotSynchronizer(
                 store: WidgetSnapshotStore(directory: widgetDirectory),
                 reloader: WidgetCenterReloader(),
@@ -215,6 +219,10 @@ final class AppEnvironment {
         } else {
             widgetSnapshotSynchronizer = nil
             Task {
+                await EnergyDiagnosticsBuffer.shared.record(
+                    name: "widget_sync_disabled",
+                    details: ["reason": "app_group_unavailable"]
+                )
                 await logWriter.log(
                     level: .warning,
                     event: "widget_group_unavailable",
@@ -278,7 +286,8 @@ final class AppEnvironment {
             updateCheckScheduler: UpdateCheckScheduler(),
             logWriter: logWriter,
             xiaomiWebSession: xiaomiWebSession,
-            providerRegistry: providerRegistry
+            providerRegistry: providerRegistry,
+            widgetSnapshotSynchronizer: widgetSnapshotSynchronizer
         )
     }
 
@@ -294,6 +303,14 @@ final class AppEnvironment {
         )
         showsOnboarding = store.orderedKeyIDs.isEmpty
         synchronizeStoreSettings()
+        await EnergyDiagnosticsBuffer.shared.record(
+            name: "app_started",
+            details: [
+                "refresh_minutes": String(settings.refreshMinutes),
+                "credential_count": String(store.orderedKeyIDs.count),
+                "widget_sync": widgetSnapshotSynchronizer == nil ? "disabled" : "enabled"
+            ]
+        )
 
         // 更新检查与六小时周期从启动阶段立即开始，不依赖首次用量刷新或通知授权。
         updateCheckScheduler.start { [weak self] in
@@ -310,6 +327,7 @@ final class AppEnvironment {
         }
         refreshScheduler.start(minutes: settings.refreshMinutes) { [weak self] in
             Task { @MainActor [weak self] in
+                await EnergyDiagnosticsBuffer.shared.record(name: "periodic_refresh_triggered")
                 await self?.store.refreshAll()
             }
         }
@@ -459,6 +477,54 @@ final class AppEnvironment {
             return
         }
         await logWriter.log(level: .info, event: "issue_report_opened", details: nil)
+    }
+
+    func exportDiagnosticsLog() async {
+        let panel = NSSavePanel()
+        panel.canCreateDirectories = true
+        panel.isExtensionHidden = false
+        panel.nameFieldStringValue = DiagnosticsLogExporter.fileName(for: Date())
+        panel.message = "导出脱敏诊断日志，发送前请检查内容。"
+        panel.prompt = "导出"
+
+        guard panel.runModal() == .OK, let destination = panel.url else {
+            diagnosticsExportMessage = "已取消导出"
+            return
+        }
+
+        let providerCounts = Dictionary(grouping: store.states.values, by: { $0.configuration.providerID.rawValue })
+            .mapValues(\.count)
+        let metadata = DiagnosticsReportMetadata(
+            version: RoutinUsageApp.currentVersion,
+            operatingSystem: ProcessInfo.processInfo.operatingSystemVersionString,
+            architecture: IssueReporter.architecture(),
+            exportedAt: Date(),
+            updateStatus: IssueReporter.statusDescription(updateStatus),
+            refreshMinutes: settings.refreshMinutes,
+            notificationsEnabled: settings.notificationsEnabled,
+            widgetSyncEnabled: widgetSnapshotSynchronizer?.isDisabledForSession == false,
+            configuredCredentialCount: store.orderedKeyIDs.count,
+            enabledCredentialCount: store.visibleKeyIDs.count,
+            providerCounts: providerCounts
+        )
+        let report = await DiagnosticsReportBuilder.makeReport(
+            metadata: metadata,
+            diagnostics: .shared,
+            logs: await logWriter.recentText(
+                maxCharacters: DiagnosticsReportBuilder.maximumLogCharacters
+            )
+        )
+
+        do {
+            try DiagnosticsLogExporter.write(report, to: destination)
+            diagnosticsExportMessage = "诊断日志已导出"
+            NSWorkspace.shared.activateFileViewerSelecting([destination])
+            await EnergyDiagnosticsBuffer.shared.record(name: "diagnostics_export_completed")
+        } catch {
+            diagnosticsExportMessage = "导出诊断日志失败"
+            await EnergyDiagnosticsBuffer.shared.record(name: "diagnostics_export_failed")
+            await logWriter.log(level: .error, event: "diagnostics_export_failed", details: nil)
+        }
     }
 
     func presentUpdateCompletionNoticeIfNeeded() {

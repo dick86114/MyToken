@@ -78,6 +78,9 @@ final class RefreshScheduler {
     }
 
     func handleWake() {
+        Task {
+            await EnergyDiagnosticsBuffer.shared.record(name: "wake_refresh_triggered")
+        }
         wakeGeneration += 1
         let generation = wakeGeneration
         let oldTimer = wakeTimer

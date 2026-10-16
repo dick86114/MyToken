@@ -130,6 +130,13 @@ final class UsageStore {
 
     func refreshAll() async {
         synchronizeConfigurations()
+        let startedAt = now()
+        let configuredCount = orderedKeyIDs.count
+        let enabledCount = visibleKeyIDs.count
+        await EnergyDiagnosticsBuffer.shared.record(
+            name: "refresh_started",
+            details: ["scope": "all", "enabled_count": String(enabledCount)]
+        )
         let requests: [RefreshRequest] = visibleKeyIDs.compactMap { keyID -> RefreshRequest? in
             guard !shouldSkipBatchRefresh(for: keyID) else {
                 return nil
@@ -138,6 +145,17 @@ final class UsageStore {
         }
         await perform(requests)
         publishWidgetSnapshot()
+        let failureCount = states.values.count(where: { $0.error != nil })
+        await EnergyDiagnosticsBuffer.shared.record(
+            name: "refresh_completed",
+            details: [
+                "duration": String(format: "%.2f", now().timeIntervalSince(startedAt)),
+                "configured_count": String(configuredCount),
+                "enabled_count": String(enabledCount),
+                "requested_count": String(requests.count),
+                "failure_count": String(failureCount)
+            ]
+        )
     }
 
     func refresh(keyID: UUID) async {
@@ -146,8 +164,18 @@ final class UsageStore {
             publishWidgetSnapshot()
             return
         }
+        let startedAt = now()
+        await EnergyDiagnosticsBuffer.shared.record(name: "refresh_started", details: ["scope": "single"])
         await perform([request])
         publishWidgetSnapshot()
+        await EnergyDiagnosticsBuffer.shared.record(
+            name: "refresh_completed",
+            details: [
+                "duration": String(format: "%.2f", now().timeIntervalSince(startedAt)),
+                "scope": "single",
+                "failure_count": states[keyID]?.error == nil ? "0" : "1"
+            ]
+        )
     }
 
     func updateSettings(

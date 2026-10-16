@@ -6,6 +6,7 @@ final class WidgetSnapshotSynchronizer {
     private let reloader: any WidgetReloading
     private let logWriter: any AppLogWriting
     private let now: @Sendable () -> Date
+    private(set) var isDisabledForSession = false
 
     init(
         store: WidgetSnapshotStore,
@@ -20,16 +21,38 @@ final class WidgetSnapshotSynchronizer {
     }
 
     func publish(states: [UUID: KeyUsageState], orderedKeyIDs: [UUID]) {
+        guard !isDisabledForSession else {
+            Task {
+                await EnergyDiagnosticsBuffer.shared.record(
+                    name: "widget_snapshot_skipped",
+                    details: ["reason": "disabled_after_failure"]
+                )
+            }
+            return
+        }
+
         do {
             try store.save(makeBundle(states: states, orderedKeyIDs: orderedKeyIDs))
             reloader.reloadAllTimelines()
+            Task {
+                await EnergyDiagnosticsBuffer.shared.record(
+                    name: "widget_snapshot_saved",
+                    details: ["credential_count": String(orderedKeyIDs.count)]
+                )
+            }
         } catch {
+            isDisabledForSession = true
+            let nsError = error as NSError
             let logWriter = logWriter
             Task {
+                await EnergyDiagnosticsBuffer.shared.record(
+                    name: "widget_snapshot_failed",
+                    details: ["domain": String(nsError.domain), "code": String(nsError.code)]
+                )
                 await logWriter.log(
                     level: .error,
                     event: "widget_snapshot_write_failed",
-                    details: nil
+                    details: "domain=\(nsError.domain) code=\(nsError.code)"
                 )
             }
         }

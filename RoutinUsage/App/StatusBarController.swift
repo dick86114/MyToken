@@ -246,6 +246,9 @@ final class StatusBarController: NSObject {
 
     private func togglePopover(from button: NSStatusBarButton) {
         if popover.isShown {
+            Task {
+                await EnergyDiagnosticsBuffer.shared.record(name: "popover_closed")
+            }
             popover.performClose(nil)
             return
         }
@@ -259,6 +262,9 @@ final class StatusBarController: NSObject {
         // accessory 应用默认 inactive：首次点击 Menu 会被系统吞掉用于激活，
         // 导致供应商下拉需要点两次。展示弹窗前手动激活即可一次生效。
         NSApp.activate(ignoringOtherApps: true)
+        Task {
+            await EnergyDiagnosticsBuffer.shared.record(name: "popover_opened")
+        }
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         configurePopoverWindow(contentSize: contentSize, anchoredTo: button)
     }
@@ -294,6 +300,9 @@ final class StatusBarController: NSObject {
             object: window,
             queue: .main
         ) { [weak self] _ in
+            Task {
+                await EnergyDiagnosticsBuffer.shared.record(name: "popover_closed")
+            }
             self?.popover.performClose(nil)
         }
     }
@@ -356,6 +365,14 @@ final class StatusBarController: NSObject {
         menu.addItem(checkForUpdatesItem)
         menu.addItem(.separator())
 
+        let exportDiagnosticsItem = NSMenuItem(
+            title: "导出诊断日志",
+            action: #selector(exportDiagnosticsLog),
+            keyEquivalent: ""
+        )
+        exportDiagnosticsItem.target = self
+        menu.addItem(exportDiagnosticsItem)
+
         let issueItem = NSMenuItem(
             title: "提交问题",
             action: #selector(submitIssueReport),
@@ -384,6 +401,10 @@ final class StatusBarController: NSObject {
 
     @objc private func submitIssueReport() {
         Task { await environment.openIssueReport() }
+    }
+
+    @objc private func exportDiagnosticsLog() {
+        Task { await environment.exportDiagnosticsLog() }
     }
 
     private var isDownloadingUpdate: Bool {

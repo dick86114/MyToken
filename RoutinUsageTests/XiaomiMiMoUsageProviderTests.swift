@@ -265,6 +265,11 @@ final class XiaomiMiMoUsageProviderTests: XCTestCase {
         }
 
         XCTAssertEqual(renewalCount, 1)
+        // async let 的第二个请求可能在首个 401 抛出后瞬间仍在收尾，先等它落盘再断言。
+        let deadline = Date().addingTimeInterval(1)
+        while requests.count < 2, Date() < deadline {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
         XCTAssertEqual(requests.count, 2)
     }
 
