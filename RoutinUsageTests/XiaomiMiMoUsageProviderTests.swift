@@ -60,6 +60,7 @@ final class XiaomiMiMoUsageProviderTests: XCTestCase {
             snapshot.metrics.first(where: { $0.id == "cache-tokens" })?.label,
             "命中缓存"
         )
+        await requests.waitForCount(2)
         XCTAssertEqual(requests.count, 2)
         XCTAssertTrue(requests.allSatisfy {
             $0.value(forHTTPHeaderField: "Cookie") == "api-platform_serviceToken=session-token"
@@ -115,6 +116,7 @@ final class XiaomiMiMoUsageProviderTests: XCTestCase {
         XCTAssertEqual(total.limit, 20000)
         XCTAssertEqual(compensation.value, 300)
         XCTAssertEqual(snapshot.subscriptionEndAt, ISO8601DateFormatter().date(from: "2026-10-01T00:00:00Z"))
+        await requests.waitForCount(2)
         XCTAssertEqual(requests.count, 2)
         XCTAssertTrue(requests.allSatisfy {
             $0.value(forHTTPHeaderField: "Cookie") == "api-platform_serviceToken=abc; api-platform_ph=def"
@@ -270,6 +272,7 @@ final class XiaomiMiMoUsageProviderTests: XCTestCase {
         while requests.count < 2, Date() < deadline {
             try? await Task.sleep(nanoseconds: 10_000_000)
         }
+        await requests.waitForCount(2)
         XCTAssertEqual(requests.count, 2)
     }
 
@@ -307,6 +310,7 @@ final class XiaomiMiMoUsageProviderTests: XCTestCase {
             XCTAssertEqual(error as? UsageProviderError, .providerMessage("小米 MiMo：未登录"))
         }
 
+        await requests.waitForCount(2)
         XCTAssertEqual(requests.count, 2)
     }
 
@@ -389,5 +393,12 @@ private final class RequestRecorder: @unchecked Sendable {
 
     func allSatisfy(_ predicate: (URLRequest) -> Bool) -> Bool {
         lock.withLock { requests.allSatisfy(predicate) }
+    }
+
+    func waitForCount(_ expectedCount: Int, timeout: TimeInterval = 1) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while count < expectedCount, Date() < deadline {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
     }
 }
