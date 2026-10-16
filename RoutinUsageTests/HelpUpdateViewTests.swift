@@ -23,6 +23,20 @@ final class HelpUpdateViewTests: XCTestCase {
         XCTAssertTrue(source.contains("installAvailableUpdate"))
     }
 
+    func test帮助页版本区块附近提供可关闭的GitHubStar引导() throws {
+        let source = try TestSourceReader.read([
+            "RoutinUsage", "Views", "Settings", "HelpUpdateView.swift"
+        ])
+
+        XCTAssertTrue(source.contains("starPromptSection"))
+        XCTAssertTrue(source.contains("StarPromptBanner"))
+        XCTAssertTrue(source.contains("如果 MyToken 帮到了你，请在 GitHub 点个 Star，这对我们意义重大"))
+        XCTAssertTrue(source.contains("去点 Star"))
+        XCTAssertTrue(source.contains("RoutinUsageApp.githubURL"))
+        XCTAssertTrue(source.contains("starPromptDismissed = true"))
+        XCTAssertTrue(source.contains("关闭 Star 引导"))
+    }
+
     func test真实弹窗移除签到状态和分组检测入口() throws {
         let source = try TestSourceReader.read([
             "RoutinUsage", "Views", "UsagePopoverView.swift"

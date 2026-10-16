@@ -87,6 +87,13 @@ final class AppSettings {
         }
     }
 
+    /// 帮助页 Star 引导条是否已被用户关闭；关闭后不再显示。
+    var starPromptDismissed: Bool {
+        didSet {
+            defaults.set(starPromptDismissed, forKey: Keys.starPromptDismissed)
+        }
+    }
+
     var updateChannel: UpdateChannel {
         didSet {
             guard updateChannel != oldValue || defaults.string(forKey: Keys.updateChannel) != updateChannel.rawValue else {
@@ -289,6 +296,7 @@ final class AppSettings {
         }
 
         launchAtLogin = defaults.bool(forKey: Keys.launchAtLogin)
+        starPromptDismissed = defaults.bool(forKey: Keys.starPromptDismissed)
 
         updateChannel = defaults.string(forKey: Keys.updateChannel)
             .flatMap(UpdateChannel.init(rawValue:)) ?? .direct
@@ -342,6 +350,7 @@ private extension AppSettings {
         static let highThreshold = "notificationHighThreshold"
         static let menuBarColorRules = "menuBarColorRules"
         static let launchAtLogin = "launchAtLogin"
+        static let starPromptDismissed = "starPromptDismissed"
         static let updateChannel = "updateChannel"
         static let updateCDNBase = "updateCDNBase"
         static let selectedCredentialIDs = "selectedCredentialIDs"

@@ -14,6 +14,7 @@ struct HelpUpdateView: View {
                 )
 
                 currentVersionSection
+                starPromptSection
                 updateSection
                 feedbackSection
             }
@@ -104,6 +105,16 @@ struct HelpUpdateView: View {
                 Text("此版本未提供更新日志")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    /// 版本区块下方的 GitHub Star 引导；用户关闭后不再显示。
+    @ViewBuilder
+    private var starPromptSection: some View {
+        if !environment.settings.starPromptDismissed {
+            StarPromptBanner {
+                environment.settings.starPromptDismissed = true
             }
         }
     }
@@ -289,6 +300,54 @@ struct HelpUpdateView: View {
     }
 }
 
+/// 版本区块附近的 GitHub Star 引导条：星标图标 + 引导文案 + 去点 Star 按钮 + 关闭按钮。
+private struct StarPromptBanner: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: "star.fill")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(CompactPopoverPalette.warningColor)
+                .accessibilityHidden(true)
+
+            Text("如果 MyToken 帮到了你，请在 GitHub 点个 Star，这对我们意义重大")
+                .font(.system(size: 13))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 12)
+
+            Link(destination: RoutinUsageApp.githubURL) {
+                Label("去点 Star", systemImage: "arrow.up.right.square")
+                    .font(.system(size: 12, weight: .semibold))
+            }
+            .liquidGlassButton(prominent: true)
+            .accessibilityLabel("在 GitHub 打开 MyToken 仓库并为项目点 Star")
+
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(width: 20, height: 20)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .accessibilityLabel("关闭 Star 引导")
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(CompactPopoverPalette.warningColor.opacity(colorScheme == .dark ? 0.14 : 0.10))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(CompactPopoverPalette.warningColor.opacity(0.28), lineWidth: 1)
+        )
+    }
+}
+
 private struct ReleaseHistorySheet: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -371,7 +430,7 @@ private struct ReleaseHistorySheet: View {
                 Spacer(minLength: 12)
 
                 if let publishedAt = release.publishedAt {
-                    Text(publishedAt.formatted(date: .abbreviated, time: .omitted))
+                    Text(UsageFormatter.shortDateText(publishedAt))
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
