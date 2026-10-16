@@ -341,6 +341,30 @@ enum UsageFormatter {
         return state.snapshot == nil ? "等待首次刷新" : "用量数据可用"
     }
 
+    /// 说明数据获取时间的紧凑本地化日期时间，供刷新失败提示使用。
+    static func lastSuccessDateText(
+        _ date: Date,
+        timeZone: TimeZone = .current
+    ) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter.string(from: date)
+    }
+
+    /// 仅标注日期的紧凑本地化格式，例如更新历史中的发布日期。
+    static func shortDateText(
+        _ date: Date,
+        timeZone: TimeZone = .current
+    ) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
     /// 凭证卡片失败标识的悬浮提示，说明失败原因与当前展示的数据来源。
     static func refreshFailureTooltip(state: KeyUsageState) -> String {
         guard let error = state.error else {
@@ -355,7 +379,7 @@ enum UsageFormatter {
         guard let lastSuccessAt = state.lastSuccessAt else {
             return "\(reason)。当前显示上次成功数据。"
         }
-        return "\(reason)。当前显示 \(lastSuccessAt.formatted(date: .abbreviated, time: .shortened)) 的上次成功数据。"
+        return "\(reason)。当前显示 \(lastSuccessDateText(lastSuccessAt)) 的上次成功数据。"
     }
 
     /// New API 站点可能把内部 quota 换算为 CNY/USD 等展示单位；这里统一保留两位小数。

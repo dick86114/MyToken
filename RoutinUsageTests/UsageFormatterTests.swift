@@ -636,6 +636,33 @@ final class UsageFormatterTests: XCTestCase {
         XCTAssertTrue(tooltip.contains("上次成功数据"))
     }
 
+    func test刷新失败提示日期使用本地化紧凑格式() {
+        let snapshot = makePeriodicSnapshot(fiveHourPercent: 68)
+        let 时区 = TimeZone(secondsFromGMT: 8 * 60 * 60)!
+
+        XCTAssertEqual(
+            UsageFormatter.lastSuccessDateText(snapshot.fetchedAt, timeZone: 时区),
+            "2026-08-10 22:00"
+        )
+
+        let state = makeState(snapshot: snapshot, error: .network)
+        let tooltip = UsageFormatter.refreshFailureTooltip(state: state)
+        XCTAssertTrue(tooltip.contains("的上次成功数据。"))
+        XCTAssertTrue(tooltip.contains(UsageFormatter.lastSuccessDateText(snapshot.fetchedAt)))
+    }
+
+    func test短日期使用本地化紧凑格式() {
+        let 时区 = TimeZone(secondsFromGMT: 8 * 60 * 60)!
+
+        XCTAssertEqual(
+            UsageFormatter.shortDateText(
+                Date(timeIntervalSince1970: 1_786_341_600),
+                timeZone: 时区
+            ),
+            "2026-08-10"
+        )
+    }
+
     func test刷新失败无缓存时悬浮提示说明暂无缓存() {
         let state = makeState(snapshot: nil, error: .invalidResponse)
 

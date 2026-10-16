@@ -1060,6 +1060,6 @@ private struct RefreshFailurePopover: View {
         guard let lastSuccessAt = state.lastSuccessAt, state.snapshot != nil else {
             return "暂无可用缓存，重试将重新请求用量数据。"
         }
-        return "当前显示 \(lastSuccessAt.formatted(date: .abbreviated, time: .shortened)) 的上次成功数据。"
+        return "当前显示 \(UsageFormatter.lastSuccessDateText(lastSuccessAt)) 的上次成功数据。"
     }
 }

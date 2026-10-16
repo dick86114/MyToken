@@ -371,7 +371,7 @@ private struct ReleaseHistorySheet: View {
                 Spacer(minLength: 12)
 
                 if let publishedAt = release.publishedAt {
-                    Text(publishedAt.formatted(date: .abbreviated, time: .omitted))
+                    Text(UsageFormatter.shortDateText(publishedAt))
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
