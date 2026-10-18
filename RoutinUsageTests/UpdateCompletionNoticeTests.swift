@@ -105,6 +105,29 @@ final class UpdateCompletionNoticeTests: XCTestCase {
         XCTAssertTrue(view.contains(".borderless"))
     }
 
+    func test更新完成窗口置顶并跨空间显示() throws {
+        let view = try TestSourceReader.read([
+            "RoutinUsage", "Views", "UpdateCompletionNoticeView.swift"
+        ])
+
+        XCTAssertTrue(view.contains("window.level = .floating"))
+        XCTAssertTrue(view.contains("window.collectionBehavior"))
+        XCTAssertTrue(view.contains(".canJoinAllSpaces"))
+        XCTAssertTrue(view.contains(".fullScreenAuxiliary"))
+        XCTAssertTrue(view.contains("window.hidesOnDeactivate = false"))
+        XCTAssertTrue(view.contains("orderFrontRegardless"))
+    }
+
+    func test更新完成窗口标题区域支持鼠标拖动() throws {
+        let view = try TestSourceReader.read([
+            "RoutinUsage", "Views", "UpdateCompletionNoticeView.swift"
+        ])
+
+        XCTAssertTrue(view.contains("UpdateCompletionDragHandle"))
+        XCTAssertTrue(view.contains("performDrag(with: event)"))
+        XCTAssertTrue(view.contains(".overlay"))
+    }
+
     func test更新完成弹窗展示版本关系日志摘要和完整入口() throws {
         let view = try TestSourceReader.read([
             "RoutinUsage", "Views", "UpdateCompletionNoticeView.swift"
