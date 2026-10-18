@@ -76,6 +76,10 @@ struct UpdateCompletionNoticeView: View {
             }
         }
         .accessibilityElement(children: .combine)
+        .overlay {
+            UpdateCompletionDragHandle()
+                .accessibilityHidden(true)
+        }
     }
 
     private var previousVersionDescription: String {
@@ -209,6 +213,25 @@ struct UpdateCompletionNoticeView: View {
     }
 }
 
+/// SwiftUI 的整块内容会拦截背景拖拽，这里用 AppKit 视图把标题区域明确变成拖动把手。
+private struct UpdateCompletionDragHandle: NSViewRepresentable {
+    func makeNSView(context: Context) -> DraggableView {
+        DraggableView()
+    }
+
+    func updateNSView(_ nsView: DraggableView, context: Context) {}
+
+    final class DraggableView: NSView {
+        override func mouseDown(with event: NSEvent) {
+            window?.performDrag(with: event)
+        }
+
+        override func resetCursorRects() {
+            addCursorRect(bounds, cursor: .openHand)
+        }
+    }
+}
+
 /// 无标题栏窗口默认不能成为 key window；更新提示需要键盘确认，因此显式允许。
 private final class UpdateCompletionNoticeWindow: NSWindow {
     override var canBecomeKey: Bool { true }
@@ -224,7 +247,8 @@ final class UpdateCompletionNoticeWindowController: NSObject, NSWindowDelegate {
 
     func present(_ notice: UpdateCompletionNotice) {
         if let window {
-            window.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
+            window.makeKey()
             NSApp.activate(ignoringOtherApps: true)
             return
         }
@@ -251,6 +275,9 @@ final class UpdateCompletionNoticeWindowController: NSObject, NSWindowDelegate {
             defer: false
         )
         window.title = "更新完成"
+        window.level = .floating
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        window.hidesOnDeactivate = false
         window.isMovableByWindowBackground = true
         window.isReleasedWhenClosed = false
         window.isRestorable = false
@@ -265,6 +292,7 @@ final class UpdateCompletionNoticeWindowController: NSObject, NSWindowDelegate {
 
         SettingsWindowActivationPolicy.register(window)
         window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
         window.makeFirstResponder(window.contentView)
         NSApp.activate(ignoringOtherApps: true)
     }
