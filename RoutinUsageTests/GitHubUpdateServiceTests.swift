@@ -496,13 +496,30 @@ final class GitHubUpdateServiceTests: XCTestCase {
     }
 
     func test更新完成标记只会被新进程消费一次() throws {
-        let suiteName = "GitHubUpdateServiceTests.notice-(UUID().uuidString)"
+        let suiteName = "GitHubUpdateServiceTests.notice-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
+        let publishedAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let update = AppUpdate(
+            version: "1.3.0",
+            releaseURL: URL(string: "https://example.com/releases/v1.3.0")!,
+            downloadURL: URL(string: "https://example.com/MyToken.dmg")!,
+            notes: "## macOS\n- 修复更新提示",
+            publishedAt: publishedAt
+        )
 
-        UpdateCompletionNotice.record(version: "1.3.0", defaults: defaults)
+        UpdateCompletionNotice.record(
+            update: update,
+            previousVersion: "1.2.0",
+            defaults: defaults
+        )
 
-        XCTAssertEqual(UpdateCompletionNotice.consume(defaults: defaults), "1.3.0")
+        let notice = try XCTUnwrap(UpdateCompletionNotice.consume(defaults: defaults))
+        XCTAssertEqual(notice.version, "1.3.0")
+        XCTAssertEqual(notice.previousVersion, "1.2.0")
+        XCTAssertEqual(notice.notes, update.notes)
+        XCTAssertEqual(notice.releaseURL, update.releaseURL)
+        XCTAssertEqual(notice.publishedAt, publishedAt)
         XCTAssertNil(UpdateCompletionNotice.consume(defaults: defaults))
     }
 
