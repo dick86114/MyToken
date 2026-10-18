@@ -245,6 +245,168 @@ enum UpdateNotesRenderer {
     }
 }
 
+enum UpdateReleaseChangeCategory: Equatable, Sendable {
+    case added
+    case fixed
+    case improved
+    case other
+
+    var title: String {
+        switch self {
+        case .added:
+            return "新增"
+        case .fixed:
+            return "修复"
+        case .improved:
+            return "优化"
+        case .other:
+            return "更新"
+        }
+    }
+}
+
+struct UpdateReleaseSummaryItem: Identifiable, Equatable, Sendable {
+    let id: Int
+    let category: UpdateReleaseChangeCategory
+    let text: String
+}
+
+/// 把 GitHub Release 正文整理成更新完成弹窗里的简短条目。
+/// 双端共用发布说明时只展示 macOS 区，避免把 Android 变更混入 macOS 更新提示。
+enum UpdateReleaseSummaryBuilder {
+    static func items(from notes: String) -> [UpdateReleaseSummaryItem] {
+        let rendered = UpdateNotesRenderer.plainText(notes: notes)
+        let lines = rendered
+            .components(separatedBy: .newlines)
+            .map(cleanedLine)
+            .filter { !$0.isEmpty }
+        guard !lines.isEmpty else { return [] }
+
+        let hasMacOSSection = lines.contains(where: isMacOSHeading)
+        var isReadingMacOS = !hasMacOSSection
+        var sectionCategory: UpdateReleaseChangeCategory?
+        var result: [UpdateReleaseSummaryItem] = []
+
+        for line in lines {
+            if isMacOSHeading(line) {
+                isReadingMacOS = true
+                sectionCategory = nil
+                continue
+            }
+            if isAndroidHeading(line) {
+                if hasMacOSSection { break }
+                isReadingMacOS = false
+                sectionCategory = nil
+                continue
+            }
+            guard isReadingMacOS, !isNoise(line) else { continue }
+            if let category = categoryHeading(line) {
+                sectionCategory = category
+                continue
+            }
+
+            let split = splitCategoryPrefix(line)
+            let text = split?.text ?? line
+            guard !text.isEmpty else { continue }
+            let category = split?.category ?? sectionCategory ?? inferredCategory(from: text)
+            result.append(
+                UpdateReleaseSummaryItem(
+                    id: result.count,
+                    category: category,
+                    text: text
+                )
+            )
+        }
+        return result
+    }
+
+    private static func cleanedLine(_ line: String) -> String {
+        var result = line
+            .replacingOccurrences(of: #"^[\s•·*+-]+\s*"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"^\d+[.)、]\s*"#, with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        while result.hasSuffix("  ") {
+            result.removeLast()
+        }
+        return result
+    }
+
+    private static func isMacOSHeading(_ line: String) -> Bool {
+        let value = line.lowercased()
+        return value == "macos" || value.hasPrefix("macos ")
+    }
+
+    private static func isAndroidHeading(_ line: String) -> Bool {
+        let value = line.lowercased()
+        return value == "android" || value.hasPrefix("android ")
+    }
+
+    private static func isNoise(_ line: String) -> Bool {
+        let value = line.lowercased()
+        return value == "full changelog"
+            || value.hasPrefix("full changelog")
+            || value.hasPrefix("http://")
+            || value.hasPrefix("https://")
+    }
+
+    private static func categoryHeading(_ line: String) -> UpdateReleaseChangeCategory? {
+        let value = line
+            .trimmingCharacters(in: CharacterSet(charactersIn: "：: "))
+        switch value {
+        case "新增", "新功能", "新增功能":
+            return .added
+        case "修复", "问题修复":
+            return .fixed
+        case "优化", "改进", "优化改进", "性能优化":
+            return .improved
+        case "其他", "更新":
+            return .other
+        default:
+            return nil
+        }
+    }
+
+    private static func splitCategoryPrefix(
+        _ line: String
+    ) -> (category: UpdateReleaseChangeCategory, text: String)? {
+        let prefixes: [(String, UpdateReleaseChangeCategory)] = [
+            ("新增", .added),
+            ("添加", .added),
+            ("新功能", .added),
+            ("修复", .fixed),
+            ("修正", .fixed),
+            ("优化", .improved),
+            ("改进", .improved),
+            ("提升", .improved)
+        ]
+        for (prefix, category) in prefixes {
+            for separator in ["：", ":", " "] where line.hasPrefix(prefix + separator) {
+                let text = String(line.dropFirst(prefix.count + separator.count))
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if !text.isEmpty {
+                    return (category, text)
+                }
+            }
+        }
+        return nil
+    }
+
+    private static func inferredCategory(from text: String) -> UpdateReleaseChangeCategory {
+        if text.contains("修复") || text.contains("修正") || text.localizedCaseInsensitiveContains("fix") {
+            return .fixed
+        }
+        if text.contains("优化") || text.contains("改进") || text.contains("提升")
+            || text.contains("性能") || text.localizedCaseInsensitiveContains("improve") {
+            return .improved
+        }
+        if text.contains("新增") || text.contains("新功能") || text.contains("添加")
+            || text.localizedCaseInsensitiveContains("support") {
+            return .added
+        }
+        return .other
+    }
+}
+
 enum UpdateNotesAccessibility {
     static func label(notes: String) -> String {
         let trimmed = notes.trimmingCharacters(in: .whitespacesAndNewlines)

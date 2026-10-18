@@ -39,17 +39,66 @@ enum AppReleaseHistoryState: Equatable, Sendable {
     case failed(String)
 }
 
-enum UpdateCompletionNotice {
-    private static let versionKey = "updateCompletionVersion"
+/// 更新安装完成后跨进程传递的提示内容。除版本号外一并保留日志与发布页，
+/// 让新版本首次启动时不依赖网络也能说明本次更新了什么。
+struct UpdateCompletionNotice: Codable, Equatable, Sendable {
+    static let payloadKey = "updateCompletionNotice.v2"
+    static let legacyVersionKey = "updateCompletionVersion"
 
-    static func record(version: String, defaults: UserDefaults = .standard) {
-        defaults.set(version, forKey: versionKey)
+    let version: String
+    let previousVersion: String?
+    let notes: String
+    let releaseURL: URL
+    let publishedAt: Date?
+
+    static func record(
+        update: AppUpdate,
+        previousVersion: String?,
+        defaults: UserDefaults = .standard
+    ) {
+        let normalizedPreviousVersion = previousVersion?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let notice = UpdateCompletionNotice(
+            version: update.version,
+            previousVersion: normalizedPreviousVersion?.isEmpty == false
+                ? normalizedPreviousVersion
+                : nil,
+            notes: update.notes,
+            releaseURL: update.releaseURL,
+            publishedAt: update.publishedAt
+        )
+        guard let data = try? JSONEncoder().encode(notice) else { return }
+        defaults.set(data, forKey: payloadKey)
+        defaults.removeObject(forKey: legacyVersionKey)
     }
 
-    static func consume(defaults: UserDefaults = .standard) -> String? {
-        let version = defaults.string(forKey: versionKey)
-        defaults.removeObject(forKey: versionKey)
-        return version
+    static func consume(defaults: UserDefaults = .standard) -> UpdateCompletionNotice? {
+        defer {
+            defaults.removeObject(forKey: payloadKey)
+            defaults.removeObject(forKey: legacyVersionKey)
+        }
+
+        if let data = defaults.data(forKey: payloadKey),
+           let notice = try? JSONDecoder().decode(UpdateCompletionNotice.self, from: data) {
+            return notice
+        }
+
+        guard let version = defaults.string(forKey: legacyVersionKey),
+              !version.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        return UpdateCompletionNotice(
+            version: version,
+            previousVersion: nil,
+            notes: "",
+            releaseURL: legacyReleaseURL(version: version),
+            publishedAt: nil
+        )
+    }
+
+    private static func legacyReleaseURL(version: String) -> URL {
+        URL(string: "https://github.com/\(GitHubUpdateService.repository)/releases/tag/v\(version)")
+            ?? GitHubUpdateService.releasesPageURL
     }
 }
 
@@ -949,7 +998,8 @@ enum UpdateInstaller {
     static func install(
         dmgURL: URL,
         appName: String = "MyToken",
-        version: String,
+        update: AppUpdate,
+        previousVersion: String?,
         logWriter: any AppLogWriting = AppLogStore.shared
     ) throws {
         let mountPoint = FileManager.default.temporaryDirectory.appendingPathComponent("routin-update-\(UUID().uuidString)")
@@ -969,14 +1019,17 @@ enum UpdateInstaller {
         guard run("/usr/bin/ditto", [source.path, temporaryDestination.path]) == 0 else { throw UpdateServiceError.installFailed("复制新版本失败") }
         try? FileManager.default.removeItem(at: destination)
         try FileManager.default.moveItem(at: temporaryDestination, to: destination)
-        UpdateCompletionNotice.record(version: version)
+        UpdateCompletionNotice.record(
+            update: update,
+            previousVersion: previousVersion
+        )
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.createsNewApplicationInstance = true
         configuration.activates = true
         NSWorkspace.shared.openApplication(at: destination, configuration: configuration) { _, error in
             Task { @MainActor in
                 if error == nil {
-                    await logWriter.log(level: .info, event: "update_restart_succeeded", details: "version=\(version)")
+                    await logWriter.log(level: .info, event: "update_restart_succeeded", details: "version=\(update.version)")
                     NSApplication.shared.terminate(nil)
                     return
                 }

@@ -80,7 +80,7 @@ final class AppEnvironment {
     var xiaomiLoginRequest: XiaomiLoginRequest?
     private(set) var updateStatus: AppUpdateStatus = .idle
     private(set) var releaseHistoryState: AppReleaseHistoryState = .idle
-    private(set) var updateCompletionNotice: String?
+    private(set) var updateCompletionNotice: UpdateCompletionNotice?
     private(set) var diagnosticsExportMessage: String?
 
     @ObservationIgnored private let refreshScheduler: any RefreshScheduling
@@ -453,7 +453,8 @@ final class AppEnvironment {
             }
             try UpdateInstaller.install(
                 dmgURL: dmgURL,
-                version: update.version,
+                update: update,
+                previousVersion: RoutinUsageApp.currentVersion,
                 logWriter: logWriter
             )
             updateStatus = .completed(update.version)
@@ -552,18 +553,11 @@ final class AppEnvironment {
     }
 
     func presentUpdateCompletionNoticeIfNeeded() {
-        guard let version = updateCompletionNotice else {
+        guard let notice = updateCompletionNotice else {
             return
         }
         updateCompletionNotice = nil
-
-        let alert = NSAlert()
-        alert.messageText = "更新完成"
-        alert.informativeText = "MyToken 已更新到 \(version)，应用已重新启动。"
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "好")
-        NSApp.activate(ignoringOtherApps: true)
-        alert.runModal()
+        UpdateCompletionNoticeWindowController.shared.present(notice)
     }
 
     /// 检测到新版本时发系统通知。同一版本只提醒一次（跨启动持久化）。
