@@ -3,7 +3,7 @@ import Observation
 import SwiftUI
 
 @MainActor
-final class StatusBarController: NSObject {
+final class StatusBarController: NSObject, NSPopoverDelegate {
     static weak var shared: StatusBarController?
 
     private let environment: AppEnvironment
@@ -12,6 +12,7 @@ final class StatusBarController: NSObject {
     private var settingsWindow: NSWindow?
     private var refreshMinutes: Int
     private var notificationsEnabled: Bool
+    private var isPopoverClosing = false
     private var popoverWindowResignObserver: NSObjectProtocol?
     private var applicationDidBecomeActiveObserver: NSObjectProtocol?
 
@@ -106,6 +107,7 @@ final class StatusBarController: NSObject {
     }
 
     private func configurePopover() {
+        popover.delegate = self
         popover.behavior = .transient
     }
 
@@ -133,14 +135,17 @@ final class StatusBarController: NSObject {
     }
 
     private func closePopover() {
-        guard popover.isShown else {
-            releasePopoverContent()
-            return
-        }
+        guard popover.isShown else { return }
         Task {
             await EnergyDiagnosticsBuffer.shared.record(name: "popover_closed")
         }
+        isPopoverClosing = true
         popover.performClose(nil)
+    }
+
+    /// 关闭动画结束前保留内容，避免残留一个只有系统箭头的空白弹层。
+    func popoverDidClose(_ notification: Notification) {
+        isPopoverClosing = false
         releasePopoverContent()
     }
 
@@ -272,6 +277,7 @@ final class StatusBarController: NSObject {
             closePopover()
             return
         }
+        guard !isPopoverClosing else { return }
         guard !environment.store.orderedKeyIDs.isEmpty else {
             // 空配置不能在 NSPopover 中嵌套引导 sheet，否则会形成双层窗口并阻塞 key 状态。
             openSettingsWindow()
@@ -294,22 +300,19 @@ final class StatusBarController: NSObject {
         guard let window = popover.contentViewController?.view.window else {
             return
         }
-        window.contentViewController?.preferredContentSize = contentSize
-        window.setContentSize(contentSize)
         window.level = .statusBar
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         window.makeKeyAndOrderFront(nil)
-        positionPopoverWindow(window, anchoredTo: button)
+        window.invalidateShadow()
 
         // 打开瞬间 SwiftUI 可能还没用最新数据完成布局，fittingSize 会过期。
-        // 下一轮 runloop 再校准一次窗口尺寸和位置。
+        // 通过 NSPopover 的公开 contentSize 接口校准，让系统自行维护箭头和定位。
         DispatchQueue.main.async { [weak self] in
             guard let self, self.popover.isShown else { return }
             let refreshedSize = self.popoverContentSize(for: button)
-            guard window.frame.size != refreshedSize else { return }
-            window.contentViewController?.preferredContentSize = refreshedSize
-            window.setContentSize(refreshedSize)
-            self.positionPopoverWindow(window, anchoredTo: button)
+            guard self.popover.contentSize != refreshedSize else { return }
+            self.popover.contentSize = refreshedSize
+            window.invalidateShadow()
             window.makeKeyAndOrderFront(nil)
         }
 
@@ -325,23 +328,6 @@ final class StatusBarController: NSObject {
                 self?.closePopover()
             }
         }
-    }
-
-    private func positionPopoverWindow(_ popoverWindow: NSWindow, anchoredTo button: NSStatusBarButton) {
-        let mouseLocation = NSEvent.mouseLocation
-        let screen = NSScreen.screens.first { $0.frame.contains(mouseLocation) }
-            ?? button.window?.screen
-            ?? popoverWindow.screen
-            ?? NSScreen.main
-        guard let screen else { return }
-
-        let anchorRect = button.window?.convertToScreen(button.bounds) ?? .zero
-        let origin = PopoverWindowPlacement.origin(
-            popoverSize: popoverWindow.frame.size,
-            anchorRect: anchorRect,
-            visibleFrame: screen.visibleFrame
-        )
-        popoverWindow.setFrameOrigin(origin)
     }
 
     private func popoverContentSize(for button: NSStatusBarButton) -> NSSize {
@@ -360,7 +346,7 @@ final class StatusBarController: NSObject {
 
     private func showContextMenu(from button: NSStatusBarButton) {
         guard let statusItem else { return }
-        popover.performClose(nil)
+        closePopover()
         let menu = NSMenu()
         menu.autoenablesItems = false
         menu.presentationStyle = .regular
@@ -468,22 +454,6 @@ final class StatusBarController: NSObject {
 
     @objc private func quitApplication() {
         NSApplication.shared.terminate(nil)
-    }
-}
-
-enum PopoverWindowPlacement {
-    /// NSPopover 在设置窗口跨屏后可能跟随主屏；这里根据被点击的状态按钮重新落位。
-    static func origin(
-        popoverSize: NSSize,
-        anchorRect: NSRect,
-        visibleFrame: NSRect
-    ) -> NSPoint {
-        let preferredX = anchorRect.midX - popoverSize.width / 2
-        let minimumX = visibleFrame.minX
-        let maximumX = max(minimumX, visibleFrame.maxX - popoverSize.width)
-        let x = min(max(preferredX, minimumX), maximumX)
-        let y = visibleFrame.maxY - popoverSize.height
-        return NSPoint(x: x, y: y)
     }
 }
 
