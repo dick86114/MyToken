@@ -96,6 +96,63 @@ final class UpdateCompletionNoticeTests: XCTestCase {
         XCTAssertLessThanOrEqual(height, 500)
     }
 
+    func test版本详情窗口使用圆润玻璃卡片和分层阴影() throws {
+        let view = try TestSourceReader.read([
+            "RoutinUsage", "Views", "UpdateCompletionNoticeView.swift"
+        ])
+
+        XCTAssertTrue(view.contains("liquidGlassModalSurface(cornerRadius: UpdateNoticeStyle.outerCornerRadius)"))
+        XCTAssertTrue(view.contains("UpdateNoticeStyle.outerInset"))
+        XCTAssertTrue(view.contains("UpdateNoticeStyle.innerCornerRadius"))
+        XCTAssertTrue(view.contains(".shadow("))
+        XCTAssertTrue(view.contains("window.hasShadow = false"))
+        XCTAssertTrue(view.contains("windowSize(for:"))
+        XCTAssertTrue(view.contains("colorScheme == .dark ?"))
+    }
+
+    func test版本详情窗口不叠加额外容器阴影() throws {
+        let view = try TestSourceReader.read([
+            "RoutinUsage", "Views", "UpdateCompletionNoticeView.swift"
+        ])
+        let bodyStart = try XCTUnwrap(view.range(of: "var body: some View"))
+        let cardShapeStart = try XCTUnwrap(
+            view.range(of: "private var cardShape", range: bodyStart.lowerBound..<view.endIndex)
+        )
+        let body = view[bodyStart.lowerBound..<cardShapeStart.lowerBound]
+
+        XCTAssertTrue(body.contains("liquidGlassModalSurface"))
+        XCTAssertFalse(body.contains(".shadow("))
+    }
+
+    func test版本详情窗口尺寸包含外圈阴影留白() {
+        let notes = """
+        ## macOS
+        - 新增一
+        - 修复二
+        - 优化三
+        """
+        let notice = UpdateCompletionNotice(
+            version: "5.7.4",
+            previousVersion: "5.7.2",
+            notes: notes,
+            releaseURL: URL(string: "https://example.com/v5.7.4")!,
+            publishedAt: nil
+        )
+
+        let size = UpdateCompletionNoticeView.windowSize(for: notice)
+
+        XCTAssertEqual(
+            size.width,
+            UpdateNoticeStyle.cardWidth + UpdateNoticeStyle.outerInset * 2,
+            accuracy: 0.01
+        )
+        XCTAssertEqual(
+            size.height,
+            UpdateCompletionNoticeView.preferredHeight(for: notice) + UpdateNoticeStyle.outerInset * 2,
+            accuracy: 0.01
+        )
+    }
+
     func test更新完成窗口使用无标题栏可键盘激活窗口() throws {
         let view = try TestSourceReader.read([
             "RoutinUsage", "Views", "UpdateCompletionNoticeView.swift"

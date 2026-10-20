@@ -24,6 +24,15 @@ enum UpdateNoticePresentation: Equatable, Sendable {
     }
 }
 
+enum UpdateNoticeStyle {
+    static let cardWidth: CGFloat = 640
+    static let outerInset: CGFloat = 36
+    static let outerCornerRadius: CGFloat = 24
+    static let innerCornerRadius: CGFloat = 14
+    static let contentHorizontalInset: CGFloat = 30
+    static let contentVerticalInset: CGFloat = 26
+}
+
 /// 更新完成后的版本说明弹窗：展示本次版本、上一版本和可直接阅读的变更摘要。
 struct UpdateCompletionNoticeView: View {
     @Environment(\.colorScheme) private var colorScheme
@@ -51,6 +60,13 @@ struct UpdateCompletionNoticeView: View {
         return min(500, max(430, 330 + CGFloat(visibleRows) * 30))
     }
 
+    static func windowSize(for notice: UpdateCompletionNotice) -> NSSize {
+        NSSize(
+            width: UpdateNoticeStyle.cardWidth + UpdateNoticeStyle.outerInset * 2,
+            height: preferredHeight(for: notice) + UpdateNoticeStyle.outerInset * 2
+        )
+    }
+
     private var items: [UpdateReleaseSummaryItem] {
         UpdateReleaseSummaryBuilder.items(from: notice.notes)
     }
@@ -74,14 +90,86 @@ struct UpdateCompletionNoticeView: View {
                 draggableSpacer
                 actions
             }
-            .padding(.horizontal, 30)
-            .padding(.vertical, 26)
+            .padding(.horizontal, UpdateNoticeStyle.contentHorizontalInset)
+            .padding(.vertical, UpdateNoticeStyle.contentVerticalInset)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .frame(width: 640, height: preferredHeight, alignment: .topLeading)
-        .liquidGlassWindowBackground()
+        .frame(width: UpdateNoticeStyle.cardWidth, height: preferredHeight, alignment: .topLeading)
+        .background { cardBackdrop }
+        .clipShape(cardShape)
+        .liquidGlassModalSurface(cornerRadius: UpdateNoticeStyle.outerCornerRadius)
+        .overlay { cardBorder }
+        .padding(UpdateNoticeStyle.outerInset)
+        .frame(
+            width: UpdateNoticeStyle.cardWidth + UpdateNoticeStyle.outerInset * 2,
+            height: preferredHeight + UpdateNoticeStyle.outerInset * 2
+        )
         .onExitCommand(perform: onDismiss)
         .accessibilityElement(children: .contain)
+    }
+
+    private var cardShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: UpdateNoticeStyle.outerCornerRadius, style: .continuous)
+    }
+
+    private var notesShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: UpdateNoticeStyle.innerCornerRadius, style: .continuous)
+    }
+
+    private var cardBackdrop: some View {
+        ZStack {
+            cardShape.fill(
+                LinearGradient(
+                    colors: colorScheme == .dark
+                        ? [
+                            Color.white.opacity(0.045),
+                            CompactPopoverPalette.surface(.modal, colorScheme).opacity(0.58)
+                        ]
+                        : [
+                            Color.white.opacity(0.64),
+                            CompactPopoverPalette.lightCanvas.opacity(0.36)
+                        ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+
+            RadialGradient(
+                colors: [
+                    accent.opacity(colorScheme == .dark ? 0.13 : 0.075),
+                    .clear
+                ],
+                center: .topLeading,
+                startRadius: 0,
+                endRadius: 300
+            )
+            .clipShape(cardShape)
+        }
+    }
+
+    private var cardBorder: some View {
+        cardShape
+            .strokeBorder(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(colorScheme == .dark ? 0.34 : 0.94),
+                        Color.white.opacity(colorScheme == .dark ? 0.10 : 0.40),
+                        CompactPopoverPalette.cardStroke(colorScheme)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
+            )
+            .overlay {
+                cardShape
+                    .strokeBorder(
+                        Color.white.opacity(colorScheme == .dark ? 0.08 : 0.46),
+                        lineWidth: 0.7
+                    )
+                    .padding(1)
+            }
+            .allowsHitTesting(false)
     }
 
     private var preferredHeight: CGFloat {
@@ -97,12 +185,22 @@ struct UpdateCompletionNoticeView: View {
                     .frame(width: 42, height: 42)
                     .background {
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(accent.opacity(colorScheme == .dark ? 0.18 : 0.12))
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        accent.opacity(colorScheme == .dark ? 0.30 : 0.20),
+                                        accent.opacity(colorScheme == .dark ? 0.10 : 0.07)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
                     }
                     .overlay {
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(accent.opacity(0.24), lineWidth: 1)
+                            .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.18 : 0.55), lineWidth: 1)
                     }
+                    .shadow(color: accent.opacity(colorScheme == .dark ? 0.14 : 0.10), radius: 8, y: 3)
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 5) {
@@ -174,6 +272,40 @@ struct UpdateCompletionNoticeView: View {
 
     @ViewBuilder
     private var notesContent: some View {
+        notesCore
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background {
+                notesShape.fill(
+                    colorScheme == .dark
+                        ? CompactPopoverPalette.surface(.metric, colorScheme).opacity(0.82)
+                        : CompactPopoverPalette.lightCanvas.opacity(0.74)
+                )
+            }
+            .overlay {
+                notesShape
+                    .strokeBorder(CompactPopoverPalette.cardStroke(colorScheme), lineWidth: 1)
+            }
+            .overlay {
+                notesShape
+                    .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.62), lineWidth: 0.7)
+                    .padding(1)
+            }
+            .overlay {
+                if items.count <= 5 {
+                    UpdateCompletionDragHandle()
+                        .accessibilityHidden(true)
+                }
+            }
+            .shadow(
+                color: Color.black.opacity(colorScheme == .dark ? 0.16 : 0.05),
+                radius: 10,
+                y: 4
+            )
+    }
+
+    @ViewBuilder
+    private var notesCore: some View {
         if items.isEmpty {
             HStack(spacing: 10) {
                 Image(systemName: "doc.text")
@@ -183,18 +315,6 @@ struct UpdateCompletionNoticeView: View {
                     .foregroundStyle(mutedText)
             }
             .frame(maxWidth: .infinity, minHeight: 110, alignment: .center)
-            .background {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(CompactPopoverPalette.surface(.metric, colorScheme))
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(CompactPopoverPalette.cardStroke(colorScheme), lineWidth: 1)
-            }
-            .overlay {
-                UpdateCompletionDragHandle()
-                    .accessibilityHidden(true)
-            }
         } else if items.count <= 5 {
             draggableNotesContent
         } else {
@@ -235,12 +355,26 @@ struct UpdateCompletionNoticeView: View {
                 .frame(minWidth: 44)
                 .background {
                     Capsule()
-                        .fill(categoryColor.opacity(colorScheme == .dark ? 0.16 : 0.10))
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    categoryColor.opacity(colorScheme == .dark ? 0.22 : 0.14),
+                                    categoryColor.opacity(colorScheme == .dark ? 0.10 : 0.07)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                 }
                 .overlay {
                     Capsule()
-                        .strokeBorder(categoryColor.opacity(0.24), lineWidth: 1)
+                        .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.12 : 0.50), lineWidth: 0.7)
                 }
+                .shadow(
+                    color: categoryColor.opacity(colorScheme == .dark ? 0.12 : 0.08),
+                    radius: 4,
+                    y: 1
+                )
 
             Text(item.text)
                 .font(.system(size: 14))
@@ -266,21 +400,26 @@ struct UpdateCompletionNoticeView: View {
     }
 
     private var actions: some View {
-        HStack(spacing: 12) {
-            draggableSpacer
+        VStack(spacing: 14) {
+            Divider()
+                .opacity(colorScheme == .dark ? 0.28 : 0.46)
 
-            Button("查看完整更新内容", action: onOpenFullNotes)
-                .liquidGlassButton()
-                .pointingHandCursorOnHover()
-                .controlSize(.large)
-                .accessibilityHint("在 GitHub 打开本次版本的完整发布说明")
+            HStack(spacing: 12) {
+                draggableSpacer
 
-            Button("知道了", action: onDismiss)
-                .liquidGlassButton(prominent: true)
-                .pointingHandCursorOnHover()
-                .tint(accent)
-                .controlSize(.large)
-                .keyboardShortcut(.defaultAction)
+                Button("查看完整更新内容", action: onOpenFullNotes)
+                    .liquidGlassButton()
+                    .pointingHandCursorOnHover()
+                    .controlSize(.large)
+                    .accessibilityHint("在 GitHub 打开本次版本的完整发布说明")
+
+                Button("知道了", action: onDismiss)
+                    .liquidGlassButton(prominent: true)
+                    .pointingHandCursorOnHover()
+                    .tint(accent)
+                    .controlSize(.large)
+                    .keyboardShortcut(.defaultAction)
+            }
         }
     }
 }
@@ -347,10 +486,7 @@ final class UpdateCompletionNoticeWindowController: NSObject, NSWindowDelegate {
         )
         let hostingController = NSHostingController(rootView: view)
         hostingController.sizingOptions = []
-        let contentSize = NSSize(
-            width: 640,
-            height: UpdateCompletionNoticeView.preferredHeight(for: notice)
-        )
+        let contentSize = UpdateCompletionNoticeView.windowSize(for: notice)
         let window = UpdateCompletionNoticeWindow(
             contentRect: NSRect(origin: .zero, size: contentSize),
             styleMask: [.borderless],
@@ -368,7 +504,7 @@ final class UpdateCompletionNoticeWindowController: NSObject, NSWindowDelegate {
         window.tabbingMode = .disallowed
         window.backgroundColor = .clear
         window.isOpaque = false
-        window.hasShadow = true
+        window.hasShadow = false
         window.delegate = self
         window.contentViewController = hostingController
         window.setContentSize(contentSize)
