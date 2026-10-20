@@ -5,6 +5,7 @@ import SwiftUI
 struct UsagePopoverView: View {
     typealias InstallAvailableUpdate = @MainActor () async -> Void
     typealias CheckForUpdates = @MainActor () async -> Void
+    typealias ShowVersionDetails = @MainActor () -> Void
     @Environment(\.colorScheme) private var colorScheme
 
     @Bindable var store: UsageStore
@@ -15,12 +16,13 @@ struct UsagePopoverView: View {
     let refreshCredential: @MainActor (UUID) async -> Void
     let retryCredential: @MainActor (UUID) async -> Void
     let openSettings: @MainActor () -> Void
+    let showVersionDetails: ShowVersionDetails
 
     @State private var providerFilter: ProviderID?
     @State private var selectedUpdate: AppUpdate?
     @State private var isUpdateIndicatorVisible = true
     @State private var showRefreshSuccess = false
-    @State private var isVersionLinkHovered = false
+    @State private var isVersionButtonHovered = false
     @State private var isUpdateBadgeHovered = false
     @State private var isCheckForUpdatesHovered = false
 
@@ -32,7 +34,8 @@ struct UsagePopoverView: View {
         installAvailableUpdate: @escaping InstallAvailableUpdate = {},
         refreshCredential: @escaping @MainActor (UUID) async -> Void = { _ in },
         retryCredential: @escaping @MainActor (UUID) async -> Void = { _ in },
-        openSettings: @escaping @MainActor () -> Void = {}
+        openSettings: @escaping @MainActor () -> Void = {},
+        showVersionDetails: @escaping ShowVersionDetails = {}
     ) {
         self.store = store
         self.settings = settings
@@ -42,6 +45,7 @@ struct UsagePopoverView: View {
         self.refreshCredential = refreshCredential
         self.retryCredential = retryCredential
         self.openSettings = openSettings
+        self.showVersionDetails = showVersionDetails
     }
 
     var body: some View {
@@ -114,7 +118,9 @@ private extension UsagePopoverView {
         VStack(alignment: .leading, spacing: 6) {
         HStack(spacing: 10) {
             HStack(spacing: 6) {
-                Link(destination: RoutinUsageApp.releasesURL) {
+                Button {
+                    showVersionDetails()
+                } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "tag")
                             .imageScale(.small)
@@ -127,18 +133,19 @@ private extension UsagePopoverView {
                     .foregroundStyle(CompactPopoverPalette.chipText(colorScheme))
                     .background {
                         Capsule()
-                            .fill(CompactPopoverPalette.chipFill(hovered: isVersionLinkHovered, colorScheme))
+                            .fill(CompactPopoverPalette.chipFill(hovered: isVersionButtonHovered, colorScheme))
                     }
                     .overlay {
                         Capsule()
                             .strokeBorder(CompactPopoverPalette.cardStroke(colorScheme), lineWidth: 1)
                     }
+                    .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
-                .onHover { isVersionLinkHovered = $0 }
-                .animation(.easeInOut(duration: 0.15), value: isVersionLinkHovered)
-                .help("打开 Releases 页面")
-                .accessibilityLabel("当前版本 v\(RoutinUsageApp.currentVersion)，打开 Releases 页面")
+                .onHover { isVersionButtonHovered = $0 }
+                .animation(.easeInOut(duration: 0.15), value: isVersionButtonHovered)
+                .help("查看当前版本更新内容")
+                .accessibilityLabel("当前版本 v\(RoutinUsageApp.currentVersion)，查看版本更新内容")
 
                 if case let .available(update) = updateStatus {
                     Button {

@@ -1,13 +1,49 @@
 import AppKit
 import SwiftUI
 
+enum UpdateNoticePresentation: Equatable, Sendable {
+    case updateCompleted
+    case currentVersion
+
+    func heading(version: String) -> String {
+        switch self {
+        case .updateCompleted:
+            return "已更新到 v\(version)"
+        case .currentVersion:
+            return "当前版本 v\(version)"
+        }
+    }
+
+    var windowTitle: String {
+        switch self {
+        case .updateCompleted:
+            return "更新完成"
+        case .currentVersion:
+            return "版本更新内容"
+        }
+    }
+}
+
 /// 更新完成后的版本说明弹窗：展示本次版本、上一版本和可直接阅读的变更摘要。
 struct UpdateCompletionNoticeView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     let notice: UpdateCompletionNotice
+    let presentation: UpdateNoticePresentation
     let onOpenFullNotes: () -> Void
     let onDismiss: () -> Void
+
+    init(
+        notice: UpdateCompletionNotice,
+        presentation: UpdateNoticePresentation = .updateCompleted,
+        onOpenFullNotes: @escaping () -> Void,
+        onDismiss: @escaping () -> Void
+    ) {
+        self.notice = notice
+        self.presentation = presentation
+        self.onOpenFullNotes = onOpenFullNotes
+        self.onDismiss = onDismiss
+    }
 
     static func preferredHeight(for notice: UpdateCompletionNotice) -> CGFloat {
         let rowCount = UpdateReleaseSummaryBuilder.items(from: notice.notes).count
@@ -28,14 +64,20 @@ struct UpdateCompletionNoticeView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            header
-            releaseSection
-            Spacer(minLength: 0)
-            actions
+        ZStack(alignment: .topLeading) {
+            UpdateCompletionDragHandle()
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 20) {
+                header
+                releaseSection
+                draggableSpacer
+                actions
+            }
+            .padding(.horizontal, 30)
+            .padding(.vertical, 26)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .padding(.horizontal, 30)
-        .padding(.vertical, 26)
         .frame(width: 640, height: preferredHeight, alignment: .topLeading)
         .liquidGlassWindowBackground()
         .onExitCommand(perform: onDismiss)
@@ -64,7 +106,7 @@ struct UpdateCompletionNoticeView: View {
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("已更新到 v\(notice.version)")
+                    Text(presentation.heading(version: notice.version))
                         .font(.system(size: 24, weight: .bold))
                         .foregroundStyle(.primary)
                         .monospacedDigit()
@@ -111,6 +153,7 @@ struct UpdateCompletionNoticeView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .pointingHandCursorOnHover()
                 .help("在 GitHub 查看完整发布说明")
                 .accessibilityLabel("在 GitHub 查看 v\(notice.version) 的完整发布说明")
             }
@@ -119,6 +162,14 @@ struct UpdateCompletionNoticeView: View {
 
             notesContent
         }
+    }
+
+    private var draggableSpacer: some View {
+        Spacer(minLength: 0)
+            .overlay {
+                UpdateCompletionDragHandle()
+                    .accessibilityHidden(true)
+            }
     }
 
     @ViewBuilder
@@ -140,17 +191,36 @@ struct UpdateCompletionNoticeView: View {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .strokeBorder(CompactPopoverPalette.cardStroke(colorScheme), lineWidth: 1)
             }
+            .overlay {
+                UpdateCompletionDragHandle()
+                    .accessibilityHidden(true)
+            }
+        } else if items.count <= 5 {
+            draggableNotesContent
         } else {
             ScrollView(.vertical, showsIndicators: true) {
-                LazyVStack(alignment: .leading, spacing: 13) {
-                    ForEach(items) { item in
-                        summaryRow(item)
-                    }
-                }
-                .padding(.vertical, 2)
+                notesList
             }
             .frame(maxHeight: .infinity)
         }
+    }
+
+    private var draggableNotesContent: some View {
+        notesList
+            .overlay {
+                UpdateCompletionDragHandle()
+                    .accessibilityHidden(true)
+            }
+    }
+
+    private var notesList: some View {
+        LazyVStack(alignment: .leading, spacing: 13) {
+            ForEach(items) { item in
+                summaryRow(item)
+            }
+        }
+        .padding(.vertical, 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func summaryRow(_ item: UpdateReleaseSummaryItem) -> some View {
@@ -197,15 +267,17 @@ struct UpdateCompletionNoticeView: View {
 
     private var actions: some View {
         HStack(spacing: 12) {
-            Spacer(minLength: 0)
+            draggableSpacer
 
             Button("查看完整更新内容", action: onOpenFullNotes)
                 .liquidGlassButton()
+                .pointingHandCursorOnHover()
                 .controlSize(.large)
                 .accessibilityHint("在 GitHub 打开本次版本的完整发布说明")
 
             Button("知道了", action: onDismiss)
                 .liquidGlassButton(prominent: true)
+                .pointingHandCursorOnHover()
                 .tint(accent)
                 .controlSize(.large)
                 .keyboardShortcut(.defaultAction)
@@ -222,13 +294,22 @@ private struct UpdateCompletionDragHandle: NSViewRepresentable {
     func updateNSView(_ nsView: DraggableView, context: Context) {}
 
     final class DraggableView: NSView {
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+            true
+        }
+
         override func mouseDown(with event: NSEvent) {
             window?.performDrag(with: event)
         }
+    }
+}
 
-        override func resetCursorRects() {
-            addCursorRect(bounds, cursor: .openHand)
-        }
+enum UpdateCompletionWindowPlacement {
+    static func centeredOrigin(windowSize: NSSize, visibleFrame: NSRect) -> NSPoint {
+        NSPoint(
+            x: visibleFrame.midX - windowSize.width / 2,
+            y: visibleFrame.midY - windowSize.height / 2
+        )
     }
 }
 
@@ -245,16 +326,18 @@ final class UpdateCompletionNoticeWindowController: NSObject, NSWindowDelegate {
 
     private var window: NSWindow?
 
-    func present(_ notice: UpdateCompletionNotice) {
+    func present(
+        _ notice: UpdateCompletionNotice,
+        presentation: UpdateNoticePresentation = .updateCompleted
+    ) {
         if let window {
-            window.orderFrontRegardless()
-            window.makeKey()
-            NSApp.activate(ignoringOtherApps: true)
-            return
+            window.close()
+            self.window = nil
         }
 
         let view = UpdateCompletionNoticeView(
             notice: notice,
+            presentation: presentation,
             onOpenFullNotes: {
                 NSWorkspace.shared.open(notice.releaseURL)
             },
@@ -274,11 +357,12 @@ final class UpdateCompletionNoticeWindowController: NSObject, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "更新完成"
+        window.title = presentation.windowTitle
         window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         window.hidesOnDeactivate = false
         window.isMovableByWindowBackground = true
+        window.acceptsMouseMovedEvents = true
         window.isReleasedWhenClosed = false
         window.isRestorable = false
         window.tabbingMode = .disallowed
@@ -287,14 +371,32 @@ final class UpdateCompletionNoticeWindowController: NSObject, NSWindowDelegate {
         window.hasShadow = true
         window.delegate = self
         window.contentViewController = hostingController
-        window.center()
+        window.setContentSize(contentSize)
+        centerWindowOnCurrentScreen(window)
         self.window = window
 
         SettingsWindowActivationPolicy.register(window)
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()
+        // SwiftUI 首次布局可能调整窗口 frame；下一轮主循环再按最终尺寸居中一次。
+        DispatchQueue.main.async { [weak self, weak window] in
+            guard let self, let window else { return }
+            self.centerWindowOnCurrentScreen(window)
+        }
         window.makeFirstResponder(window.contentView)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func centerWindowOnCurrentScreen(_ window: NSWindow) {
+        let screen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) }
+            ?? NSScreen.main
+        guard let screen else { return }
+        window.setFrameOrigin(
+            UpdateCompletionWindowPlacement.centeredOrigin(
+                windowSize: window.frame.size,
+                visibleFrame: screen.visibleFrame
+            )
+        )
     }
 
     func close() {

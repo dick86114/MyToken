@@ -560,6 +560,30 @@ final class AppEnvironment {
         UpdateCompletionNoticeWindowController.shared.present(notice)
     }
 
+    /// 从菜单栏当前版本入口打开应用内版本详情，不直接跳出到 GitHub。
+    func presentCurrentVersionDetails() async {
+        await loadReleaseHistoryIfNeeded()
+        let version = releaseHistoryAppVersion
+        let release: AppReleaseHistoryItem?
+        if case let .loaded(releases) = releaseHistoryState {
+            release = releases.first { $0.version == version }
+        } else {
+            release = nil
+        }
+
+        let notice = UpdateCompletionNotice(
+            version: version,
+            previousVersion: nil,
+            notes: release?.notes ?? "",
+            releaseURL: release?.releaseURL ?? RoutinUsageApp.releasesURL,
+            publishedAt: release?.publishedAt
+        )
+        UpdateCompletionNoticeWindowController.shared.present(
+            notice,
+            presentation: .currentVersion
+        )
+    }
+
     /// 检测到新版本时发系统通知。同一版本只提醒一次（跨启动持久化）。
     private func notifyUpdateAvailable(_ update: AppUpdate) {
         let defaults = UserDefaults.standard

@@ -121,6 +121,11 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
                 environment: environment,
                 openSettings: { [weak self] in
                     self?.openSettingsWindow()
+                },
+                showVersionDetails: { [weak self] in
+                    guard let self else { return }
+                    self.closePopover()
+                    Task { await self.environment.presentCurrentVersionDetails() }
                 }
             )
         )
@@ -465,6 +470,7 @@ extension Notification.Name {
 private struct StatusPopoverContent: View {
     @Bindable var environment: AppEnvironment
     let openSettings: @MainActor () -> Void
+    let showVersionDetails: @MainActor () -> Void
 
     var body: some View {
         UsagePopoverView(
@@ -475,7 +481,8 @@ private struct StatusPopoverContent: View {
             installAvailableUpdate: environment.installAvailableUpdate,
             refreshCredential: environment.refreshCredential(_:),
             retryCredential: environment.retryCredential(_:),
-            openSettings: openSettings
+            openSettings: openSettings,
+            showVersionDetails: showVersionDetails
         )
     }
 }
