@@ -16,6 +16,17 @@ final class ReleaseNotesAndUpdateFeedbackTests: XCTestCase {
         XCTAssertTrue(view.contains("loadReleaseHistoryIfNeeded(force: true)"))
     }
 
+    func test菜单栏版本号加载当前版本日志并打开应用内窗口() throws {
+        let environment = try TestSourceReader.read([
+            "RoutinUsage", "App", "AppEnvironment.swift"
+        ])
+
+        XCTAssertTrue(environment.contains("func presentCurrentVersionDetails"))
+        XCTAssertTrue(environment.contains("loadReleaseHistoryIfNeeded()"))
+        XCTAssertTrue(environment.contains("presentation: .currentVersion"))
+        XCTAssertTrue(environment.contains("UpdateCompletionNoticeWindowController.shared.present"))
+    }
+
     func test菜单栏检测更新失败显示可见提示() throws {
         let source = try TestSourceReader.read([
             "RoutinUsage", "Views", "UsagePopoverView.swift"

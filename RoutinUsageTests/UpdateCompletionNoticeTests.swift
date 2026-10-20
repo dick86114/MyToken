@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import XCTest
 @testable import RoutinUsage
@@ -118,14 +119,55 @@ final class UpdateCompletionNoticeTests: XCTestCase {
         XCTAssertTrue(view.contains("orderFrontRegardless"))
     }
 
-    func test更新完成窗口标题区域支持鼠标拖动() throws {
+    func test更新完成窗口默认居中于当前屏幕可视区域() {
+        let origin = UpdateCompletionWindowPlacement.centeredOrigin(
+            windowSize: NSSize(width: 640, height: 480),
+            visibleFrame: NSRect(x: 0, y: 0, width: 2048, height: 1120)
+        )
+
+        XCTAssertEqual(origin.x, 704, accuracy: 0.01)
+        XCTAssertEqual(origin.y, 320, accuracy: 0.01)
+    }
+
+    func test更新完成弹窗按钮悬停显示手指光标() throws {
+        let view = try TestSourceReader.read([
+            "RoutinUsage", "Views", "UpdateCompletionNoticeView.swift"
+        ])
+        let cursorSupport = try TestSourceReader.read([
+            "RoutinUsage", "Views", "PointingHandCursor.swift"
+        ])
+
+        XCTAssertTrue(cursorSupport.contains("NSCursor.pointingHand.push()"))
+        XCTAssertTrue(cursorSupport.contains("NSCursor.pop()"))
+        XCTAssertGreaterThanOrEqual(
+            view.components(separatedBy: "pointingHandCursorOnHover()").count - 1,
+            3
+        )
+        XCTAssertFalse(view.contains("addCursorRect"))
+    }
+
+    func test更新完成窗口标题日志和空白区域支持鼠标拖动() throws {
         let view = try TestSourceReader.read([
             "RoutinUsage", "Views", "UpdateCompletionNoticeView.swift"
         ])
 
         XCTAssertTrue(view.contains("UpdateCompletionDragHandle"))
         XCTAssertTrue(view.contains("performDrag(with: event)"))
-        XCTAssertTrue(view.contains(".overlay"))
+        XCTAssertTrue(view.contains("draggableSpacer"))
+        XCTAssertTrue(view.contains("draggableNotesContent"))
+        XCTAssertTrue(view.contains("acceptsFirstMouse"))
+        XCTAssertTrue(view.contains("ZStack(alignment: .topLeading)"))
+        XCTAssertGreaterThanOrEqual(
+            view.components(separatedBy: "UpdateCompletionDragHandle()").count - 1,
+            5
+        )
+    }
+
+    func test当前版本详情复用窗口但使用当前版本标题() {
+        let presentation = UpdateNoticePresentation.currentVersion
+
+        XCTAssertEqual(presentation.heading(version: "5.7.3"), "当前版本 v5.7.3")
+        XCTAssertEqual(presentation.windowTitle, "版本更新内容")
     }
 
     func test更新完成弹窗展示版本关系日志摘要和完整入口() throws {

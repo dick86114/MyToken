@@ -56,17 +56,20 @@ final class ProjectBootstrapTests: XCTestCase {
         )
     }
 
-    func test菜单栏弹窗左侧版本号可点击并链接到Releases() throws {
+    func test菜单栏弹窗左侧版本号打开应用内版本日志() throws {
         let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
         let app = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
+        let controller = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
 
         XCTAssertTrue(app.contains("nonisolated static var currentVersion"))
         XCTAssertTrue(app.contains("nonisolated static let githubURL"))
         XCTAssertTrue(app.contains("nonisolated static let releasesURL"))
-        XCTAssertTrue(popover.contains("Link(destination: RoutinUsageApp.releasesURL)"))
+        XCTAssertTrue(popover.contains("showVersionDetails"))
         XCTAssertTrue(popover.contains("RoutinUsageApp.currentVersion"))
-        XCTAssertTrue(popover.contains("打开 Releases 页面"))
+        XCTAssertTrue(popover.contains("查看版本更新内容"))
+        XCTAssertFalse(popover.contains("Link(destination: RoutinUsageApp.releasesURL)"))
         XCTAssertFalse(popover.contains(".underline()"))
+        XCTAssertTrue(controller.contains("environment.presentCurrentVersionDetails"))
     }
 
     func test菜单栏弹窗顶部使用左版本中彩色透明Logo右刷新布局() throws {
