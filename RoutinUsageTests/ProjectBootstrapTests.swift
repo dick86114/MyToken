@@ -355,14 +355,16 @@ final class ProjectBootstrapTests: XCTestCase {
         )
         let logoSource = String(menuBarLabel[logoStart.lowerBound..<logoEnd.lowerBound])
 
-        XCTAssertTrue(source.contains("button.image = MenuBarMonoBrandLogo.image()"))
-        XCTAssertFalse(source.contains("MenuBarMonoBrandLogo.image(appearance:"))
+        XCTAssertTrue(source.contains("button.image = MenuBarMonoBrandLogo.image(appearance: button.effectiveAppearance)"))
+        XCTAssertTrue(source.contains("MenuBarMultiUsageIcon.image("))
+        XCTAssertTrue(source.contains("appearance: button.effectiveAppearance"))
         XCTAssertFalse(source.contains("observeStatusBarAppearance()"))
         XCTAssertFalse(source.contains("scheduleStatusButtonUpdate()"))
-        XCTAssertTrue(logoSource.contains("NSImage(size: size, flipped: false)"))
-        XCTAssertTrue(logoSource.contains("NSColor.labelColor.setFill()"))
-        XCTAssertFalse(logoSource.contains("bestMatch(from: [.aqua, .darkAqua])"))
-        XCTAssertFalse(logoSource.contains("performAsCurrentDrawingAppearance"))
+        XCTAssertTrue(logoSource.contains("NSImage(size: size)"))
+        XCTAssertTrue(logoSource.contains("performAsCurrentDrawingAppearance"))
+        XCTAssertTrue(logoSource.contains("image.lockFocus()"))
+        XCTAssertTrue(logoSource.contains("foregroundColor.setFill()"))
+        XCTAssertTrue(menuBarLabel.contains("appearance.bestMatch(from: [.darkAqua, .aqua])"))
         XCTAssertFalse(source.contains("button.image?.isTemplate = true"))
     }
 
@@ -604,7 +606,8 @@ final class ProjectBootstrapTests: XCTestCase {
 
         XCTAssertTrue(statusBarController.contains("MenuBarMultiUsageIcon.image("))
         XCTAssertTrue(statusBarController.contains("indicators: selectedIndicators"))
-        XCTAssertTrue(statusBarController.contains("MenuBarMonoBrandLogo.image()"))
+        XCTAssertTrue(statusBarController.contains("MenuBarMonoBrandLogo.image(appearance: button.effectiveAppearance)"))
+        XCTAssertTrue(statusBarController.contains("appearance: button.effectiveAppearance"))
         XCTAssertTrue(statusBarController.contains("button.setAccessibilityLabel"))
     }
 

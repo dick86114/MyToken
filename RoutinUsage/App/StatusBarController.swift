@@ -233,7 +233,8 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
             button.title = ""
             button.image = MenuBarMultiUsageIcon.image(
                 indicators: selectedIndicators,
-                colorRules: environment.settings.menuBarColorRules
+                colorRules: environment.settings.menuBarColorRules,
+                appearance: button.effectiveAppearance
             )
             button.imagePosition = .imageOnly
             button.imageScaling = .scaleProportionallyDown
@@ -246,7 +247,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         let text = "尚未配置 Key"
         statusItem.length = 24
         button.title = ""
-        button.image = MenuBarMonoBrandLogo.image()
+        button.image = MenuBarMonoBrandLogo.image(appearance: button.effectiveAppearance)
         button.imagePosition = .imageOnly
         button.imageScaling = .scaleProportionallyDown
         button.setAccessibilityLabel(text)

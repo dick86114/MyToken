@@ -1,6 +1,12 @@
 import AppKit
 import CoreText
 
+private func resolvedMenuBarForegroundColor(for appearance: NSAppearance) -> NSColor {
+    appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        ? .white
+        : .black
+}
+
 enum MenuBarBalanceFormatter {
     static func compactText(_ value: Decimal?) -> String {
         guard let value, !value.isNaN else {
@@ -210,20 +216,27 @@ enum MenuBarMultiUsageIcon {
 
     static func image(
         indicators: [MenuBarIndicatorModel],
-        colorRules: MenuBarColorRules = .standard
+        colorRules: MenuBarColorRules = .standard,
+        appearance: NSAppearance = NSAppearance.currentDrawing()
     ) -> NSImage {
         let displayedIndicators = Array(indicators.prefix(maximumCount))
         let imageSize = NSSize(
             width: imageWidth(for: displayedIndicators),
             height: size.height
         )
-        let image = NSImage(size: imageSize, flipped: false) { _ in
+        let image = NSImage(size: imageSize)
+        let foregroundColor = resolvedMenuBarForegroundColor(for: appearance)
+        // 立即按状态栏外观栅格化；延迟绘制在 macOS 15 可能生成不可见的空白状态项。
+        appearance.performAsCurrentDrawingAppearance {
+            image.lockFocus()
+            defer { image.unlockFocus() }
             var cursor = outerPadding
             for (index, indicator) in displayedIndicators.enumerated() {
                 let width = unitWidth(for: indicator)
                 draw(
                     indicator: indicator,
                     colorRules: colorRules,
+                    foregroundColor: foregroundColor,
                     in: NSRect(
                         x: cursor,
                         y: 0,
@@ -236,9 +249,8 @@ enum MenuBarMultiUsageIcon {
                     cursor += gap
                 }
             }
-            return true
         }
-        // 延迟绘制让 labelColor 在每块屏幕的菜单栏外观里解析，彩色填充不会被模板化抹掉。
+        // 模板图会丢弃风险色；这里保留颜色，并提前解析菜单栏前景色。
         image.isTemplate = false
         return image
     }
@@ -294,6 +306,7 @@ enum MenuBarMultiUsageIcon {
     private static func draw(
         indicator: MenuBarIndicatorModel,
         colorRules: MenuBarColorRules,
+        foregroundColor: NSColor,
         in rect: NSRect
     ) {
         if indicator.style == .stacked {
@@ -303,6 +316,7 @@ enum MenuBarMultiUsageIcon {
                     indicator: indicator,
                     valueText: stackedPercentText(percent),
                     valueColor: progressColor(for: indicator, rules: colorRules),
+                    foregroundColor: foregroundColor,
                     in: rect
                 )
                 return
@@ -311,6 +325,7 @@ enum MenuBarMultiUsageIcon {
                     indicator: indicator,
                     valueText: indicator.balanceCurrencyText ?? text,
                     valueColor: balanceColor(for: indicator, rules: colorRules),
+                    foregroundColor: foregroundColor,
                     in: rect
                 )
                 return
@@ -321,6 +336,7 @@ enum MenuBarMultiUsageIcon {
 
         drawVerticalShortCode(
             indicator: indicator,
+            foregroundColor: foregroundColor,
             in: rect
         )
 
@@ -330,6 +346,7 @@ enum MenuBarMultiUsageIcon {
                 percent: percent,
                 indicator: indicator,
                 colorRules: colorRules,
+                foregroundColor: foregroundColor,
                 in: rect
             )
         case let .balance(text):
@@ -337,6 +354,7 @@ enum MenuBarMultiUsageIcon {
                 text: text,
                 indicator: indicator,
                 colorRules: colorRules,
+                foregroundColor: foregroundColor,
                 in: rect
             )
         case .status, .none:
@@ -346,6 +364,7 @@ enum MenuBarMultiUsageIcon {
 
     private static func drawVerticalShortCode(
         indicator: MenuBarIndicatorModel,
+        foregroundColor: NSColor,
         in rect: NSRect
     ) {
         let text = indicator.shortCode
@@ -353,7 +372,7 @@ enum MenuBarMultiUsageIcon {
         let font = codeFont(for: characters.count)
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
-            .foregroundColor: NSColor.labelColor
+            .foregroundColor: foregroundColor
         ]
         let textCenter = rect.minX + 4.5
 
@@ -377,6 +396,7 @@ enum MenuBarMultiUsageIcon {
         indicator: MenuBarIndicatorModel,
         valueText: String,
         valueColor: NSColor,
+        foregroundColor: NSColor,
         in rect: NSRect
     ) {
         let text = String(indicator.shortCode.prefix(3))
@@ -394,7 +414,7 @@ enum MenuBarMultiUsageIcon {
             text: text,
             font: codeFont,
             tracking: stackedTracking,
-            color: NSColor.labelColor,
+            color: foregroundColor,
             baselineY: codeBaseline,
             in: rect
         )
@@ -475,15 +495,20 @@ enum MenuBarMultiUsageIcon {
 enum MenuBarMonoBrandLogo {
     static let size = NSSize(width: 18, height: 18)
 
-    static func image() -> NSImage {
-        // 和短码/进度条一致：使用动态 labelColor 延迟解析菜单栏外观。
-        let image = NSImage(size: size, flipped: false) { _ in
+    static func image(
+        appearance: NSAppearance = NSAppearance.currentDrawing()
+    ) -> NSImage {
+        let image = NSImage(size: size)
+        let foregroundColor = resolvedMenuBarForegroundColor(for: appearance)
+        appearance.performAsCurrentDrawingAppearance {
+            image.lockFocus()
+            defer { image.unlockFocus() }
             let rect = NSRect(origin: .zero, size: size)
             guard let source = NSImage(named: "MenuBarMonoBrandLogo") else {
-                return false
+                return
             }
 
-            NSColor.labelColor.setFill()
+            foregroundColor.setFill()
             NSBezierPath(rect: rect).fill()
             source.draw(
                 in: rect,
@@ -491,7 +516,6 @@ enum MenuBarMonoBrandLogo {
                 operation: .destinationIn,
                 fraction: 1
             )
-            return true
         }
         image.isTemplate = false
         return image
@@ -500,9 +524,6 @@ enum MenuBarMonoBrandLogo {
 
 extension MenuBarMultiUsageIcon {
     static let indicatorStrokeWidth: CGFloat = 1
-    static var indicatorBorderColor: NSColor {
-        NSColor.labelColor
-    }
     static let balanceUnitWidth: CGFloat = 30
     static let balanceDiameter: CGFloat = 18
     static var balanceTextMaximumWidth: CGFloat {
@@ -598,6 +619,7 @@ extension MenuBarMultiUsageIcon {
         percent: Double,
         indicator: MenuBarIndicatorModel,
         colorRules: MenuBarColorRules,
+        foregroundColor: NSColor,
         in rect: NSRect
     ) {
         let trackRect = NSRect(
@@ -608,8 +630,8 @@ extension MenuBarMultiUsageIcon {
         )
         let track = NSBezierPath(roundedRect: trackRect, xRadius: 2.5, yRadius: 2.5)
         track.lineWidth = Self.indicatorStrokeWidth
-        indicatorBorderColor.setStroke()
-        NSColor.secondaryLabelColor.withAlphaComponent(0.22).setFill()
+        foregroundColor.setStroke()
+        foregroundColor.withAlphaComponent(0.22).setFill()
         track.fill()
 
         let innerRect = trackRect.insetBy(
@@ -640,6 +662,7 @@ extension MenuBarMultiUsageIcon {
         text: String,
         indicator: MenuBarIndicatorModel,
         colorRules: MenuBarColorRules,
+        foregroundColor: NSColor,
         in rect: NSRect
     ) {
         let circleRect = NSRect(
@@ -651,7 +674,7 @@ extension MenuBarMultiUsageIcon {
         let statusColor = balanceColor(for: indicator, rules: colorRules)
         let circle = NSBezierPath(ovalIn: circleRect)
         circle.lineWidth = Self.indicatorStrokeWidth
-        indicatorBorderColor.setStroke()
+        foregroundColor.setStroke()
         circle.stroke()
 
         let font = balanceFont(for: text)

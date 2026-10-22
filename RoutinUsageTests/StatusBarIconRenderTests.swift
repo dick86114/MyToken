@@ -49,6 +49,50 @@ final class StatusBarIconRenderTests: XCTestCase {
         XCTAssertGreaterThan(image.size.width, 0)
     }
 
+    func test暗色状态栏零进度图标在浅色绘制环境仍可见() throws {
+        let indicator = MenuBarIndicatorModel(
+            shortCode: "CC",
+            percent: 0,
+            healthState: .normal,
+            accessibilityLabel: "Command Code，已使用 0%"
+        )
+        let darkAppearance = try XCTUnwrap(NSAppearance(named: .darkAqua))
+        var image: NSImage?
+        darkAppearance.performAsCurrentDrawingAppearance {
+            image = MenuBarMultiUsageIcon.image(indicators: [indicator])
+        }
+        let bitmap = try renderedBitmap(
+            try XCTUnwrap(image),
+            appearance: try XCTUnwrap(NSAppearance(named: .aqua))
+        )
+
+        XCTAssertTrue(try hasOpaquePixel(in: bitmap) { color in
+            luminance(of: color) > 0.8
+        })
+    }
+
+    func test浅色状态栏零进度图标在暗色绘制环境仍可见() throws {
+        let indicator = MenuBarIndicatorModel(
+            shortCode: "CC",
+            percent: 0,
+            healthState: .normal,
+            accessibilityLabel: "Command Code，已使用 0%"
+        )
+        let lightAppearance = try XCTUnwrap(NSAppearance(named: .aqua))
+        var image: NSImage?
+        lightAppearance.performAsCurrentDrawingAppearance {
+            image = MenuBarMultiUsageIcon.image(indicators: [indicator])
+        }
+        let bitmap = try renderedBitmap(
+            try XCTUnwrap(image),
+            appearance: try XCTUnwrap(NSAppearance(named: .darkAqua))
+        )
+
+        XCTAssertTrue(try hasOpaquePixel(in: bitmap) { color in
+            luminance(of: color) < 0.2
+        })
+    }
+
     func test多指标图标最多绘制五个() {
         let indicators = (0..<6).map { index in
             MenuBarIndicatorModel(
@@ -95,6 +139,51 @@ final class StatusBarIconRenderTests: XCTestCase {
         NSGraphicsContext.restoreGraphicsState()
 
         return bitmap
+    }
+
+    private func renderedBitmap(
+        _ image: NSImage,
+        appearance: NSAppearance
+    ) throws -> NSBitmapImageRep {
+        var result: NSBitmapImageRep?
+        var renderError: Error?
+        appearance.performAsCurrentDrawingAppearance {
+            do {
+                result = try renderedBitmap(image)
+            } catch {
+                renderError = error
+            }
+        }
+        if let renderError {
+            throw renderError
+        }
+        return try XCTUnwrap(result)
+    }
+
+    private func hasOpaquePixel(
+        in bitmap: NSBitmapImageRep,
+        matching predicate: (NSColor) -> Bool
+    ) throws -> Bool {
+        for x in 0..<bitmap.pixelsWide {
+            for y in 0..<bitmap.pixelsHigh {
+                guard let color = bitmap.colorAt(x: x, y: y),
+                      color.alphaComponent > 0.8
+                else {
+                    continue
+                }
+                if predicate(color) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private func luminance(of color: NSColor) -> CGFloat {
+        let rgb = color.usingColorSpace(.sRGB) ?? color
+        return 0.2126 * rgb.redComponent
+            + 0.7152 * rgb.greenComponent
+            + 0.0722 * rgb.blueComponent
     }
 
     private func containsColor(
