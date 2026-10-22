@@ -232,7 +232,7 @@ final class AppEnvironment {
         ])
         let widgetSnapshotSynchronizer: WidgetSnapshotSynchronizer?
         let widgetDirectory = WidgetSnapshotAvailability.validateDirectory(
-            FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: WidgetSharedAppGroup.identifier)
+            WidgetSharedAppGroup.containerURL()
         )
         if let widgetDirectory {
             widgetSnapshotSynchronizer = WidgetSnapshotSynchronizer(

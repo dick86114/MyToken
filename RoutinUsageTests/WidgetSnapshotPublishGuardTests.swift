@@ -13,11 +13,50 @@ final class WidgetSnapshotPublishGuardTests: XCTestCase {
         let appEntitlements = try readSourceText(at: "RoutinUsage/RoutinUsage.entitlements")
         let widgetEntitlements = try readSourceText(at: "RoutinUsageWidget/RoutinUsageWidget.entitlements")
 
-        XCTAssertTrue(appEnvironment.contains("WidgetSharedAppGroup.identifier"))
-        XCTAssertTrue(credentialEntity.contains("WidgetSharedAppGroup.identifier"))
+        XCTAssertTrue(appEnvironment.contains("WidgetSharedAppGroup.containerURL()"))
+        XCTAssertTrue(credentialEntity.contains("WidgetSharedAppGroup.containerURL()"))
         XCTAssertTrue(project.contains("RoutinUsage/WidgetShared/WidgetSharedAppGroup.swift"))
         XCTAssertTrue(appEntitlements.contains(WidgetSharedAppGroup.identifier))
         XCTAssertTrue(widgetEntitlements.contains(WidgetSharedAppGroup.identifier))
+    }
+
+    func test没有AppGroup授权时不会请求共享容器() {
+        var lookupCount = 0
+
+        let directory = WidgetSharedAppGroup.containerURL(entitlementGroups: nil) {
+            lookupCount += 1
+            return URL(fileURLWithPath: "/tmp/mytoken-widget")
+        }
+
+        XCTAssertNil(directory)
+        XCTAssertEqual(lookupCount, 0)
+    }
+
+    func testAppGroup授权不包含当前标识时不会请求共享容器() {
+        var lookupCount = 0
+
+        let directory = WidgetSharedAppGroup.containerURL(entitlementGroups: ["group.example.other"]) {
+            lookupCount += 1
+            return URL(fileURLWithPath: "/tmp/mytoken-widget")
+        }
+
+        XCTAssertNil(directory)
+        XCTAssertEqual(lookupCount, 0)
+    }
+
+    func test拥有当前AppGroup授权时才请求共享容器() {
+        var lookupCount = 0
+        let expected = URL(fileURLWithPath: "/tmp/mytoken-widget")
+
+        let directory = WidgetSharedAppGroup.containerURL(
+            entitlementGroups: [WidgetSharedAppGroup.identifier]
+        ) {
+            lookupCount += 1
+            return expected
+        }
+
+        XCTAssertEqual(directory, expected)
+        XCTAssertEqual(lookupCount, 1)
     }
 
     func test可用性探测会拒绝空目录和不可写目录() throws {
