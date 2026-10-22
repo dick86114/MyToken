@@ -5,6 +5,10 @@ import WebKit
 @MainActor
 final class XiaomiWebSession: NSObject {
     nonisolated static let consoleURL = URL(string: "https://platform.xiaomimimo.com/console/balance")!
+    /// 与网页在登录态失效时使用的入口一致：先进入 genLoginUrl，再沿用持久 SSO 登录态自动换票。
+    nonisolated static let silentRenewURL = URL(
+        string: "https://platform.xiaomimimo.com/api/v1/genLoginUrl?currentPath=%2Fconsole%2Fbalance"
+    )!
 
     let webView: WKWebView
     var onLoginCompleted: (@MainActor () -> Void)?
@@ -86,7 +90,7 @@ final class XiaomiWebSession: NSObject {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         webView.stopLoading()
         webView.load(URLRequest(
-            url: Self.consoleURL,
+            url: Self.silentRenewURL,
             cachePolicy: .reloadIgnoringLocalAndRemoteCacheData,
             timeoutInterval: 30
         ))
@@ -108,14 +112,18 @@ final class XiaomiWebSession: NSObject {
         return nil
     }
 
-    /// 判断隐藏 WebView 是否被带到了交互式登录页。
+    /// 判断隐藏 WebView 是否已确认停在必须人工操作的登录页。
+    ///
+    /// `account.xiaomi.com/pass/serviceLogin` 也是浏览器自动换票的 SSO 中转页：
+    /// 持久 `passToken` 仍有效时会继续 302 回控制台并换发新的短期票据。这里不能
+    /// 仅凭账号域提前终止，否则每次 24 小时服务票据过期都会误判为需要重新登录。
     nonisolated static func requiresInteractiveLogin(url: URL?) -> Bool {
         guard let url else {
             return false
         }
         let host = url.host?.lowercased() ?? ""
         if host == "account.xiaomi.com" || host.hasSuffix(".account.xiaomi.com") {
-            return true
+            return false
         }
         let value = url.absoluteString.lowercased()
         if host == "xiaomimimo.com" || host.hasSuffix(".xiaomimimo.com") {
