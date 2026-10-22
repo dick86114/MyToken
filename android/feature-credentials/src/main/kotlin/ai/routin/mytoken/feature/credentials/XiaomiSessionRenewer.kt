@@ -24,8 +24,11 @@ fun interface XiaomiCookieExchange {
 }
 
 /**
- * 判断隐藏 WebView 是否被带到了交互式登录页。
- * 落到登录页说明小米账号登录态也已失效，继续等待没有意义。
+ * 判断隐藏 WebView 是否已确认停在必须人工操作的登录页。
+ *
+ * account.xiaomi.com/pass/serviceLogin 也可能只是浏览器自动换票的 SSO 中转页：
+ * 持久 passToken 仍有效时会继续跳回控制台并换发新的短期票据。这里不能仅凭
+ * 账号域提前终止，否则每次 24 小时服务票据过期都会误判为需要重新登录。
  */
 object XiaomiLoginPage {
     private const val ACCOUNT_HOST = "account.xiaomi.com"
@@ -35,7 +38,7 @@ object XiaomiLoginPage {
         val target = url?.trim()?.takeIf(String::isNotEmpty) ?: return false
         val lowercased = target.lowercase()
         val host = runCatching { java.net.URI(lowercased).host.orEmpty() }.getOrDefault("")
-        if (host == ACCOUNT_HOST || host.endsWith(".$ACCOUNT_HOST")) return true
+        if (host == ACCOUNT_HOST || host.endsWith(".$ACCOUNT_HOST")) return false
         if (host.endsWith("xiaomimimo.com") || host == "xiaomimimo.com") {
             return lowercased.contains("/login") || lowercased.contains("#/login")
         }
@@ -151,7 +154,7 @@ private class WebViewCookieExchange(
                         loaded.complete(Unit)
                     }
                 }
-                webView.loadUrl(XiaomiCookieReader.consoleUrl)
+                webView.loadUrl(XiaomiCookieReader.renewUrl)
                 loaded.await()
                 if (loginPageReached) return@withTimeoutOrNull null
 

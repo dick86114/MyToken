@@ -87,13 +87,25 @@ class XiaomiSessionRenewerTest {
     )
 
     @Test
-    fun `interactive login page is detected so renewal can bail out early`() {
-        // 落到小米账号域或控制台登录页时，隐藏 WebView 等下去也不会拿到票据。
-        assertTrue(
+    fun `xiaomi account sso redirect keeps silent renewal alive`() {
+        // account.xiaomi.com 可能只是长期账号登录态换票的 SSO 中转页。
+        assertFalse(
             XiaomiLoginPage.requiresInteractiveLogin(
                 "https://account.xiaomi.com/pass/serviceLogin?callback=https%3A%2F%2Fplatform.xiaomimimo.com"
             )
         )
+    }
+
+    @Test
+    fun `silent renewal uses the same browser sso entry`() {
+        assertEquals(
+            "https://platform.xiaomimimo.com/api/v1/genLoginUrl?currentPath=%2Fconsole%2Fbalance",
+            XiaomiCookieReader.renewUrl,
+        )
+    }
+
+    @Test
+    fun `platform login page still stops silent renewal`() {
         assertTrue(
             XiaomiLoginPage.requiresInteractiveLogin(
                 "https://platform.xiaomimimo.com/login?redirect=/console/balance"
