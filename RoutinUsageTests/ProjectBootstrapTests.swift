@@ -363,8 +363,8 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(logoSource.contains("NSImage(size: size)"))
         XCTAssertTrue(logoSource.contains("performAsCurrentDrawingAppearance"))
         XCTAssertTrue(logoSource.contains("image.lockFocus()"))
-        XCTAssertTrue(logoSource.contains("NSColor.labelColor.setFill()"))
-        XCTAssertFalse(logoSource.contains("bestMatch(from: [.aqua, .darkAqua])"))
+        XCTAssertTrue(logoSource.contains("foregroundColor.setFill()"))
+        XCTAssertTrue(menuBarLabel.contains("appearance.bestMatch(from: [.darkAqua, .aqua])"))
         XCTAssertFalse(source.contains("button.image?.isTemplate = true"))
     }
 

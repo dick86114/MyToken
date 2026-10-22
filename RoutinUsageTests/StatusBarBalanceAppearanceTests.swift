@@ -44,22 +44,12 @@ final class StatusBarBalanceAppearanceTests: XCTestCase {
         XCTAssertTrue(source.contains("circle.lineWidth = Self.indicatorStrokeWidth"))
     }
 
-    func test余额圆圈与进度条共享边框颜色且数字保留状态色() throws {
+    func test余额圆圈与进度条共享显式前景色且数字保留状态色() throws {
         let sourceURL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .appendingPathComponent("RoutinUsage/Views/MenuBarLabelView.swift")
         let source = try String(contentsOf: sourceURL, encoding: .utf8)
-        let borderStart = try XCTUnwrap(
-            source.range(of: "static var indicatorBorderColor: NSColor")
-        )
-        let borderEnd = try XCTUnwrap(
-            source.range(of: "static let balanceUnitWidth")
-        )
-        let border = source[borderStart.lowerBound..<borderEnd.lowerBound]
-
-        XCTAssertTrue(border.contains("NSColor.labelColor"))
-        XCTAssertFalse(border.contains("withAlphaComponent"))
         let progressStart = try XCTUnwrap(
             source.range(of: "private static func drawProgress(")
         )
@@ -72,9 +62,10 @@ final class StatusBarBalanceAppearanceTests: XCTestCase {
         let progress = source[progressStart.lowerBound..<balanceStart.lowerBound]
         let balance = source[balanceStart.lowerBound..<balanceEnd.lowerBound]
 
-        XCTAssertTrue(source.contains("static var indicatorBorderColor: NSColor"))
-        XCTAssertTrue(progress.contains("indicatorBorderColor.setStroke()"))
-        XCTAssertTrue(balance.contains("indicatorBorderColor.setStroke()"))
+        XCTAssertTrue(progress.contains("foregroundColor.setStroke()"))
+        XCTAssertTrue(balance.contains("foregroundColor.setStroke()"))
+        XCTAssertFalse(progress.contains("NSColor.labelColor"))
+        XCTAssertFalse(balance.contains("NSColor.labelColor"))
         XCTAssertFalse(balance.contains("statusColor.setStroke()"))
         XCTAssertTrue(balance.contains("balanceTextAttributes("))
         XCTAssertTrue(balance.contains("color: statusColor"))
