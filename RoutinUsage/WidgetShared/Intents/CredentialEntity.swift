@@ -5,9 +5,7 @@ typealias WidgetSnapshotLoader = @Sendable () throws -> WidgetSnapshotBundle?
 
 enum WidgetSharedSnapshotLoader {
     static let load: WidgetSnapshotLoader = {
-        guard let directory = FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: WidgetSharedAppGroup.identifier
-        ) else {
+        guard let directory = WidgetSharedAppGroup.containerURL() else {
             return nil
         }
         return try WidgetSnapshotStore(directory: directory).load()
