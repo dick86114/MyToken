@@ -216,20 +216,19 @@ enum MenuBarMultiUsageIcon {
 
     static func image(
         indicators: [MenuBarIndicatorModel],
-        colorRules: MenuBarColorRules = .standard,
-        appearance: NSAppearance = NSAppearance.currentDrawing()
+        colorRules: MenuBarColorRules = .standard
     ) -> NSImage {
         let displayedIndicators = Array(indicators.prefix(maximumCount))
         let imageSize = NSSize(
             width: imageWidth(for: displayedIndicators),
             height: size.height
         )
-        let image = NSImage(size: imageSize)
-        let foregroundColor = resolvedMenuBarForegroundColor(for: appearance)
-        // 立即按状态栏外观栅格化；延迟绘制在 macOS 15 可能生成不可见的空白状态项。
-        appearance.performAsCurrentDrawingAppearance {
-            image.lockFocus()
-            defer { image.unlockFocus() }
+        // 交给 AppKit 在每块屏幕的菜单栏上下文中延迟绘制，
+        // 同一个状态项才能在多屏明暗不同的时候分别反色。
+        let image = NSImage(size: imageSize, flipped: false) { _ in
+            let foregroundColor = resolvedMenuBarForegroundColor(
+                for: NSAppearance.currentDrawing()
+            )
             var cursor = outerPadding
             for (index, indicator) in displayedIndicators.enumerated() {
                 let width = unitWidth(for: indicator)
@@ -249,8 +248,9 @@ enum MenuBarMultiUsageIcon {
                     cursor += gap
                 }
             }
+            return true
         }
-        // 模板图会丢弃风险色；这里保留颜色，并提前解析菜单栏前景色。
+        // 模板图会丢弃风险色；保留颜色，同时让黑白前景随绘制外观变化。
         image.isTemplate = false
         return image
     }
@@ -495,17 +495,14 @@ enum MenuBarMultiUsageIcon {
 enum MenuBarMonoBrandLogo {
     static let size = NSSize(width: 18, height: 18)
 
-    static func image(
-        appearance: NSAppearance = NSAppearance.currentDrawing()
-    ) -> NSImage {
-        let image = NSImage(size: size)
-        let foregroundColor = resolvedMenuBarForegroundColor(for: appearance)
-        appearance.performAsCurrentDrawingAppearance {
-            image.lockFocus()
-            defer { image.unlockFocus() }
+    static func image() -> NSImage {
+        let image = NSImage(size: size, flipped: false) { _ in
+            let foregroundColor = resolvedMenuBarForegroundColor(
+                for: NSAppearance.currentDrawing()
+            )
             let rect = NSRect(origin: .zero, size: size)
             guard let source = NSImage(named: "MenuBarMonoBrandLogo") else {
-                return
+                return false
             }
 
             foregroundColor.setFill()
@@ -516,6 +513,7 @@ enum MenuBarMonoBrandLogo {
                 operation: .destinationIn,
                 fraction: 1
             )
+            return true
         }
         image.isTemplate = false
         return image
