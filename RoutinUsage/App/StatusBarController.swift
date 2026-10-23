@@ -15,6 +15,9 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
     private var isPopoverClosing = false
     private var popoverWindowResignObserver: NSObjectProtocol?
     private var applicationDidBecomeActiveObserver: NSObjectProtocol?
+    private var statusButtonAppearanceObservation: NSKeyValueObservation?
+    private var appearanceUpdateTask: Task<Void, Never>?
+    private var lastDrawnMenuBarDark: Bool?
 
     init(environment: AppEnvironment) {
         self.environment = environment
@@ -70,6 +73,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         configurePopover()
         configureStatusButton()
         updateStatusButton()
+        observeStatusButtonAppearance(statusItem?.button)
     }
 
     private func restoreStatusItemIfNeeded() {
@@ -167,6 +171,37 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         button.imageScaling = .scaleProportionallyDown
     }
 
+    private func observeStatusButtonAppearance(_ button: NSStatusBarButton?) {
+        guard let button else {
+            statusButtonAppearanceObservation = nil
+            return
+        }
+
+        statusButtonAppearanceObservation = button.observe(
+            \.effectiveAppearance,
+            options: [.new]
+        ) { [weak self] _, _ in
+            Task { @MainActor [weak self] in
+                self?.scheduleStatusButtonUpdate()
+            }
+        }
+    }
+
+    private func scheduleStatusButtonUpdate() {
+        appearanceUpdateTask?.cancel()
+        guard let button = statusItem?.button else { return }
+        let isDark = button.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        guard isDark != lastDrawnMenuBarDark else { return }
+
+        appearanceUpdateTask = Task { @MainActor [weak self] in
+            // 外观传播期间立即测量/绘制文字曾触发 CoreText 崩溃；
+            // 延迟并合并到传播稳定后重绘。
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            self?.updateStatusButton()
+        }
+    }
+
     private func observeEnvironment() {
         withObservationTracking {
             _ = environment.settings.menuBarStyle
@@ -204,6 +239,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         guard let statusItem, let button = statusItem.button else {
             return
         }
+        lastDrawnMenuBarDark = button.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
         let enabledIDs = Set(environment.store.visibleKeyIDs)
         let visibility = environment.settings.displayOrder.visible(enabledIDs: enabledIDs)
         let selectedIndicators = visibility.menuBarIDs.compactMap { id -> MenuBarIndicatorModel? in
