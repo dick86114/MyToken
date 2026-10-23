@@ -355,50 +355,22 @@ final class ProjectBootstrapTests: XCTestCase {
         )
         let logoSource = String(menuBarLabel[logoStart.lowerBound..<logoEnd.lowerBound])
 
-        XCTAssertTrue(source.contains("button.image = MenuBarMonoBrandLogo.image(appearance: button.effectiveAppearance)"))
+        XCTAssertTrue(source.contains("button.image = MenuBarMonoBrandLogo.image()"))
         XCTAssertTrue(source.contains("MenuBarMultiUsageIcon.image("))
-        XCTAssertTrue(source.contains("appearance: button.effectiveAppearance"))
-        XCTAssertTrue(source.contains("observeStatusButtonAppearance(statusItem?.button)"))
-        XCTAssertTrue(source.contains("scheduleStatusButtonUpdate()"))
-        XCTAssertTrue(logoSource.contains("NSImage(size: size)"))
-        XCTAssertTrue(logoSource.contains("performAsCurrentDrawingAppearance"))
-        XCTAssertTrue(logoSource.contains("image.lockFocus()"))
+        XCTAssertFalse(source.contains("appearance: button.effectiveAppearance"))
+        XCTAssertTrue(logoSource.contains("NSImage(size: size, flipped: false)"))
+        XCTAssertTrue(logoSource.contains("NSAppearance.currentDrawing()"))
         XCTAssertTrue(logoSource.contains("foregroundColor.setFill()"))
         XCTAssertTrue(menuBarLabel.contains("appearance.bestMatch(from: [.darkAqua, .aqua])"))
         XCTAssertFalse(source.contains("button.image?.isTemplate = true"))
     }
 
-    func test菜单栏外观切换会延迟合并重绘() throws {
+    func test菜单栏颜色交给系统逐屏绘制() throws {
         let source = try sourceText(at: "RoutinUsage/App/StatusBarController.swift")
-        let observerStart = try XCTUnwrap(
-            source.range(of: "private func observeStatusButtonAppearance(")
-        )
-        let observerEnd = try XCTUnwrap(
-            source.range(
-                of: "private func scheduleStatusButtonUpdate()",
-                range: observerStart.lowerBound..<source.endIndex
-            )
-        )
-        let observer = String(source[observerStart.lowerBound..<observerEnd.lowerBound])
-        let schedulerStart = try XCTUnwrap(
-            source.range(of: "private func scheduleStatusButtonUpdate()")
-        )
-        let schedulerEnd = try XCTUnwrap(
-            source.range(
-                of: "private func observeEnvironment()",
-                range: schedulerStart.lowerBound..<source.endIndex
-            )
-        )
-        let scheduler = String(source[schedulerStart.lowerBound..<schedulerEnd.lowerBound])
 
-        XCTAssertTrue(observer.contains("button.observe("))
-        XCTAssertTrue(observer.contains("\\.effectiveAppearance"))
-        XCTAssertTrue(observer.contains("scheduleStatusButtonUpdate()"))
-        XCTAssertFalse(observer.contains("self?.updateStatusButton()"))
-        XCTAssertTrue(scheduler.contains("appearanceUpdateTask?.cancel()"))
-        XCTAssertTrue(scheduler.contains("Task.sleep(for: .milliseconds(250))"))
-        XCTAssertTrue(scheduler.contains("await Task.sleep"))
-        XCTAssertFalse(scheduler.contains("DispatchQueue.main.async"))
+        XCTAssertFalse(source.contains("observeStatusButtonAppearance"))
+        XCTAssertFalse(source.contains("scheduleStatusButtonUpdate"))
+        XCTAssertFalse(source.contains("appearanceUpdateTask"))
     }
 
     func test未配置菜单栏黑白图标资源包含明暗外观() throws {
@@ -639,8 +611,8 @@ final class ProjectBootstrapTests: XCTestCase {
 
         XCTAssertTrue(statusBarController.contains("MenuBarMultiUsageIcon.image("))
         XCTAssertTrue(statusBarController.contains("indicators: selectedIndicators"))
-        XCTAssertTrue(statusBarController.contains("MenuBarMonoBrandLogo.image(appearance: button.effectiveAppearance)"))
-        XCTAssertTrue(statusBarController.contains("appearance: button.effectiveAppearance"))
+        XCTAssertTrue(statusBarController.contains("MenuBarMonoBrandLogo.image()"))
+        XCTAssertFalse(statusBarController.contains("appearance: button.effectiveAppearance"))
         XCTAssertTrue(statusBarController.contains("button.setAccessibilityLabel"))
     }
 
