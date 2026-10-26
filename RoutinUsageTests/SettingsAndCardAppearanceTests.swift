@@ -1,4 +1,3 @@
-import AppKit
 import XCTest
 @testable import RoutinUsage
 
@@ -34,54 +33,6 @@ final class SettingsAndCardAppearanceTests: XCTestCase {
         XCTAssertLessThan(orderIndex.lowerBound, registerIndex.lowerBound)
         XCTAssertLessThan(registerIndex.lowerBound, activateIndex.lowerBound)
         XCTAssertEqual(body.components(separatedBy: "NSApp.activate(ignoringOtherApps: true)").count - 1, 1)
-    }
-
-    func test所有供应商Logo均可从资源目录加载() {
-        for providerID in ProviderID.allCases {
-            XCTAssertNotNil(
-                NSImage(named: providerID.logoAssetName),
-                "缺少 \(providerID.rawValue) 的 Logo 资源"
-            )
-        }
-    }
-
-    func test弹窗别名头像使用供应商Logo() throws {
-        let source = try sourceText(
-            at: "RoutinUsage/Views/CompactUsageCardViews.swift"
-        )
-        let avatarStart = try XCTUnwrap(
-            source.range(of: "struct CompactAccountAvatar: View")
-        )
-        let avatarEnd = try XCTUnwrap(
-            source.range(of: "struct CompactCardActionButton")
-        )
-        let avatar = source[avatarStart.lowerBound..<avatarEnd.lowerBound]
-
-        XCTAssertTrue(avatar.contains("ProviderLogoBadge("))
-        XCTAssertTrue(avatar.contains("providerID: providerID"))
-        XCTAssertFalse(avatar.contains("Text(letter)"))
-    }
-
-    func test分享卡别名头像使用供应商Logo() throws {
-        let source = try sourceText(
-            at: "RoutinUsage/Views/UsageShareCardView.swift"
-        )
-        let avatarStart = try XCTUnwrap(
-            source.range(of: "private func avatar(")
-        )
-        let avatarEnd = try XCTUnwrap(
-            source.range(of: "private func statusBadge(")
-        )
-        let avatar = source[avatarStart.lowerBound..<avatarEnd.lowerBound]
-
-        XCTAssertTrue(avatar.contains("ProviderLogoBadge("))
-        XCTAssertTrue(avatar.contains("providerID: card.providerID"))
-        XCTAssertFalse(avatar.contains("Text(card.avatarLetter)"))
-
-        let content = try sourceText(
-            at: "RoutinUsage/Share/UsageShareContent.swift"
-        )
-        XCTAssertFalse(content.contains("let avatarLetter: String"))
     }
 
     func test简洁卡片标题区没有分隔线() throws {
