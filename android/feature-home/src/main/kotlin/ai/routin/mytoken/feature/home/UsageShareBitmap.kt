@@ -37,8 +37,8 @@ internal object UsageShareBitmapFactory {
 
 internal fun renderUsageShareBitmap(
     card: UsageShareRenderedCard,
-    density: Float,
-    context: Context? = null,
+    context: Context,
+    density: Float = context.resources.displayMetrics.density,
 ): Bitmap {
     val width = (UsageShareCardRenderer.CANVAS_WIDTH * density).toInt()
     val height = UsageShareCardRenderer.height(card, width)
@@ -54,7 +54,7 @@ internal suspend fun exportUsageShareImage(
     action: UsageShareAction,
     targetPackage: String? = null,
 ): String? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-    val bitmap = renderUsageShareBitmap(card, context.resources.displayMetrics.density)
+    val bitmap = renderUsageShareBitmap(card, context)
     try {
         when (action) {
             UsageShareAction.Copy -> {

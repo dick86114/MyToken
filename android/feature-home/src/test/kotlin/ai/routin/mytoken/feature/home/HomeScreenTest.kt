@@ -533,6 +533,25 @@ class HomeScreenTest {
     }
 
     @Test
+    fun credentialAvatarUsesProviderLogoImage() {
+        val credential = credential("主账户", ProviderId.Glm)
+        val usageCard = card(
+            credential,
+            metrics = listOf(progress(14.0, 100.0)),
+        )
+        composeRule.setContent {
+            MaterialTheme {
+                CredentialUsageCard(usageCard, onOpen = {}, onRetry = {})
+            }
+        }
+
+        composeRule.onNodeWithTag(
+            "credential_avatar_${credential.id}",
+            useUnmergedTree = true,
+        ).assertExists()
+    }
+
+    @Test
     fun loadingCardKeepsRefreshAffordanceVisible() {
         val credential = credential("加载中")
         val loadingCard = card(
