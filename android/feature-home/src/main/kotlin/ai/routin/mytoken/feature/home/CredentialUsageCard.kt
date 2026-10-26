@@ -16,6 +16,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -49,6 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -62,11 +64,13 @@ import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 
 /** 方案 A：石墨蓝承载卡片，品牌蓝表达正常用量，彩色只表达状态。 */
 internal object CardPalette {
@@ -294,7 +298,7 @@ private fun CredentialCardHeader(
     val subscriptionExpiry = card.snapshot?.subscriptionEndAt
 
     Row(verticalAlignment = Alignment.CenterVertically) {
-        AvatarWithFailureBadge(card = card, isDark = isDark, onClick = onShowFailure)
+        AvatarWithFailureBadge(card = card, onClick = onShowFailure)
 
         Column(
             modifier = Modifier
@@ -371,11 +375,10 @@ private fun CredentialCardHeader(
 @Composable
 private fun AvatarWithFailureBadge(
     card: CredentialCardUi,
-    isDark: Boolean,
     onClick: () -> Unit,
 ) {
     val accent = ProviderCatalog.accentColor(card.credential.providerId)
-    val letter = card.credential.name.trim().firstOrNull()?.uppercase() ?: "M"
+    val avatarShape = RoundedCornerShape(MyTokenVisualPolicy.innerRadiusDp)
     val failed = card.status == RefreshStatus.Failed
 
     // 44dp 触摸区承载 30dp 头像，失败时整块点击弹失败详情，不再落入卡片详情。
@@ -395,17 +398,19 @@ private fun AvatarWithFailureBadge(
         contentAlignment = Alignment.Center,
     ) {
         Box(
-            modifier = Modifier
-                .size(30.dp)
-                .background(accent.copy(alpha = 0.15f), RoundedCornerShape(MyTokenVisualPolicy.innerRadiusDp))
-                .border(1.dp, accent.copy(alpha = 0.30f), RoundedCornerShape(MyTokenVisualPolicy.innerRadiusDp)),
+            modifier = Modifier.size(30.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = letter,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = accent,
+            Image(
+                painter = painterResource(ProviderCatalog.logoRes(card.credential.providerId)),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(avatarShape)
+                    .background(accent.copy(alpha = 0.15f))
+                    .border(1.dp, accent.copy(alpha = 0.30f), avatarShape)
+                    .testTag("credential_avatar_${card.credential.id}"),
             )
             if (failed) {
                 Box(

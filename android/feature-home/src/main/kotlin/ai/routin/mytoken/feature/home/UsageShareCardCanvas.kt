@@ -31,7 +31,7 @@ internal object UsageShareCardRenderer {
         canvas: Canvas,
         card: UsageShareRenderedCard,
         widthPx: Int,
-        context: Context? = null,
+        context: Context,
     ) {
         if (widthPx <= 0) return
         val save = canvas.save()
@@ -530,17 +530,28 @@ private class RootPainter(
     }
 
     private fun drawAvatar(x: Float, y: Float, size: Float) {
+        val radius = 10f * d
         val rect = RectF(x, y, x + size, y + size)
-        paint.color = if (ticket) 0x26F59E0B.toInt() else if (colors.isLight) 0xFF0F172A.toInt() else 0xFF2563EB.toInt()
-        canvas.drawRoundRect(rect, 10f * d, 10f * d, paint)
-        if (ticket) {
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = d
-            paint.color = 0x4DF59E0B.toInt()
-            canvas.drawRoundRect(rect, 10f * d, 10f * d, paint)
-            paint.style = Paint.Style.FILL
+        paint.style = Paint.Style.FILL
+        paint.shader = null
+        paint.strokeWidth = 0f
+        paint.color = if (colors.isLight) 0xFF0F172A.toInt() else 0xFF2563EB.toInt()
+        canvas.drawRoundRect(rect, radius, radius, paint)
+
+        val save = canvas.save()
+        val clipPath = Path().apply {
+            addRoundRect(rect, radius, radius, Path.Direction.CW)
         }
-        drawText(card.avatarLetter, x + size / 2f, y + size / 2f + 7f, 15f, if (ticket) 0xFFFBBF24.toInt() else Color.WHITE, bold = true, align = Paint.Align.CENTER)
+        canvas.clipPath(clipPath)
+        drawBrandLogo(x, y, size, ProviderCatalog.logoRes(card.providerId))
+        canvas.restoreToCount(save)
+
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = d
+        paint.color = if (colors.isLight) 0x24000000 else 0x24FFFFFF
+        canvas.drawRoundRect(rect, radius, radius, paint)
+        paint.style = Paint.Style.FILL
+        paint.strokeWidth = 0f
     }
 
     private fun drawPassBadge(x: Float, y: Float, measureOnly: Boolean): Float {

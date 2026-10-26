@@ -55,7 +55,6 @@ data class UsageShareContent(
     val providerId: ProviderId,
     val websiteUrl: String? = null,
     val passCode: String,
-    val avatarLetter: String,
     val isAvailable: Boolean,
 )
 
@@ -117,7 +116,6 @@ data class UsageShareRenderedCard(
     val showsStatus: Boolean,
     val template: UsageShareTemplate,
     val passCode: String,
-    val avatarLetter: String,
     val isAvailable: Boolean,
 )
 
@@ -165,7 +163,6 @@ object UsageShareContentBuilder {
             providerId = providerId,
             websiteUrl = card.credential.metadata[CredentialMetadataKey.WebsiteURL],
             passCode = "PASS #TK-${card.credential.id.toString().replace("-", "").take(4).uppercase(Locale.US)}",
-            avatarLetter = card.credential.name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "M",
             isAvailable = card.error == null && !subscriptionExpired,
         )
     }
@@ -215,7 +212,6 @@ object UsageShareContentBuilder {
             showsStatus = draft.showsStatus,
             template = draft.template,
             passCode = content.passCode,
-            avatarLetter = displayName.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "M",
             isAvailable = content.isAvailable,
         )
     }

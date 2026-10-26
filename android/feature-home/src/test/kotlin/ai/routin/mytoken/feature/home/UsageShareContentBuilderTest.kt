@@ -45,7 +45,6 @@ class UsageShareContentBuilderTest {
 
         assertEquals("Routin · Team".replace("Routin", "New API"), content?.subtitle)
         assertEquals("PASS #TK-1234", content?.passCode)
-        assertEquals("主", content?.avatarLetter)
         assertEquals(1, content?.metrics?.size)
         assertEquals("≈ $2.50", content?.metrics?.first()?.companionText)
         assertNull(content?.websiteUrl)
@@ -111,7 +110,6 @@ class UsageShareContentBuilderTest {
             showsStatus = true,
             template = UsageShareTemplate.Ticket,
             passCode = "PASS #TK-1234",
-            avatarLetter = "T",
             isAvailable = true,
         )
         assertEquals(
@@ -167,7 +165,6 @@ class UsageShareContentBuilderTest {
             capturedAtText = "2026.09.20 16:30",
             providerId = ProviderId.Routin,
             passCode = "PASS #TK-1234",
-            avatarLetter = "M",
             isAvailable = true,
         )
 

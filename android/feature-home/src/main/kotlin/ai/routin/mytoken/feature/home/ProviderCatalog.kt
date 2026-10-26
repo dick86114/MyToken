@@ -1,6 +1,7 @@
 package ai.routin.mytoken.feature.home
 
 import ai.routin.mytoken.domain.model.ProviderId
+import androidx.annotation.DrawableRes
 import androidx.compose.ui.graphics.Color
 
 /**
@@ -17,6 +18,18 @@ object ProviderCatalog {
         ProviderId.CommandCode -> "Command Code"
         ProviderId.Xiaomi -> "小米 MiMo"
         ProviderId.OpenCode -> "OpenCode"
+    }
+
+    @DrawableRes
+    fun logoRes(providerId: ProviderId): Int = when (providerId) {
+        ProviderId.Routin -> R.drawable.share_provider_routin_logo
+        ProviderId.DeepSeek -> R.drawable.share_provider_deepseek_logo
+        ProviderId.Glm -> R.drawable.share_provider_glm_logo
+        ProviderId.Volcengine -> R.drawable.share_provider_volcengine_logo
+        ProviderId.NewAPI -> R.drawable.share_provider_newapi_logo
+        ProviderId.CommandCode -> R.drawable.share_provider_commandcode_logo
+        ProviderId.Xiaomi -> R.drawable.share_provider_xiaomi_logo
+        ProviderId.OpenCode -> R.drawable.share_provider_opencode_logo
     }
 
     fun accentColor(providerId: ProviderId): Color = when (providerId) {
