@@ -903,13 +903,7 @@ private extension UsageRowView {
     /// 失败徽章挂在别名头像右上角，点击头像即可查看失败详情。
     @ViewBuilder
     var avatarWithStatus: some View {
-        let avatar = CompactAccountAvatar(
-            letter: CompactUsageCardPresentation.avatarLetter(
-                displayName: state.configuration.displayName,
-                providerID: state.configuration.providerID
-            ),
-            providerID: state.configuration.providerID
-        )
+        let avatar = CompactAccountAvatar(providerID: state.configuration.providerID)
 
         if state.error != nil {
             Button {

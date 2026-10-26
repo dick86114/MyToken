@@ -35,21 +35,6 @@ final class SettingsAndCardAppearanceTests: XCTestCase {
         XCTAssertEqual(body.components(separatedBy: "NSApp.activate(ignoringOtherApps: true)").count - 1, 1)
     }
 
-    func test卡片头像使用低饱和供应商色() throws {
-        let source = try sourceText(
-            at: "RoutinUsage/Views/CompactUsageCardViews.swift"
-        )
-        let avatarStart = try XCTUnwrap(
-            source.range(of: "struct CompactAccountAvatar: View")
-        )
-        let avatarEnd = try XCTUnwrap(
-            source.range(of: "struct CompactCardActionButton")
-        )
-        let avatar = source[avatarStart.lowerBound..<avatarEnd.lowerBound]
-
-        XCTAssertTrue(avatar.contains(".saturation(0.55)"))
-    }
-
     func test简洁卡片标题区没有分隔线() throws {
         let source = try sourceText(
             at: "RoutinUsage/Views/UsageRowView.swift"

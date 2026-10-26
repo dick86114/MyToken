@@ -9,15 +9,6 @@ enum CompactUsageCardPresentation {
         case valueTiles
     }
 
-    static func avatarLetter(displayName: String, providerID: ProviderID) -> String {
-        let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let first = trimmed.first {
-            return String(first)
-        }
-        let code = ProviderRegistry.builtInDescriptors.first(where: { $0.id == providerID })?.shortCode
-        return String(code?.prefix(1) ?? "M")
-    }
-
     static func arrangement(for metrics: [NormalizedUsageMetric]) -> Arrangement {
         if metrics.count == 1, metrics[0].presentation == .balance {
             return .balance

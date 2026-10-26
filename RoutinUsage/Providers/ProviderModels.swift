@@ -11,6 +11,20 @@ enum ProviderID: String, Codable, CaseIterable, Identifiable, Sendable {
     case opencode
 
     var id: String { rawValue }
+
+    /// 别名头像、分享卡片等所有供应商品牌位置共享同一份 Logo 资源映射。
+    var logoAssetName: String {
+        switch self {
+        case .routin: return "ProviderRoutinLogo"
+        case .deepseek: return "ProviderDeepseekLogo"
+        case .glm: return "ProviderGLMLogo"
+        case .volcengine: return "ProviderVolcengineLogo"
+        case .newAPI: return "ProviderNewAPILogo"
+        case .commandCode: return "ProviderCommandCodeLogo"
+        case .xiaomi: return "ProviderXiaomiLogo"
+        case .opencode: return "ProviderOpenCodeLogo"
+        }
+    }
 }
 
 enum CredentialKind: String, Codable, Sendable {

@@ -159,24 +159,14 @@ enum CompactPopoverPalette {
 
 
 struct CompactAccountAvatar: View {
-    let letter: String
     let providerID: ProviderID
 
     var body: some View {
-        Text(letter)
-            .font(.system(size: 12, weight: .bold))
-            .foregroundStyle(ProviderTheme.accentColor(for: providerID))
-            .frame(width: CompactPopoverMetrics.avatarSize, height: CompactPopoverMetrics.avatarSize)
-            .background(
-                ProviderTheme.accentColor(for: providerID).opacity(0.15),
-                in: RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .inner), style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: PopoverVisualPolicy.cornerRadius(for: .inner), style: .continuous)
-                    .strokeBorder(ProviderTheme.accentColor(for: providerID).opacity(0.30), lineWidth: 1)
-            }
-            .saturation(0.55)
-            .accessibilityHidden(true)
+        ProviderLogoBadge(
+            providerID: providerID,
+            size: CompactPopoverMetrics.avatarSize,
+            cornerRadius: PopoverVisualPolicy.cornerRadius(for: .inner)
+        )
     }
 }
 
