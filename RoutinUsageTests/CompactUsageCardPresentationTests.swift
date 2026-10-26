@@ -2,20 +2,6 @@ import XCTest
 @testable import RoutinUsage
 
 final class CompactUsageCardPresentationTests: XCTestCase {
-    func test头像取显示名首字() {
-        XCTAssertEqual(
-            CompactUsageCardPresentation.avatarLetter(displayName: "武", providerID: .glm),
-            "武"
-        )
-        XCTAssertEqual(
-            CompactUsageCardPresentation.avatarLetter(displayName: "  洋", providerID: .commandCode),
-            "洋"
-        )
-        XCTAssertFalse(
-            CompactUsageCardPresentation.avatarLetter(displayName: "   ", providerID: .routin).isEmpty
-        )
-    }
-
     func test指标排布按数量和类型切换() {
         XCTAssertEqual(
             CompactUsageCardPresentation.arrangement(for: [balanceMetric()]),

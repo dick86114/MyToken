@@ -592,12 +592,7 @@ struct UsageShareCardView: View {
 
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 10) {
-                avatar(
-                    size: 32,
-                    fill: isLight ? Color(rgb: 0x0F172A) : Color(rgb: 0x2563EB),
-                    stroke: .clear,
-                    text: .white
-                )
+                avatar(size: 32)
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Text(card.passCode)
@@ -843,16 +838,12 @@ struct UsageShareCardView: View {
         return items
     }
 
-    private func avatar(size: CGFloat, fill: Color, stroke: Color, text: Color) -> some View {
-        Text(card.avatarLetter)
-            .font(.system(size: size * 0.42, weight: .black))
-            .foregroundStyle(text)
-            .frame(width: size, height: size)
-            .background(fill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(stroke, lineWidth: stroke == .clear ? 0 : 1)
-            }
+    private func avatar(size: CGFloat) -> some View {
+        ProviderLogoBadge(
+            providerID: card.providerID,
+            size: size,
+            cornerRadius: 10
+        )
     }
 
     private func statusBadge(light: Bool) -> some View {

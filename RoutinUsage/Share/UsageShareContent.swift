@@ -60,7 +60,6 @@ struct UsageShareContent: Equatable, Sendable {
     let providerID: ProviderID
     let websiteURL: URL?
     let passCode: String
-    let avatarLetter: String
     let isAvailable: Bool
 }
 
@@ -147,7 +146,6 @@ struct UsageShareRenderedCard: Equatable, Sendable {
     let showsStatus: Bool
     let template: UsageShareTemplate
     let passCode: String
-    let avatarLetter: String
     let isAvailable: Bool
 }
 
@@ -208,7 +206,6 @@ enum UsageShareContentBuilder {
             providerID: providerID,
             websiteURL: state.configuration.websiteURL,
             passCode: passCode(for: credentialID),
-            avatarLetter: avatarLetter(for: state.configuration.displayName, providerID: providerID),
             isAvailable: state.error == nil && !isExpired
         )
     }
@@ -254,7 +251,6 @@ enum UsageShareContentBuilder {
             showsStatus: draft.showsStatus,
             template: draft.template,
             passCode: content.passCode,
-            avatarLetter: avatarLetter(for: trimmed(draft.displayName, fallback: content.displayName), providerID: content.providerID),
             isAvailable: content.isAvailable
         )
     }
@@ -465,15 +461,6 @@ enum UsageShareContentBuilder {
     private static func passCode(for id: UUID) -> String {
         let hex = id.uuidString.replacingOccurrences(of: "-", with: "").prefix(4).uppercased()
         return "PASS #TK-\(hex)"
-    }
-
-    private static func avatarLetter(for name: String, providerID: ProviderID) -> String {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let first = trimmed.first {
-            return String(first).uppercased()
-        }
-        let code = ProviderRegistry.builtInDescriptors.first(where: { $0.id == providerID })?.shortCode
-        return String(code?.prefix(1) ?? "M")
     }
 
     private static func providerDisplayName(_ providerID: ProviderID) -> String {

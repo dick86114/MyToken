@@ -28,7 +28,6 @@ final class UsageShareBrandingTests: XCTestCase {
                     providerID: .glm,
                     websiteURL: URL(string: "https://open.bigmodel.cn"),
                     passCode: "PASS",
-                    avatarLetter: "M",
                     isAvailable: true
                 )
             ).template,
