@@ -13,13 +13,13 @@ struct ProviderLogoBadge: View {
             .interpolation(.high)
             .scaledToFill()
             .frame(width: size, height: size)
-            .background(ProviderTheme.background(for: providerID))
+            .background(Color.white)
             .clipShape(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.14), lineWidth: 0.5)
+                    .strokeBorder(Color.black.opacity(0.12), lineWidth: 0.5)
             }
             .accessibilityHidden(true)
     }

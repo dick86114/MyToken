@@ -535,7 +535,7 @@ private class RootPainter(
         paint.style = Paint.Style.FILL
         paint.shader = null
         paint.strokeWidth = 0f
-        paint.color = if (colors.isLight) 0xFF0F172A.toInt() else 0xFF2563EB.toInt()
+        paint.color = Color.WHITE
         canvas.drawRoundRect(rect, radius, radius, paint)
 
         val save = canvas.save()
@@ -548,7 +548,7 @@ private class RootPainter(
 
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = d
-        paint.color = if (colors.isLight) 0x24000000 else 0x24FFFFFF
+        paint.color = 0x1F000000
         canvas.drawRoundRect(rect, radius, radius, paint)
         paint.style = Paint.Style.FILL
         paint.strokeWidth = 0f
@@ -617,6 +617,18 @@ private class RootPainter(
         if (logoRes != null) {
             context?.let { context ->
                 ContextCompat.getDrawable(context, logoRes)?.let { drawable ->
+                    val footerRect = RectF(cx, cy, cx + size, cy + size)
+                    paint.style = Paint.Style.FILL
+                    paint.shader = null
+                    paint.strokeWidth = 0f
+                    paint.color = Color.WHITE
+                    canvas.drawRoundRect(footerRect, 5f * d, 5f * d, paint)
+                    paint.style = Paint.Style.STROKE
+                    paint.strokeWidth = d
+                    paint.color = 0x1F000000
+                    canvas.drawRoundRect(footerRect, 5f * d, 5f * d, paint)
+                    paint.style = Paint.Style.FILL
+                    paint.strokeWidth = 0f
                     drawable.setBounds(
                         cx.toInt(),
                         cy.toInt(),

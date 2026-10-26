@@ -377,7 +377,6 @@ private fun AvatarWithFailureBadge(
     card: CredentialCardUi,
     onClick: () -> Unit,
 ) {
-    val accent = ProviderCatalog.accentColor(card.credential.providerId)
     val avatarShape = RoundedCornerShape(MyTokenVisualPolicy.innerRadiusDp)
     val failed = card.status == RefreshStatus.Failed
 
@@ -408,8 +407,8 @@ private fun AvatarWithFailureBadge(
                 modifier = Modifier
                     .size(30.dp)
                     .clip(avatarShape)
-                    .background(accent.copy(alpha = 0.15f))
-                    .border(1.dp, accent.copy(alpha = 0.30f), avatarShape)
+                    .background(Color.White)
+                    .border(1.dp, Color.Black.copy(alpha = 0.12f), avatarShape)
                     .testTag("credential_avatar_${card.credential.id}"),
             )
             if (failed) {
