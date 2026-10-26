@@ -907,6 +907,12 @@ struct UsageShareCardView: View {
                             .interpolation(.high)
                             .scaledToFit()
                             .frame(width: 22, height: 22)
+                            .background(Color.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                    .strokeBorder(Color.black.opacity(0.12), lineWidth: 0.5)
+                            }
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text("MyToken")
