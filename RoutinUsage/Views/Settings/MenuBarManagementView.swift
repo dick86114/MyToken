@@ -270,7 +270,8 @@ struct MenuBarManagementView: View {
     }
 
     private func previewCredentialRow(_ state: KeyUsageState) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 7) {
+            providerLogo(for: state, size: 20)
             Text(state.configuration.displayName)
             Text(providerName(for: state))
             Text("·")
@@ -375,6 +376,8 @@ struct MenuBarManagementView: View {
                 .equatable()
                 .frame(width: 42, height: 32)
             }
+
+            providerLogo(for: state, size: 28)
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 7) {
@@ -483,6 +486,17 @@ struct MenuBarManagementView: View {
         withAnimation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.84)) {
             environment.settings.displayOrder = updated
         }
+    }
+
+    private func providerLogo(
+        for state: KeyUsageState,
+        size: CGFloat
+    ) -> some View {
+        ProviderLogoBadge(
+            providerID: state.configuration.providerID,
+            size: size,
+            cornerRadius: max(5, size * 0.25)
+        )
     }
 
     private func descriptor(for state: KeyUsageState) -> ProviderDescriptor? {
