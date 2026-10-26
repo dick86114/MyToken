@@ -43,4 +43,34 @@ final class MenuBarManagementViewTests: XCTestCase {
         XCTAssertFalse(source.contains("onDrop"))
         XCTAssertFalse(source.contains(".frame(height: 178)"))
     }
+
+    func test菜单栏管理页预览和凭证卡显示供应商Logo() throws {
+        let source = try TestSourceReader.read([
+            "RoutinUsage", "Views", "Settings", "MenuBarManagementView.swift"
+        ])
+
+        let previewStart = try XCTUnwrap(
+            source.range(of: "private func previewCredentialRow")
+        )
+        let previewEnd = try XCTUnwrap(
+            source.range(of: "private func previewPanel", range: previewStart.upperBound..<source.endIndex)
+        )
+        let preview = source[previewStart.lowerBound..<previewEnd.lowerBound]
+        XCTAssertTrue(preview.contains("providerLogo(for: state, size: 20)"))
+
+        let cardStart = try XCTUnwrap(
+            source.range(of: "private func managementCardContent")
+        )
+        let cardEnd = try XCTUnwrap(
+            source.range(of: "private func pruneDisabledDisplayOrder", range: cardStart.upperBound..<source.endIndex)
+        )
+        let card = source[cardStart.lowerBound..<cardEnd.lowerBound]
+        XCTAssertTrue(card.contains("providerLogo(for: state, size: 28)"))
+
+        XCTAssertEqual(
+            source.components(separatedBy: "providerLogo(for: state").count - 1,
+            2
+        )
+        XCTAssertTrue(source.contains("private func providerLogo("))
+    }
 }
