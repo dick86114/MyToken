@@ -65,6 +65,29 @@ final class SettingsAndCardAppearanceTests: XCTestCase {
         XCTAssertFalse(source.contains("struct CompactBalanceWave"))
     }
 
+    func test简洁用量卡片不叠加内层描边() throws {
+        let source = try sourceText(
+            at: "RoutinUsage/Views/CompactUsageCardViews.swift"
+        )
+        let gaugeStart = try XCTUnwrap(
+            source.range(of: "struct CompactMetricGaugeTile")
+        )
+        let valueStart = try XCTUnwrap(
+            source.range(of: "struct CompactValueTile")
+        )
+        let balanceStart = try XCTUnwrap(
+            source.range(of: "struct CompactBalanceStrip")
+        )
+        let gaugeTile = source[gaugeStart.lowerBound..<valueStart.lowerBound]
+        let valueTile = source[valueStart.lowerBound..<balanceStart.lowerBound]
+
+        XCTAssertFalse(gaugeTile.contains(".overlay"))
+        XCTAssertFalse(gaugeTile.contains("strokeBorder"))
+        XCTAssertFalse(valueTile.contains(".overlay"))
+        XCTAssertFalse(valueTile.contains("strokeBorder"))
+        XCTAssertFalse(source.contains("static func tileStroke"))
+    }
+
     private func sourceText(at relativePath: String) throws -> String {
         let url = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

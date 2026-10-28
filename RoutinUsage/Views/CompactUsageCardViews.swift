@@ -125,17 +125,6 @@ enum CompactPopoverPalette {
         }
     }
 
-    static func tileStroke(_ scheme: ColorScheme, tone: UsageMetricTone) -> Color {
-        switch tone {
-        case .warning:
-            return warningColor.opacity(isDark(scheme) ? 0.34 : 0.22)
-        case .critical:
-            return criticalColor.opacity(isDark(scheme) ? 0.34 : 0.22)
-        case .normal:
-            return cardStroke(scheme)
-        }
-    }
-
     static func subtitle(_ scheme: ColorScheme) -> Color {
         isDark(scheme) ? darkMutedText : Color(red: 0.42, green: 0.45, blue: 0.50)
     }
@@ -335,10 +324,6 @@ struct CompactMetricGaugeTile: View {
             RoundedRectangle(cornerRadius: CompactPopoverMetrics.metricCornerRadius, style: .continuous)
                 .fill(tileFill(tone: tone))
         }
-        .overlay {
-            RoundedRectangle(cornerRadius: CompactPopoverMetrics.metricCornerRadius, style: .continuous)
-                .strokeBorder(tileStroke(tone: tone), lineWidth: 1)
-        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText(subtitle: subtitle))
     }
@@ -364,10 +349,6 @@ struct CompactMetricGaugeTile: View {
 
     private func tileFill(tone: UsageMetricTone) -> Color {
         CompactPopoverPalette.tileFill(colorScheme, tone: tone)
-    }
-
-    private func tileStroke(tone: UsageMetricTone) -> Color {
-        CompactPopoverPalette.tileStroke(colorScheme, tone: tone)
     }
 
     private func subtitleColor(tone: UsageMetricTone) -> Color {
@@ -413,10 +394,6 @@ struct CompactValueTile: View {
         .background {
             RoundedRectangle(cornerRadius: CompactPopoverMetrics.metricCornerRadius, style: .continuous)
                 .fill(CompactPopoverPalette.tileFill(colorScheme, tone: .normal))
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: CompactPopoverMetrics.metricCornerRadius, style: .continuous)
-                .strokeBorder(CompactPopoverPalette.tileStroke(colorScheme, tone: .normal), lineWidth: 1)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(metric.label)，\(valueText)")
