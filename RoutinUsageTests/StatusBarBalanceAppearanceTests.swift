@@ -14,7 +14,8 @@ final class StatusBarBalanceAppearanceTests: XCTestCase {
             content: .balance("99")
         )
         let darkBitmap = try renderedBitmap(
-            MenuBarMultiUsageIcon.image(indicators: [indicator], colorRules: rules)
+            MenuBarMultiUsageIcon.image(indicators: [indicator], colorRules: rules),
+            appearance: try XCTUnwrap(NSAppearance(named: .darkAqua))
         )
         let lightBitmap = try renderedBitmap(
             MenuBarMultiUsageIcon.image(indicators: [indicator], colorRules: rules),
