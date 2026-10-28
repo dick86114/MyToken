@@ -251,7 +251,7 @@ final class MenuBarCodeLayoutTests: XCTestCase {
         )
         XCTAssertEqual(
             MenuBarMultiUsageIcon.stackedValueFont.pointSize,
-            13,
+            12,
             accuracy: 0.01
         )
         XCTAssertTrue(

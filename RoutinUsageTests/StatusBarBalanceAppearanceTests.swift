@@ -3,7 +3,7 @@ import XCTest
 @testable import RoutinUsage
 
 final class StatusBarBalanceAppearanceTests: XCTestCase {
-    func test余额圆圈空心且数字使用状态色() throws {
+    func test余额圆圈空心且数字使用短码前景色() throws {
         var rules = MenuBarColorRules.standard
         rules.normalColor = .init(red: 0.1, green: 0.9, blue: 0.3)
         let indicator = MenuBarIndicatorModel(
@@ -13,21 +13,40 @@ final class StatusBarBalanceAppearanceTests: XCTestCase {
             accessibilityLabel: "余额正常",
             content: .balance("99")
         )
-        let bitmap = try renderedBitmap(
+        let darkBitmap = try renderedBitmap(
             MenuBarMultiUsageIcon.image(indicators: [indicator], colorRules: rules)
         )
-        let circleCenter = circleCenterInBitmap(bitmap)
+        let lightBitmap = try renderedBitmap(
+            MenuBarMultiUsageIcon.image(indicators: [indicator], colorRules: rules),
+            appearance: try XCTUnwrap(NSAppearance(named: .aqua))
+        )
+        let circleCenter = circleCenterInBitmap(darkBitmap)
         let interiorSample = try XCTUnwrap(
-            bitmap.colorAt(x: circleCenter.x, y: circleCenter.y - 14)
+            darkBitmap.colorAt(x: circleCenter.x, y: circleCenter.y - 14)
         )
 
         XCTAssertLessThan(interiorSample.alphaComponent, 0.1)
         XCTAssertTrue(
             containsColor(
-                in: bitmap,
-                within: circleTextBounds(for: bitmap),
-                contains: rules.normalColor,
-                tolerance: 0.05
+                in: darkBitmap,
+                within: circleTextBounds(for: darkBitmap),
+                matches: { $0.greenComponent > 0.9 && $0.alphaComponent > 0.8 }
+            )
+        )
+        XCTAssertTrue(
+            containsColor(
+                in: lightBitmap,
+                within: circleTextBounds(for: lightBitmap),
+                matches: { $0.greenComponent < 0.1 && $0.alphaComponent > 0.8 }
+            )
+        )
+        XCTAssertFalse(
+            containsColor(
+                in: darkBitmap,
+                within: circleTextBounds(for: darkBitmap),
+                matches: { color in
+                    colorMatches(color, expected: rules.normalColor, tolerance: 0.05)
+                }
             )
         )
     }
@@ -44,7 +63,7 @@ final class StatusBarBalanceAppearanceTests: XCTestCase {
         XCTAssertTrue(source.contains("circle.lineWidth = Self.indicatorStrokeWidth"))
     }
 
-    func test余额圆圈与进度条共享显式前景色且数字保留状态色() throws {
+    func test余额圆圈与进度条共享显式前景色且数字使用短码前景色() throws {
         let sourceURL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -67,8 +86,9 @@ final class StatusBarBalanceAppearanceTests: XCTestCase {
         XCTAssertFalse(progress.contains("NSColor.labelColor"))
         XCTAssertFalse(balance.contains("NSColor.labelColor"))
         XCTAssertFalse(balance.contains("statusColor.setStroke()"))
+        XCTAssertFalse(balance.contains("balanceColor("))
         XCTAssertTrue(balance.contains("balanceTextAttributes("))
-        XCTAssertTrue(balance.contains("color: statusColor"))
+        XCTAssertTrue(balance.contains("color: foregroundColor"))
         XCTAssertTrue(balance.contains(".foregroundColor: color"))
         XCTAssertFalse(balance.contains(".strokeColor"))
         XCTAssertFalse(balance.contains(".strokeWidth"))
@@ -142,11 +162,29 @@ final class StatusBarBalanceAppearanceTests: XCTestCase {
         return (xLower...xUpper, yLower...yUpper)
     }
 
+    private func renderedBitmap(
+        _ image: NSImage,
+        appearance: NSAppearance
+    ) throws -> NSBitmapImageRep {
+        var result: NSBitmapImageRep?
+        var renderError: Error?
+        appearance.performAsCurrentDrawingAppearance {
+            do {
+                result = try renderedBitmap(image)
+            } catch {
+                renderError = error
+            }
+        }
+        if let renderError {
+            throw renderError
+        }
+        return try XCTUnwrap(result)
+    }
+
     private func containsColor(
         in bitmap: NSBitmapImageRep,
         within bounds: (xRange: ClosedRange<Int>, yRange: ClosedRange<Int>),
-        contains expected: MenuBarColorComponents,
-        tolerance: Double
+        matches predicate: (NSColor) -> Bool
     ) -> Bool {
         for x in bounds.xRange {
             for y in bounds.yRange {
@@ -155,14 +193,23 @@ final class StatusBarBalanceAppearanceTests: XCTestCase {
                     let rgb = color.usingColorSpace(.sRGB)
                 else { continue }
 
-                if abs(rgb.redComponent - expected.red) < tolerance,
-                   abs(rgb.greenComponent - expected.green) < tolerance,
-                   abs(rgb.blueComponent - expected.blue) < tolerance,
-                   rgb.alphaComponent > 0.9 {
+                if predicate(rgb) {
                     return true
                 }
             }
         }
         return false
+    }
+
+    private func colorMatches(
+        _ color: NSColor,
+        expected: MenuBarColorComponents,
+        tolerance: Double
+    ) -> Bool {
+        guard let rgb = color.usingColorSpace(.sRGB) else { return false }
+        return abs(rgb.redComponent - expected.red) < tolerance
+            && abs(rgb.greenComponent - expected.green) < tolerance
+            && abs(rgb.blueComponent - expected.blue) < tolerance
+            && rgb.alphaComponent > 0.9
     }
 }

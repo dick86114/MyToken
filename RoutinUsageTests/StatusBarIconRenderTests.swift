@@ -249,42 +249,31 @@ final class StatusBarIconRenderTests: XCTestCase {
         )
     }
 
-    func test余额圆圈按健康状态使用绿红规则() throws {
+    func test余额圆圈文字使用短码前景色而非健康状态色() throws {
         var rules = MenuBarColorRules.standard
         rules.normalColor = .init(red: 0.1, green: 0.9, blue: 0.3)
         rules.criticalColor = .init(red: 0.95, green: 0.1, blue: 0.2)
-        let normal = MenuBarIndicatorModel(
+        let indicator = MenuBarIndicatorModel(
             shortCode: "DS",
             percent: nil,
             healthState: .normal,
             accessibilityLabel: "余额正常",
             content: .balance("99")
         )
-        let warning = MenuBarIndicatorModel(
-            shortCode: "DS",
-            percent: nil,
-            healthState: .warning,
-            accessibilityLabel: "余额偏低",
-            content: .balance("1")
+        let bitmap = try renderedBitmap(
+            MenuBarMultiUsageIcon.image(indicators: [indicator], colorRules: rules)
         )
 
-        let normalBitmap = try renderedBitmap(
-            MenuBarMultiUsageIcon.image(indicators: [normal], colorRules: rules)
-        )
-        let warningBitmap = try renderedBitmap(
-            MenuBarMultiUsageIcon.image(indicators: [warning], colorRules: rules)
-        )
-
-        XCTAssertTrue(
+        XCTAssertFalse(
             try containsColor(
-                in: normalBitmap,
+                in: bitmap,
                 contains: rules.normalColor,
                 tolerance: 0.05
             )
         )
-        XCTAssertTrue(
+        XCTAssertFalse(
             try containsColor(
-                in: warningBitmap,
+                in: bitmap,
                 contains: rules.criticalColor,
                 tolerance: 0.05
             )
@@ -325,30 +314,66 @@ final class StatusBarIconRenderTests: XCTestCase {
         XCTAssertFalse(colorMatches(gapColor, expected: rules.normalColor))
     }
 
-    func test上下百分比文字使用进度颜色规则() throws {
+    func test上下百分比和余额文字使用短码前景色() throws {
         var rules = MenuBarColorRules.standard
+        rules.normalColor = .init(red: 0.1, green: 0.9, blue: 0.3)
         rules.warningColor = .init(red: 0.9, green: 0.5, blue: 0.1)
-        let indicator = MenuBarIndicatorModel(
-            shortCode: "GLM",
-            percent: 60,
-            healthState: .warning,
-            accessibilityLabel: "GLM，已使用 60%",
-            content: .progress(60),
-            style: .stacked
-        )
-        let bitmap = try renderedBitmap(
-            MenuBarMultiUsageIcon.image(
-                indicators: [indicator],
-                colorRules: rules
+        let indicators = [
+            MenuBarIndicatorModel(
+                shortCode: "GLM",
+                percent: 60,
+                healthState: .warning,
+                accessibilityLabel: "GLM，已使用 60%",
+                content: .progress(60),
+                style: .stacked
+            ),
+            MenuBarIndicatorModel(
+                shortCode: "DS",
+                percent: nil,
+                healthState: .warning,
+                accessibilityLabel: "DeepSeek，余额不足",
+                balanceCurrencyText: "¥1",
+                content: .balance("1"),
+                style: .stacked
             )
+        ]
+        let image = MenuBarMultiUsageIcon.image(
+            indicators: indicators,
+            colorRules: rules
+        )
+        let darkBitmap = try renderedBitmap(
+            image,
+            appearance: try XCTUnwrap(NSAppearance(named: .darkAqua))
+        )
+        let lightBitmap = try renderedBitmap(
+            image,
+            appearance: try XCTUnwrap(NSAppearance(named: .aqua))
         )
 
         XCTAssertTrue(
+            try hasOpaquePixel(in: darkBitmap) { color in
+                luminance(of: color) > 0.8
+            }
+        )
+        XCTAssertTrue(
+            try hasOpaquePixel(in: lightBitmap) { color in
+                luminance(of: color) < 0.2
+            }
+        )
+        XCTAssertFalse(
             try containsColor(
-                in: bitmap,
+                in: darkBitmap,
                 contains: rules.warningColor,
                 tolerance: 0.08
             )
         )
+        XCTAssertFalse(
+            try containsColor(
+                in: darkBitmap,
+                contains: rules.normalColor,
+                tolerance: 0.05
+            )
+        )
     }
+
 }

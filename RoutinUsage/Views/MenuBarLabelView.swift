@@ -199,7 +199,7 @@ enum MenuBarMultiUsageIcon {
     static let stackedBalanceHorizontalPadding: CGFloat = 2.5
     static let stackedBalanceMinimumUnitWidth: CGFloat = 24
     static let stackedTracking: CGFloat = 0.75
-    static let stackedValueFontSize: CGFloat = 13
+    static let stackedValueFontSize: CGFloat = 12
     static var stackedValueFont: NSFont {
         NSFont.monospacedSystemFont(
             ofSize: stackedValueFontSize,
@@ -315,7 +315,6 @@ enum MenuBarMultiUsageIcon {
                 drawStackedValue(
                     indicator: indicator,
                     valueText: stackedPercentText(percent),
-                    valueColor: progressColor(for: indicator, rules: colorRules),
                     foregroundColor: foregroundColor,
                     in: rect
                 )
@@ -324,7 +323,6 @@ enum MenuBarMultiUsageIcon {
                 drawStackedValue(
                     indicator: indicator,
                     valueText: indicator.balanceCurrencyText ?? text,
-                    valueColor: balanceColor(for: indicator, rules: colorRules),
                     foregroundColor: foregroundColor,
                     in: rect
                 )
@@ -352,8 +350,6 @@ enum MenuBarMultiUsageIcon {
         case let .balance(text):
             drawBalance(
                 text: text,
-                indicator: indicator,
-                colorRules: colorRules,
                 foregroundColor: foregroundColor,
                 in: rect
             )
@@ -395,7 +391,6 @@ enum MenuBarMultiUsageIcon {
     private static func drawStackedValue(
         indicator: MenuBarIndicatorModel,
         valueText: String,
-        valueColor: NSColor,
         foregroundColor: NSColor,
         in rect: NSRect
     ) {
@@ -403,12 +398,12 @@ enum MenuBarMultiUsageIcon {
         let codeFont = codeFont(for: text.count)
         let valueFont = stackedValueFont
         let totalHeight = codeFont.capHeight
-            + 3
+            + 4
             + valueFont.capHeight
         let valueBaseline = (rect.height - totalHeight) / 2
         let codeBaseline = valueBaseline
             + valueFont.capHeight
-            + 3
+            + 4
 
         drawCenteredLine(
             text: text,
@@ -422,7 +417,7 @@ enum MenuBarMultiUsageIcon {
             text: valueText,
             font: valueFont,
             tracking: stackedTracking,
-            color: valueColor,
+            color: foregroundColor,
             baselineY: valueBaseline,
             in: rect
         )
@@ -658,8 +653,6 @@ extension MenuBarMultiUsageIcon {
 
     private static func drawBalance(
         text: String,
-        indicator: MenuBarIndicatorModel,
-        colorRules: MenuBarColorRules,
         foregroundColor: NSColor,
         in rect: NSRect
     ) {
@@ -669,14 +662,13 @@ extension MenuBarMultiUsageIcon {
             width: balanceDiameter,
             height: balanceDiameter
         )
-        let statusColor = balanceColor(for: indicator, rules: colorRules)
         let circle = NSBezierPath(ovalIn: circleRect)
         circle.lineWidth = Self.indicatorStrokeWidth
         foregroundColor.setStroke()
         circle.stroke()
 
         let font = balanceFont(for: text)
-        let attributes = balanceTextAttributes(font: font, color: statusColor)
+        let attributes = balanceTextAttributes(font: font, color: foregroundColor)
         let textSize = NSString(string: text).size(withAttributes: attributes)
         let origin = NSPoint(
             x: circleRect.midX - textSize.width / 2,
@@ -717,21 +709,4 @@ extension MenuBarMultiUsageIcon {
         return contrastWithBlack >= contrastWithWhite ? .black : .white
     }
 
-    private static func balanceColor(
-        for indicator: MenuBarIndicatorModel,
-        rules: MenuBarColorRules
-    ) -> NSColor {
-        if case let .balance(text) = indicator.content, text == "--" {
-            return .gray
-        }
-
-        switch indicator.healthState {
-        case .normal:
-            return rules.normalColor.nsColor
-        case .warning, .critical, .unavailable, .stale:
-            return rules.criticalColor.nsColor
-        case .unknown:
-            return .gray
-        }
-    }
 }
