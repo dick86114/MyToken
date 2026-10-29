@@ -3,6 +3,8 @@ package ai.routin.mytoken.feature.home
 import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -10,14 +12,24 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -103,6 +115,7 @@ internal fun progressPercent(metric: UsageMetric): Double? {
 private val shortResetFormatter = DateTimeFormatter.ofPattern("MM-dd HH:mm")
 private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 private val subscriptionFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+private val resetCardFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
 internal fun formatResetTime(instant: Instant): String {
     val zone = ZoneId.systemDefault()
@@ -162,6 +175,9 @@ internal fun formatSubscriptionTime(instant: Instant?): String {
     if (instant == null) return "-"
     return subscriptionFormatter.format(instant.atZone(ZoneId.systemDefault()))
 }
+
+internal fun formatResetCardExpiry(instant: Instant): String =
+    resetCardFormatter.format(instant.atZone(ZoneId.systemDefault()))
 
 internal fun formatCommandCodeAmount(value: BigDecimal?): String =
     value?.setScale(2, java.math.RoundingMode.HALF_UP)?.toPlainString() ?: "-"
@@ -226,6 +242,80 @@ fun UsageMetricGrid(
                     MetricCell(metric, colors, Modifier.weight(1f))
                 }
                 repeat(columns - row.size) { Spacer(modifier = Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+internal enum class ResetCardsBadgeStyle {
+    Compact,
+    Detail,
+}
+
+@Composable
+internal fun ResetCardsBadge(
+    metric: UsageMetric,
+    style: ResetCardsBadgeStyle,
+    modifier: Modifier = Modifier,
+) {
+    val cards = metric.resetCards
+    if (cards.isEmpty()) return
+    var expanded by remember(metric.id, cards) { mutableStateOf(false) }
+    val text = "${cards.size} 张重置卡"
+    val iconFill = MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)
+    val iconAccent = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f)
+
+    Row(
+        modifier = modifier
+            .clickable { expanded = !expanded }
+            .semantics { contentDescription = text }
+            .background(
+                MaterialTheme.colorScheme.onSurface.copy(alpha = if (expanded) 0.10f else 0.05f),
+                androidx.compose.foundation.shape.CircleShape,
+            )
+            .padding(horizontal = if (style == ResetCardsBadgeStyle.Detail) 7.dp else 5.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Canvas(modifier = Modifier.size(width = 12.dp, height = 9.dp)) {
+            drawRoundRect(
+                color = iconFill,
+                cornerRadius = CornerRadius(2.5.dp.toPx(), 2.5.dp.toPx()),
+            )
+            drawRoundRect(
+                color = iconAccent,
+                topLeft = Offset(2.dp.toPx(), 3.8.dp.toPx()),
+                size = Size(8.dp.toPx(), 1.4.dp.toPx()),
+                cornerRadius = CornerRadius(0.7.dp.toPx(), 0.7.dp.toPx()),
+            )
+        }
+        Text(
+            text = if (style == ResetCardsBadgeStyle.Detail) text else cards.size.toString(),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = if (style == ResetCardsBadgeStyle.Detail) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
+            },
+        )
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                Text(
+                    text = "重置卡到期时间",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                cards.forEachIndexed { index, card ->
+                    Text(
+                        text = "${index + 1}  ${formatResetCardExpiry(card.expiresAt)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(vertical = 2.dp),
+                    )
+                }
             }
         }
     }
@@ -387,6 +477,9 @@ internal fun GLMMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modifie
                         metric.windowEnd?.let {
                             Text("重置 ${formatResetTime(it)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             RemainingDurationText(it, colors)
+                        }
+                        if (metric.resetCards.isNotEmpty()) {
+                            ResetCardsBadge(metric = metric, style = ResetCardsBadgeStyle.Detail)
                         }
                     }
                 }

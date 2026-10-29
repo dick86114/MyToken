@@ -11,6 +11,7 @@ import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import ai.routin.mytoken.domain.model.UsageMetricSemantic
 import ai.routin.mytoken.domain.model.UsageMetricUnit
+import ai.routin.mytoken.domain.model.UsageResetCard
 import ai.routin.mytoken.domain.model.UsageSnapshot
 import ai.routin.mytoken.domain.usage.RefreshStatus
 import androidx.compose.material3.MaterialTheme
@@ -111,6 +112,26 @@ class HomeScreenTest {
         cards = cards,
     )
 
+    private fun glmProgressMetric(
+        id: String,
+        label: String,
+        resetCards: Int,
+    ) = UsageMetric(
+        id = id,
+        label = label,
+        used = BigDecimal.valueOf(42),
+        limit = BigDecimal.valueOf(100),
+        remaining = BigDecimal.valueOf(58),
+        unit = UsageMetricUnit.Token,
+        windowEnd = now.plusSeconds(3_600),
+        presentation = UsageMetricPresentation.Progress,
+        semantic = UsageMetricSemantic.UsedQuota,
+        healthState = UsageMetricHealthState.Normal,
+        resetCards = (1..resetCards).map {
+            UsageResetCard(Instant.parse("2026-11-07T09:42:45Z"))
+        },
+    )
+
     @Test
     fun newApiTokenColumnsAreCenteredInTheirCells() {
         composeRule.setContent {
@@ -139,6 +160,65 @@ class HomeScreenTest {
         assertEquals(0.75f, centerRatio("15,123,456"), 0.015f)
         assertEquals(0.25f, centerRatio("近 7 天 Token"), 0.015f)
         assertEquals(0.75f, centerRatio("近 30 天 Token"), 0.015f)
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h1100dp")
+    fun compactGlmCardShowsResetCardCountsAndOpensDetailList() {
+        val credential = credential("GLM 重置卡", ProviderId.Glm)
+        val testCard = card(
+            credential,
+            metrics = listOf(
+                glmProgressMetric("five-hour", "5 小时用量", resetCards = 2),
+                glmProgressMetric("weekly", "每周用量", resetCards = 1),
+            ),
+        )
+
+        composeRule.setContent {
+            MaterialTheme {
+                CredentialUsageCard(
+                    testCard,
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.COMPACT,
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("2 张重置卡").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("1 张重置卡").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("2 张重置卡").performClick()
+        composeRule.onNodeWithText("重置卡到期时间").assertIsDisplayed()
+        composeRule
+            .onAllNodesWithText(
+                formatResetCardExpiry(Instant.parse("2026-11-07T09:42:45Z")),
+                substring = true,
+                useUnmergedTree = true,
+            )
+            .onFirst()
+            .assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h1100dp")
+    fun fullGlmCardShowsResetCardCountBelowRemainingTime() {
+        val credential = credential("GLM 完整模式", ProviderId.Glm)
+        val testCard = card(
+            credential,
+            metrics = listOf(
+                glmProgressMetric("five-hour", "5 小时用量", resetCards = 2),
+                glmProgressMetric("weekly", "每周用量", resetCards = 1),
+            ),
+        )
+
+        composeRule.setContent {
+            MaterialTheme {
+                CredentialUsageCard(testCard, onOpen = {}, onRetry = {})
+            }
+        }
+
+        composeRule.onAllNodesWithText("2 张重置卡").onFirst().assertIsDisplayed()
+        composeRule.onAllNodesWithText("1 张重置卡").onFirst().assertIsDisplayed()
     }
 
     @Test

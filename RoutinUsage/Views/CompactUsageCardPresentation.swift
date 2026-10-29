@@ -118,6 +118,24 @@ enum CompactUsageCardPresentation {
     }
 }
 
+enum UsageResetCardPresentation {
+    static func isVisible(cards: [UsageResetCard]) -> Bool {
+        !cards.isEmpty
+    }
+
+    static func badgeText(cards: [UsageResetCard]) -> String {
+        "\(cards.count)"
+    }
+
+    static func detailText(cards: [UsageResetCard]) -> String {
+        "\(cards.count) 张重置卡"
+    }
+
+    static func accessibilityText(cards: [UsageResetCard]) -> String {
+        detailText(cards: cards)
+    }
+}
+
 enum CompactGaugeStyle: Equatable {
     case horizontal
     case vertical

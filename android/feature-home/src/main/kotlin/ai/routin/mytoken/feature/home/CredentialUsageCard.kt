@@ -502,34 +502,48 @@ private fun CompactUsageCardBody(card: CredentialCardUi, isDark: Boolean) {
         )
         CompactUsageArrangement.HorizontalRings -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             metrics.forEach { metric ->
-                Column(
+                Box(
                     modifier = Modifier
                         .weight(1f)
                         .ringTileBackground(isDark, tone = CompactUsageCardPresentation.tone(metric))
-                        .padding(10.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    UsageRing(
-                        percent = progressPercent(metric),
-                        tone = CompactUsageCardPresentation.tone(metric),
-                        isDark = isDark,
-                        diameter = 44.dp,
-                    )
-                    Text(
-                        text = metric.label,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Text(
-                        text = ringSubtitle(metric, vertical = false),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        UsageRing(
+                            percent = progressPercent(metric),
+                            tone = CompactUsageCardPresentation.tone(metric),
+                            isDark = isDark,
+                            diameter = 44.dp,
+                        )
+                        Text(
+                            text = metric.label,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text(
+                            text = ringSubtitle(metric, vertical = false),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    if (metric.resetCards.isNotEmpty()) {
+                        ResetCardsBadge(
+                            metric = metric,
+                            style = ResetCardsBadgeStyle.Compact,
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(end = 8.dp),
+                        )
+                    }
                 }
             }
         }

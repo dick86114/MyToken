@@ -222,12 +222,21 @@ private struct NormalizedUsageMetricCell: View {
                     }
                 }
             }
+            if !metric.resetCards.isEmpty {
+                UsageResetCardsBadge(resetCards: metric.resetCards, style: .detail)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
-            "\(metric.label)，已使用 \(percentText)，剩余 \(decimalText(metric.remaining))"
+            "\(metric.label)，已使用 \(percentText)，剩余 \(decimalText(metric.remaining))\(resetCardsAccessibilityText)"
         )
+    }
+
+    private var resetCardsAccessibilityText: String {
+        metric.resetCards.isEmpty
+            ? ""
+            : "，\(UsageResetCardPresentation.accessibilityText(cards: metric.resetCards))"
     }
 
     @ViewBuilder

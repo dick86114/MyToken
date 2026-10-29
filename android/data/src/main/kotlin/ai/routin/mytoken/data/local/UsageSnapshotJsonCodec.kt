@@ -5,6 +5,7 @@ import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import ai.routin.mytoken.domain.model.UsageMetricSemantic
 import ai.routin.mytoken.domain.model.UsageMetricUnit
+import ai.routin.mytoken.domain.model.UsageResetCard
 import ai.routin.mytoken.domain.model.UsageGroupMultiplier
 import ai.routin.mytoken.domain.model.UsageSnapshot
 import java.math.BigDecimal
@@ -40,6 +41,14 @@ object UsageSnapshotJsonCodec {
                     .put("semantic", metric.semantic.rawValue)
                     .putOpt("currencyCode", metric.currencyCode)
                     .put("healthState", metric.healthState.rawValue)
+                    .put(
+                        "resetCards",
+                        JSONArray().apply {
+                            metric.resetCards.forEach { card ->
+                                put(JSONObject().put("expiresAt", card.expiresAt.toString()))
+                            }
+                        }
+                    )
             )
         }
         return JSONObject()
@@ -90,7 +99,16 @@ object UsageSnapshotJsonCodec {
                 semantic = requireNotNull(UsageMetricSemantic.fromRawValue(item.getString("semantic"))) { "unknown semantic" },
                 currencyCode = item.optNullableString("currencyCode"),
                 healthState = UsageMetricHealthState.fromRawValue(item.getString("healthState"))
-                    ?: UsageMetricHealthState.Unknown
+                    ?: UsageMetricHealthState.Unknown,
+                resetCards = item.optJSONArray("resetCards")
+                    ?.let { cards ->
+                        (0 until cards.length()).mapNotNull { index ->
+                            val card = cards.optJSONObject(index) ?: return@mapNotNull null
+                            card.optNullableString("expiresAt")?.let(Instant::parse)
+                                ?.let(::UsageResetCard)
+                        }
+                    }
+                    ?: emptyList()
             )
         }
         UsageSnapshot(

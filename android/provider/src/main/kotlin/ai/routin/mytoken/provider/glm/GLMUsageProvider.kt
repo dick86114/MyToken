@@ -10,6 +10,7 @@ import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import ai.routin.mytoken.domain.model.UsageMetricSemantic
 import ai.routin.mytoken.domain.model.UsageMetricUnit
+import ai.routin.mytoken.domain.model.UsageResetCard
 import ai.routin.mytoken.domain.model.UsageSnapshot
 import ai.routin.mytoken.domain.usage.UsageProvider
 import ai.routin.mytoken.domain.usage.UsageProviderException
@@ -24,18 +25,19 @@ import ai.routin.mytoken.provider.json.decimalOrNull
 import ai.routin.mytoken.provider.json.intOrNull
 import ai.routin.mytoken.provider.json.longOrNull
 import ai.routin.mytoken.provider.json.objOrNull
+import ai.routin.mytoken.provider.json.boolOrNull
 import ai.routin.mytoken.provider.json.stringOrNull
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDateTime
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import kotlinx.serialization.json.JsonObject
 
 /**
- * GLM Coding Plan usage adapter, aligned with the macOS GLMUsageProvider:
- * three GET requests (model usage + quota limit + model list) with a raw Authorization header,
- * metric order [five-hour, weekly, model-calls, zcode-mcp].
+ * GLM Coding Plan 用量适配器，与 macOS GLMUsageProvider 保持一致。
+ * 各接口使用裸 API Key 作为 Authorization，重置卡接口失败时不影响主用量。
  */
 class GLMUsageProvider(
     private val transport: HttpTransport,
@@ -83,9 +85,16 @@ class GLMUsageProvider(
             if (error is kotlinx.coroutines.CancellationException) throw error
             emptyList()
         }
+        val resetCards = runCatching {
+            val response = request(url = baseURL.trimEnd('/') + RESET_CARDS_PATH + "?targetType=PERSONAL", key = key)
+            resetCards(response)
+        }.getOrElse { error ->
+            if (error is kotlinx.coroutines.CancellationException) throw error
+            ResetCards()
+        }
 
         return runCatching {
-            mapResponses(modelResponse, quotaResponse, activityResponse, credential.id, models)
+            mapResponses(modelResponse, quotaResponse, activityResponse, credential.id, models, resetCards)
         }.recoverCatching { error ->
             if (error is UsageProviderException) throw error
             throw UsageProviderException.InvalidResponse()
@@ -121,6 +130,7 @@ class GLMUsageProvider(
         activityResponse: ProviderHttpResponse?,
         credentialId: java.util.UUID,
         allowedModels: List<String>,
+        resetCards: ResetCards,
     ): UsageSnapshot {
         val modelRoot = ProviderJson.parse(modelResponse.body.decodeToString()).asObjectOrNull()
         val quotaRoot = ProviderJson.parse(quotaResponse.body.decodeToString()).asObjectOrNull()
@@ -135,6 +145,12 @@ class GLMUsageProvider(
             modelCallMetric(modelRoot)?.let { add(it) }
             quotaMetrics.firstOrNull { it.id == "zcode-mcp" }?.let { add(it) }
             addAll(activityMetrics(activityRoot))
+        }.map { metric ->
+            when (metric.id) {
+                "five-hour" -> metric.copy(resetCards = resetCards.fiveHour)
+                "weekly" -> metric.copy(resetCards = resetCards.weekly)
+                else -> metric
+            }
         }
         if (metrics.isEmpty()) throw UsageProviderException.InvalidResponse()
 
@@ -156,6 +172,38 @@ class GLMUsageProvider(
         return data.mapNotNull { item ->
             item.asObjectOrNull()?.stringOrNull("id")?.takeIf(String::isNotBlank)
         }
+    }
+
+    private fun resetCards(response: ProviderHttpResponse): ResetCards {
+        val data = ProviderJson.parse(response.body.decodeToString())
+            .asObjectOrNull()
+            ?.objOrNull("data")
+            ?: return ResetCards()
+        return ResetCards(
+            fiveHour = availableResetCards(data.arrayOrNull("fiveHourResets")),
+            weekly = availableResetCards(data.arrayOrNull("weekResets")),
+        )
+    }
+
+    private fun availableResetCards(items: kotlinx.serialization.json.JsonArray?): List<UsageResetCard> =
+        items.orEmpty().mapNotNull { item ->
+            val obj = item.asObjectOrNull() ?: return@mapNotNull null
+            if (obj.boolOrNull("available") != true) return@mapNotNull null
+            UsageResetCard(expiresAt = resetCardExpiresAt(obj) ?: return@mapNotNull null)
+        }
+
+    private fun resetCardExpiresAt(obj: JsonObject): Instant? {
+        obj.longOrNull("expireTime")?.let { timestamp ->
+            return when {
+                timestamp >= 100_000_000_000L -> Instant.ofEpochMilli(timestamp)
+                timestamp >= 100_000_000L -> Instant.ofEpochSecond(timestamp)
+                else -> null
+            }
+        }
+        val text = obj.stringOrNull("expireTime") ?: return null
+        return runCatching {
+            LocalDateTime.parse(text, RESET_TIME_FORMATTER).toInstant(ZoneOffset.ofHours(8))
+        }.getOrNull()
     }
 
     private fun quotaMetrics(root: JsonObject?): List<UsageMetric> {
@@ -303,7 +351,14 @@ class GLMUsageProvider(
         private const val QUOTA_LIMIT_PATH = "/api/monitor/usage/quota/limit"
         private const val ACTIVITY_PATH = "/api/monitor/credit-usage/activity"
         private const val MODEL_LIST_PATH = "/api/coding/paas/v4/models"
+        private const val RESET_CARDS_PATH = "/api/biz/customer-package-reset/list"
 
         private val FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+        private val RESET_TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
     }
+
+    private data class ResetCards(
+        val fiveHour: List<UsageResetCard> = emptyList(),
+        val weekly: List<UsageResetCard> = emptyList(),
+    )
 }

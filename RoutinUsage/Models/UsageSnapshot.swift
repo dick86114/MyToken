@@ -54,6 +54,10 @@ enum UsageMetricHealthState: String, Codable, Equatable, Sendable {
     case unknown
 }
 
+struct UsageResetCard: Codable, Equatable, Sendable {
+    let expiresAt: Date
+}
+
 enum UsageMetricHealthEvaluator {
     static func balanceState(
         balance: Decimal,
@@ -83,6 +87,7 @@ struct NormalizedUsageMetric: Codable, Equatable, Sendable, Identifiable {
     let semantic: NormalizedUsageMetricSemantic
     let currencyCode: String?
     let healthState: UsageMetricHealthState
+    let resetCards: [UsageResetCard]
 
     var displayedPercent: Double? {
         guard let limit, limit > 0 else { return nil }
@@ -120,7 +125,8 @@ struct NormalizedUsageMetric: Codable, Equatable, Sendable, Identifiable {
         presentation: NormalizedUsageMetricPresentation,
         semantic: NormalizedUsageMetricSemantic,
         currencyCode: String? = nil,
-        healthState: UsageMetricHealthState = .unknown
+        healthState: UsageMetricHealthState = .unknown,
+        resetCards: [UsageResetCard] = []
     ) {
         self.id = id
         self.label = label
@@ -135,6 +141,7 @@ struct NormalizedUsageMetric: Codable, Equatable, Sendable, Identifiable {
         self.semantic = semantic
         self.currencyCode = currencyCode
         self.healthState = healthState
+        self.resetCards = resetCards
     }
 
     func withID(_ id: String) -> NormalizedUsageMetric {
@@ -151,7 +158,27 @@ struct NormalizedUsageMetric: Codable, Equatable, Sendable, Identifiable {
             presentation: presentation,
             semantic: semantic,
             currencyCode: currencyCode,
-            healthState: healthState
+            healthState: healthState,
+            resetCards: resetCards
+        )
+    }
+
+    func withResetCards(_ resetCards: [UsageResetCard]) -> NormalizedUsageMetric {
+        NormalizedUsageMetric(
+            id: id,
+            label: label,
+            used: used,
+            limit: limit,
+            remaining: remaining,
+            value: value,
+            unit: unit,
+            windowStart: windowStart,
+            windowEnd: windowEnd,
+            presentation: presentation,
+            semantic: semantic,
+            currencyCode: currencyCode,
+            healthState: healthState,
+            resetCards: resetCards
         )
     }
 
@@ -169,6 +196,7 @@ struct NormalizedUsageMetric: Codable, Equatable, Sendable, Identifiable {
         case semantic
         case currencyCode
         case healthState
+        case resetCards
     }
 
     init(from decoder: Decoder) throws {
@@ -191,6 +219,7 @@ struct NormalizedUsageMetric: Codable, Equatable, Sendable, Identifiable {
             ?? Self.legacySemantic(id: id, label: label, presentation: presentation)
         currencyCode = try container.decodeIfPresent(String.self, forKey: .currencyCode)
         healthState = try container.decodeIfPresent(UsageMetricHealthState.self, forKey: .healthState) ?? .unknown
+        resetCards = try container.decodeIfPresent([UsageResetCard].self, forKey: .resetCards) ?? []
     }
 
     private static func legacySemantic(

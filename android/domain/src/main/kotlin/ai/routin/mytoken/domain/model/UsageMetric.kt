@@ -55,6 +55,10 @@ enum class UsageMetricHealthState(val rawValue: String) {
     }
 }
 
+data class UsageResetCard(
+    val expiresAt: Instant,
+)
+
 data class UsageMetric(
     val id: String,
     val label: String,
@@ -68,5 +72,6 @@ data class UsageMetric(
     val presentation: UsageMetricPresentation,
     val semantic: UsageMetricSemantic,
     val currencyCode: String? = null,
-    val healthState: UsageMetricHealthState = UsageMetricHealthState.Unknown
+    val healthState: UsageMetricHealthState = UsageMetricHealthState.Unknown,
+    val resetCards: List<UsageResetCard> = emptyList(),
 )

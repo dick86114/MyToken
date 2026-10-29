@@ -5,6 +5,7 @@ import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import ai.routin.mytoken.domain.model.UsageMetricSemantic
 import ai.routin.mytoken.domain.model.UsageMetricUnit
+import ai.routin.mytoken.domain.model.UsageResetCard
 import ai.routin.mytoken.domain.model.UsageSnapshot
 import java.math.BigDecimal
 import java.time.Instant
@@ -42,7 +43,11 @@ class UsageSnapshotJsonCodecTest {
         presentation = UsageMetricPresentation.Progress,
         semantic = UsageMetricSemantic.UsedQuota,
         currencyCode = "USD",
-        healthState = UsageMetricHealthState.Normal
+        healthState = UsageMetricHealthState.Normal,
+        resetCards = listOf(
+            UsageResetCard(Instant.parse("2026-11-07T09:42:45Z")),
+            UsageResetCard(Instant.parse("2026-12-22T15:59:59Z"))
+        )
     )
 
     @Test
@@ -54,6 +59,7 @@ class UsageSnapshotJsonCodecTest {
         assertEquals("progress", metricJson.getString("presentation"))
         assertEquals("usedQuota", metricJson.getString("semantic"))
         assertEquals("normal", metricJson.getString("healthState"))
+        assertEquals(2, metricJson.getJSONArray("resetCards").length())
     }
 
     @Test
@@ -75,7 +81,11 @@ class UsageSnapshotJsonCodecTest {
                   "presentation": "progress",
                   "semantic": "usedQuota",
                   "currencyCode": "USD",
-                  "healthState": "normal"
+                  "healthState": "normal",
+                  "resetCards": [
+                    {"expiresAt": "2026-11-07T09:42:45Z"},
+                    {"expiresAt": "2026-12-22T15:59:59Z"}
+                  ]
                 }
               ]
             }
