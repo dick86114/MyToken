@@ -78,7 +78,7 @@ final class RefreshScheduler {
     }
 
     func start(minutes: Int, onTick: @escaping @Sendable () -> Void) {
-        guard AppSettings.allowedRefreshMinutes.contains(minutes) else {
+        guard AppSettings.refreshMinutesRange.contains(minutes) else {
             return
         }
         self.onTick = onTick
@@ -86,7 +86,7 @@ final class RefreshScheduler {
     }
 
     func reschedule(minutes: Int) {
-        guard AppSettings.allowedRefreshMinutes.contains(minutes) else {
+        guard AppSettings.refreshMinutesRange.contains(minutes) else {
             return
         }
         guard onTick != nil else {

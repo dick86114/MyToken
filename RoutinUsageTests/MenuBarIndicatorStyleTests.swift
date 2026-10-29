@@ -22,7 +22,7 @@ final class MenuBarIndicatorStyleTests: XCTestCase {
         )
         XCTAssertEqual(
             MenuBarIndicatorStyle.stacked.title(for: metric),
-            "短码 + 余额"
+            "余额"
         )
     }
 
@@ -44,7 +44,7 @@ final class MenuBarIndicatorStyleTests: XCTestCase {
         )
         XCTAssertEqual(
             MenuBarIndicatorStyle.stacked.title(for: metric),
-            "短码 + 百分比"
+            "百分比"
         )
     }
 

@@ -20,10 +20,11 @@ struct GeneralSettingsView: View {
             VStack(alignment: .leading, spacing: 20) {
                 SettingsPageHeader(
                     title: "通用",
-                    subtitle: "刷新、启动、提醒与显示"
+                    subtitle: "刷新、外观、启动、提醒与显示"
                 )
 
                 refreshSection
+                appearanceSection
                 launchSection
                 notificationSection
                 displaySection
@@ -61,6 +62,9 @@ struct GeneralSettingsView: View {
         } message: {
             Text("当前凭证、用量提醒和展示顺序会被备份文件覆盖。导入后建议立即刷新用量。")
         }
+        .onChange(of: settings.appearance) { _, appearance in
+            environment.appearanceDidChange(to: appearance)
+        }
         .alert(
             "无法完成操作",
             isPresented: Binding(
@@ -95,16 +99,25 @@ struct GeneralSettingsView: View {
 
                 Spacer(minLength: 16)
 
-                Picker("刷新间隔", selection: $settings.refreshMinutes) {
-                    ForEach(AppSettings.allowedRefreshMinutes, id: \.self) { minutes in
-                        Text("每 \(minutes) 分钟")
-                            .tag(minutes)
-                    }
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .frame(width: 150)
-                .accessibilityLabel("自动刷新间隔")
+                RefreshIntervalControl(minutes: $settings.refreshMinutes)
+            }
+        }
+    }
+
+    private var appearanceSection: some View {
+        settingSection {
+            HStack(alignment: .center, spacing: 16) {
+                settingLabel(
+                    title: "外观",
+                    message: "跟随系统外观，或固定使用浅色、深色。"
+                )
+
+                Spacer(minLength: 16)
+
+                AppAppearanceSegmentedControl(
+                    selection: $settings.appearance
+                )
+                .accessibilityLabel("外观")
             }
         }
     }
@@ -173,7 +186,7 @@ struct GeneralSettingsView: View {
                 } label: {
                     Label("导出配置", systemImage: "square.and.arrow.up")
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 .help("导出包含凭证密钥的完整配置备份")
 
                 Button {

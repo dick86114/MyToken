@@ -23,7 +23,8 @@ enum UpdateChannel: String, Codable, Equatable, Sendable, CaseIterable {
 
 @Observable
 final class AppSettings {
-    static let allowedRefreshMinutes = [1, 5, 15, 30]
+    static let presetRefreshMinutes = [1, 5, 15, 30]
+    static let refreshMinutesRange = 1...1440
     static let cdnBases = ["https://ghfast.top", "https://gh-proxy.com", "https://ghproxy.net"]
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -32,7 +33,7 @@ final class AppSettings {
 
     var refreshMinutes: Int {
         didSet {
-            guard Self.allowedRefreshMinutes.contains(refreshMinutes) else {
+            guard Self.refreshMinutesRange.contains(refreshMinutes) else {
                 refreshMinutes = oldValue
                 return
             }
@@ -126,6 +127,12 @@ final class AppSettings {
         }
     }
 
+    var appearance: AppAppearance {
+        didSet {
+            defaults.set(appearance.rawValue, forKey: Keys.appearance)
+        }
+    }
+
     /// nil = 直连 GitHub；非空 = 走该镜像前缀下载和检测。
     var updateMirrorBase: String? {
         updateChannel == .cdn && !updateCDNBase.isEmpty ? updateCDNBase : nil
@@ -179,6 +186,7 @@ final class AppSettings {
             refreshMinutes: refreshMinutes,
             displayDimension: displayDimension,
             usageCardDensity: usageCardDensity,
+            appearance: appearance,
             menuBarStyle: menuBarStyle,
             notificationsEnabled: notificationsEnabled,
             thresholds: thresholds,
@@ -192,11 +200,12 @@ final class AppSettings {
     }
 
     func applyBackup(_ backup: ConfigurationBackupSettings) {
-        refreshMinutes = AppSettings.allowedRefreshMinutes.contains(backup.refreshMinutes)
+        refreshMinutes = AppSettings.refreshMinutesRange.contains(backup.refreshMinutes)
             ? backup.refreshMinutes
             : refreshMinutes
         displayDimension = backup.displayDimension
         usageCardDensity = backup.usageCardDensity
+        appearance = backup.appearance
         menuBarStyle = backup.menuBarStyle
         notificationsEnabled = backup.notificationsEnabled
         thresholds = backup.thresholds
@@ -259,7 +268,7 @@ final class AppSettings {
 
         let storedRefreshMinutes = defaults.object(forKey: Keys.refreshMinutes) as? Int
         if let storedRefreshMinutes,
-           Self.allowedRefreshMinutes.contains(storedRefreshMinutes) {
+           Self.refreshMinutesRange.contains(storedRefreshMinutes) {
             refreshMinutes = storedRefreshMinutes
         } else {
             refreshMinutes = 5
@@ -336,6 +345,9 @@ final class AppSettings {
             usageCardDensity = initialDensity
         }
 
+        appearance = defaults.string(forKey: Keys.appearance)
+            .flatMap(AppAppearance.init(rawValue:)) ?? .system
+
         syncUpdateMirrorBase()
     }
 }
@@ -356,6 +368,7 @@ private extension AppSettings {
         static let selectedCredentialIDs = "selectedCredentialIDs"
         static let availableCredentialIDs = "availableCredentialIDs"
         static let usageCardDensity = "usageCardDensity"
+        static let appearance = "appearance"
     }
 
     static let displayOrderKey = "displayOrder.v1"

@@ -554,6 +554,32 @@ final class GitHubUpdateServiceTests: XCTestCase {
         )
     }
 
+    func testGitHubAPI请求携带用户令牌() async throws {
+        let body = #"{"tag_name":"v1.2.0","html_url":"https://github.com/dick86114/MyToken/releases/tag/v1.2.0","assets":[{"name":"MyToken.dmg","browser_download_url":"https://example.com/MyToken.dmg"}]}"#
+        let stub = URLProtocolStub.makeSession { request in
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer ghp_test-token")
+            let response = try XCTUnwrap(
+                HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)
+            )
+            return (response, Data(body.utf8))
+        }
+        let service = GitHubUpdateService(
+            session: stub.session,
+            currentVersion: "1.1.0",
+            tokenProvider: { " ghp_test-token " }
+        )
+
+        let update = try await service.checkForUpdate()
+
+        XCTAssertEqual(update?.version, "1.2.0")
+    }
+
+    func testGitHub令牌脱敏只保留首尾四位() {
+        XCTAssertEqual(GitHubTokenMask.mask("ghp_1234567890abcd"), "ghp_…abcd")
+        XCTAssertEqual(GitHubTokenMask.mask("short"), "•••••")
+        XCTAssertNil(GitHubTokenMask.mask(nil))
+    }
+
     func testCDN模式下API不可用时走镜像Atom检测() async throws {
         struct NetworkUnavailable: Error {}
         let atom = """

@@ -103,6 +103,60 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(restored.usageCardDensity, .full)
     }
 
+    func test应用外观可持久化并重新载入() throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let settings = AppSettings(defaults: context.defaults)
+
+        XCTAssertEqual(settings.appearance, .system)
+
+        settings.appearance = .light
+        XCTAssertEqual(AppSettings(defaults: context.defaults).appearance, .light)
+
+        settings.appearance = .dark
+        XCTAssertEqual(AppSettings(defaults: context.defaults).appearance, .dark)
+    }
+
+    func test应用外观映射到AppKit外观() {
+        XCTAssertNil(AppAppearance.system.nsAppearanceName)
+        XCTAssertEqual(AppAppearance.light.nsAppearanceName, .aqua)
+        XCTAssertEqual(AppAppearance.dark.nsAppearanceName, .darkAqua)
+    }
+
+    func test自定义刷新间隔和外观可备份导入() throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let settings = AppSettings(defaults: context.defaults)
+        settings.refreshMinutes = 7
+        settings.appearance = .dark
+
+        let restored = AppSettings(defaults: context.defaults)
+        restored.applyBackup(settings.backupSettings)
+
+        XCTAssertEqual(restored.refreshMinutes, 7)
+        XCTAssertEqual(restored.appearance, .dark)
+    }
+
+    func test旧备份缺少外观设置时跟随系统() throws {
+        let context = try makeContext()
+        defer { context.cleanUp() }
+        let settings = AppSettings(defaults: context.defaults)
+        settings.appearance = .dark
+        let data = try JSONEncoder().encode(settings.backupSettings)
+        var object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        object.removeValue(forKey: "appearance")
+
+        let legacyBackup = try JSONDecoder().decode(
+            ConfigurationBackupSettings.self,
+            from: JSONSerialization.data(withJSONObject: object)
+        )
+        settings.applyBackup(legacyBackup)
+
+        XCTAssertEqual(settings.appearance, .system)
+    }
+
     func test旧备份缺少卡片密度时导入为完整() throws {
         let context = try makeContext()
         defer { context.cleanUp() }
@@ -276,7 +330,7 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(window.minSize, WindowFramePersistence.minimumSize)
     }
 
-    func test刷新间隔只接受固定选项并可重新载入() throws {
+    func test刷新间隔接受预设和自定义分钟数() throws {
         let context = try makeContext()
         defer { context.cleanUp() }
         let settings = AppSettings(defaults: context.defaults)
@@ -292,14 +346,21 @@ final class AppSettingsTests: XCTestCase {
 
         settings.refreshMinutes = 7
 
-        XCTAssertEqual(settings.refreshMinutes, 30)
-        XCTAssertEqual(AppSettings(defaults: context.defaults).refreshMinutes, 30)
+        XCTAssertEqual(settings.refreshMinutes, 7)
+        XCTAssertEqual(AppSettings(defaults: context.defaults).refreshMinutes, 7)
+
+        let validValue = settings.refreshMinutes
+        settings.refreshMinutes = 0
+        settings.refreshMinutes = 1441
+
+        XCTAssertEqual(settings.refreshMinutes, validValue)
+        XCTAssertEqual(AppSettings(defaults: context.defaults).refreshMinutes, validValue)
     }
 
     func test损坏的持久化值恢复为安全默认值() throws {
         let context = try makeContext()
         defer { context.cleanUp() }
-        context.defaults.set(7, forKey: "refreshMinutes")
+        context.defaults.set(0, forKey: "refreshMinutes")
         context.defaults.set("token", forKey: "displayDimension")
         context.defaults.set(0, forKey: "notificationLowThreshold")
         context.defaults.set(101, forKey: "notificationHighThreshold")

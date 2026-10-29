@@ -38,11 +38,11 @@ enum MenuBarIndicatorStyle: String, CaseIterable, Codable, Equatable, Sendable {
         case .stacked:
             switch semantic {
             case .balance:
-                return "短码 + 余额"
+                return "余额"
             case .usedQuota, .remainingQuota:
-                return "短码 + 百分比"
+                return "百分比"
             case .status, .value, .none:
-                return "短码 + 数值"
+                return "数值"
             }
         }
     }
