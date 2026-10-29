@@ -12,8 +12,8 @@ android {
         applicationId = "ai.routin.mytoken"
         minSdk = 29
         targetSdk = 34
-        versionCode = 580
-        versionName = "5.8.0"
+        versionCode = 581
+        versionName = "5.8.1"
     }
 
     buildTypes {
