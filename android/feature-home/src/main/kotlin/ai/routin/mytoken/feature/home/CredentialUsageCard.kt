@@ -15,7 +15,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -58,6 +57,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathMeasure
@@ -505,7 +505,7 @@ private fun CompactUsageCardBody(card: CredentialCardUi, isDark: Boolean) {
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .ringTileBackground(isDark, tone = CompactUsageCardPresentation.tone(metric))
+                        .usageTileGlass(isDark)
                 ) {
                     Column(
                         modifier = Modifier
@@ -550,15 +550,10 @@ private fun CompactUsageCardBody(card: CredentialCardUi, isDark: Boolean) {
         CompactUsageArrangement.VerticalRings -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             metrics.forEach { metric ->
                 val tone = CompactUsageCardPresentation.tone(metric)
-                val toneColor = when (tone) {
-                    UsageMetricTone.Warning -> statusColors().warning
-                    UsageMetricTone.Critical -> statusColors().critical
-                    UsageMetricTone.Normal -> MaterialTheme.colorScheme.onSurface
-                }
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .ringTileBackground(isDark, tone = tone),
+                        .usageTileGlass(isDark),
                 ) {
                     Column(
                         modifier = Modifier
@@ -577,20 +572,12 @@ private fun CompactUsageCardBody(card: CredentialCardUi, isDark: Boolean) {
                             text = metric.label,
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Medium,
-                            color = if (tone == UsageMetricTone.Normal) {
-                                MaterialTheme.colorScheme.onSurface
-                            } else {
-                                toneColor
-                            },
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                         Text(
                             text = ringSubtitle(metric, vertical = true),
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (tone == UsageMetricTone.Normal) {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            } else {
-                                toneColor
-                            },
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -602,8 +589,14 @@ private fun CompactUsageCardBody(card: CredentialCardUi, isDark: Boolean) {
             metrics.chunked(2).forEach { rowMetrics ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     rowMetrics.forEach { metric ->
-                        Box(modifier = Modifier.weight(1f)) {
-                            CompactMetricRow(metric = metric)
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .usageTileGlass(isDark),
+                        ) {
+                            Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
+                                CompactMetricRow(metric = metric)
+                            }
                         }
                     }
                     if (rowMetrics.size == 1) {
@@ -615,23 +608,28 @@ private fun CompactUsageCardBody(card: CredentialCardUi, isDark: Boolean) {
     }
 }
 
-private fun Modifier.ringTileBackground(isDark: Boolean, tone: UsageMetricTone): Modifier {
-    val colors = StatusColors.forTheme(isDark)
-    val (fill, stroke) = when (tone) {
-        UsageMetricTone.Warning -> colors.warning.copy(alpha = 0.12f) to colors.warning.copy(alpha = 0.40f)
-        UsageMetricTone.Critical -> colors.critical.copy(alpha = 0.12f) to colors.critical.copy(alpha = 0.40f)
-        UsageMetricTone.Normal ->
-            if (isDark) {
-                Color.Transparent to Color.Transparent
-            } else {
-                Color.White.copy(alpha = 0.45f) to Color.White.copy(alpha = 0.55f)
-            }
-    }
-    // 深色下普通用量扁平化，不铺格子底和框线。
-    if (tone == UsageMetricTone.Normal && isDark) return this
+/** 简洁用量小卡片只保留一层无色透明玻璃，状态色仍只出现在圆环或进度条。 */
+private fun Modifier.usageTileGlass(isDark: Boolean): Modifier {
+    val shape = RoundedCornerShape(MyTokenVisualPolicy.innerRadiusDp)
+    val fillTopAlpha = if (isDark) 0.11f else 0.56f
+    val fillBottomAlpha = if (isDark) 0.05f else 0.28f
+    val edgeAlpha = if (isDark) 0.22f else 0.80f
+    val fill = Brush.verticalGradient(
+        listOf(
+            Color.White.copy(alpha = fillTopAlpha),
+            Color.White.copy(alpha = fillBottomAlpha),
+        )
+    )
+    val edge = Brush.linearGradient(
+        listOf(
+            Color.White.copy(alpha = edgeAlpha),
+            Color.White.copy(alpha = edgeAlpha * 0.45f),
+        )
+    )
     return this
-        .background(fill, RoundedCornerShape(MyTokenVisualPolicy.innerRadiusDp))
-        .border(1.dp, stroke, RoundedCornerShape(MyTokenVisualPolicy.innerRadiusDp))
+        .clip(shape)
+        .background(fill, shape)
+        .border(1.dp, edge, shape)
 }
 
 @Composable
@@ -643,40 +641,8 @@ private fun BalanceStrip(metric: UsageMetric, isDark: Boolean) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                if (isDark) CardPalette.darkSurface else MaterialTheme.colorScheme.surface,
-                RoundedCornerShape(MyTokenVisualPolicy.innerRadiusDp),
-            )
-            .border(
-                1.dp,
-                if (isDark) CardPalette.darkSurfaceBorder else statusColor.copy(alpha = 0.18f),
-                RoundedCornerShape(MyTokenVisualPolicy.innerRadiusDp),
-            ),
+            .usageTileGlass(isDark),
     ) {
-        // 底部渐隐波浪装饰
-        Canvas(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .fillMaxWidth()
-                .height(36.dp),
-        ) {
-            val waveColor = statusColor.copy(alpha = 0.08f)
-            val path = androidx.compose.ui.graphics.Path()
-            path.moveTo(0f, size.height * 0.7f)
-            path.quadraticTo(
-                size.width * 0.25f, size.height * 0.2f,
-                size.width * 0.5f, size.height * 0.5f,
-            )
-            path.quadraticTo(
-                size.width * 0.75f, size.height * 0.8f,
-                size.width, size.height * 0.3f,
-            )
-            path.lineTo(size.width, size.height)
-            path.lineTo(0f, size.height)
-            path.close()
-            drawPath(path, waveColor)
-        }
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -727,7 +693,11 @@ private fun CompactMetricRow(metric: UsageMetric) {
                     text = formatPercent(percent),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
-                    color = progressColor(percent, colors),
+                    color = if (percent <= 0.0) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
+                    },
                 )
             }
         }

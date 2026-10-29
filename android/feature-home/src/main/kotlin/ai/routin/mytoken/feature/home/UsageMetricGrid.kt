@@ -2,8 +2,12 @@ package ai.routin.mytoken.feature.home
 
 import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
+import ai.routin.mytoken.core.ui.MyTokenPalette
+import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -14,6 +18,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,11 +36,15 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import java.math.RoundingMode
 import java.math.BigDecimal
 import java.time.Duration
@@ -264,6 +276,7 @@ internal fun ResetCardsBadge(
     val text = "${cards.size} 张重置卡"
     val iconFill = MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)
     val iconAccent = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f)
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
     Row(
         modifier = modifier
@@ -271,7 +284,12 @@ internal fun ResetCardsBadge(
             .semantics { contentDescription = text }
             .background(
                 MaterialTheme.colorScheme.onSurface.copy(alpha = if (expanded) 0.10f else 0.05f),
-                androidx.compose.foundation.shape.CircleShape,
+                CircleShape,
+            )
+            .border(
+                1.dp,
+                MaterialTheme.colorScheme.onSurface.copy(alpha = if (expanded) 0.12f else 0.06f),
+                CircleShape,
             )
             .padding(horizontal = if (style == ResetCardsBadgeStyle.Detail) 7.dp else 5.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -299,26 +317,72 @@ internal fun ResetCardsBadge(
                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
             },
         )
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.width(210.dp),
+            shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
+            containerColor = resetCardsMenuContainer(isDark),
+            tonalElevation = 0.dp,
+            shadowElevation = 12.dp,
+            border = BorderStroke(1.dp, resetCardsMenuBorder(isDark)),
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(all = 12.dp)) {
                 Text(
                     text = "重置卡到期时间",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold,
+                    style = TextStyle(
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                )
                 cards.forEachIndexed { index, card ->
-                    Text(
-                        text = "${index + 1}  ${formatResetCardExpiry(card.expiresAt)}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(vertical = 2.dp),
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = (index + 1).toString(),
+                            style = TextStyle(
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                fontFamily = FontFamily.Monospace,
+                            ),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.width(14.dp),
+                            textAlign = TextAlign.End,
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = formatResetCardExpiry(card.expiresAt),
+                            style = TextStyle(
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
                 }
             }
         }
     }
+}
+
+/** macOS popover 使用中性弹层；Android 以高不透明中性色近似玻璃弹层。 */
+private fun resetCardsMenuContainer(isDark: Boolean): Color = if (isDark) {
+    MyTokenPalette.darkSurface.copy(alpha = 0.96f)
+} else {
+    Color.White.copy(alpha = 0.96f)
+}
+
+private fun resetCardsMenuBorder(isDark: Boolean): Color = if (isDark) {
+    Color.White.copy(alpha = 0.14f)
+} else {
+    Color.Black.copy(alpha = 0.08f)
 }
 
 
