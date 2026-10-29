@@ -44,15 +44,11 @@ internal fun UsageRing(
     val numberSize = (if (diameter > 42.dp) 13.5 else 11.5).sp
     val percentSize = (if (diameter > 42.dp) 9.5 else 8.0).sp
     val numberWeight = if ((percent ?: 0.0) <= 0.0) FontWeight.SemiBold else FontWeight.Bold
-    val labelColor = when (tone) {
-        UsageMetricTone.Critical -> colors.critical
-        UsageMetricTone.Warning -> colors.warning
-        UsageMetricTone.Normal ->
-            if ((percent ?: 0.0) <= 0.0 && percent != null) {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
-            }
+    // 状态色只用于圆环本体；数值保留常规前景色以维持易读性。
+    val labelColor = if ((percent ?: 0.0) <= 0.0) {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    } else {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
     }
     val numberText = CompactUsageCardPresentation.compactPercentNumberText(percent)
 
