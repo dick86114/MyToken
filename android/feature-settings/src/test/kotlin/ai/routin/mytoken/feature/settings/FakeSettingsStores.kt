@@ -60,6 +60,25 @@ class FakeUpdateSettingsStore(initial: UpdateSettings = UpdateSettings()) : Upda
         state.update { it.copy(mirrorBase = base) }
 }
 
+class FakeGitHubTokenStore(initialToken: String? = null) : GitHubTokenStore {
+    var token: String? = initialToken
+    var failOperations = false
+
+    override suspend fun readToken(): String? = token
+
+    override suspend fun saveToken(token: String) {
+        if (failOperations) throw IllegalStateException("storage failed")
+        this.token = token.trim()
+    }
+
+    override suspend fun clearToken() {
+        if (failOperations) throw IllegalStateException("storage failed")
+        token = null
+    }
+
+    override suspend fun tokenMask(): String? = GitHubTokenMask.mask(token)
+}
+
 class FakeAppUpdateController : AppUpdateController {
     override val state = MutableStateFlow<AppUpdateUiState>(AppUpdateUiState.Idle)
     override val releaseHistoryState =

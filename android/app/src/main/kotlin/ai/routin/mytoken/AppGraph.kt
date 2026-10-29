@@ -15,6 +15,7 @@ import ai.routin.mytoken.feature.settings.DataStoreDisplaySettingsStore
 import ai.routin.mytoken.feature.transfer.TransferClient
 import ai.routin.mytoken.feature.transfer.TransferRepositoryImpl
 import ai.routin.mytoken.provider.defaultUsageProviders
+import ai.routin.mytoken.security.KeystoreGitHubTokenStore
 import ai.routin.mytoken.update.GitHubAppUpdateController
 import ai.routin.mytoken.feature.credentials.XiaomiSessionRenewer
 import android.content.Context
@@ -66,6 +67,12 @@ class AppGraph(context: Context) {
         AppPreferencesUpdateSettingsStore(AppPreferencesRepository(appContext))
     }
 
+    val gitHubTokenStore: KeystoreGitHubTokenStore by lazy {
+        KeystoreGitHubTokenStore(
+            AndroidKeystoreSecretStore(appContext, keyAliasPrefix = "mytoken.githubToken.")
+        )
+    }
+
     val notificationSettingsStore: AppPreferencesNotificationSettingsStore by lazy {
         AppPreferencesNotificationSettingsStore(AppPreferencesRepository(appContext))
     }
@@ -112,6 +119,7 @@ class AppGraph(context: Context) {
                     .updateMirrorBase
                     .takeIf { it.isNotBlank() }
             },
+            gitHubTokenProvider = { gitHubTokenStore.readToken() },
         )
     }
 }

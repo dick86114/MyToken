@@ -24,6 +24,7 @@ class SettingsViewModelTest {
     private lateinit var notificationStore: FakeNotificationSettingsStore
     private lateinit var updateController: FakeAppUpdateController
     private lateinit var updateStore: FakeUpdateSettingsStore
+    private lateinit var gitHubTokenStore: FakeGitHubTokenStore
 
     @Before
     fun setUp() {
@@ -33,6 +34,7 @@ class SettingsViewModelTest {
         notificationStore = FakeNotificationSettingsStore()
         updateController = FakeAppUpdateController()
         updateStore = FakeUpdateSettingsStore()
+        gitHubTokenStore = FakeGitHubTokenStore()
     }
 
     @After
@@ -45,6 +47,7 @@ class SettingsViewModelTest {
         displayStore,
         notificationStore,
         updateStore,
+        gitHubTokenStore,
         updateController,
     )
 
@@ -122,6 +125,36 @@ class SettingsViewModelTest {
         advanceUntilIdle()
 
         assertFalse(notificationStore.state.value.credentialFailureAlertsEnabled)
+    }
+
+    @Test
+    fun githubTokenSavesMaskAndRemovesSecureValue() = runTest(dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+
+        vm.setGitHubToken(" ghp_1234567890abcd ")
+        advanceUntilIdle()
+
+        assertEquals("ghp_…abcd", vm.state.value.update.githubTokenMask)
+        assertEquals("ghp_1234567890abcd", gitHubTokenStore.token)
+
+        vm.removeGitHubToken()
+        advanceUntilIdle()
+
+        assertEquals(null, vm.state.value.update.githubTokenMask)
+        assertEquals(null, gitHubTokenStore.token)
+    }
+
+    @Test
+    fun githubTokenStorageFailureShowsRetryError() = runTest(dispatcher) {
+        gitHubTokenStore.failOperations = true
+        val vm = viewModel()
+        advanceUntilIdle()
+
+        vm.setGitHubToken("ghp_1234567890abcd")
+        advanceUntilIdle()
+
+        assertEquals("GitHub 令牌保存失败，请重试", vm.state.value.update.githubTokenError)
     }
 
 }

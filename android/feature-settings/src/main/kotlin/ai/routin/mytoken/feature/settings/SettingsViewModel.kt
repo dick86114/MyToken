@@ -18,6 +18,11 @@ data class SettingsUiState(
     val update: UpdateSettings = UpdateSettings(),
 )
 
+private data class GitHubTokenUiState(
+    val mask: String? = null,
+    val error: String? = null,
+)
+
 /**
  * Settings state holder. All preferences are Android-local; macOS-only options
  * (menu bar style, login item, window behavior) are intentionally absent.
@@ -27,23 +32,34 @@ class SettingsViewModel(
     private val displayStore: DisplaySettingsStore,
     private val notificationStore: NotificationSettingsStore,
     private val updateStore: UpdateSettingsStore,
+    private val gitHubTokenStore: GitHubTokenStore,
     private val updateController: AppUpdateController,
 ) : ViewModel() {
+
+    private val gitHubToken = MutableStateFlow(GitHubTokenUiState())
 
     val state: StateFlow<SettingsUiState> = combine(
         refreshStore.settings,
         displayStore.settings,
         notificationStore.settings,
         updateStore.settings,
-    ) { refresh, display, notifications, update ->
+        gitHubToken,
+    ) { refresh, display, notifications, update, token ->
         SettingsUiState(
             isLoading = false,
             refresh = refresh,
             display = display,
             notifications = notifications,
-            update = update,
+            update = update.copy(
+                githubTokenMask = token.mask,
+                githubTokenError = token.error,
+            ),
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsUiState())
+
+    init {
+        loadGitHubTokenMask()
+    }
 
     val updateState: StateFlow<AppUpdateUiState> = updateController.state
 
@@ -85,6 +101,44 @@ class SettingsViewModel(
         launch { notificationStore.setCredentialFailureAlertsEnabled(enabled) }
 
     fun setUpdateMirrorBase(base: String) = launch { updateStore.setMirrorBase(base) }
+
+    fun setGitHubToken(token: String) {
+        val normalized = token.trim()
+        if (normalized.isEmpty()) return
+        launch {
+            gitHubToken.value = try {
+                gitHubTokenStore.saveToken(normalized)
+                GitHubTokenUiState(mask = gitHubTokenStore.tokenMask())
+            } catch (_: Exception) {
+                GitHubTokenUiState(
+                    mask = gitHubToken.value.mask,
+                    error = "GitHub 令牌保存失败，请重试",
+                )
+            }
+        }
+    }
+
+    fun removeGitHubToken() = launch {
+        gitHubToken.value = try {
+            gitHubTokenStore.clearToken()
+            GitHubTokenUiState()
+        } catch (_: Exception) {
+            GitHubTokenUiState(
+                mask = gitHubToken.value.mask,
+                error = "GitHub 令牌移除失败，请重试",
+            )
+        }
+    }
+
+    private fun loadGitHubTokenMask() {
+        launch {
+            gitHubToken.value = try {
+                GitHubTokenUiState(mask = gitHubTokenStore.tokenMask())
+            } catch (_: Exception) {
+                GitHubTokenUiState(error = "GitHub 令牌读取失败")
+            }
+        }
+    }
 
     private fun launch(block: suspend () -> Unit) {
         viewModelScope.launch { block() }

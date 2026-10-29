@@ -157,6 +157,7 @@ fun MyTokenApp(
             displayStore = graph.displaySettingsStore,
             notificationStore = graph.notificationSettingsStore,
             updateStore = graph.updateSettingsStore,
+            gitHubTokenStore = graph.gitHubTokenStore,
             updateController = graph.appUpdateController,
         )
     }
@@ -319,6 +320,8 @@ fun MyTokenApp(
                                 onOpenInstallPermissionSettings = settingsViewModel::openInstallPermissionSettings,
                                 onInstallDownloadedUpdate = settingsViewModel::installDownloadedUpdate,
                                 onMirrorBaseChange = settingsViewModel::setUpdateMirrorBase,
+                                onGitHubTokenSave = settingsViewModel::setGitHubToken,
+                                onGitHubTokenRemove = settingsViewModel::removeGitHubToken,
                                 logExportState = logExportState,
                                 onExportLogs = logExportController::export,
                                 onShareLogs = logExportController::share,

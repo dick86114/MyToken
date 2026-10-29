@@ -42,6 +42,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
@@ -74,6 +75,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -101,6 +103,8 @@ fun SettingsScreen(
     onOpenInstallPermissionSettings: () -> Unit = {},
     onInstallDownloadedUpdate: () -> Unit = {},
     onMirrorBaseChange: (String) -> Unit = {},
+    onGitHubTokenSave: (String) -> Unit = {},
+    onGitHubTokenRemove: () -> Unit = {},
     logExportState: LogExportUiState = LogExportUiState.Idle,
     onExportLogs: () -> Unit = {},
     onShareLogs: () -> Unit = {},
@@ -258,6 +262,13 @@ fun SettingsScreen(
                     UpdateChannelSection(
                         mirrorBase = state.update.mirrorBase,
                         onMirrorBaseChange = onMirrorBaseChange,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    GitHubTokenSection(
+                        tokenMask = state.update.githubTokenMask,
+                        error = state.update.githubTokenError,
+                        onSave = onGitHubTokenSave,
+                        onRemove = onGitHubTokenRemove,
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     UpdateSection(
@@ -802,6 +813,85 @@ private fun ThemeChip(
         colors = glassFilterChipColors(selected = selected),
         border = glassFilterChipBorder(selected = selected),
     )
+}
+
+@Composable
+private fun GitHubTokenSection(
+    tokenMask: String?,
+    error: String?,
+    onSave: (String) -> Unit,
+    onRemove: () -> Unit,
+) {
+    var tokenInput by rememberSaveable { mutableStateOf("") }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            text = "GitHub 令牌",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = "检查更新时使用。带令牌每小时 5000 次请求，不带仅 60 次；公开仓库只读权限即可。",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        if (tokenMask == null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                OutlinedTextField(
+                    value = tokenInput,
+                    onValueChange = { tokenInput = it },
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("github_token_input"),
+                    singleLine = true,
+                    placeholder = { Text("ghp_ 或 github_pat_ 令牌") },
+                    visualTransformation = PasswordVisualTransformation(),
+                )
+                GlassButton(
+                    onClick = {
+                        onSave(tokenInput)
+                        tokenInput = ""
+                    },
+                    enabled = tokenInput.isNotBlank(),
+                    tone = GlassButtonTone.Primary,
+                    text = "保存",
+                    modifier = Modifier.testTag("github_token_save_button"),
+                )
+            }
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    text = tokenMask,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("github_token_mask"),
+                )
+                TextButton(
+                    onClick = onRemove,
+                    modifier = Modifier.testTag("github_token_remove_button"),
+                ) {
+                    Text("移除")
+                }
+            }
+        }
+
+        if (error != null) {
+            Text(
+                text = error,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)

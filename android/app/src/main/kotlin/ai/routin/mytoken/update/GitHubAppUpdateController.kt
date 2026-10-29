@@ -40,6 +40,8 @@ class GitHubAppUpdateController(
     private val cacheStore: ai.routin.mytoken.feature.settings.ReleaseNotesCacheStore? = null,
     /** 返回当前镜像前缀；空值/空白表示 GitHub 直连。由 App 层接 DataStore。 */
     private val mirrorBaseProvider: suspend () -> String? = { null },
+    /** 返回 GitHub API 访问令牌；空值/空白表示匿名请求。 */
+    private val gitHubTokenProvider: suspend () -> String? = { null },
     private val network: suspend (String, Map<String, String>) -> UpdateResponse = ::request,
     private val probeStatus: (suspend (String) -> Int)? = null,
 ) : AppUpdateController {
@@ -240,6 +242,19 @@ class GitHubAppUpdateController(
     private suspend fun mirrorBase(): String? =
         mirrorBaseProvider()?.takeIf { it.isNotBlank() }
 
+    private suspend fun apiHeaders(): Map<String, String> {
+        val baseHeaders = mapOf(
+            "Accept" to "application/vnd.github+json",
+            "X-GitHub-Api-Version" to "2022-11-28",
+        )
+        val token = gitHubTokenProvider()?.trim()?.takeIf { it.isNotEmpty() }
+        return if (token == null) {
+            baseHeaders
+        } else {
+            baseHeaders + ("Authorization" to "Bearer $token")
+        }
+    }
+
     private fun applyMirror(url: String, mirror: String?): String =
         if (mirror != null && url.startsWith("https://github.com/")) "$mirror/$url" else url
 
@@ -264,10 +279,7 @@ class GitHubAppUpdateController(
         while (page <= 50) {
             val body = network(
                 "https://api.github.com/repos/$repository/releases?per_page=100&page=$page",
-                mapOf(
-                    "Accept" to "application/vnd.github+json",
-                    "X-GitHub-Api-Version" to "2022-11-28",
-                ),
+                apiHeaders(),
             ).body
             val releases = org.json.JSONArray(body)
             for (index in 0 until releases.length()) {
@@ -375,10 +387,7 @@ class GitHubAppUpdateController(
     private suspend fun fetchLatestReleaseFromApi(): AvailableRelease {
         val body = network(
             "https://api.github.com/repos/$repository/releases?per_page=100",
-            mapOf(
-                "Accept" to "application/vnd.github+json",
-                "X-GitHub-Api-Version" to "2022-11-28",
-            ),
+            apiHeaders(),
         ).body
         val releases = org.json.JSONArray(body)
         // v5.5.1 起双端合并进同一条 vX Release（DMG + APK），

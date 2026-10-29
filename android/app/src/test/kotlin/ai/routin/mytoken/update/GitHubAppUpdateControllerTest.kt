@@ -69,6 +69,39 @@ class GitHubAppUpdateControllerTest {
     }
 
     @Test
+    fun API请求携带GitHub令牌() = runBlocking {
+        val body = """
+        [
+          {"tag_name":"v5.5.1","assets":[
+            {"name":"MyToken-5.5.1-android.apk","browser_download_url":"https://example.com/MyToken-5.5.1-android.apk"}
+          ],"html_url":"https://github.com/dick86114/MyToken/releases/tag/v5.5.1"}
+        ]
+        """.trimIndent()
+        val headers = mutableListOf<Map<String, String>>()
+        val controller = GitHubAppUpdateController(
+            context = ApplicationProvider.getApplicationContext<Context>(),
+            currentVersionName = "5.5.0",
+            gitHubTokenProvider = { " ghp_test-token " },
+            network = { _, requestHeaders ->
+                headers.add(requestHeaders)
+                UpdateResponse(body)
+            },
+        )
+
+        controller.checkForUpdates()
+        val state = withTimeout(5_000) {
+            controller.state.first {
+                it is AppUpdateUiState.Available ||
+                    it is AppUpdateUiState.Error ||
+                    it is AppUpdateUiState.UpToDate
+            }
+        }
+
+        assertTrue(state is AppUpdateUiState.Available)
+        assertEquals("Bearer ghp_test-token", headers.single()["Authorization"])
+    }
+
+    @Test
     fun 合并Release下vTag携带APK时可检测更新() = runBlocking {
         val body = """
         [
