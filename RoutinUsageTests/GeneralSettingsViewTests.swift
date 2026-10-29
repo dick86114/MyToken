@@ -83,7 +83,7 @@ final class GeneralSettingsViewTests: XCTestCase {
         XCTAssertTrue(source.contains("SecureField"))
         XCTAssertTrue(source.contains("Button(\"移除\")"))
         XCTAssertTrue(source.contains("tokenMask()"))
-        XCTAssertTrue(source.contains("本机钥匙串"))
+        XCTAssertTrue(source.contains("应用本地存储"))
     }
 
     func test刷新间隔控件提供预设和自定义输入() throws {

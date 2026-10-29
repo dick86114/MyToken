@@ -1,6 +1,4 @@
 import Foundation
-import os
-
 /// GitHub 访问令牌只保存在本机；备份设置不允许携带该密钥材料。
 protocol GitHubTokenStoring: Sendable {
     func readToken() -> String?
@@ -9,23 +7,20 @@ protocol GitHubTokenStoring: Sendable {
     func tokenMask() -> String?
 }
 
-struct KeychainGitHubTokenStore: GitHubTokenStoring {
-    private let keychain: KeychainSecretStore
-    private let tokenID: UUID
+/// GitHub 令牌保存在应用偏好存储中，避免启动时触发系统钥匙串授权。
+final class AppLocalGitHubTokenStore: GitHubTokenStoring, @unchecked Sendable {
+    private let defaults: UserDefaults
+    private let storageKey: String
 
-    init(
-        keychain: KeychainSecretStore = KeychainSecretStore(
-            service: "ai.routin.usage-monitor.github-token"
-        ),
-        tokenID: UUID = UUID(uuidString: "E2B4B7A0-34F4-45B3-96F4-6B0D6C4D1E31")!
-    ) {
-        self.keychain = keychain
-        self.tokenID = tokenID
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        self.storageKey = "github.update.token"
     }
 
     func readToken() -> String? {
-        let token = try? keychain.read(for: tokenID)
-        return token?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+        defaults.string(forKey: storageKey)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nonEmpty
     }
 
     func saveToken(_ token: String) throws {
@@ -33,38 +28,11 @@ struct KeychainGitHubTokenStore: GitHubTokenStoring {
             removeToken()
             return
         }
-        try keychain.save(normalized, for: tokenID)
+        defaults.set(normalized, forKey: storageKey)
     }
 
     func removeToken() {
-        try? keychain.delete(for: tokenID)
-    }
-
-    func tokenMask() -> String? {
-        GitHubTokenMask.mask(readToken())
-    }
-}
-
-/// Debug 和测试宿主专用：避免启动或更新检查触碰真实 Keychain。
-final class InMemoryGitHubTokenStore: GitHubTokenStoring, @unchecked Sendable {
-    private let token = OSAllocatedUnfairLock<String?>(initialState: nil)
-
-    func readToken() -> String? {
-        token.withLock { state in
-            state?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
-        }
-    }
-
-    func saveToken(_ token: String) throws {
-        self.token.withLock { state in
-            state = token
-        }
-    }
-
-    func removeToken() {
-        token.withLock { state in
-            state = nil
-        }
+        defaults.removeObject(forKey: storageKey)
     }
 
     func tokenMask() -> String? {
