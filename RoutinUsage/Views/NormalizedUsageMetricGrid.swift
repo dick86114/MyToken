@@ -122,7 +122,7 @@ private struct NormalizedUsageMetricCell: View {
                 Spacer(minLength: 4)
                 Text(percentText)
                     .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(healthColor)
+                    .foregroundStyle(.primary)
                     .monospacedDigit()
             }
 

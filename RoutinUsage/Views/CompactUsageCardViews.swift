@@ -227,12 +227,7 @@ struct CompactUsageGauge: View {
     }
 
     private var gaugeColor: Color {
-        switch tone {
-        case .normal:
-            return UsageMetricPresentation.color(for: tone, rules: menuBarColorRules)
-        case .warning, .critical:
-            return UsageMetricPresentation.color(for: tone, rules: menuBarColorRules)
-        }
+        UsageMetricPresentation.color(for: tone, rules: menuBarColorRules)
     }
 
     /// 数字放大突出，百分号缩小并轻微上移。
@@ -252,14 +247,7 @@ struct CompactUsageGauge: View {
         if (percent ?? 0) <= 0 {
             return Color.secondary.opacity(0.7)
         }
-        switch tone {
-        case .critical:
-            return UsageMetricPresentation.color(for: tone, rules: menuBarColorRules)
-        case .warning:
-            return UsageMetricPresentation.color(for: tone, rules: menuBarColorRules)
-        case .normal:
-            return UsageMetricPresentation.color(for: tone, rules: menuBarColorRules)
-        }
+        return Color.primary.opacity(0.82)
     }
 }
 
@@ -288,10 +276,10 @@ struct CompactMetricGaugeTile: View {
                         size: CompactPopoverMetrics.largeGaugeSize
                     )
                     VStack(alignment: .leading, spacing: 4) {
-                        labelRow(tone: tone)
+                        labelRow()
                         Text(subtitle)
                             .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(subtitleColor(tone: tone))
+                            .foregroundStyle(subtitleColor())
                             .monospacedDigit()
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
@@ -306,11 +294,11 @@ struct CompactMetricGaugeTile: View {
                         tone: tone,
                         size: CompactPopoverMetrics.smallGaugeSize
                     )
-                    labelRow(tone: tone)
+                    labelRow()
                         .multilineTextAlignment(.center)
                     Text(subtitle)
                             .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(subtitleColor(tone: tone))
+                        .foregroundStyle(subtitleColor())
                         .monospacedDigit()
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
@@ -324,47 +312,24 @@ struct CompactMetricGaugeTile: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: style == .horizontal ? .leading : .center)
-        .background {
-            RoundedRectangle(cornerRadius: CompactPopoverMetrics.metricCornerRadius, style: .continuous)
-                .fill(tileFill(tone: tone))
-        }
+        .compactUsageGlass(cornerRadius: CompactPopoverMetrics.metricCornerRadius)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText(subtitle: subtitle))
     }
 
     @ViewBuilder
-    private func labelRow(tone: UsageMetricTone) -> some View {
+    private func labelRow() -> some View {
         HStack(spacing: 4) {
-            if tone == .critical || tone == .warning {
-                Circle()
-                    .fill(UsageMetricPresentation.color(for: tone, rules: menuBarColorRules))
-                    .frame(width: tone == .critical ? 6 : 4, height: tone == .critical ? 6 : 4)
-            }
             Text(metric.label)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(
-                    tone == .warning || tone == .critical
-                        ? UsageMetricPresentation.color(for: tone, rules: menuBarColorRules)
-                        : Color.primary.opacity(0.82)
-                )
+                .foregroundStyle(Color.primary.opacity(0.82))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
     }
 
-    private func tileFill(tone: UsageMetricTone) -> Color {
-        CompactPopoverPalette.tileFill(colorScheme, tone: tone)
-    }
-
-    private func subtitleColor(tone: UsageMetricTone) -> Color {
-        switch tone {
-        case .warning:
-            return UsageMetricPresentation.color(for: tone, rules: menuBarColorRules)
-        case .critical:
-            return UsageMetricPresentation.color(for: tone, rules: menuBarColorRules)
-        case .normal:
-            return CompactPopoverPalette.subtitle(colorScheme)
-        }
+    private func subtitleColor() -> Color {
+        CompactPopoverPalette.subtitle(colorScheme)
     }
 
     private func accessibilityText(subtitle: String) -> String {
@@ -396,10 +361,7 @@ struct CompactValueTile: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background {
-            RoundedRectangle(cornerRadius: CompactPopoverMetrics.metricCornerRadius, style: .continuous)
-                .fill(CompactPopoverPalette.tileFill(colorScheme, tone: .normal))
-        }
+        .compactUsageGlass(cornerRadius: CompactPopoverMetrics.metricCornerRadius)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(metric.label)，\(valueText)")
     }
@@ -423,5 +385,19 @@ struct CompactBalanceStrip: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(metric.label)，\(UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode))")
+    }
+}
+
+private extension View {
+    /// 用量小卡片只保留一层无色玻璃；旧系统退回系统超薄材质。
+    @ViewBuilder
+    func compactUsageGlass(cornerRadius: CGFloat) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
+        if #available(macOS 26.0, *) {
+            self.glassEffect(.regular, in: shape)
+        } else {
+            self.background(.ultraThinMaterial, in: shape)
+        }
     }
 }
