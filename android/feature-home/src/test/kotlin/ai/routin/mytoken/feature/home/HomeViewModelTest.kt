@@ -236,6 +236,30 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `external change refreshes the latest credential set`() = runTest {
+        val credential = credential("IMPORTED", ProviderId.Routin)
+        val provider = FakeUsageProvider(
+            ProviderId.Routin,
+            Result.success(snapshot(credential.id, balanceMetric(88.0))),
+        )
+        providers[ProviderId.Routin] = provider
+
+        val vm = viewModel()
+        backgroundScope.launch { vm.state.collect {} }
+
+        // 模拟编辑器保存或迁移导入：先写入仓储，再由 UI 通知首页。
+        addCredential(credential)
+        vm.refreshAfterExternalChange()
+        advanceUntilIdle()
+
+        assertEquals(1, provider.fetchCalls)
+        val card = vm.state.value.groups.single().cards.single()
+        assertEquals(credential.name, card.credential.name)
+        assertEquals(RefreshStatus.Ready, card.status)
+        assertEquals(88.0.toBigDecimal(), card.snapshot?.metrics?.single()?.value)
+    }
+
+    @Test
     fun `failed refresh keeps last snapshot and marks stale`() = runTest {
         val credential = credential("RT-1", ProviderId.Routin)
         addCredential(credential)

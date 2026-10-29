@@ -404,7 +404,10 @@ fun MyTokenApp(
                         onSave = editorViewModel::save,
                     )
                     if (editorState.saveCompleted) {
-                        LaunchedEffect(editorState.saveCompleted) { goBack() }
+                        LaunchedEffect(editorState.saveCompleted) {
+                            homeViewModel.refreshAfterExternalChange()
+                            goBack()
+                        }
                     }
                 }
                 AppScreen.Transfer -> {
@@ -432,11 +435,16 @@ fun MyTokenApp(
                             onConfirm = { mode: ImportConflictMode -> transferViewModel.confirmImport(mode) },
                             onCancel = transferViewModel::cancel,
                         )
-                        is TransferUiState.Completed -> TransferCompletedScreen(
-                            summary = state.summary,
-                            layoutMode = layoutMode,
-                            onDone = { goBack() },
-                        )
+                        is TransferUiState.Completed -> {
+                            LaunchedEffect(state) {
+                                homeViewModel.refreshAfterExternalChange()
+                            }
+                            TransferCompletedScreen(
+                                summary = state.summary,
+                                layoutMode = layoutMode,
+                                onDone = { goBack() },
+                            )
+                        }
                         is TransferUiState.Failed -> Column(
                             modifier = Modifier.fillMaxSize(),
                             horizontalAlignment = Alignment.CenterHorizontally,

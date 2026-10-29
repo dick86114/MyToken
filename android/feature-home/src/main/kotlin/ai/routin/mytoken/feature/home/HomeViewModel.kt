@@ -268,6 +268,14 @@ class HomeViewModel(
     }
 
     /**
+     * 新增/编辑凭证和 Mac 迁移导入都会直接写入凭证仓储。首页刷新前重新读取
+     * 最新集合，避免只刷新旧快照，同时覆盖迁移时复用原 UUID 的覆盖写入。
+     */
+    fun refreshAfterExternalChange() {
+        refreshAll(retryOnFailure)
+    }
+
+    /**
      * Uses the same phone-local order persisted by the credential page. IDs that
      * have not been ordered yet keep repository order after the ordered prefix.
      */
