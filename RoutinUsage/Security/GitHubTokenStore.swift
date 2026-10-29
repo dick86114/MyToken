@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// GitHub 访问令牌只保存在本机；备份设置不允许携带该密钥材料。
 protocol GitHubTokenStoring: Sendable {
@@ -37,6 +38,33 @@ struct KeychainGitHubTokenStore: GitHubTokenStoring {
 
     func removeToken() {
         try? keychain.delete(for: tokenID)
+    }
+
+    func tokenMask() -> String? {
+        GitHubTokenMask.mask(readToken())
+    }
+}
+
+/// Debug 和测试宿主专用：避免启动或更新检查触碰真实 Keychain。
+final class InMemoryGitHubTokenStore: GitHubTokenStoring, @unchecked Sendable {
+    private let token = OSAllocatedUnfairLock<String?>(initialState: nil)
+
+    func readToken() -> String? {
+        token.withLock { state in
+            state?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+        }
+    }
+
+    func saveToken(_ token: String) throws {
+        self.token.withLock { state in
+            state = token
+        }
+    }
+
+    func removeToken() {
+        token.withLock { state in
+            state = nil
+        }
     }
 
     func tokenMask() -> String? {
