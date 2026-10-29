@@ -189,7 +189,7 @@ struct HelpUpdateView: View {
             try environment.gitHubTokenStore.saveToken(githubTokenInput)
             githubTokenInput = ""
             githubTokenMask = environment.gitHubTokenStore.tokenMask()
-            githubTokenMessage = "GitHub 令牌已保存到本机钥匙串"
+            githubTokenMessage = "GitHub 令牌已保存到应用本地存储"
         } catch {
             githubTokenMessage = "GitHub 令牌保存失败，请重试"
         }

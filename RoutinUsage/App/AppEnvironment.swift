@@ -126,7 +126,7 @@ final class AppEnvironment {
         xiaomiCookieReader: (@MainActor () async -> String?)? = nil,
         providerRegistry: ProviderRegistry? = nil,
         widgetSnapshotSynchronizer: WidgetSnapshotSynchronizer? = nil,
-        gitHubTokenStore: any GitHubTokenStoring = KeychainGitHubTokenStore()
+        gitHubTokenStore: any GitHubTokenStoring = AppLocalGitHubTokenStore()
     ) {
         self.settings = settings
         self.store = store
@@ -166,22 +166,6 @@ final class AppEnvironment {
         let settings = AppSettings(defaults: defaults)
         let legacyStore = LocalKeyStore(defaults: defaults)
         let legacyRepository = KeyRepository(defaults: defaults, localStore: legacyStore)
-        #if !DEBUG
-        if !defaults.bool(forKey: "didRestoreLegacyKeychainCredentials") {
-            let keychainStore = KeychainSecretStore()
-            // 兼容上一轮测试版本：仅回迁已存在的 Keychain 项，之后不再访问 Keychain。
-            do {
-                try KeychainMigration.restore(
-                    ids: legacyRepository.list().map(\.id),
-                    from: keychainStore,
-                    to: legacyStore
-                )
-                defaults.set(true, forKey: "didRestoreLegacyKeychainCredentials")
-            } catch {
-                // 回迁失败时不标记完成，下一次启动继续尝试。
-            }
-        }
-        #endif
         let localStore: any CredentialStoring = legacyStore
         let keyRepository = legacyRepository
         let cache = UsageCache(defaults: defaults)
@@ -193,12 +177,7 @@ final class AppEnvironment {
         let xiaomiWebSessionProvider = XiaomiWebSessionProvider {
             XiaomiWebSession()
         }
-        #if DEBUG
-        // Debug 预览和测试宿主不访问真实 Keychain；令牌只在本次进程内保留。
-        let gitHubTokenStore: any GitHubTokenStoring = InMemoryGitHubTokenStore()
-        #else
-        let gitHubTokenStore = KeychainGitHubTokenStore()
-        #endif
+        let gitHubTokenStore = AppLocalGitHubTokenStore(defaults: defaults)
         let xiaomiRenewCoordinator = XiaomiSilentRenewCoordinator()
         let providerRegistry = ProviderRegistry(providers: [
             RoutinUsageProvider(client: apiClient),
