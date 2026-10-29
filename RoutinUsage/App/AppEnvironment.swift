@@ -93,6 +93,7 @@ final class AppEnvironment {
     @ObservationIgnored private let logWriter: any AppLogWriting
     @ObservationIgnored private let updateCheckScheduler: any UpdateCheckScheduling
     @ObservationIgnored private let notificationTaskYield: @Sendable () async -> Void
+    @ObservationIgnored let gitHubTokenStore: any GitHubTokenStoring
     @ObservationIgnored private let applicationNotificationCenter: NotificationCenter
     @ObservationIgnored private let xiaomiCookieReader: @MainActor () async -> String?
     @ObservationIgnored private var terminationObservation: ApplicationTerminationObservation?
@@ -124,7 +125,8 @@ final class AppEnvironment {
         xiaomiWebSessionProvider: XiaomiWebSessionProvider? = nil,
         xiaomiCookieReader: (@MainActor () async -> String?)? = nil,
         providerRegistry: ProviderRegistry? = nil,
-        widgetSnapshotSynchronizer: WidgetSnapshotSynchronizer? = nil
+        widgetSnapshotSynchronizer: WidgetSnapshotSynchronizer? = nil,
+        gitHubTokenStore: any GitHubTokenStoring = KeychainGitHubTokenStore()
     ) {
         self.settings = settings
         self.store = store
@@ -141,6 +143,7 @@ final class AppEnvironment {
         self.logWriter = logWriter
         self.updateCheckScheduler = updateCheckScheduler ?? UpdateCheckScheduler()
         self.notificationTaskYield = notificationTaskYield
+        self.gitHubTokenStore = gitHubTokenStore
         let resolvedXiaomiWebSessionProvider = xiaomiWebSessionProvider ?? XiaomiWebSessionProvider {
             if let xiaomiWebSession {
                 return xiaomiWebSession
@@ -188,6 +191,7 @@ final class AppEnvironment {
         let xiaomiWebSessionProvider = XiaomiWebSessionProvider {
             XiaomiWebSession()
         }
+        let gitHubTokenStore = KeychainGitHubTokenStore()
         let xiaomiRenewCoordinator = XiaomiSilentRenewCoordinator()
         let providerRegistry = ProviderRegistry(providers: [
             RoutinUsageProvider(client: apiClient),
@@ -304,14 +308,18 @@ final class AppEnvironment {
             keyRepository: keyRepository,
             apiClient: apiClient,
             notificationSender: notificationSender,
-            updateService: GitHubUpdateService(logWriter: logWriter),
+            updateService: GitHubUpdateService(
+                logWriter: logWriter,
+                tokenProvider: { [gitHubTokenStore] in gitHubTokenStore.readToken() }
+            ),
             releaseHistoryCache: UserDefaultsReleaseHistoryCache(defaults: defaults),
             releaseHistoryAppVersion: RoutinUsageApp.currentVersion,
             updateCheckScheduler: UpdateCheckScheduler(),
             logWriter: logWriter,
             xiaomiWebSessionProvider: xiaomiWebSessionProvider,
             providerRegistry: providerRegistry,
-            widgetSnapshotSynchronizer: widgetSnapshotSynchronizer
+            widgetSnapshotSynchronizer: widgetSnapshotSynchronizer,
+            gitHubTokenStore: gitHubTokenStore
         )
     }
 
@@ -367,6 +375,20 @@ final class AppEnvironment {
             return
         }
         refreshScheduler.reschedule(minutes: minutes)
+    }
+
+    func appearanceDidChange(to appearance: AppAppearance) {
+        guard let app = NSApp else { return }
+        switch appearance {
+        case .system:
+            app.appearance = nil
+        case .light:
+            app.appearance = NSAppearance(named: .aqua)
+        case .dark:
+            app.appearance = NSAppearance(named: .darkAqua)
+        }
+        // NSPopover 的展示窗口不会始终可靠继承应用级外观，菜单栏弹窗需要显式同步。
+        StatusBarController.shared?.appearanceDidChange(to: appearance)
     }
 
     func notificationsDidChange(enabled: Bool) async {
@@ -737,6 +759,7 @@ final class AppEnvironment {
             )
         })
         settings.applyBackup(backup.settings)
+        appearanceDidChange(to: settings.appearance)
 
         let requestedLoginEnabled = backup.settings.launchAtLogin
         if requestedLoginEnabled != loginItemManager.isEnabled {

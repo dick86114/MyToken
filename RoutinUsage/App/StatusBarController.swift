@@ -12,6 +12,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
     private var settingsWindow: NSWindow?
     private var refreshMinutes: Int
     private var notificationsEnabled: Bool
+    private var currentAppearance: AppAppearance = .system
     private var isPopoverClosing = false
     private var popoverWindowResignObserver: NSObjectProtocol?
     private var applicationDidBecomeActiveObserver: NSObjectProtocol?
@@ -42,6 +43,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
 
     func start() {
         guard statusItem == nil else { return }
+        environment.appearanceDidChange(to: environment.settings.appearance)
         registerStatusItem()
         observeEnvironment()
         applicationDidBecomeActiveObserver = NotificationCenter.default.addObserver(
@@ -109,6 +111,20 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
     private func configurePopover() {
         popover.delegate = self
         popover.behavior = .transient
+        appearanceDidChange(to: currentAppearance)
+    }
+
+    /// 弹窗和设置窗口显式跟随应用外观；状态栏图标仍交由系统菜单栏决定。
+    func appearanceDidChange(to appearance: AppAppearance) {
+        currentAppearance = appearance
+        if let name = appearance.nsAppearanceName {
+            let resolved = NSAppearance(named: name)
+            popover.appearance = resolved
+            settingsWindow?.appearance = resolved
+        } else {
+            popover.appearance = nil
+            settingsWindow?.appearance = nil
+        }
     }
 
     /// SwiftUI 弹窗内容只在首次打开时创建；关闭后释放，避免隐藏 TimelineView 持续唤醒。
@@ -116,6 +132,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         guard popover.contentViewController == nil else {
             return
         }
+        appearanceDidChange(to: environment.settings.appearance)
         let hostingController = NSHostingController(
             rootView: StatusPopoverContent(
                 environment: environment,
@@ -429,6 +446,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         closePopover()
         let window = settingsWindow ?? makeSettingsWindow()
         settingsWindow = window
+        appearanceDidChange(to: currentAppearance)
         NSApp.setActivationPolicy(.regular)
         window.makeKeyAndOrderFront(nil)
         SettingsWindowActivationPolicy.register(window)

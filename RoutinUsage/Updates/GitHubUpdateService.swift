@@ -141,6 +141,8 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
     let logWriter: any AppLogWriting
     /// 返回当前镜像前缀（如 `https://ghfast.top`）；nil 表示 GitHub 直连。
     let mirrorBaseProvider: @Sendable () -> String?
+    /// 返回用户设置的 GitHub API 令牌；nil 表示匿名访问。
+    let tokenProvider: @Sendable () -> String?
 
     init(
         session: URLSession = .shared,
@@ -148,12 +150,14 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
         logWriter: any AppLogWriting = NoopAppLogWriter(),
         mirrorBaseProvider: @escaping @Sendable () -> String? = {
             UserDefaults.standard.string(forKey: "updateMirrorBase")
-        }
+        },
+        tokenProvider: @escaping @Sendable () -> String? = { nil }
     ) {
         self.session = session
         self.currentVersion = currentVersion ?? (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0")
         self.logWriter = logWriter
         self.mirrorBaseProvider = mirrorBaseProvider
+        self.tokenProvider = tokenProvider
     }
 
     /// CDN 模式下把 `https://github.com/...` 地址套上镜像前缀；其余地址原样返回。
@@ -403,6 +407,9 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
         )
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("MyToken/\(currentVersion)", forHTTPHeaderField: "User-Agent")
+        if let token = tokenProvider()?.trimmingCharacters(in: .whitespacesAndNewlines), !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
         let data: Data
         let response: URLResponse
         do {
@@ -436,6 +443,9 @@ struct GitHubUpdateService: UpdateChecking, Sendable {
             throw UpdateServiceError.unavailable(
                 "GitHub 接口限流（HTTP \(http.statusCode)），请稍后重试"
             )
+        }
+        if http.statusCode == 401 {
+            throw UpdateServiceError.unavailable("GitHub 令牌无效或没有仓库读取权限（HTTP 401）")
         }
         guard (200..<300).contains(http.statusCode) else {
             throw UpdateServiceError.unavailable("GitHub API 返回 HTTP \(http.statusCode)")

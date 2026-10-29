@@ -4,6 +4,9 @@ struct HelpUpdateView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Bindable var environment: AppEnvironment
     @State private var showingReleaseHistory = false
+    @State private var githubTokenInput = ""
+    @State private var githubTokenMask: String?
+    @State private var githubTokenMessage: String?
 
     var body: some View {
         ScrollView {
@@ -15,6 +18,7 @@ struct HelpUpdateView: View {
 
                 currentVersionSection
                 starPromptSection
+                githubTokenSection
                 updateSection
                 feedbackSection
             }
@@ -23,6 +27,7 @@ struct HelpUpdateView: View {
         }
         .task {
             await environment.loadReleaseHistoryIfNeeded()
+            githubTokenMask = environment.gitHubTokenStore.tokenMask()
         }
         .sheet(isPresented: $showingReleaseHistory) {
             ReleaseHistorySheet(state: environment.releaseHistoryState) {
@@ -125,6 +130,75 @@ struct HelpUpdateView: View {
             return RoutinUsageApp.releasesURL
         }
         return current.releaseURL
+    }
+
+    private var githubTokenSection: some View {
+        settingSection {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("GitHub 令牌")
+                        .font(.system(size: 14, weight: .semibold))
+
+                    Text("检查更新时使用。带令牌每小时 5000 次请求，不带仅 60 次；公开仓库只读权限即可。")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 12)
+
+                if let githubTokenMask {
+                    Text(githubTokenMask)
+                        .font(.system(size: 13, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("已保存 GitHub 令牌")
+
+                    Button("移除") {
+                        removeGitHubToken()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityLabel("移除 GitHub 令牌")
+                }
+            }
+
+            if githubTokenMask == nil {
+                HStack(spacing: 12) {
+                    SecureField("ghp_ 或 github_pat_ 令牌", text: $githubTokenInput)
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityLabel("GitHub 令牌输入框")
+
+                    Button("保存") {
+                        saveGitHubToken()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(githubTokenInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .accessibilityLabel("保存 GitHub 令牌")
+                }
+            }
+
+            if let githubTokenMessage {
+                Text(githubTokenMessage)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func saveGitHubToken() {
+        do {
+            try environment.gitHubTokenStore.saveToken(githubTokenInput)
+            githubTokenInput = ""
+            githubTokenMask = environment.gitHubTokenStore.tokenMask()
+            githubTokenMessage = "GitHub 令牌已保存到本机钥匙串"
+        } catch {
+            githubTokenMessage = "GitHub 令牌保存失败，请重试"
+        }
+    }
+
+    private func removeGitHubToken() {
+        environment.gitHubTokenStore.removeToken()
+        githubTokenMask = nil
+        githubTokenMessage = nil
     }
 
     private var updateSection: some View {

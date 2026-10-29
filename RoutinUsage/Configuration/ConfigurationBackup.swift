@@ -5,6 +5,7 @@ struct ConfigurationBackupSettings: Codable, Equatable, Sendable {
     var refreshMinutes: Int
     var displayDimension: DisplayDimension
     var usageCardDensity: UsageCardDensity
+    var appearance: AppAppearance
     var menuBarStyle: MenuBarStyle
     var notificationsEnabled: Bool
     var thresholds: AlertThresholds
@@ -19,6 +20,7 @@ struct ConfigurationBackupSettings: Codable, Equatable, Sendable {
         case refreshMinutes
         case displayDimension
         case usageCardDensity
+        case appearance
         case menuBarStyle
         case notificationsEnabled
         case thresholds
@@ -34,6 +36,7 @@ struct ConfigurationBackupSettings: Codable, Equatable, Sendable {
         refreshMinutes: Int,
         displayDimension: DisplayDimension,
         usageCardDensity: UsageCardDensity,
+        appearance: AppAppearance,
         menuBarStyle: MenuBarStyle,
         notificationsEnabled: Bool,
         thresholds: AlertThresholds,
@@ -47,6 +50,7 @@ struct ConfigurationBackupSettings: Codable, Equatable, Sendable {
         self.refreshMinutes = refreshMinutes
         self.displayDimension = displayDimension
         self.usageCardDensity = usageCardDensity
+        self.appearance = appearance
         self.menuBarStyle = menuBarStyle
         self.notificationsEnabled = notificationsEnabled
         self.thresholds = thresholds
@@ -66,6 +70,10 @@ struct ConfigurationBackupSettings: Codable, Equatable, Sendable {
             UsageCardDensity.self,
             forKey: .usageCardDensity
         ) ?? .full
+        appearance = try container.decodeIfPresent(
+            AppAppearance.self,
+            forKey: .appearance
+        ) ?? .system
         menuBarStyle = try container.decode(MenuBarStyle.self, forKey: .menuBarStyle)
         notificationsEnabled = try container.decode(Bool.self, forKey: .notificationsEnabled)
         thresholds = try container.decode(AlertThresholds.self, forKey: .thresholds)
