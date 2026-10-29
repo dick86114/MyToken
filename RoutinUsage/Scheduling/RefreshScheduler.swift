@@ -217,7 +217,10 @@ private final class MainRunLoopTimer: CancellableTimer, @unchecked Sendable {
         action: @escaping @Sendable () -> Void
     ) {
         dispatchPrecondition(condition: .onQueue(.main))
-        let timer = Timer(timeInterval: seconds, repeats: repeats) { _ in
+        let timer = Timer(timeInterval: seconds, repeats: repeats) { [weak self] _ in
+            guard let self, self.canFire else {
+                return
+            }
             action()
         }
         timer.tolerance = max(0, tolerance)
@@ -246,11 +249,26 @@ private final class MainRunLoopTimer: CancellableTimer, @unchecked Sendable {
         guard shouldDispatch else {
             return
         }
-        DispatchQueue.main.async { [self] in
-            timer?.invalidate()
-            lock.withLock {
-                timer = nil
+        if Thread.isMainThread {
+            invalidateOnMainRunLoop()
+        } else {
+            DispatchQueue.main.async { [self] in
+                invalidateOnMainRunLoop()
             }
         }
+    }
+
+    private var canFire: Bool {
+        lock.withLock { !isCancelled }
+    }
+
+    private func invalidateOnMainRunLoop() {
+        dispatchPrecondition(condition: .onQueue(.main))
+        let timer = lock.withLock {
+            let timer = self.timer
+            self.timer = nil
+            return timer
+        }
+        timer?.invalidate()
     }
 }
