@@ -149,6 +149,22 @@ final class CompactUsageCardPresentationTests: XCTestCase {
         XCTAssertEqual(CompactUsageCardPresentation.balanceStatusText(healthState: .unavailable), "不足")
     }
 
+    func test重置卡文案无卡隐藏有卡展示数量和到期清单() {
+        let cards = [
+            UsageResetCard(expiresAt: date("2026-11-07 17:42:45")),
+            UsageResetCard(expiresAt: date("2026-12-22 23:59:59"))
+        ]
+
+        XCTAssertFalse(UsageResetCardPresentation.isVisible(cards: []))
+        XCTAssertTrue(UsageResetCardPresentation.isVisible(cards: cards))
+        XCTAssertEqual(UsageResetCardPresentation.badgeText(cards: cards), "2")
+        XCTAssertEqual(UsageResetCardPresentation.detailText(cards: cards), "2 张重置卡")
+        XCTAssertEqual(
+            UsageResetCardPresentation.accessibilityText(cards: cards),
+            "2 张重置卡"
+        )
+    }
+
     private func balanceMetric() -> NormalizedUsageMetric {
         NormalizedUsageMetric(
             id: "balance",

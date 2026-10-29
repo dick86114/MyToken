@@ -279,7 +279,7 @@ struct CompactMetricGaugeTile: View {
             for: metric,
             now: now
         )
-        Group {
+        ZStack(alignment: .trailing) {
             if style == .horizontal {
                 HStack(spacing: 12) {
                     CompactUsageGauge(
@@ -318,6 +318,10 @@ struct CompactMetricGaugeTile: View {
                 }
                 .padding(8)
             }
+            if !metric.resetCards.isEmpty {
+                UsageResetCardsBadge(resetCards: metric.resetCards, style: .compact)
+                    .padding(style == .horizontal ? 8 : 6)
+            }
         }
         .frame(maxWidth: .infinity, alignment: style == .horizontal ? .leading : .center)
         .background {
@@ -344,6 +348,7 @@ struct CompactMetricGaugeTile: View {
                         : Color.primary.opacity(0.82)
                 )
                 .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
     }
 

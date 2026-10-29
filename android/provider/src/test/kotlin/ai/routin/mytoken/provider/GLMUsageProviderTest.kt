@@ -9,6 +9,7 @@ import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import ai.routin.mytoken.domain.model.UsageMetricSemantic
 import ai.routin.mytoken.domain.model.UsageMetricUnit
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
+import ai.routin.mytoken.domain.model.UsageResetCard
 import ai.routin.mytoken.domain.usage.UsageProviderException
 import ai.routin.mytoken.provider.http.ProviderHttpResponse
 import ai.routin.mytoken.provider.glm.GLMUsageProvider
@@ -52,6 +53,14 @@ class GLMUsageProviderTest {
         transport.responses += ok("""{"data":[{"id":"glm-5.3"},{"id":"glm-5.3-flash"},{"id":""}]}""")
     }
 
+    private fun queueResetCards() {
+        transport.responses += ok(
+            """
+            {"data":{"fiveHourResets":[{"expireTime":"2026-11-07 17:42:45","available":true},{"expireTime":"2026-12-22 23:59:59","available":false}],"weekResets":[{"expireTime":"2026-11-07 17:42:45","available":true},{"expireTime":1797983999,"available":true}]}}
+            """.trimIndent()
+        )
+    }
+
     @Test
     fun fetchUsage_requestsModelUsageThenQuotaLimitWithRawAuthorization() = runTest {
         queueSuccess()
@@ -59,7 +68,7 @@ class GLMUsageProviderTest {
         val result = provider.fetchUsage(credential(), secret)
 
         assertTrue(result.isSuccess)
-        assertEquals(4, transport.requests.size)
+        assertEquals(5, transport.requests.size)
 
         val modelUsage = transport.requests[0]
         assertEquals("GET", modelUsage.method)
@@ -176,6 +185,48 @@ class GLMUsageProviderTest {
 
         assertTrue(snapshot.allowedModels.isEmpty())
         assertEquals(9, snapshot.metrics.size)
+    }
+
+    @Test
+    fun fetchUsage_requestsAndMapsAvailableResetCards() = runTest {
+        queueSuccess()
+        queueResetCards()
+
+        val snapshot = provider.fetchUsage(credential(), secret).getOrThrow()
+
+        assertEquals(5, transport.requests.size)
+        val resetCards = transport.requests[4]
+        assertEquals(
+            "https://api.z.ai/api/biz/customer-package-reset/list?targetType=PERSONAL",
+            resetCards.url
+        )
+        assertEquals("GET", resetCards.method)
+        assertEquals("glm-secret-key", resetCards.headers["Authorization"])
+
+        val fiveHour = snapshot.metrics.first { it.id == "five-hour" }
+        assertEquals(
+            listOf(UsageResetCard(Instant.parse("2026-11-07T09:42:45Z"))),
+            fiveHour.resetCards
+        )
+        val weekly = snapshot.metrics.first { it.id == "weekly" }
+        assertEquals(
+            listOf(
+                UsageResetCard(Instant.parse("2026-11-07T09:42:45Z")),
+                UsageResetCard(Instant.ofEpochSecond(1797983999L))
+            ),
+            weekly.resetCards
+        )
+    }
+
+    @Test
+    fun fetchUsage_keepsUsageWhenResetCardRequestFails() = runTest {
+        queueSuccess()
+        transport.responses += ProviderHttpResponse(500, "{}".toByteArray())
+
+        val snapshot = provider.fetchUsage(credential(), secret).getOrThrow()
+
+        assertEquals(5, transport.requests.size)
+        assertTrue(snapshot.metrics.first { it.id == "five-hour" }.resetCards.isEmpty())
     }
 
     @Test

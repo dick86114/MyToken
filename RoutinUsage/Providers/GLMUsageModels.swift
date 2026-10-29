@@ -49,6 +49,15 @@ enum GLMJSONValue: Codable, Equatable, Sendable {
         if case let .string(value) = self { return value }
         return nil
     }
+
+    func boolValue() -> Bool? {
+        switch self {
+        case let .bool(value): return value
+        case let .string(value): return Bool(value)
+        case let .number(value): return NSDecimalNumber(decimal: value).boolValue
+        default: return nil
+        }
+    }
 }
 
 private struct DynamicKey: CodingKey {

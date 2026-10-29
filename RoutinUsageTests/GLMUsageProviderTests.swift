@@ -2,6 +2,19 @@ import XCTest
 @testable import RoutinUsage
 
 final class GLMUsageProviderTests: XCTestCase {
+    private final class RequestRecorder: @unchecked Sendable {
+        private let lock = NSLock()
+        private var requests: [URLRequest] = []
+
+        func append(_ request: URLRequest) {
+            lock.withLock { requests.append(request) }
+        }
+
+        var allRequests: [URLRequest] {
+            lock.withLock { requests }
+        }
+    }
+
     func test配额模型和工具响应转换为通用指标() async throws {
         let stub = URLProtocolStub.makeSession { request in
             let path = request.url?.path ?? ""
@@ -81,6 +94,77 @@ final class GLMUsageProviderTests: XCTestCase {
 
         XCTAssertTrue(snapshot.allowedModels.isEmpty)
         XCTAssertTrue(snapshot.metrics.contains(where: { $0.id == "five-hour" }))
+    }
+
+    func test重置卡接口转换为周期用量附加信息() async throws {
+        let recorder = RequestRecorder()
+        let stub = URLProtocolStub.makeSession { request in
+            recorder.append(request)
+            let path = request.url?.path ?? ""
+            let body: String
+            if path.contains("quota/limit") {
+                body = #"{"data":{"limits":[{"type":"TOKENS_LIMIT","unit":3,"number":5,"percentage":42},{"type":"TOKENS_LIMIT","unit":6,"number":1,"percentage":12}]}}"#
+            } else if path.contains("model-usage") {
+                body = #"{"data":{"totalUsage":{"totalModelCallCount":22}}}"#
+            } else if path.contains("customer-package-reset/list") {
+                body = #"""
+                {"data":{"fiveHourResets":[{"expireTime":"2026-11-07 17:42:45","available":true},{"expireTime":"2026-12-22 23:59:59","available":false}],"weekResets":[{"expireTime":"2026-11-07 17:42:45","available":true},{"expireTime":1797983999,"available":true}]}}
+                """#
+            } else {
+                body = #"{"data":{}}"#
+            }
+            let response = try XCTUnwrap(HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            ))
+            return (response, Data(body.utf8))
+        }
+        let provider = GLMUsageProvider(session: stub.session, baseURL: URL(string: "https://glm.test")!)
+        let credential = ProviderCredential(providerID: .glm, kind: .apiKey, secret: "glm-token")
+
+        let snapshot = try await provider.fetchUsage(credential, now: Date(timeIntervalSince1970: 100))
+
+        let resetRequest = try XCTUnwrap(recorder.allRequests.first { $0.url?.path == "/api/biz/customer-package-reset/list" })
+        XCTAssertEqual(
+            resetRequest.url?.query,
+            "targetType=PERSONAL"
+        )
+        XCTAssertEqual(resetRequest.value(forHTTPHeaderField: "Authorization"), "glm-token")
+        let fiveHour = try XCTUnwrap(snapshot?.metrics.first { $0.id == "five-hour" })
+        XCTAssertEqual(
+            fiveHour.resetCards.map(\.expiresAt.timeIntervalSince1970),
+            [1_794_044_565]
+        )
+        let weekly = try XCTUnwrap(snapshot?.metrics.first { $0.id == "weekly" })
+        XCTAssertEqual(
+            weekly.resetCards.map(\.expiresAt.timeIntervalSince1970),
+            [1_794_044_565, 1_797_983_999]
+        )
+    }
+
+    func test重置卡接口失败时不影响主用量() async throws {
+        let stub = URLProtocolStub.makeSession { request in
+            let path = request.url?.path ?? ""
+            let statusCode = path.contains("customer-package-reset/list") ? 500 : 200
+            let body = path.contains("quota/limit")
+                ? #"{"data":{"limits":[{"type":"TOKENS_LIMIT","unit":3,"number":5,"percentage":42}]}}"#
+                : #"{"data":{"totalUsage":{"totalModelCallCount":22}}}"#
+            let response = try XCTUnwrap(HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: statusCode,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            return (response, Data(body.utf8))
+        }
+        let provider = GLMUsageProvider(session: stub.session, baseURL: URL(string: "https://glm.test")!)
+        let credential = ProviderCredential(providerID: .glm, kind: .apiKey, secret: "glm-token")
+
+        let snapshot = try await provider.fetchUsage(credential, now: .now)
+
+        XCTAssertEqual(snapshot?.metrics.first { $0.id == "five-hour" }?.resetCards, [])
     }
 
     func test单个接口认证失败映射为统一错误() async {

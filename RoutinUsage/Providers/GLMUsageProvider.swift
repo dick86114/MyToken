@@ -4,6 +4,13 @@ struct GLMUsageProvider: UsageProvider {
     let descriptor: ProviderDescriptor
     private let session: URLSession
     private let baseURL: URL
+    private static let resetDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 8 * 3_600)
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter
+    }()
 
     init(session: URLSession = .shared, baseURL: URL = URL(string: "https://api.z.ai")!) {
         self.session = session
@@ -139,6 +146,7 @@ struct GLMUsageProvider: UsageProvider {
             credential: credential
         )
         async let allowedModels = fetchAllowedModels(root: root, credential: credential)
+        async let resetCards = fetchResetCards(root: root, credential: credential)
 
         let (modelValue, quotaValue) = try await (model, quota)
         let activityValue: GLMJSONValue?
@@ -157,6 +165,14 @@ struct GLMUsageProvider: UsageProvider {
         } catch {
             models = []
         }
+        let cards: (fiveHour: [UsageResetCard], weekly: [UsageResetCard])
+        do {
+            cards = try await resetCards
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            cards = ([], [])
+        }
         let quotaMetrics = Self.quotaMetrics(from: quotaValue)
         var metrics = quotaMetrics.filter { $0.id != "zcode-mcp" }
         if let modelCallMetric = Self.modelCallMetric(from: modelValue) {
@@ -166,6 +182,7 @@ struct GLMUsageProvider: UsageProvider {
             metrics.append(zcodeMCPMetric)
         }
         metrics.append(contentsOf: Self.activityMetrics(from: activityValue))
+        metrics = Self.appendingResetCards(cards, to: metrics)
         guard !metrics.isEmpty else {
             throw UsageProviderError.invalidResponse
         }
@@ -225,6 +242,17 @@ struct GLMUsageProvider: UsageProvider {
         return Self.allowedModels(from: value)
     }
 
+    private func fetchResetCards(
+        root: URL,
+        credential: ProviderCredential
+    ) async throws -> (fiveHour: [UsageResetCard], weekly: [UsageResetCard]) {
+        let url = root
+            .appendingPathComponent("/api/biz/customer-package-reset/list")
+            .appending(query: "?targetType=PERSONAL")
+        let value = try await request(url: url, credential: credential)
+        return Self.resetCards(from: value)
+    }
+
     private static func allowedModels(from value: GLMJSONValue) -> [String] {
         let items: [GLMJSONValue]
         switch value {
@@ -240,6 +268,64 @@ struct GLMUsageProvider: UsageProvider {
         return items.compactMap { item -> String? in
             guard case let .object(object) = item else { return nil }
             return object["id"]?.stringValue().flatMap { $0.isEmpty ? nil : $0 }
+        }
+    }
+
+    private static func resetCards(
+        from value: GLMJSONValue
+    ) -> (fiveHour: [UsageResetCard], weekly: [UsageResetCard]) {
+        guard case let .object(root) = value,
+              case let .object(data)? = root["data"]
+        else { return ([], []) }
+
+        return (
+            data["fiveHourResets"].map(Self.availableResetCards(from:)) ?? [],
+            data["weekResets"].map(Self.availableResetCards(from:)) ?? []
+        )
+    }
+
+    private static func availableResetCards(from value: GLMJSONValue) -> [UsageResetCard] {
+        guard case let .array(items) = value else { return [] }
+        return items.compactMap { item in
+            guard case let .object(object) = item,
+                  object["available"]?.boolValue() == true,
+                  let date = resetCardDate(object["expireTime"])
+            else { return nil }
+            return UsageResetCard(expiresAt: date)
+        }
+    }
+
+    private static func resetCardDate(_ value: GLMJSONValue?) -> Date? {
+        switch value {
+        case let .string(text):
+            return resetDateFormatter.date(from: text)
+        case let .number(value):
+            let timestamp = NSDecimalNumber(decimal: value).doubleValue
+            if abs(timestamp) >= 100_000_000_000 {
+                return Date(timeIntervalSince1970: timestamp / 1_000)
+            }
+            if abs(timestamp) >= 100_000_000 {
+                return Date(timeIntervalSince1970: timestamp)
+            }
+            return nil
+        default:
+            return nil
+        }
+    }
+
+    private static func appendingResetCards(
+        _ cards: (fiveHour: [UsageResetCard], weekly: [UsageResetCard]),
+        to metrics: [NormalizedUsageMetric]
+    ) -> [NormalizedUsageMetric] {
+        metrics.map { metric in
+            switch metric.id {
+            case "five-hour":
+                return metric.withResetCards(cards.fiveHour)
+            case "weekly":
+                return metric.withResetCards(cards.weekly)
+            default:
+                return metric
+            }
         }
     }
 
