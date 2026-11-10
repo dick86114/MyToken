@@ -549,9 +549,9 @@ final class UsagePresentationPolicyTests: XCTestCase {
 
         XCTAssertFalse(identity.contains("Text(UsageRowPresentation.subscriptionDescription("))
         XCTAssertTrue(identity.contains("providerSubtitle"))
-        XCTAssertTrue(identity.contains(".lineLimit(showsPlanBelowProvider ? 1 : 2)"))
-        XCTAssertTrue(identity.contains("VStack(alignment: .leading, spacing: 1)"))
-        XCTAssertTrue(identity.contains("HStack(alignment: .firstTextBaseline, spacing: 3)"))
+        XCTAssertFalse(identity.contains(".lineLimit(showsPlanBelowProvider ? 1 : 2)"))
+        XCTAssertFalse(identity.contains("VStack(alignment: .leading, spacing: 1)"))
+        XCTAssertFalse(identity.contains("HStack(alignment: .firstTextBaseline, spacing: 3)"))
 
         let balanceStart = try XCTUnwrap(source.range(of: "private func compactBalanceCard"))
         let headerStart = try XCTUnwrap(source.range(of: "private func compactHeader"))
@@ -601,8 +601,11 @@ final class UsagePresentationPolicyTests: XCTestCase {
             )
         )
         let subtitle = String(source[subtitleStart.lowerBound..<subtitleEnd.lowerBound])
-        XCTAssertTrue(subtitle.contains("Text(planName)"))
-        XCTAssertTrue(subtitle.contains("Text(\" · \\(planName)\")"))
+        XCTAssertFalse(subtitle.contains("state.snapshot?.planName"))
+        XCTAssertFalse(subtitle.contains("Text(planName)"))
+        XCTAssertFalse(subtitle.contains("Text(\" · \\(planName)\")"))
+        XCTAssertFalse(subtitle.contains("subscriptionDescription"))
+        XCTAssertTrue(subtitle.contains("Text(providerName)"))
     }
 
     func test设置窗口存在时显示Dock图标关闭后恢复菜单栏形态() throws {

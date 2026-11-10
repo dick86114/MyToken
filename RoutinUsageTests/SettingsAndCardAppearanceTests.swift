@@ -65,6 +65,67 @@ final class SettingsAndCardAppearanceTests: XCTestCase {
         XCTAssertFalse(source.contains("struct CompactBalanceWave"))
     }
 
+    func test简洁余额使用明细行直接展示两类余额() throws {
+        let compactViews = try sourceText(
+            at: "RoutinUsage/Views/CompactUsageCardViews.swift"
+        )
+
+        let balanceStart = try XCTUnwrap(compactViews.range(of: "private struct BalanceCompositionSegment"))
+        let balanceEnd = try XCTUnwrap(
+            compactViews.range(of: "private extension View", range: balanceStart.lowerBound..<compactViews.endIndex)
+        )
+        let balanceViews = String(compactViews[balanceStart.lowerBound..<balanceEnd.lowerBound])
+
+        XCTAssertTrue(compactViews.contains("struct BalanceCompositionDetails"))
+        XCTAssertTrue(compactViews.contains("struct BalanceCompositionDetailItem"))
+        XCTAssertTrue(compactViews.contains("static let width: CGFloat = 164"))
+        XCTAssertTrue(compactViews.contains("static let height: CGFloat = 14"))
+        XCTAssertTrue(compactViews.contains("static let contentHeight: CGFloat = 46"))
+        XCTAssertTrue(compactViews.contains(".frame(height: balanceComposition == nil ? 24 : BalanceCompositionDetailMetrics.contentHeight)"))
+        XCTAssertTrue(compactViews.contains("Text(segment.compactLabel)"))
+        XCTAssertTrue(compactViews.contains("UsageFormatter.currencyText(segment.value, currencyCode: currencyCode)"))
+        XCTAssertTrue(compactViews.contains("case \"toppedUpBalance\":"))
+        XCTAssertTrue(compactViews.contains("case \"grantedBalance\":"))
+        XCTAssertTrue(compactViews.contains("case \"cash-balance\":"))
+        XCTAssertTrue(compactViews.contains("case \"gift-balance\":"))
+        XCTAssertTrue(balanceViews.contains("Circle()"))
+        XCTAssertTrue(balanceViews.contains("separatorSize"))
+        XCTAssertFalse(balanceViews.contains("RoundedRectangle"))
+        XCTAssertFalse(balanceViews.contains(".background"))
+        XCTAssertFalse(balanceViews.contains(".overlay"))
+        XCTAssertFalse(compactViews.contains("BalanceCompositionBar"))
+        XCTAssertFalse(compactViews.contains("BalanceCompositionHoverRegion"))
+        XCTAssertFalse(compactViews.contains("BalanceCompositionDetailCard"))
+        XCTAssertFalse(compactViews.contains("BalanceCompositionChip"))
+        XCTAssertFalse(compactViews.contains(".popover(isPresented: $isHovered"))
+        XCTAssertFalse(compactViews.contains("static let hoverHeight"))
+        XCTAssertFalse(compactViews.contains("BalanceCompositionCalloutShape"))
+        XCTAssertFalse(compactViews.contains("onContinuousHover"))
+        XCTAssertFalse(compactViews.contains("CompactUsageCardPresentation.balanceStatusText"))
+        XCTAssertFalse(compactViews.contains("balanceStatusText"))
+    }
+
+    func test余额卡片移除聚焦环上方状态文案() throws {
+        let source = try sourceText(
+            at: "RoutinUsage/Views/UsageRowView.swift"
+        )
+        let selectorStart = try XCTUnwrap(source.range(of: "private static func balanceCompositionMetrics"))
+        let selectorEnd = try XCTUnwrap(
+            source.range(of: "\n}", range: selectorStart.lowerBound..<source.endIndex)
+        )
+        let selector = String(source[selectorStart.lowerBound..<selectorEnd.lowerBound])
+        let balanceStart = try XCTUnwrap(source.range(of: "private func compactBalanceCard"))
+        let headerStart = try XCTUnwrap(
+            source.range(of: "private func compactHeader", range: balanceStart.lowerBound..<source.endIndex)
+        )
+        let balanceCard = String(source[balanceStart.lowerBound..<headerStart.lowerBound])
+
+        XCTAssertFalse(balanceCard.contains("balanceStatusText"))
+        XCTAssertFalse(balanceCard.contains("Capsule().fill(balanceAccent.opacity(0.10))"))
+        XCTAssertTrue(balanceCard.contains("compositionMetrics"))
+        XCTAssertTrue(selector.contains("[\"toppedUpBalance\", \"grantedBalance\", \"cash-balance\", \"gift-balance\"]"))
+    }
+
     func test简洁用量卡片不叠加内层描边() throws {
         let source = try sourceText(
             at: "RoutinUsage/Views/CompactUsageCardViews.swift"

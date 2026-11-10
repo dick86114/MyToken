@@ -369,22 +369,160 @@ struct CompactValueTile: View {
 
 struct CompactBalanceStrip: View {
     let metric: NormalizedUsageMetric
+    var compositionMetrics: [NormalizedUsageMetric] = []
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        VStack(spacing: 1) {
-            Text(metric.label)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(CompactPopoverPalette.subtitle(colorScheme))
+        VStack(alignment: .center, spacing: BalanceCompositionDetailMetrics.contentSpacing) {
             Text(UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode))
                 .font(.system(size: 20, weight: .bold))
                 .monospacedDigit()
                 .foregroundStyle(CompactPopoverPalette.amountGreen(colorScheme))
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
+                .frame(height: 24)
+            if let composition = balanceComposition {
+                BalanceCompositionDetails(composition: composition)
+            }
         }
+        .frame(height: balanceComposition == nil ? 24 : BalanceCompositionDetailMetrics.contentHeight)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(metric.label)，\(UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode))")
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var balanceComposition: BalanceComposition? {
+        BalanceComposition(
+            currencyCode: metric.currencyCode,
+            segments: compositionMetrics.map(BalanceCompositionSegment.init)
+        )
+    }
+
+    private var accessibilityLabel: String {
+        let amount = UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode)
+        guard let composition = balanceComposition else { return "\(metric.label)，\(amount)" }
+        let parts = composition.segments.map { segment in
+            "\(segment.label)\(UsageFormatter.currencyText(segment.value, currencyCode: composition.currencyCode))"
+        }
+        return "\(metric.label)，\(amount)，\(parts.joined(separator: "，"))"
+    }
+}
+
+private struct BalanceCompositionSegment: Identifiable, Equatable {
+    let id: String
+    let label: String
+    let compactLabel: String
+    let value: Decimal
+    let kind: BalanceCompositionKind
+
+    init(_ metric: NormalizedUsageMetric) {
+        id = metric.id
+        label = metric.label
+        value = metric.value ?? 0
+        switch metric.id {
+        case "toppedUpBalance":
+            compactLabel = "充值"
+            kind = .toppedUp
+        case "grantedBalance":
+            compactLabel = "赠金"
+            kind = .granted
+        case "cash-balance":
+            compactLabel = "现金"
+            kind = .toppedUp
+        case "gift-balance":
+            compactLabel = "赠送"
+            kind = .granted
+        default:
+            compactLabel = metric.label
+            kind = .toppedUp
+        }
+    }
+
+    func color(_ scheme: ColorScheme) -> Color {
+        switch kind {
+        case .toppedUp:
+            return CompactPopoverPalette.positive(scheme)
+        case .granted:
+            return CompactPopoverPalette.brand(scheme)
+        }
+    }
+}
+
+private enum BalanceCompositionKind: Equatable {
+    case toppedUp
+    case granted
+}
+
+private struct BalanceComposition: Equatable {
+    let currencyCode: String?
+    let segments: [BalanceCompositionSegment]
+}
+
+private enum BalanceCompositionDetailMetrics {
+    static let width: CGFloat = 164
+    static let height: CGFloat = 14
+    static let contentHeight: CGFloat = 46
+    static let contentSpacing: CGFloat = 4
+    static let groupSpacing: CGFloat = 6
+    static let itemSpacing: CGFloat = 3
+    static let dotSize: CGFloat = 5
+    static let separatorSize: CGFloat = 2
+}
+
+private struct BalanceCompositionDetails: View {
+    let composition: BalanceComposition
+
+    var body: some View {
+        HStack(spacing: BalanceCompositionDetailMetrics.groupSpacing) {
+            ForEach(Array(composition.segments.enumerated()), id: \.element.id) { index, segment in
+                if index > 0 {
+                    Circle()
+                        .fill(Color.secondary.opacity(0.35))
+                        .frame(
+                            width: BalanceCompositionDetailMetrics.separatorSize,
+                            height: BalanceCompositionDetailMetrics.separatorSize
+                        )
+                }
+                BalanceCompositionDetailItem(
+                    segment: segment,
+                    currencyCode: composition.currencyCode
+                )
+            }
+        }
+        .frame(
+            width: BalanceCompositionDetailMetrics.width,
+            height: BalanceCompositionDetailMetrics.height
+        )
+    }
+}
+
+private struct BalanceCompositionDetailItem: View {
+    let segment: BalanceCompositionSegment
+    let currencyCode: String?
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let tint = segment.color(colorScheme)
+        HStack(spacing: BalanceCompositionDetailMetrics.itemSpacing) {
+            Circle()
+                .fill(tint)
+                .frame(
+                    width: BalanceCompositionDetailMetrics.dotSize,
+                    height: BalanceCompositionDetailMetrics.dotSize
+                )
+            Text(segment.compactLabel)
+                .font(.system(size: 9.5, weight: .medium))
+                .foregroundStyle(tint)
+            Text(UsageFormatter.currencyText(segment.value, currencyCode: currencyCode))
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .monospacedDigit()
+                .foregroundStyle(tint)
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.78)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "\(segment.label)，\(UsageFormatter.currencyText(segment.value, currencyCode: currencyCode))"
+        )
     }
 }
 

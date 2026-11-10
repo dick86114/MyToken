@@ -88,17 +88,6 @@ enum CompactUsageCardPresentation {
         return reset
     }
 
-    static func balanceStatusText(healthState: UsageMetricHealthState) -> String {
-        switch healthState {
-        case .normal, .unknown, .stale:
-            return "充足"
-        case .warning:
-            return "偏低"
-        case .critical, .unavailable:
-            return "不足"
-        }
-    }
-
     static func gaugeTone(
         for metric: NormalizedUsageMetric,
         rules: MenuBarColorRules = .standard

@@ -52,7 +52,14 @@ struct UsageRowView: View {
 
         return Group {
             if arrangement == .balance, let metric = metrics.first {
-                compactBalanceCard(metric: metric, remainingText: remainingText)
+                let compositionMetrics = Self.balanceCompositionMetrics(
+                    in: state.snapshot?.normalizedMetrics
+                )
+                compactBalanceCard(
+                    metric: metric,
+                    compositionMetrics: compositionMetrics,
+                    remainingText: remainingText
+                )
             } else {
                 compactStandardCard(now: now, remainingText: remainingText)
             }
@@ -79,33 +86,18 @@ struct UsageRowView: View {
 
     private func compactBalanceCard(
         metric: NormalizedUsageMetric,
+        compositionMetrics: [NormalizedUsageMetric],
         remainingText: String?
     ) -> some View {
         HStack(alignment: .center, spacing: 10) {
             compactIdentity(showsPlanBelowProvider: true, remainingText: remainingText)
             Spacer(minLength: 8)
-            CompactBalanceStrip(metric: metric)
+            CompactBalanceStrip(
+                metric: metric,
+                compositionMetrics: compositionMetrics
+            )
             Spacer(minLength: 8)
             HStack(spacing: 8) {
-                let balanceAccent = CompactPopoverPalette.balanceAccent(
-                    for: metric.healthState,
-                    colorScheme
-                )
-
-                Text(CompactUsageCardPresentation.balanceStatusText(healthState: metric.healthState))
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .foregroundStyle(balanceAccent)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background {
-                        Capsule().fill(balanceAccent.opacity(0.10))
-                    }
-                    .overlay {
-                        Capsule().strokeBorder(
-                            balanceAccent.opacity(0.22),
-                            lineWidth: 1
-                        )
-                    }
                 compactActionButtons
             }
         }
@@ -151,19 +143,11 @@ struct UsageRowView: View {
                 }
 
                 Group {
-                    if showsPlanBelowProvider {
-                        VStack(alignment: .leading, spacing: 1) {
-                            providerSubtitle(showsPlanBelowProvider: true)
-                        }
-                    } else {
-                        HStack(alignment: .firstTextBaseline, spacing: 3) {
-                            providerSubtitle(showsPlanBelowProvider: false)
-                        }
-                    }
+                    providerSubtitle(showsPlanBelowProvider: showsPlanBelowProvider)
                 }
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(CompactPopoverPalette.subtitle(colorScheme))
-                .lineLimit(showsPlanBelowProvider ? 1 : 2)
+                .lineLimit(1)
             }
         }
     }
@@ -207,6 +191,15 @@ struct UsageRowView: View {
             metadata: state.configuration.metadata,
             metrics: snapshot.normalizedMetrics
         )
+    }
+
+    private static func balanceCompositionMetrics(
+        in metrics: [NormalizedUsageMetric]?
+    ) -> [NormalizedUsageMetric] {
+        guard let metrics else { return [] }
+        return ["toppedUpBalance", "grantedBalance", "cash-balance", "gift-balance"].compactMap { metricID in
+            metrics.first { $0.id == metricID && ($0.value ?? 0) > 0 }
+        }
     }
 }
 
@@ -876,7 +869,6 @@ private extension UsageRowView {
         let providerName = ProviderRegistry.builtInDescriptors
             .first(where: { $0.id == state.configuration.providerID })?
             .displayName ?? state.configuration.providerID.rawValue
-        let planName = state.snapshot?.planName ?? ""
 
         if let websiteURL = state.configuration.websiteURL {
             ProviderWebsiteLink(
@@ -884,19 +876,8 @@ private extension UsageRowView {
                 destination: websiteURL,
                 colorScheme: colorScheme
             )
-
-            if !planName.isEmpty {
-                if showsPlanBelowProvider {
-                    Text(planName)
-                } else {
-                    Text(" · \(planName)")
-                }
-            }
         } else {
-            Text(UsageRowPresentation.subscriptionDescription(
-                providerID: state.configuration.providerID,
-                planName: planName
-            ))
+            Text(providerName)
         }
     }
 

@@ -142,13 +142,6 @@ final class CompactUsageCardPresentationTests: XCTestCase {
         )
     }
 
-    func test余额徽章按健康状态映射() {
-        XCTAssertEqual(CompactUsageCardPresentation.balanceStatusText(healthState: .normal), "充足")
-        XCTAssertEqual(CompactUsageCardPresentation.balanceStatusText(healthState: .warning), "偏低")
-        XCTAssertEqual(CompactUsageCardPresentation.balanceStatusText(healthState: .critical), "不足")
-        XCTAssertEqual(CompactUsageCardPresentation.balanceStatusText(healthState: .unavailable), "不足")
-    }
-
     func test重置卡文案无卡隐藏有卡展示数量和到期清单() {
         let cards = [
             UsageResetCard(expiresAt: date("2026-11-07 17:42:45")),
