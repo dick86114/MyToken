@@ -234,11 +234,12 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(popover.contains("settings.availableCredentialIDs"))
     }
 
-    func test凭证管理页复用弹窗卡片并支持详情() throws {
+    func test凭证管理页使用紧凑行并保留详情入口() throws {
         let settings = try sourceText(at: "RoutinUsage/Views/Settings/CredentialManagementView.swift")
 
-        XCTAssertTrue(settings.contains("UsageRowView("))
-        XCTAssertTrue(settings.contains("LazyVGrid"))
+        XCTAssertTrue(settings.contains("CredentialCompactRow("))
+        XCTAssertFalse(settings.contains("UsageRowView("))
+        XCTAssertFalse(settings.contains("LazyVGrid"))
         XCTAssertTrue(settings.contains("CredentialDetailsView"))
     }
 
@@ -574,8 +575,9 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(settings.contains(".liquidGlassWindowBackground()"))
         XCTAssertTrue(settings.contains("List(SettingsSection.allCases"))
         XCTAssertFalse(settings.contains(".liquidGlassSurface(cornerRadius:"))
-        XCTAssertTrue(credentials.contains("UsageRowView("))
-        XCTAssertTrue(credentials.contains("LazyVGrid"))
+        XCTAssertTrue(credentials.contains("CredentialCompactRow("))
+        XCTAssertFalse(credentials.contains("UsageRowView("))
+        XCTAssertFalse(credentials.contains("LazyVGrid"))
     }
 
     func test弹窗筛选器使用单行供应商菜单并保留固定底栏() throws {
@@ -754,10 +756,14 @@ final class ProjectBootstrapTests: XCTestCase {
 
     func test凭证行不切换菜单栏当前Key并提供启用开关() throws {
         let settings = try sourceText(at: "RoutinUsage/Views/Settings/CredentialManagementView.swift")
+        let row = try TestSourceReader.read([
+            "RoutinUsage", "Views", "Settings", "Components", "CredentialCompactRow.swift"
+        ])
 
-        XCTAssertTrue(settings.contains("Toggle"))
+        XCTAssertTrue(row.contains("Toggle"))
+        XCTAssertTrue(row.contains("setEnabled"))
+        XCTAssertTrue(row.contains("isEnabled"))
         XCTAssertTrue(settings.contains("model.setEnabled"))
-        XCTAssertTrue(settings.contains("isEnabled"))
         XCTAssertFalse(settings.contains("store.selectKey"))
         XCTAssertFalse(settings.contains("store.selectedKeyID"))
     }

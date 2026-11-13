@@ -3,13 +3,17 @@ import XCTest
 
 @MainActor
 final class CredentialManagementViewTests: XCTestCase {
-    func test凭证卡片提供独立提醒设置入口() throws {
+    func test紧凑凭证行提供独立提醒设置入口() throws {
         let source = try TestSourceReader.read([
             "RoutinUsage", "Views", "Settings", "CredentialManagementView.swift"
         ])
+        let rowSource = try TestSourceReader.read([
+            "RoutinUsage", "Views", "Settings", "Components", "CredentialCompactRow.swift"
+        ])
 
-        XCTAssertTrue(source.contains("bell.badge"))
+        XCTAssertTrue(rowSource.contains("bell.badge"))
         XCTAssertTrue(source.contains("提醒设置"))
+        XCTAssertTrue(rowSource.contains("提醒设置"))
         XCTAssertTrue(source.contains("CredentialAlertSettingsView"))
         XCTAssertTrue(source.contains("CredentialAlertSettingsPresentation"))
         XCTAssertTrue(source.contains(".liquidGlassOverlay(item: $alertSettingsPresentation)"))
@@ -63,6 +67,139 @@ final class CredentialManagementViewTests: XCTestCase {
         XCTAssertEqual(model.groups.first?.provider.id, .routin)
         XCTAssertFalse(model.visibleStates.contains { $0.configuration.id == enabled.id })
         XCTAssertFalse(model.visibleStates.contains { $0.configuration.id == otherProvider.id })
+    }
+
+    func test摘要统计需注意凭证并默认展开异常供应商() async throws {
+        let context = CredentialManagementTestContext()
+        defer { context.cleanUp() }
+        let healthy = try context.addCredential(name: "正常账号", providerID: .routin)
+        let disabled = try context.addCredential(name: "停用账号", providerID: .deepseek)
+        let failing = try context.addCredential(name: "失败账号", providerID: .glm)
+        _ = try context.repository.setEnabled(id: disabled.id, enabled: false)
+        context.store.reloadConfigurations()
+        await context.store.refresh(keyID: failing.id)
+        let model = context.makeModel()
+
+        XCTAssertEqual(model.enabledCount, 2)
+        XCTAssertEqual(model.disabledCount, 1)
+        XCTAssertEqual(model.attentionCount, 1)
+        XCTAssertEqual(model.providerCount, 3)
+        XCTAssertEqual(model.expandedProviderIDs, Set([.glm]))
+        XCTAssertEqual(model.groups.first?.provider.id, .glm)
+
+        let failingState = try XCTUnwrap(context.store.state(for: failing.id))
+        XCTAssertEqual(model.attention(for: failingState), .refreshFailed)
+        XCTAssertEqual(
+            model.groups.first(where: { $0.provider.id == .glm })?.attentionCount,
+            1
+        )
+        XCTAssertEqual(
+            model.groups.first(where: { $0.provider.id == .routin })?.attentionCount,
+            0
+        )
+        XCTAssertNotNil(context.store.state(for: healthy.id))
+
+        model.filter.status = .attention
+        XCTAssertEqual(model.visibleStates.map(\.configuration.id), [failing.id])
+    }
+
+    func test需注意凭证展示触发提醒的用量项目() async throws {
+        let context = CredentialManagementTestContext()
+        defer { context.cleanUp() }
+        let key = try context.addCredential(name: "GLM 周额度", providerID: .glm)
+        let now = Date()
+        let metrics = [
+            NormalizedUsageMetric(
+                id: "five-hour",
+                label: "5 小时用量",
+                used: 0,
+                limit: 100,
+                unit: .request,
+                presentation: .progress,
+                semantic: .usedQuota,
+                healthState: .normal
+            ),
+            NormalizedUsageMetric(
+                id: "weekly",
+                label: "每周用量",
+                used: 70,
+                limit: 100,
+                unit: .request,
+                presentation: .progress,
+                semantic: .usedQuota,
+                healthState: .warning
+            )
+        ]
+        let snapshot = UsageSnapshot(
+            planName: "Coding Plan",
+            kind: .periodic,
+            fiveHour: nil,
+            weekly: nil,
+            token: nil,
+            allowedModels: [],
+            fetchedAt: now,
+            providerID: .glm,
+            credentialID: key.id,
+            metrics: metrics
+        )
+        await context.store.applyValidatedSnapshot(
+            snapshot,
+            for: key.id,
+            validatedAt: now
+        )
+        let model = context.makeModel()
+        let state = try XCTUnwrap(context.store.state(for: key.id))
+
+        XCTAssertEqual(model.attention(for: state), .warningMetric(metrics[1]))
+        XCTAssertEqual(model.attentionMetric(for: state)?.id, "weekly")
+        XCTAssertEqual(model.attentionMetric(for: state)?.displayedPercent, 70)
+        XCTAssertEqual(model.attention(for: state)?.title, "每周用量 需注意")
+    }
+
+    func test默认只展开一个供应商并支持全部展开收起() throws {
+        let context = CredentialManagementTestContext()
+        defer { context.cleanUp() }
+        _ = try context.addCredential(name: "Routin 账号", providerID: .routin)
+        _ = try context.addCredential(name: "DeepSeek 账号", providerID: .deepseek)
+        let model = context.makeModel()
+
+        XCTAssertEqual(model.expandedProviderIDs, Set([.routin]))
+        XCTAssertFalse(model.allVisibleGroupsExpanded)
+
+        model.toggleAllVisibleGroups()
+        XCTAssertEqual(model.expandedProviderIDs, Set([.routin, .deepseek]))
+        XCTAssertTrue(model.allVisibleGroupsExpanded)
+
+        model.toggleAllVisibleGroups()
+        XCTAssertTrue(model.expandedProviderIDs.isEmpty)
+        XCTAssertFalse(model.allVisibleGroupsExpanded)
+    }
+
+    func test状态和搜索筛选同步更新供应商计数() throws {
+        let context = CredentialManagementTestContext()
+        defer { context.cleanUp() }
+        let routinEnabled = try context.addCredential(name: "主账号", providerID: .routin)
+        let routinDisabled = try context.addCredential(name: "备用账号", providerID: .routin)
+        _ = try context.addCredential(name: "DeepSeek 账号", providerID: .deepseek)
+        _ = try context.repository.setEnabled(id: routinDisabled.id, enabled: false)
+        context.store.reloadConfigurations()
+        let model = context.makeModel()
+
+        model.filter.status = .enabled
+        XCTAssertEqual(model.providerFilterCounts[.routin], 1)
+        XCTAssertEqual(model.providerFilterCounts[.deepseek], 1)
+        XCTAssertEqual(model.filteredCredentialCount, 2)
+        XCTAssertTrue(
+            model.providerFilterDescriptors.contains { $0.id == .routin }
+        )
+        XCTAssertTrue(
+            model.visibleStates.contains { $0.configuration.id == routinEnabled.id }
+        )
+
+        model.filter.searchText = "Deep"
+        XCTAssertEqual(model.providerFilterCounts[.routin], nil)
+        XCTAssertEqual(model.providerFilterCounts[.deepseek], 1)
+        XCTAssertEqual(model.filteredCredentialCount, 1)
     }
 
     func test搜索归一化空白并匹配别名或供应商() throws {
@@ -275,16 +412,23 @@ final class CredentialManagementViewTests: XCTestCase {
         let modelSource = try TestSourceReader.read([
             "RoutinUsage", "Views", "Settings", "CredentialManagementModel.swift"
         ])
+        let rowSource = try TestSourceReader.read([
+            "RoutinUsage", "Views", "Settings", "Components", "CredentialCompactRow.swift"
+        ])
 
         XCTAssertTrue(source.contains("struct CredentialFilter"))
         XCTAssertTrue(modelSource.contains("ProviderID.allCases"))
         XCTAssertTrue(source.contains("searchText"))
         XCTAssertTrue(source.contains("confirmationDialog"))
         XCTAssertTrue(source.contains("将同时删除本地保存的密钥和用量缓存"))
-        XCTAssertTrue(source.contains("UsageRowView("))
-        XCTAssertTrue(source.contains("LazyVGrid"))
+        XCTAssertTrue(source.contains("CredentialCompactRow("))
+        XCTAssertTrue(source.contains("CredentialProviderGroup"))
+        XCTAssertFalse(source.contains("UsageRowView("))
+        XCTAssertFalse(source.contains("LazyVGrid"))
         XCTAssertTrue(source.contains("detailsState"))
-        XCTAssertTrue(source.contains("ellipsis.circle"))
+        XCTAssertTrue(rowSource.contains("Menu {"))
+        XCTAssertTrue(rowSource.contains("分享用量"))
+        XCTAssertTrue(rowSource.contains("删除凭证"))
     }
 
     func test页面视觉与可访问性约束作为补充() throws {
@@ -292,7 +436,7 @@ final class CredentialManagementViewTests: XCTestCase {
             "RoutinUsage", "Views", "Settings", "CredentialManagementView.swift"
         ])
         let rowSource = try TestSourceReader.read([
-            "RoutinUsage", "Views", "Settings", "Components", "CredentialSummaryRow.swift"
+            "RoutinUsage", "Views", "Settings", "Components", "CredentialCompactRow.swift"
         ])
         let chipsSource = try TestSourceReader.read([
             "RoutinUsage", "Views", "Settings", "Components", "ProviderFilterChips.swift"
@@ -300,10 +444,22 @@ final class CredentialManagementViewTests: XCTestCase {
         let usageRowSource = try TestSourceReader.read([
             "RoutinUsage", "Views", "UsageRowView.swift"
         ])
+        let modelSource = try TestSourceReader.read([
+            "RoutinUsage", "Views", "Settings", "CredentialManagementModel.swift"
+        ])
 
         XCTAssertTrue(source.contains("TextField(\"搜索别名或供应商\""))
         XCTAssertTrue(source.contains("搜索别名或供应商"))
-        XCTAssertTrue(source.contains("LazyVGrid"))
+        XCTAssertTrue(source.contains("需注意"))
+        XCTAssertFalse(source.contains("需处理"))
+        XCTAssertFalse(modelSource.contains("需处理"))
+        XCTAssertFalse(modelSource.contains("需要处理"))
+        XCTAssertTrue(source.contains("summaryStrip"))
+        XCTAssertTrue(source.contains("expandedProviderIDs"))
+        XCTAssertTrue(source.contains("ProviderFilterChips("))
+        XCTAssertTrue(source.contains("CredentialCompactRow("))
+        XCTAssertFalse(source.contains("LazyVGrid"))
+        XCTAssertFalse(source.contains("UsageRowView("))
         XCTAssertTrue(source.contains("CredentialDetailsView"))
         XCTAssertTrue(source.contains(".liquidGlassOverlay(item: $detailsState)"))
         XCTAssertTrue(source.contains("closeDetails()"))
@@ -312,9 +468,14 @@ final class CredentialManagementViewTests: XCTestCase {
         XCTAssertTrue(source.contains(".frame(minHeight: 500, maxHeight: 720)"))
         XCTAssertTrue(source.contains("accessibilitySummary("))
         XCTAssertTrue(usageRowSource.contains(".saturation(state.configuration.isEnabled ? 1 : 0)"))
-        XCTAssertTrue(rowSource.contains("credentialContent"))
-        XCTAssertFalse(rowSource.contains(".opacity(state.configuration.isEnabled ? 1 : 0.58)\n        }\n    }"))
+        XCTAssertTrue(rowSource.contains("statusLine"))
+        XCTAssertTrue(rowSource.contains("trailingSummary"))
+        XCTAssertTrue(rowSource.contains("attentionMetric"))
+        XCTAssertTrue(rowSource.contains("attentionProgressBar"))
+        XCTAssertTrue(rowSource.contains("accessibilityLabel"))
         XCTAssertTrue(chipsSource.contains("ScrollView(.horizontal"))
+        XCTAssertTrue(chipsSource.contains("ProviderLogoMark("))
+        XCTAssertTrue(chipsSource.contains("counts[provider.id, default: 0]"))
         XCTAssertTrue(chipsSource.contains("accessibilityAddTraits(isSelected ? [.isSelected] : [])"))
     }
 }
