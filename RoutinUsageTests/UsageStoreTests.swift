@@ -228,7 +228,7 @@ final class UsageStoreTests: XCTestCase {
         defer { context.cleanUp() }
         let key = try context.repository.add(
             name: "小米 MiMo",
-            secret: "old-cookie",
+            secret: "sk-test-key",
             providerID: .xiaomi,
             credentialKind: .bearerAPIKey,
             metadata: ["usageKind": "api"]

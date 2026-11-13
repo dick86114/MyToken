@@ -26,10 +26,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import ai.routin.mytoken.core.ui.GlassButton
 import ai.routin.mytoken.core.ui.GlassButtonTone
 import ai.routin.mytoken.core.ui.GlassTextField
@@ -78,8 +74,6 @@ fun CredentialEditorScreen(
     onSave: () -> Unit,
     layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
 ) {
-    var showsXiaomiLogin by remember { mutableStateOf(false) }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -180,7 +174,7 @@ fun CredentialEditorScreen(
                     }
                 }
                 SecretField(
-                    label = "网页 Cookie 或 serviceToken",
+                    label = "API Key（sk- / tp-）",
                     value = state.apiKey,
                     onValueChange = onApiKeyChange,
                     isVisible = state.isSecretVisible,
@@ -193,15 +187,10 @@ fun CredentialEditorScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        text = "登录 platform.xiaomimimo.com 后复制 Cookie；也可只粘贴 api-platform_serviceToken 的值。",
+                        text = "API 按量使用 sk- 开头的普通 API Key；Token Plan 使用 tp- 开头的专用 API Key。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
-                    )
-                    GlassButton(
-                        onClick = { showsXiaomiLogin = true },
-                        modifier = Modifier.testTag("editor_xiaomi_login"),
-                        text = "登录并获取 Cookie",
                     )
                 }
             } else when (state.credentialKind) {
@@ -322,24 +311,6 @@ fun CredentialEditorScreen(
         }
     }
 
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val xiaomiLoginLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
-    ) { result ->
-        val cookie = result.data?.getStringExtra(XiaomiLoginActivity.RESULT_COOKIE)
-        if (result.resultCode == android.app.Activity.RESULT_OK && cookie != null) {
-            onApiKeyChange(cookie)
-        }
-        showsXiaomiLogin = false
-    }
-
-    if (showsXiaomiLogin) {
-        androidx.compose.runtime.LaunchedEffect(Unit) {
-            xiaomiLoginLauncher.launch(
-                android.content.Intent(context, XiaomiLoginActivity::class.java)
-            )
-        }
-    }
 }
 
 @Composable

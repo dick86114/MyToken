@@ -277,14 +277,14 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(source.contains("return false"))
     }
 
-    func test启动阶段会关闭旧登录和签到窗口() throws {
+    func test启动阶段不再创建网页登录窗口() throws {
         let app = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
         let environment = try sourceText(at: "RoutinUsage/App/AppEnvironment.swift")
 
-        XCTAssertTrue(app.contains("closeLegacySuppressedLaunchWindows()"))
-        XCTAssertTrue(app.contains("登录小米 MiMo"))
-        XCTAssertTrue(environment.contains("isStartupRefreshActive"))
-        XCTAssertTrue(environment.contains("guard !isStartupRefreshActive else { return }"))
+        XCTAssertFalse(app.contains("closeLegacySuppressedLaunchWindows"))
+        XCTAssertFalse(app.contains("登录小米 MiMo"))
+        XCTAssertFalse(environment.contains("isStartupRefreshActive"))
+        XCTAssertFalse(environment.contains("XiaomiLoginRequest"))
     }
 
     func test菜单栏标签提供应用操作菜单但不提供账号选择() throws {
@@ -817,24 +817,35 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(settings.contains("更新完成"))
     }
 
-    func test小米重试登录清理旧Web会话并绕过缓存() throws {
+    func test小米仅通过官方APIKey查询且不存在网页登录入口() throws {
         let projectRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        let session = try String(
+        let provider = try String(
             contentsOf: projectRoot
-                .appendingPathComponent("RoutinUsage/Providers/XiaomiWebSession.swift"),
+                .appendingPathComponent("RoutinUsage/Providers/XiaomiMiMoUsageProvider.swift"),
             encoding: .utf8
         )
-        let loginWindow = try String(
+        let editor = try String(
             contentsOf: projectRoot
-                .appendingPathComponent("RoutinUsage/Views/XiaomiLoginWindow.swift"),
+                .appendingPathComponent("RoutinUsage/Views/CredentialEditorView.swift"),
             encoding: .utf8
         )
+        let environment = try sourceText(at: "RoutinUsage/App/AppEnvironment.swift")
 
-        XCTAssertTrue(session.contains("await clearWebsiteData()"))
-        XCTAssertTrue(session.contains(".reloadIgnoringLocalAndRemoteCacheData"))
-        XCTAssertTrue(loginWindow.contains("resetSession: request.resetsWebSession"))
+        XCTAssertTrue(provider.contains("api.xiaomimimo.com"))
+        XCTAssertTrue(provider.contains("token-plan-cn.xiaomimimo.com"))
+        XCTAssertTrue(provider.contains("sk-"))
+        XCTAssertTrue(provider.contains("tp-"))
+        XCTAssertFalse(provider.contains("cookieHeader"))
+        XCTAssertFalse(provider.contains("api-platform_serviceToken"))
+        XCTAssertFalse(provider.contains("renewSession"))
+        XCTAssertFalse(editor.contains("XiaomiLogin"))
+        XCTAssertFalse(editor.contains("网页 Cookie"))
+        XCTAssertFalse(environment.contains("XiaomiWebSession"))
+        XCTAssertFalse(environment.contains("XiaomiLogin"))
+        XCTAssertFalse(editor.contains("打开控制台"))
+        XCTAssertTrue(editor.contains("CredentialWebsiteDefaults.suggestedURL"))
     }
 
     func test更新弹窗操作按钮整块可点击() throws {
@@ -866,11 +877,6 @@ final class ProjectBootstrapTests: XCTestCase {
                 .appendingPathComponent("android/feature-home/src/main/kotlin/ai/routin/mytoken/feature/home/CredentialUsageCard.kt"),
             encoding: .utf8
         )
-        let dialog = try String(
-            contentsOf: projectRoot
-                .appendingPathComponent("android/feature-credentials/src/main/kotlin/ai/routin/mytoken/feature/credentials/XiaomiLoginActivity.kt"),
-            encoding: .utf8
-        )
         // 失败徽章改挂头像后，标题区改为 CredentialCardHeader：头像徽章在左，刷新按钮在右。
         let headerStart = try XCTUnwrap(card.range(of: "CredentialCardHeader("))
         let avatarCallIndex = try XCTUnwrap(card.range(of: "AvatarWithFailureBadge(card = card"))
@@ -883,15 +889,6 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(card.contains("widthIn(max = 96.dp)"))
         // StatusPill 单行截断是防御性设计，防止大字号下头部徽章溢出。
         XCTAssertTrue(card.contains("overflow = TextOverflow.Ellipsis"))
-        XCTAssertTrue(dialog.contains("WebSettings.LOAD_NO_CACHE"))
-        XCTAssertTrue(dialog.contains("removeAllCookies"))
-        // 401 时清空 cookie 并重载会打断小米 SSO 的登录跳转（真机表现为一直白屏），
-        // 因此这里只保留手动重置会话时的清 cookie，并断言恢复逻辑已被移除。
-        XCTAssertFalse(dialog.contains("authRecoveryAttempted"))
-        // 移动 UA 会停在只显示 cookie 提示的中间页，登录页必须使用桌面 UA。
-        XCTAssertTrue(dialog.contains("CHROME_DESKTOP_UA"))
-        // 登录页流程写入可导出的诊断日志，便于真机排查。
-        XCTAssertTrue(dialog.contains("login_page_http_error"))
     }
 
     func test弹窗设置入口复用右键菜单设置逻辑() throws {
@@ -924,7 +921,7 @@ final class ProjectBootstrapTests: XCTestCase {
         let app = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
 
         XCTAssertFalse(app.contains("Window(\"Routin 签到\", id: \"routin-check-in\")"))
-        XCTAssertTrue(app.contains("closeLegacySuppressedLaunchWindows()"))
+        XCTAssertFalse(app.contains("closeLegacySuppressedLaunchWindows"))
     }
 
     func testCodex分组检测功能已移除() throws {

@@ -1,22 +1,28 @@
 import Foundation
 
+/// 小米 MiMo 官方财务接口适配器。
+///
+/// `sk-` 普通 API Key 读取账户余额与最近 31 天用量；
+/// `tp-` 专用 API Key 读取 Token Plan Credits、周期和过期时间。
+/// 不再支持网页 Cookie 或任何网页登录态续期。
 struct XiaomiMiMoUsageProvider: UsageProvider {
-    static let defaultBaseURL = URL(string: "https://platform.xiaomimimo.com/api/v1")!
+    static let defaultOfficialBaseURL = URL(string: "https://api.xiaomimimo.com/v1")!
+    static let defaultTokenPlanBaseURL = URL(string: "https://token-plan-cn.xiaomimimo.com/v1")!
+    private static let officialUsageEarliestDate = "2026-09-01"
 
     let descriptor: ProviderDescriptor
     private let session: URLSession
-    private let baseURL: URL
-    /// 登录态过期时的静默续期钩子：(credentialID, 旧 Cookie) -> 新 Cookie。
-    private let renewSession: (@Sendable (UUID, String) async -> String?)?
+    private let officialBaseURL: URL
+    private let tokenPlanBaseURL: URL
 
     init(
         session: URLSession = .shared,
-        baseURL: URL = XiaomiMiMoUsageProvider.defaultBaseURL,
-        renewSession: (@Sendable (UUID, String) async -> String?)? = nil
+        officialBaseURL: URL = XiaomiMiMoUsageProvider.defaultOfficialBaseURL,
+        tokenPlanBaseURL: URL = XiaomiMiMoUsageProvider.defaultTokenPlanBaseURL
     ) {
         self.session = session
-        self.baseURL = baseURL
-        self.renewSession = renewSession
+        self.officialBaseURL = officialBaseURL
+        self.tokenPlanBaseURL = tokenPlanBaseURL
         self.descriptor = ProviderRegistry.builtInDescriptors.first(where: { $0.id == .xiaomi })!
     }
 
@@ -32,16 +38,6 @@ struct XiaomiMiMoUsageProvider: UsageProvider {
                     isMenuBarSelectable: true,
                     menuBarPriority: 0,
                     defaultAlertEnabled: true,
-                    defaultAbsoluteAlertThreshold: nil
-                ),
-                UsageMetricCapability(
-                    metricID: "plan-compensation",
-                    label: "补偿 Credits",
-                    presentation: .value,
-                    semantic: .value,
-                    isMenuBarSelectable: false,
-                    menuBarPriority: nil,
-                    defaultAlertEnabled: false,
                     defaultAbsoluteAlertThreshold: nil
                 ),
                 UsageMetricCapability(
@@ -72,7 +68,7 @@ struct XiaomiMiMoUsageProvider: UsageProvider {
             ),
             UsageMetricCapability(
                 metricID: "total-consumption",
-                label: "累计消费",
+                label: "消费",
                 presentation: .value,
                 semantic: .value,
                 isMenuBarSelectable: false,
@@ -82,7 +78,7 @@ struct XiaomiMiMoUsageProvider: UsageProvider {
             ),
             UsageMetricCapability(
                 metricID: "total-tokens",
-                label: "历史消耗",
+                label: "Token 消耗",
                 presentation: .value,
                 semantic: .value,
                 isMenuBarSelectable: true,
@@ -99,150 +95,94 @@ struct XiaomiMiMoUsageProvider: UsageProvider {
 
     func fetchUsage(_ credential: ProviderCredential, now: Date) async throws -> UsageSnapshot? {
         guard credential.providerID == .xiaomi,
-              credential.kind == .bearerAPIKey,
-              !credential.secret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+              credential.kind == .bearerAPIKey
         else {
             throw UsageProviderError.invalidCredential
         }
-
-        do {
-            return try await fetchUsageOnce(credential, now: now)
-        } catch let error as UsageProviderError where error.isAuthenticationFailure {
-            // 控制台票据通常只活 1-2 天；先用持久登录态静默续期，再重试一次。
-            guard let renewSession,
-                  let credentialID = credential.credentialID,
-                  let renewed = await renewSession(credentialID, credential.secret),
-                  renewed != credential.secret else {
-                throw error
-            }
-            let updated = ProviderCredential(
-                credentialID: credential.credentialID,
-                providerID: credential.providerID,
-                kind: credential.kind,
-                secret: renewed,
-                secondarySecret: credential.secondarySecret,
-                metadata: credential.metadata
+        let secret = credential.secret.trimmingCharacters(in: .whitespacesAndNewlines)
+        let mode: CredentialMode
+        if secret.lowercased().hasPrefix("sk-") {
+            mode = .apiKey
+        } else if secret.lowercased().hasPrefix("tp-") {
+            mode = .tokenPlanKey
+        } else {
+            throw UsageProviderError.providerMessage(
+                "小米 MiMo：请使用官方 API Key（API 按量 sk-，Token Plan tp-）"
             )
-            return try await fetchUsageOnce(updated, now: now)
         }
-    }
 
-    private func fetchUsageOnce(_ credential: ProviderCredential, now: Date) async throws -> UsageSnapshot? {
-        let usageKind = credential.metadata["usageKind"] ?? "api"
-        switch usageKind {
-        case "plan":
-            return try await fetchPlanUsage(credential, now: now)
-        case "api":
-            return try await fetchAPIUsage(credential, now: now)
+        switch (mode, credential.metadata["usageKind"] ?? "api") {
+        case (.apiKey, "api"):
+            return try await fetchAPIUsage(credential, apiKey: secret, now: now)
+        case (.tokenPlanKey, "plan"):
+            return try await fetchPlanUsage(credential, apiKey: secret, now: now)
+        case (.apiKey, "plan"):
+            throw UsageProviderError.providerMessage(
+                "小米 MiMo：Token Plan 请使用 tp- 开头的专用 API Key"
+            )
+        case (.tokenPlanKey, "api"):
+            throw UsageProviderError.providerMessage(
+                "小米 MiMo：API 按量请使用 sk- 开头的普通 API Key"
+            )
         default:
             throw UsageProviderError.invalidCredential
         }
     }
 
-    private func fetchAPIUsage(_ credential: ProviderCredential, now: Date) async throws -> UsageSnapshot {
-        async let balanceValue = requestJSON(path: "balance", credential: credential)
-        async let usageValue = requestJSON(path: "usage", credential: credential)
+    /// 官方按量接口：余额 + 最近 31 天日用量。
+    private func fetchAPIUsage(
+        _ credential: ProviderCredential,
+        apiKey: String,
+        now: Date
+    ) async throws -> UsageSnapshot {
+        let balanceURL = Self.officialURL(base: officialBaseURL, path: "platform/balance")
+        let usageURL = Self.officialUsageURL(base: officialBaseURL, now: now)
+        async let balanceValue = requestJSON(url: balanceURL, apiKey: apiKey)
+        async let usageValue = requestJSON(url: usageURL, apiKey: apiKey)
         let (balancePayload, usagePayload) = try await (balanceValue, usageValue)
+
         let balance = Self.object(from: balancePayload)
-        let usage = Self.object(from: usagePayload)
-        let availableBalance = Self.firstNumber(in: balance, keys: [
-            "balance", "availableBalance", "totalBalance"
-        ]) ?? 0
-        guard availableBalance != 0 || !balance.isEmpty else {
+        guard let balanceInfo = Self.firstObject(in: balance, key: "balance_infos") else {
             throw UsageProviderError.invalidResponse
         }
-
-        let currency = Self.normalizedCurrency(Self.firstString(in: balance, keys: ["currency", "currencyCode"]))
+        let currency = Self.normalizedCurrency(Self.firstString(in: balanceInfo, keys: ["currency"]))
+        let cashBalance = Self.firstNumber(in: balanceInfo, keys: ["cash_balance"]) ?? 0
+        let giftBalance = Self.firstNumber(in: balanceInfo, keys: ["gift_balance"]) ?? 0
+        let availableBalance = Self.firstNumber(in: balanceInfo, keys: ["total_available"])
+            ?? cashBalance + giftBalance + (Self.firstNumber(in: balanceInfo, keys: ["credit_available"]) ?? 0)
+        let isAvailable = Self.firstBool(in: balance, keys: ["is_available"]) ?? (availableBalance > 0)
         let warningThreshold = credential.metadata["balanceWarningThreshold"]
             .flatMap { Decimal(string: $0) }
         let health = UsageMetricHealthEvaluator.balanceState(
             balance: availableBalance,
             warningThreshold: warningThreshold,
-            isAvailable: true
+            isAvailable: isAvailable
         )
-        let tokenUsage = Self.objectValue(in: usage, key: "tokenUsage")
-        let costUsage = Self.objectValue(in: usage, key: "costUsage")
-        let inputTokens = Self.firstNumber(in: tokenUsage, keys: ["inputToken", "input_tokens"]) ?? 0
-        let outputTokens = Self.firstNumber(in: tokenUsage, keys: ["outputToken", "output_tokens"]) ?? 0
-        let cacheTokens = Self.firstNumber(in: tokenUsage, keys: ["cacheToken", "cache_tokens"]) ?? 0
-        let inputMissTokens = max(0, inputTokens - cacheTokens)
-        let totalTokens = inputTokens + outputTokens
-        let totalCost = Self.firstNumber(in: costUsage, keys: ["totalCost", "total_cost"]) ?? 0
-        let availableModels = Self.defaultAllowedModels
 
-        let metrics = [
-            NormalizedUsageMetric(
-                id: "account-balance",
-                label: "账户余额",
-                value: availableBalance,
-                unit: .currency,
-                presentation: .balance,
-                semantic: .balance,
-                currencyCode: currency,
-                healthState: health
-            ),
-            NormalizedUsageMetric(
-                id: "cash-balance",
-                label: "现金余额",
-                value: Self.firstNumber(in: balance, keys: ["cashBalance", "cash_balance"]) ?? 0,
-                unit: .currency,
-                presentation: .value,
-                semantic: .value,
-                currencyCode: currency,
-                healthState: health
-            ),
-            NormalizedUsageMetric(
-                id: "gift-balance",
-                label: "赠送余额",
-                value: Self.firstNumber(in: balance, keys: ["giftBalance", "gift_balance"]) ?? 0,
-                unit: .currency,
-                presentation: .value,
-                semantic: .value,
-                currencyCode: currency,
-                healthState: health
-            ),
-            NormalizedUsageMetric(
-                id: "total-consumption",
-                label: "累计消费",
-                value: totalCost,
-                unit: .currency,
-                presentation: .value,
-                semantic: .value,
-                currencyCode: currency
-            ),
-            NormalizedUsageMetric(
-                id: "total-tokens",
-                label: "历史消耗",
-                value: totalTokens,
-                unit: .token,
-                presentation: .value,
-                semantic: .value
-            ),
-            NormalizedUsageMetric(
-                id: "input-tokens",
-                label: "未命中缓存",
-                value: inputMissTokens,
-                unit: .token,
-                presentation: .value,
-                semantic: .value
-            ),
-            NormalizedUsageMetric(
-                id: "output-tokens",
-                label: "输出",
-                value: outputTokens,
-                unit: .token,
-                presentation: .value,
-                semantic: .value
-            ),
-            NormalizedUsageMetric(
-                id: "cache-tokens",
-                label: "命中缓存",
-                value: cacheTokens,
-                unit: .token,
-                presentation: .value,
-                semantic: .value
-            )
-        ]
+        let usageRoot = Self.object(from: usagePayload)
+        let records: [GLMJSONValue]
+        if case let .array(values)? = usageRoot["data"] {
+            records = values
+        } else {
+            records = []
+        }
+        var totalCost: Decimal = 0
+        var totalTokens: Decimal = 0
+        var inputMissTokens: Decimal = 0
+        var outputTokens: Decimal = 0
+        var cacheTokens: Decimal = 0
+        for value in records {
+            guard case let .object(record) = value else { continue }
+            totalCost += Self.firstNumber(in: record, keys: ["consumed_amount"]) ?? 0
+            let recordCache = Self.firstNumber(in: record, keys: ["input_cache_hit_tokens"]) ?? 0
+            let recordMiss = Self.firstNumber(in: record, keys: ["input_cache_miss_tokens"]) ?? 0
+            let recordOutput = Self.firstNumber(in: record, keys: ["output_tokens"]) ?? 0
+            cacheTokens += recordCache
+            inputMissTokens += recordMiss
+            outputTokens += recordOutput
+            let components = recordCache + recordMiss + recordOutput
+            totalTokens += max(Self.firstNumber(in: record, keys: ["total_tokens"]) ?? 0, components)
+        }
 
         return UsageSnapshot(
             planName: "API 按量",
@@ -250,98 +190,110 @@ struct XiaomiMiMoUsageProvider: UsageProvider {
             fiveHour: nil,
             weekly: nil,
             token: nil,
-            allowedModels: availableModels,
+            allowedModels: Self.defaultAllowedModels,
             fetchedAt: now,
             statusText: "可用",
             billingMode: "按量计费",
             providerID: .xiaomi,
             credentialID: credential.credentialID,
-            metrics: metrics
+            metrics: [
+                NormalizedUsageMetric(
+                    id: "account-balance",
+                    label: "账户余额",
+                    value: availableBalance,
+                    unit: .currency,
+                    presentation: .balance,
+                    semantic: .balance,
+                    currencyCode: currency,
+                    healthState: health
+                ),
+                NormalizedUsageMetric(
+                    id: "cash-balance",
+                    label: "现金余额",
+                    value: cashBalance,
+                    unit: .currency,
+                    presentation: .value,
+                    semantic: .value,
+                    currencyCode: currency,
+                    healthState: health
+                ),
+                NormalizedUsageMetric(
+                    id: "gift-balance",
+                    label: "赠送余额",
+                    value: giftBalance,
+                    unit: .currency,
+                    presentation: .value,
+                    semantic: .value,
+                    currencyCode: currency,
+                    healthState: health
+                ),
+                NormalizedUsageMetric(
+                    id: "total-consumption",
+                    label: "近 31 天消费",
+                    value: totalCost,
+                    unit: .currency,
+                    presentation: .value,
+                    semantic: .value,
+                    currencyCode: currency
+                ),
+                NormalizedUsageMetric(
+                    id: "total-tokens",
+                    label: "近 31 天消耗",
+                    value: totalTokens,
+                    unit: .token,
+                    presentation: .value,
+                    semantic: .value
+                ),
+                NormalizedUsageMetric(
+                    id: "input-tokens",
+                    label: "未命中缓存",
+                    value: inputMissTokens,
+                    unit: .token,
+                    presentation: .value,
+                    semantic: .value
+                ),
+                NormalizedUsageMetric(
+                    id: "output-tokens",
+                    label: "输出",
+                    value: outputTokens,
+                    unit: .token,
+                    presentation: .value,
+                    semantic: .value
+                ),
+                NormalizedUsageMetric(
+                    id: "cache-tokens",
+                    label: "命中缓存",
+                    value: cacheTokens,
+                    unit: .token,
+                    presentation: .value,
+                    semantic: .value
+                )
+            ]
         )
     }
 
-    private func fetchPlanUsage(_ credential: ProviderCredential, now: Date) async throws -> UsageSnapshot {
-        async let detailValue = requestJSON(path: "tokenPlan/detail", credential: credential)
-        async let usageValue = requestJSON(path: "tokenPlan/usage", credential: credential)
-        let (detailPayload, usagePayload) = try await (detailValue, usageValue)
-        let detail = Self.object(from: detailPayload)
-        let usage = Self.object(from: usagePayload)
-
-        let periodEnd = Self.parseDate(Self.firstString(
-            in: detail,
-            keys: ["currentPeriodEnd", "current_period_end", "expireTime", "expiredTime"]
-        ))
-        let itemsValue = Self.objectValue(in: usage, key: "usage")?["items"] ?? usage["items"]
-        let items: [GLMJSONValue]
-        if case let .array(values)? = itemsValue {
-            items = values
-        } else {
-            items = []
-        }
-        let metrics = items.compactMap { item -> NormalizedUsageMetric? in
-            guard case let .object(object) = item else { return nil }
-            let name = Self.firstString(
-                in: object,
-                keys: ["name", "metricName", "type"]
-            ) ?? "usage"
-            let used = Self.firstNumber(
-                in: object,
-                keys: ["used", "currentValue", "consumed"]
-            ) ?? 0
-            let limit = Self.firstNumber(
-                in: object,
-                keys: ["limit", "total", "quota"]
-            ) ?? 0
-            let isCompensation = name.lowercased().contains("compensation")
-            guard limit > 0 || isCompensation else { return nil }
-
-            let id = Self.metricID(for: name)
-            let label = Self.metricLabel(for: name)
-            let remaining = max(0, limit - used)
-            let percent = Self.firstNumber(in: object, keys: ["percent", "percentage"])
-                .map { NSDecimalNumber(decimal: $0).doubleValue }
-                ?? Self.percent(used: used, limit: limit)
-            let health = Self.percentHealthState(percent)
-            let metricEnd = Self.parseDate(Self.firstString(
-                in: object,
-                keys: ["resetTime", "expireTime", "windowEnd", "nextResetTime"]
-            )) ?? periodEnd
-
-            if isCompensation {
-                return NormalizedUsageMetric(
-                    id: id,
-                    label: label,
-                    value: used,
-                    unit: .token,
-                    presentation: .value,
-                    semantic: .value,
-                    healthState: health
-                )
-            }
-
-            return NormalizedUsageMetric(
-                id: id,
-                label: label,
-                used: used,
-                limit: limit,
-                remaining: remaining,
-                unit: .token,
-                windowEnd: metricEnd,
-                presentation: .progress,
-                semantic: .usedQuota,
-                healthState: health
-            )
-        }
-        guard !metrics.isEmpty else {
+    /// 官方 Token Plan 接口：Credits 余量与当前周期，周期结束时间即过期时间。
+    private func fetchPlanUsage(
+        _ credential: ProviderCredential,
+        apiKey: String,
+        now: Date
+    ) async throws -> UsageSnapshot {
+        let url = Self.officialURL(base: tokenPlanBaseURL, path: "platform/token_plan")
+        let payload = try await requestJSON(url: url, apiKey: apiKey)
+        let root = Self.object(from: payload)
+        guard let quota = Self.objectValue(in: root, key: "quota") else {
             throw UsageProviderError.invalidResponse
         }
-
-        let expired = Self.firstBool(in: detail, keys: ["expired", "isExpired"]) ?? false
-        let status = expired ? "已失效" : "有效"
-        let autoRenew = Self.firstBool(
-            in: detail,
-            keys: ["enableAutoRenew", "hasAutoRenewSubscribed", "autoRenew"]
-        )
+        let totalCredits = Self.firstNumber(in: quota, keys: ["total_credits"]) ?? 0
+        let usedCredits = Self.firstNumber(in: quota, keys: ["used_credits"]) ?? 0
+        let remainingCredits = Self.firstNumber(in: quota, keys: ["remaining_credits"])
+            ?? max(0, totalCredits - usedCredits)
+        let period = Self.objectValue(in: root, key: "period")
+        let periodStart = Self.parseDate(Self.firstString(in: period ?? [:], keys: ["start_at", "startAt"]))
+        let periodEnd = Self.parseDate(Self.firstString(in: period ?? [:], keys: ["end_at", "endAt"]))
+        let expired = periodEnd.map { $0 <= now } ?? false
+        let percent = Self.percent(used: usedCredits, limit: totalCredits)
+        let autoRenew = Self.firstBool(in: root, keys: ["auto_renew", "autoRenew"])
         let billingMode: String?
         if autoRenew == true {
             billingMode = "自动续费"
@@ -350,21 +302,11 @@ struct XiaomiMiMoUsageProvider: UsageProvider {
         } else {
             billingMode = nil
         }
-        let statusMetric = NormalizedUsageMetric(
-            id: "plan-status",
-            label: "订阅状态",
-            value: expired ? 0 : 1,
-            unit: .boolean,
-            presentation: .status,
-            semantic: .status,
-            healthState: expired ? .unavailable : .normal
-        )
 
         return UsageSnapshot(
-            planName: Self.firstString(in: detail, keys: ["planName", "name"])
-                ?? Self.planName(for: Self.firstString(in: detail, keys: ["planCode"])),
+            planName: Self.planName(for: Self.firstString(in: root, keys: ["plan_code", "planCode"])),
             subscriptionId: nil,
-            planId: Self.firstString(in: detail, keys: ["planCode"]),
+            planId: Self.firstString(in: root, keys: ["plan_code", "planCode"]),
             kind: .periodic,
             fiveHour: nil,
             weekly: nil,
@@ -372,36 +314,46 @@ struct XiaomiMiMoUsageProvider: UsageProvider {
             allowedModels: Self.defaultAllowedModels,
             fetchedAt: now,
             status: expired ? 0 : 1,
-            statusText: status,
+            statusText: expired ? "已失效" : "有效",
             billingMode: billingMode,
-            subscriptionStartAt: Self.parseDate(Self.firstString(
-                in: detail,
-                keys: ["currentPeriodStart", "current_period_start", "startTime"]
-            )),
+            subscriptionStartAt: periodStart,
             subscriptionEndAt: periodEnd,
             providerID: .xiaomi,
             credentialID: credential.credentialID,
-            metrics: metrics + [statusMetric]
+            metrics: [
+                NormalizedUsageMetric(
+                    id: "plan-total",
+                    label: "套餐总量",
+                    used: usedCredits,
+                    limit: totalCredits,
+                    remaining: remainingCredits,
+                    unit: .token,
+                    windowStart: periodStart,
+                    windowEnd: periodEnd,
+                    presentation: .progress,
+                    semantic: .usedQuota,
+                    healthState: Self.percentHealthState(percent)
+                ),
+                NormalizedUsageMetric(
+                    id: "plan-status",
+                    label: "订阅状态",
+                    value: expired ? 0 : 1,
+                    unit: .boolean,
+                    presentation: .status,
+                    semantic: .status,
+                    healthState: expired ? .unavailable : .normal
+                )
+            ]
         )
     }
 
-    private func requestJSON(
-        path: String,
-        credential: ProviderCredential
-    ) async throws -> GLMJSONValue {
-        guard let cookie = Self.cookieHeader(from: credential.secret) else {
-            throw UsageProviderError.invalidCredential
-        }
-        let url = baseURL.appendingPathComponent(path)
+    private func requestJSON(url: URL, apiKey: String) async throws -> GLMJSONValue {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.timeoutInterval = 15
-        request.setValue(cookie, forHTTPHeaderField: "Cookie")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json, text/plain, */*", forHTTPHeaderField: "Accept")
         request.setValue("zh-CN,zh;q=0.9,en;q=0.8", forHTTPHeaderField: "Accept-Language")
-        request.setValue(TimeZone.current.identifier, forHTTPHeaderField: "x-timeZone")
-        request.setValue("https://platform.xiaomimimo.com/", forHTTPHeaderField: "Referer")
-        request.setValue("https://platform.xiaomimimo.com", forHTTPHeaderField: "Origin")
 
         let data: Data
         let response: URLResponse
@@ -436,6 +388,53 @@ struct XiaomiMiMoUsageProvider: UsageProvider {
         } catch {
             throw UsageProviderError.invalidResponse
         }
+    }
+
+    private enum CredentialMode {
+        case apiKey
+        case tokenPlanKey
+    }
+
+    private static func officialURL(base: URL, path: String) -> URL {
+        path.split(separator: "/").reduce(base) { url, component in
+            url.appendingPathComponent(String(component))
+        }
+    }
+
+    private static func officialUsageURL(base: URL, now: Date) -> URL {
+        let calendar = Calendar(identifier: .gregorian)
+        let endDate = utcDateString(now)
+        let thirtyDaysAgo = calendar.date(byAdding: .day, value: -30, to: now) ?? now
+        let startDate = max(utcDateString(thirtyDaysAgo), officialUsageEarliestDate)
+        var components = URLComponents(
+            url: officialURL(base: base, path: "platform/usage/daily"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "start_date", value: min(startDate, endDate)),
+            URLQueryItem(name: "end_date", value: endDate)
+        ]
+        return components.url!
+    }
+
+    private static func utcDateString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
+    private static func firstObject(
+        in object: [String: GLMJSONValue],
+        key: String
+    ) -> [String: GLMJSONValue]? {
+        guard case let .array(values)? = object[key],
+              case let .object(value)? = values.first
+        else {
+            return nil
+        }
+        return value
     }
 
     private static func object(from value: GLMJSONValue) -> [String: GLMJSONValue] {
@@ -515,24 +514,6 @@ struct XiaomiMiMoUsageProvider: UsageProvider {
         return value
     }
 
-    private static func cookieHeader(from rawValue: String) -> String? {
-        var value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !value.isEmpty,
-              !value.contains("\r"),
-              !value.contains("\n")
-        else {
-            return nil
-        }
-        if value.lowercased().hasPrefix("cookie:") {
-            value = String(value.dropFirst("cookie:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-        guard !value.isEmpty else { return nil }
-        if value.contains("=") {
-            return value
-        }
-        return "api-platform_serviceToken=\(value)"
-    }
-
     private static func errorMessage(from data: Data) -> String? {
         guard let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return nil
@@ -544,27 +525,6 @@ struct XiaomiMiMoUsageProvider: UsageProvider {
             return error["message"] as? String
         }
         return nil
-    }
-
-    private static func metricID(for name: String) -> String {
-        let normalized = name.lowercased()
-        if normalized.contains("compensation") { return "plan-compensation" }
-        if normalized.contains("five") || normalized.contains("5h") { return "plan-five-hour" }
-        if normalized.contains("total") { return "plan-total" }
-        let sanitized = normalized
-            .replacingOccurrences(of: "_", with: "-")
-            .filter { $0.isLetter || $0.isNumber || $0 == "-" }
-        return sanitized.isEmpty ? "plan-usage" : "plan-\(sanitized)"
-    }
-
-    private static func metricLabel(for name: String) -> String {
-        let normalized = name.lowercased()
-        if normalized.contains("compensation") { return "补偿 Credits" }
-        if normalized.contains("five") || normalized.contains("5h") { return "每 5 小时" }
-        if normalized.contains("total") { return "套餐总量" }
-        return name
-            .replacingOccurrences(of: "_", with: " ")
-            .replacingOccurrences(of: "token", with: "Credits", options: .caseInsensitive)
     }
 
     private static func percent(used: Decimal, limit: Decimal) -> Double {
@@ -608,8 +568,18 @@ struct XiaomiMiMoUsageProvider: UsageProvider {
 
     private static func planName(for planCode: String?) -> String {
         guard let planCode, !planCode.isEmpty else { return "Token Plan" }
+        let normalized = planCode.lowercased()
+        for (suffix, label) in [
+            ("_year", " 年度套餐"),
+            ("_month", " 月度套餐"),
+            ("_week", " 周套餐")
+        ] where normalized.hasSuffix(suffix) {
+            let base = String(normalized.dropLast(suffix.count))
+                .replacingOccurrences(of: "_", with: " ")
+                .capitalized
+            return base + label
+        }
         return planCode
-            .replacingOccurrences(of: "_year", with: " 年度套餐")
             .replacingOccurrences(of: "_", with: " ")
             .capitalized
     }

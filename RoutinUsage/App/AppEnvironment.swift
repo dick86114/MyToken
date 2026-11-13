@@ -25,12 +25,6 @@ enum UpdateCheckSource: Sendable {
     case user
 }
 
-struct XiaomiLoginRequest: Identifiable, Equatable, Sendable {
-    let id = UUID()
-    let credentialID: UUID
-    var resetsWebSession = false
-}
-
 extension RefreshScheduler: RefreshScheduling {}
 
 actor AuthorizationCachingNotificationSender: NotificationSending {
@@ -73,11 +67,9 @@ final class AppEnvironment {
     let store: UsageStore
     let loginItemManager: any LoginItemManaging
     let providerRegistry: ProviderRegistry?
-    let xiaomiWebSessionProvider: XiaomiWebSessionProvider
     let widgetSnapshotSynchronizer: WidgetSnapshotSynchronizer?
     var showsOnboarding = false
     var pendingSettingsCredentialID: UUID?
-    var xiaomiLoginRequest: XiaomiLoginRequest?
     private(set) var updateStatus: AppUpdateStatus = .idle
     private(set) var releaseHistoryState: AppReleaseHistoryState = .idle
     private(set) var updateCompletionNotice: UpdateCompletionNotice?
@@ -95,10 +87,8 @@ final class AppEnvironment {
     @ObservationIgnored private let notificationTaskYield: @Sendable () async -> Void
     @ObservationIgnored let gitHubTokenStore: any GitHubTokenStoring
     @ObservationIgnored private let applicationNotificationCenter: NotificationCenter
-    @ObservationIgnored private let xiaomiCookieReader: @MainActor () async -> String?
     @ObservationIgnored private var terminationObservation: ApplicationTerminationObservation?
     @ObservationIgnored private var isStarted = false
-    @ObservationIgnored private var isStartupRefreshActive = false
     @ObservationIgnored private var hasRequestedNotificationAuthorization = false
     @ObservationIgnored private var notificationAuthorizationTask: Task<Void, Never>?
     @ObservationIgnored private var updateCheckTask: Task<Void, Never>?
@@ -121,9 +111,6 @@ final class AppEnvironment {
         updateCheckScheduler: (any UpdateCheckScheduling)? = nil,
         notificationTaskYield: @escaping @Sendable () async -> Void = { await Task.yield() },
         logWriter: any AppLogWriting = NoopAppLogWriter(),
-        xiaomiWebSession: XiaomiWebSession? = nil,
-        xiaomiWebSessionProvider: XiaomiWebSessionProvider? = nil,
-        xiaomiCookieReader: (@MainActor () async -> String?)? = nil,
         providerRegistry: ProviderRegistry? = nil,
         widgetSnapshotSynchronizer: WidgetSnapshotSynchronizer? = nil,
         gitHubTokenStore: any GitHubTokenStoring = AppLocalGitHubTokenStore()
@@ -144,16 +131,6 @@ final class AppEnvironment {
         self.updateCheckScheduler = updateCheckScheduler ?? UpdateCheckScheduler()
         self.notificationTaskYield = notificationTaskYield
         self.gitHubTokenStore = gitHubTokenStore
-        let resolvedXiaomiWebSessionProvider = xiaomiWebSessionProvider ?? XiaomiWebSessionProvider {
-            if let xiaomiWebSession {
-                return xiaomiWebSession
-            }
-            return XiaomiWebSession()
-        }
-        self.xiaomiWebSessionProvider = resolvedXiaomiWebSessionProvider
-        self.xiaomiCookieReader = xiaomiCookieReader ?? { [resolvedXiaomiWebSessionProvider] in
-            await resolvedXiaomiWebSessionProvider.existingSession?.captureCookieHeader()
-        }
         self.providerRegistry = providerRegistry
         self.widgetSnapshotSynchronizer = widgetSnapshotSynchronizer
         updateCompletionNotice = UpdateCompletionNotice.consume()
@@ -174,11 +151,7 @@ final class AppEnvironment {
         let notificationSender = AuthorizationCachingNotificationSender(
             sender: UserNotificationSender()
         )
-        let xiaomiWebSessionProvider = XiaomiWebSessionProvider {
-            XiaomiWebSession()
-        }
         let gitHubTokenStore = AppLocalGitHubTokenStore(defaults: defaults)
-        let xiaomiRenewCoordinator = XiaomiSilentRenewCoordinator()
         let providerRegistry = ProviderRegistry(providers: [
             RoutinUsageProvider(client: apiClient),
             DeepSeekUsageProvider(session: .shared),
@@ -186,38 +159,7 @@ final class AppEnvironment {
             VolcenginePlanUsageProvider(session: .shared),
             NewAPIUsageProvider(session: .shared),
             CommandCodeUsageProvider(session: .shared),
-            XiaomiMiMoUsageProvider(
-                session: .shared,
-                renewSession: { [weak xiaomiWebSessionProvider, weak xiaomiRenewCoordinator] credentialID, previousSecret in
-                    guard let xiaomiWebSessionProvider, let xiaomiRenewCoordinator else { return nil }
-                    // 控制台票据过期时用持久登录态静默换发；协调器负责串行化和失败退避。
-                    let renewed = await xiaomiRenewCoordinator.renew(
-                        credentialID: credentialID,
-                        previousSecret: previousSecret
-                    ) { [weak xiaomiWebSessionProvider] in
-                        guard let xiaomiWebSessionProvider else { return nil }
-                        let session = await MainActor.run {
-                            xiaomiWebSessionProvider.sessionForLogin()
-                        }
-                        let renewed = await session.refreshSessionSilently(
-                            previousCookieHeader: previousSecret
-                        )
-                        await MainActor.run {
-                            xiaomiWebSessionProvider.releaseSession(session)
-                        }
-                        return renewed
-                    }
-                    guard let renewed, renewed != previousSecret else {
-                        return nil
-                    }
-                    do {
-                        try localStore.save(renewed, for: credentialID)
-                    } catch {
-                        return nil
-                    }
-                    return renewed
-                }
-            ),
+            XiaomiMiMoUsageProvider(session: .shared),
             OpenCodeUsageProvider(session: .shared)
         ])
         let widgetSnapshotSynchronizer: WidgetSnapshotSynchronizer?
@@ -302,7 +244,6 @@ final class AppEnvironment {
             releaseHistoryAppVersion: RoutinUsageApp.currentVersion,
             updateCheckScheduler: UpdateCheckScheduler(),
             logWriter: logWriter,
-            xiaomiWebSessionProvider: xiaomiWebSessionProvider,
             providerRegistry: providerRegistry,
             widgetSnapshotSynchronizer: widgetSnapshotSynchronizer,
             gitHubTokenStore: gitHubTokenStore
@@ -339,7 +280,6 @@ final class AppEnvironment {
         _ = beginUpdateCheckIfNeeded(requiresStarted: true)
 
         await store.refreshAll()
-        isStartupRefreshActive = false
         guard isStarted else {
             return
         }
@@ -811,64 +751,7 @@ final class AppEnvironment {
     }
 
     func retryCredential(_ keyID: UUID) async {
-        guard store.state(for: keyID)?.configuration.providerID == .xiaomi else {
-            await store.refresh(keyID: keyID)
-            return
-        }
-
-        guard let cookie = await xiaomiCookieReader(), !cookie.isEmpty else {
-            presentXiaomiLogin(
-                XiaomiLoginRequest(
-                    credentialID: keyID,
-                    resetsWebSession: true
-                )
-            )
-            return
-        }
-
-        guard updateCredentialSecret(keyID: keyID, secret: cookie) else {
-            return
-        }
         await store.refresh(keyID: keyID)
-        guard store.state(for: keyID)?.failureIsAuthentication == true else {
-            return
-        }
-        presentXiaomiLogin(
-            XiaomiLoginRequest(
-                credentialID: keyID,
-                resetsWebSession: true
-            )
-        )
-    }
-
-    private func presentXiaomiLogin(_ request: XiaomiLoginRequest) {
-        guard !isStartupRefreshActive else { return }
-        xiaomiLoginRequest = request
-        XiaomiLoginPanelController.shared.present(
-            request: request,
-            session: xiaomiWebSessionProvider.sessionForLogin(),
-            onCaptured: { [weak self] cookie in
-                await self?.completeXiaomiLogin(request, cookie: cookie)
-            },
-            onClose: { [weak self] in
-                self?.cancelXiaomiLogin(request)
-            }
-        )
-    }
-
-    func completeXiaomiLogin(_ request: XiaomiLoginRequest, cookie: String) async {
-        xiaomiLoginRequest = nil
-        guard updateCredentialSecret(keyID: request.credentialID, secret: cookie) else {
-            return
-        }
-        await store.refresh(keyID: request.credentialID)
-    }
-
-    func cancelXiaomiLogin(_ request: XiaomiLoginRequest) {
-        guard xiaomiLoginRequest?.id == request.id else {
-            return
-        }
-        xiaomiLoginRequest = nil
     }
 
     func deleteKey(_ keyID: UUID) throws {
@@ -890,27 +773,6 @@ final class AppEnvironment {
         releaseHistoryTask?.cancel()
         releaseHistoryTask = nil
         cancelActiveUpdateCheck()
-    }
-
-    @discardableResult
-    private func updateCredentialSecret(keyID: UUID, secret: String) -> Bool {
-        guard let configuration = keyRepository.list().first(where: { $0.id == keyID }) else {
-            return false
-        }
-        do {
-            _ = try keyRepository.update(
-                id: keyID,
-                name: configuration.name,
-                secret: secret,
-                providerID: configuration.providerID,
-                credentialKind: configuration.credentialKind,
-                metadata: configuration.metadata
-            )
-            store.reloadConfigurations()
-            return true
-        } catch {
-            return false
-        }
     }
 
     deinit {

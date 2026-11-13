@@ -151,7 +151,7 @@ struct ProviderRegistry: Sendable {
             iconName: "cpu",
             capabilities: [.quotaWindow, .balance, .tokenUsage, .resetTime, .planDetection],
             credentialSchemas: [
-                .bearerAPIKey: [CredentialField(id: "secret", label: "网页 Cookie", isSecret: true)]
+                .bearerAPIKey: [CredentialField(id: "secret", label: "API Key", isSecret: true)]
             ]
         ),
         ProviderDescriptor(

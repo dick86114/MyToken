@@ -123,7 +123,19 @@ class CredentialEditorViewModel(
     }
 
     fun setName(value: String) = _state.update { it.copy(name = value) }
-    fun setApiKey(value: String) = _state.update { it.copy(apiKey = value) }
+    fun setApiKey(value: String) = _state.update { state ->
+        val normalized = value.trimStart().lowercase()
+        val usageKind = if (state.providerId == ProviderId.Xiaomi) {
+            when {
+                normalized.startsWith("tp-") -> "plan"
+                normalized.startsWith("sk-") -> "api"
+                else -> state.xiaomiUsageKind
+            }
+        } else {
+            state.xiaomiUsageKind
+        }
+        state.copy(apiKey = value, xiaomiUsageKind = usageKind)
+    }
     fun setAccessKeyID(value: String) = _state.update { it.copy(accessKeyID = value) }
     fun setSecretAccessKey(value: String) = _state.update { it.copy(secretAccessKey = value) }
     fun setRegion(value: String) = _state.update { it.copy(region = value) }

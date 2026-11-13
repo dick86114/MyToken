@@ -255,102 +255,6 @@ final class AppLifecycleTests: XCTestCase {
         XCTAssertEqual(newRequestCount, 1)
     }
 
-    func test小米凭证重试会同步WebViewCookie并单独刷新() async throws {
-        let context = try makeContext()
-        defer { context.cleanUp() }
-        let key = try context.repository.add(
-            name: "小米 MiMo",
-            secret: "old-cookie",
-            providerID: .xiaomi,
-            credentialKind: .bearerAPIKey,
-            metadata: ["usageKind": "api"]
-        )
-        let providerRegistry = ProviderRegistry(providers: [XiaomiCookieLifecycleProvider()])
-        let environment = context.makeEnvironment(
-            providerRegistry: providerRegistry,
-            xiaomiCookieReader: { "new-cookie" }
-        )
-
-        await environment.retryCredential(key.id)
-
-        XCTAssertEqual(try context.repository.read(id: key.id), "new-cookie")
-        XCTAssertNotNil(environment.store.state(for: key.id)?.snapshot)
-        XCTAssertNil(environment.store.state(for: key.id)?.error)
-        XCTAssertNil(environment.xiaomiLoginRequest)
-    }
-
-    func test小米WebView没有Cookie时打开登录窗口() async throws {
-        let context = try makeContext()
-        defer { context.cleanUp() }
-        let key = try context.repository.add(
-            name: "小米 MiMo",
-            secret: "old-cookie",
-            providerID: .xiaomi,
-            credentialKind: .bearerAPIKey,
-            metadata: ["usageKind": "api"]
-        )
-        let providerRegistry = ProviderRegistry(providers: [XiaomiCookieLifecycleProvider()])
-        let environment = context.makeEnvironment(
-            providerRegistry: providerRegistry,
-            xiaomiCookieReader: { nil }
-        )
-
-        await environment.retryCredential(key.id)
-
-        XCTAssertEqual(environment.xiaomiLoginRequest?.credentialID, key.id)
-        XCTAssertEqual(environment.xiaomiLoginRequest?.resetsWebSession, true)
-        XCTAssertEqual(try context.repository.read(id: key.id), "old-cookie")
-    }
-
-    func test小米Cookie刷新仍未授权时打开登录窗口() async throws {
-        let context = try makeContext()
-        defer { context.cleanUp() }
-        let key = try context.repository.add(
-            name: "小米 MiMo",
-            secret: "old-cookie",
-            providerID: .xiaomi,
-            credentialKind: .bearerAPIKey,
-            metadata: ["usageKind": "api"]
-        )
-        let providerRegistry = ProviderRegistry(providers: [XiaomiCookieLifecycleProvider()])
-        let environment = context.makeEnvironment(
-            providerRegistry: providerRegistry,
-            xiaomiCookieReader: { "invalid-cookie" }
-        )
-
-        await environment.retryCredential(key.id)
-
-        XCTAssertEqual(try context.repository.read(id: key.id), "invalid-cookie")
-        XCTAssertEqual(
-            environment.store.state(for: key.id)?.error,
-            UsageDisplayError.invalidKey
-        )
-        XCTAssertEqual(environment.xiaomiLoginRequest?.credentialID, key.id)
-        XCTAssertEqual(environment.xiaomiLoginRequest?.resetsWebSession, true)
-    }
-
-    func test完成小米登录后保存Cookie并刷新() async throws {
-        let context = try makeContext()
-        defer { context.cleanUp() }
-        let key = try context.repository.add(
-            name: "小米 MiMo",
-            secret: "old-cookie",
-            providerID: .xiaomi,
-            credentialKind: .bearerAPIKey,
-            metadata: ["usageKind": "api"]
-        )
-        let providerRegistry = ProviderRegistry(providers: [XiaomiCookieLifecycleProvider()])
-        let environment = context.makeEnvironment(providerRegistry: providerRegistry)
-        let request = XiaomiLoginRequest(credentialID: key.id)
-        environment.xiaomiLoginRequest = request
-
-        await environment.completeXiaomiLogin(request, cookie: "new-cookie")
-
-        XCTAssertEqual(try context.repository.read(id: key.id), "new-cookie")
-        XCTAssertNotNil(environment.store.state(for: key.id)?.snapshot)
-        XCTAssertNil(environment.xiaomiLoginRequest)
-    }
-
     func test唤醒事件去抖后补刷全部Key() async throws {
         let context = try makeContext(useRealScheduler: true)
         defer { context.cleanUp() }
@@ -1075,15 +979,11 @@ private struct AppLifecycleTestContext {
         )
     }
 
-    func makeEnvironment(
-        providerRegistry: ProviderRegistry,
-        xiaomiCookieReader: (@MainActor () async -> String?)? = nil
-    ) -> AppEnvironment {
+    func makeEnvironment(providerRegistry: ProviderRegistry) -> AppEnvironment {
         makeEnvironment(
             updateService: NoUpdateService(),
             updateCheckScheduler: LifecycleUpdateSchedulerSpy(),
-            providerRegistry: providerRegistry,
-            xiaomiCookieReader: xiaomiCookieReader
+            providerRegistry: providerRegistry
         )
     }
 
@@ -1092,8 +992,7 @@ private struct AppLifecycleTestContext {
         updateCheckScheduler: any UpdateCheckScheduling,
         notificationTaskYield: @escaping @Sendable () async -> Void = { await Task.yield() },
         logWriter: any AppLogWriting = NoopAppLogWriter(),
-        providerRegistry: ProviderRegistry? = nil,
-        xiaomiCookieReader: (@MainActor () async -> String?)? = nil
+        providerRegistry: ProviderRegistry? = nil
     ) -> AppEnvironment {
         let settings = AppSettings(defaults: defaults)
         settings.notificationsEnabled = notificationsEnabled
@@ -1130,49 +1029,12 @@ private struct AppLifecycleTestContext {
             updateCheckScheduler: updateCheckScheduler,
             notificationTaskYield: notificationTaskYield,
             logWriter: logWriter,
-            xiaomiCookieReader: xiaomiCookieReader,
             providerRegistry: providerRegistry
         )
     }
 
     func cleanUp() {
         defaults.removePersistentDomain(forName: suiteName)
-    }
-}
-
-private struct XiaomiCookieLifecycleProvider: UsageProvider {
-    let descriptor = ProviderRegistry.builtInDescriptors.first(where: { $0.id == .xiaomi })!
-
-    func validate(_ credential: ProviderCredential, now: Date) async throws -> UsageSnapshot? {
-        try await fetchUsage(credential, now: now)
-    }
-
-    func fetchUsage(_ credential: ProviderCredential, now: Date) async throws -> UsageSnapshot? {
-        guard credential.secret == "new-cookie" else {
-            throw UsageProviderError.providerMessage("小米 MiMo：未登录")
-        }
-        return UsageSnapshot(
-            planName: "API 按量",
-            kind: .periodic,
-            fiveHour: nil,
-            weekly: nil,
-            token: nil,
-            allowedModels: [],
-            fetchedAt: now,
-            providerID: .xiaomi,
-            credentialID: credential.credentialID,
-            metrics: [
-                NormalizedUsageMetric(
-                    id: "account-balance",
-                    label: "账户余额",
-                    value: 12,
-                    unit: .currency,
-                    presentation: .balance,
-                    semantic: .balance,
-                    currencyCode: "CNY"
-                )
-            ]
-        )
     }
 }
 

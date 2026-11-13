@@ -28,6 +28,7 @@ import java.math.BigDecimal
 import java.net.URI
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import kotlinx.coroutines.async
@@ -35,16 +36,17 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.JsonObject
 
 /**
- * 小米 MiMo 开放平台用量适配器。
+ * 小米 MiMo 官方财务接口适配器。
  *
- * 平台没有公开用量查询 API Key，控制台使用同源 Cookie 登录态：
- * - API 按量模式读取 `/balance` 和 `/usage`。
- * - Token Plan 模式读取 `/tokenPlan/detail` 和 `/tokenPlan/usage`。
+ * - `sk-` 普通 API Key：账户余额 + 最近 31 天日用量。
+ * - `tp-` 专用 API Key：Token Plan Credits、周期和过期时间。
+ * 不支持网页 Cookie 或任何网页登录态续期。
  */
 class XiaomiUsageProvider(
     private val transport: HttpTransport,
     private val clock: Clock = Clock.systemUTC(),
-    private val baseURL: URI = URI.create("https://platform.xiaomimimo.com/api/v1"),
+    private val officialBaseURL: URI = URI.create("https://api.xiaomimimo.com/v1"),
+    private val tokenPlanBaseURL: URI = URI.create("https://token-plan-cn.xiaomimimo.com/v1"),
 ) : UsageProvider {
 
     override val providerId: ProviderId = ProviderId.Xiaomi
@@ -58,16 +60,27 @@ class XiaomiUsageProvider(
         ) {
             return Result.failure(UsageProviderException.InvalidCredential())
         }
-        val rawCookie = (secret as? CredentialSecret.BearerToken)?.token?.trim().orEmpty()
-        val cookie = normalizeCookie(rawCookie)
-            ?: return Result.failure(UsageProviderException.InvalidCredential())
+        val apiKey = (secret as? CredentialSecret.BearerToken)?.token?.trim().orEmpty()
+        if (apiKey.isEmpty()) return Result.failure(UsageProviderException.InvalidCredential())
         val usageKind = credential.metadata[CredentialMetadataKey.UsageKind] ?: "api"
 
         return runCatching {
-            when (usageKind) {
-                "api" -> fetchAPIUsage(credential, cookie)
-                "plan" -> fetchPlanUsage(credential, cookie)
-                else -> throw UsageProviderException.InvalidCredential()
+            when {
+                apiKey.startsWith("sk-", ignoreCase = true) && usageKind == "api" ->
+                    fetchAPIUsage(credential, apiKey)
+                apiKey.startsWith("tp-", ignoreCase = true) && usageKind == "plan" ->
+                    fetchPlanUsage(credential, apiKey)
+                apiKey.startsWith("sk-", ignoreCase = true) ->
+                    throw UsageProviderException.ProviderMessage(
+                        "小米 MiMo：Token Plan 请使用 tp- 开头的专用 API Key",
+                    )
+                apiKey.startsWith("tp-", ignoreCase = true) ->
+                    throw UsageProviderException.ProviderMessage(
+                        "小米 MiMo：API 按量请使用 sk- 开头的普通 API Key",
+                    )
+                else -> throw UsageProviderException.ProviderMessage(
+                    "小米 MiMo：请使用官方 API Key（API 按量 sk-，Token Plan tp-）",
+                )
             }
         }.recoverCatching { error ->
             if (error is UsageProviderException || error is kotlinx.coroutines.CancellationException) {
@@ -77,30 +90,55 @@ class XiaomiUsageProvider(
         }
     }
 
-    private suspend fun fetchAPIUsage(credential: Credential, cookie: String): UsageSnapshot = coroutineScope {
-        val balanceRequest = async { requestObject("balance", cookie) }
-        val usageRequest = async { requestObject("usage", cookie) }
-        val balance = balanceRequest.await()
-        val usage = usageRequest.await()
+    private suspend fun fetchAPIUsage(
+        credential: Credential,
+        apiKey: String,
+    ): UsageSnapshot = coroutineScope {
+        val balanceURL = officialBaseURL.toString().trimEnd('/') + "/platform/balance"
+        val usageURL = officialUsageURL()
+        val balanceRequest = async { requestRoot(balanceURL, officialHeaders(apiKey)) }
+        val usageRequest = async { requestRoot(usageURL, officialHeaders(apiKey)) }
+        val balanceRoot = balanceRequest.await()
+        val usageRoot = usageRequest.await()
 
-        val currency = balance.stringOrNull("currency")
+        val balance = balanceRoot.objOrNull("data") ?: balanceRoot
+        val balanceInfo = balance.arrayOrNull("balance_infos")
+            ?.firstOrNull()
+            ?.asObjectOrNull()
+            ?: throw UsageProviderException.InvalidResponse()
+        val currency = balanceInfo.stringOrNull("currency")
             ?.trim()
             ?.uppercase()
             ?.takeIf { it.isNotEmpty() }
             ?: "CNY"
-        val availableBalance = balance.decimalOrNull("balance") ?: BigDecimal.ZERO
+        val cashBalance = balanceInfo.decimalOrNull("cash_balance") ?: BigDecimal.ZERO
+        val giftBalance = balanceInfo.decimalOrNull("gift_balance") ?: BigDecimal.ZERO
+        val availableBalance = balanceInfo.decimalOrNull("total_available")
+            ?: cashBalance + giftBalance + (balanceInfo.decimalOrNull("credit_available") ?: BigDecimal.ZERO)
+        val isAvailable = balance.boolOrNull("is_available") ?: (availableBalance.signum() > 0)
         val health = UsageMetricHealthEvaluator.balanceState(
             balance = availableBalance,
             warningThreshold = null,
-            isAvailable = true,
+            isAvailable = isAvailable,
         )
-        val tokenUsage = usage.objOrNull("tokenUsage")
-        val costUsage = usage.objOrNull("costUsage")
-        val inputTokens = tokenUsage?.decimalOrNull("inputToken") ?: BigDecimal.ZERO
-        val outputTokens = tokenUsage?.decimalOrNull("outputToken") ?: BigDecimal.ZERO
-        val cacheTokens = tokenUsage?.decimalOrNull("cacheToken") ?: BigDecimal.ZERO
-        val inputMissTokens = (inputTokens - cacheTokens).max(BigDecimal.ZERO)
-        val totalTokens = inputTokens + outputTokens
+
+        var totalCost = BigDecimal.ZERO
+        var totalTokens = BigDecimal.ZERO
+        var inputMissTokens = BigDecimal.ZERO
+        var outputTokens = BigDecimal.ZERO
+        var cacheTokens = BigDecimal.ZERO
+        for (element in usageRoot.arrayOrNull("data").orEmpty()) {
+            val record = element.asObjectOrNull() ?: continue
+            totalCost += record.decimalOrNull("consumed_amount") ?: BigDecimal.ZERO
+            val recordCache = record.decimalOrNull("input_cache_hit_tokens") ?: BigDecimal.ZERO
+            val recordMiss = record.decimalOrNull("input_cache_miss_tokens") ?: BigDecimal.ZERO
+            val recordOutput = record.decimalOrNull("output_tokens") ?: BigDecimal.ZERO
+            cacheTokens += recordCache
+            inputMissTokens += recordMiss
+            outputTokens += recordOutput
+            val components = recordCache + recordMiss + recordOutput
+            totalTokens += (record.decimalOrNull("total_tokens") ?: BigDecimal.ZERO).max(components)
+        }
 
         UsageSnapshot(
             credentialId = credential.id,
@@ -112,10 +150,10 @@ class XiaomiUsageProvider(
             allowedModels = DEFAULT_MODELS,
             metrics = listOf(
                 balanceMetric("account-balance", "账户余额", availableBalance, currency, health),
-                valueMetric("cash-balance", "现金余额", balance.decimalOrNull("cashBalance") ?: BigDecimal.ZERO, UsageMetricUnit.Currency, currency),
-                valueMetric("gift-balance", "赠送余额", balance.decimalOrNull("giftBalance") ?: BigDecimal.ZERO, UsageMetricUnit.Currency, currency),
-                valueMetric("total-consumption", "累计消费", costUsage?.decimalOrNull("totalCost") ?: BigDecimal.ZERO, UsageMetricUnit.Currency, currency),
-                valueMetric("total-tokens", "历史消耗", totalTokens, UsageMetricUnit.Token),
+                valueMetric("cash-balance", "现金余额", cashBalance, UsageMetricUnit.Currency, currency),
+                valueMetric("gift-balance", "赠送余额", giftBalance, UsageMetricUnit.Currency, currency),
+                valueMetric("total-consumption", "近 31 天消费", totalCost, UsageMetricUnit.Currency, currency),
+                valueMetric("total-tokens", "近 31 天消耗", totalTokens, UsageMetricUnit.Token),
                 valueMetric("input-tokens", "未命中缓存", inputMissTokens, UsageMetricUnit.Token),
                 valueMetric("output-tokens", "输出", outputTokens, UsageMetricUnit.Token),
                 valueMetric("cache-tokens", "命中缓存", cacheTokens, UsageMetricUnit.Token),
@@ -123,101 +161,91 @@ class XiaomiUsageProvider(
         )
     }
 
-    private suspend fun fetchPlanUsage(credential: Credential, cookie: String): UsageSnapshot = coroutineScope {
-        val detailRequest = async { requestObject("tokenPlan/detail", cookie) }
-        val usageRequest = async { requestObject("tokenPlan/usage", cookie) }
-        val detail = detailRequest.await()
-        val usage = usageRequest.await()
-        val usageObject = usage.objOrNull("usage") ?: usage
-        val items = usageObject.arrayOrNull("items").orEmpty()
-        val periodEnd = parseInstant(detail.stringOrNull("currentPeriodEnd"))
-
-        val metrics = items.mapNotNull { element ->
-            val item = element.asObjectOrNull() ?: return@mapNotNull null
-            val name = item.stringOrNull("name").orEmpty()
-            if (name.isBlank()) return@mapNotNull null
-            val used = item.decimalOrNull("used") ?: BigDecimal.ZERO
-            val limit = item.decimalOrNull("limit") ?: BigDecimal.ZERO
-            val isCompensation = name.lowercase().contains("compensation")
-            if (limit.signum() <= 0 && !isCompensation) return@mapNotNull null
-            val remaining = (limit - used).max(BigDecimal.ZERO)
-            val percent = item.decimalOrNull("percent")?.toDouble()
-                ?: percent(used, limit)
-            val health = percentHealth(percent)
-            if (isCompensation) {
-                UsageMetric(
-                    id = "plan-compensation",
-                    label = "补偿 Credits",
-                    value = used,
-                    unit = UsageMetricUnit.Token,
-                    presentation = UsageMetricPresentation.Value,
-                    semantic = UsageMetricSemantic.Value,
-                    healthState = health,
-                )
-            } else {
-                UsageMetric(
-                    id = metricID(name),
-                    label = metricLabel(name),
-                    used = used,
-                    limit = limit,
-                    remaining = remaining,
-                    unit = UsageMetricUnit.Token,
-                    windowEnd = parseInstant(item.stringOrNull("resetTime"))
-                        ?: parseInstant(item.stringOrNull("expireTime"))
-                        ?: periodEnd,
-                    presentation = UsageMetricPresentation.Progress,
-                    semantic = UsageMetricSemantic.UsedQuota,
-                    healthState = health,
-                )
-            }
-        }
-        if (metrics.isEmpty()) throw UsageProviderException.InvalidResponse()
-
-        val expired = detail.boolOrNull("expired") ?: false
-        val statusText = if (expired) "已失效" else "有效"
-        val enableAutoRenew = detail.boolOrNull("enableAutoRenew")
-            ?: detail.boolOrNull("hasAutoRenewSubscribed")
-        val billingMode = enableAutoRenew?.let { if (it) "自动续费" else "手动续费" }
+    private suspend fun fetchPlanUsage(
+        credential: Credential,
+        apiKey: String,
+    ): UsageSnapshot = coroutineScope {
+        val url = tokenPlanBaseURL.toString().trimEnd('/') + "/platform/token_plan"
+        val root = requestRoot(url, officialHeaders(apiKey))
+        val data = root.objOrNull("data") ?: root
+        val quota = data.objOrNull("quota")
+            ?: throw UsageProviderException.InvalidResponse()
+        val totalCredits = quota.decimalOrNull("total_credits") ?: BigDecimal.ZERO
+        val usedCredits = quota.decimalOrNull("used_credits") ?: BigDecimal.ZERO
+        val remainingCredits = quota.decimalOrNull("remaining_credits")
+            ?: (totalCredits - usedCredits).max(BigDecimal.ZERO)
+        val period = data.objOrNull("period")
+        val periodStart = parseInstant(period?.stringOrNull("start_at"))
+        val periodEnd = parseInstant(period?.stringOrNull("end_at"))
+        val expired = periodEnd?.let { !it.isAfter(clock.instant()) } ?: false
+        val planMetric = UsageMetric(
+            id = "plan-total",
+            label = "套餐总量",
+            used = usedCredits,
+            limit = totalCredits,
+            remaining = remainingCredits,
+            unit = UsageMetricUnit.Token,
+            windowStart = periodStart,
+            windowEnd = periodEnd,
+            presentation = UsageMetricPresentation.Progress,
+            semantic = UsageMetricSemantic.UsedQuota,
+            healthState = percentHealth(percent(usedCredits, totalCredits)),
+        )
+        val statusMetric = UsageMetric(
+            id = "plan-status",
+            label = "订阅状态",
+            value = if (expired) BigDecimal.ZERO else BigDecimal.ONE,
+            unit = UsageMetricUnit.Boolean_,
+            presentation = UsageMetricPresentation.Status,
+            semantic = UsageMetricSemantic.Status,
+            healthState = if (expired) UsageMetricHealthState.Unavailable else UsageMetricHealthState.Normal,
+        )
+        val autoRenew = data.boolOrNull("auto_renew")
+        val billingMode = autoRenew?.let { if (it) "自动续费" else "手动续费" }
 
         UsageSnapshot(
             credentialId = credential.id,
             fetchedAt = clock.instant(),
-            planName = detail.stringOrNull("planName")
-                ?.takeIf { it.isNotBlank() }
-                ?: planName(detail.stringOrNull("planCode")),
-            subscriptionStartAt = parseInstant(detail.stringOrNull("currentPeriodStart")),
+            planName = planName(data.stringOrNull("plan_code")),
+            subscriptionStartAt = periodStart,
             subscriptionEndAt = periodEnd,
             status = if (expired) 0 else 1,
-            statusText = statusText,
+            statusText = if (expired) "已失效" else "有效",
             billingMode = billingMode,
             usageKind = "plan",
             allowedModels = DEFAULT_MODELS,
-            metrics = metrics + UsageMetric(
-                id = "plan-status",
-                label = "订阅状态",
-                value = if (expired) BigDecimal.ZERO else BigDecimal.ONE,
-                unit = UsageMetricUnit.Boolean_,
-                presentation = UsageMetricPresentation.Status,
-                semantic = UsageMetricSemantic.Status,
-                healthState = if (expired) UsageMetricHealthState.Unavailable else UsageMetricHealthState.Normal,
-            ),
+            metrics = listOf(planMetric, statusMetric),
         )
     }
 
-    private suspend fun requestObject(path: String, cookie: String): JsonObject {
-        val url = baseURL.toString().trimEnd('/') + "/" + path.trimStart('/')
+    private fun officialHeaders(apiKey: String): Map<String, String> = mapOf(
+        "Authorization" to "Bearer $apiKey",
+        "Accept" to "application/json",
+        "Accept-Language" to "zh-CN,zh;q=0.9,en;q=0.8",
+    )
+
+    private fun officialUsageURL(): String {
+        val endDate = clock.instant().atZone(ZoneOffset.UTC).toLocalDate()
+        val startDate = endDate.minusDays(30).coerceAtLeast(LocalDate.parse(OFFICIAL_USAGE_EARLIEST_DATE))
+        return buildString {
+            append(officialBaseURL.toString().trimEnd('/'))
+            append("/platform/usage/daily?start_date=")
+            append(startDate)
+            append("&end_date=")
+            append(endDate)
+        }
+    }
+
+    private suspend fun requestRoot(
+        url: String,
+        headers: Map<String, String>,
+    ): JsonObject {
         val response = try {
             transport.execute(
                 ProviderHttpRequest(
                     method = "GET",
                     url = url,
-                    headers = mapOf(
-                        "Cookie" to cookie,
-                        "Accept" to "application/json",
-                        "Accept-Language" to "zh-CN,zh;q=0.9,en;q=0.8",
-                        "x-timeZone" to "Asia/Shanghai",
-                        "Referer" to "https://platform.xiaomimimo.com/",
-                    ),
+                    headers = headers,
                 ),
             )
         } catch (error: Exception) {
@@ -236,9 +264,8 @@ class XiaomiUsageProvider(
                 else -> UsageProviderException.InvalidResponse()
             }
         }
-        val root = ProviderJson.parse(body).asObjectOrNull()
+        return ProviderJson.parse(body).asObjectOrNull()
             ?: throw UsageProviderException.InvalidResponse()
-        return root.objOrNull("data") ?: root
     }
 
     private fun errorMessage(body: String): String? = runCatching {
@@ -281,16 +308,6 @@ class XiaomiUsageProvider(
         healthState = UsageMetricHealthState.Normal,
     )
 
-    private fun normalizeCookie(rawValue: String): String? {
-        var value = rawValue.trim()
-        if (value.isEmpty() || value.contains('\r') || value.contains('\n')) return null
-        if (value.startsWith("Cookie:", ignoreCase = true)) {
-            value = value.substringAfter(':').trim()
-        }
-        if (value.isEmpty()) return null
-        return if (value.contains('=')) value else "api-platform_serviceToken=$value"
-    }
-
     private fun parseInstant(rawValue: String?): Instant? {
         val value = rawValue?.trim()?.takeIf { it.isNotEmpty() } ?: return null
         value.toDoubleOrNull()?.let {
@@ -301,24 +318,6 @@ class XiaomiUsageProvider(
             ?: runCatching {
                 LocalDateTime.parse(value.replace(' ', 'T')).toInstant(ZoneOffset.UTC)
             }.getOrNull()
-    }
-
-    private fun metricID(name: String): String {
-        val normalized = name.lowercase()
-        return when {
-            normalized.contains("five") || normalized.contains("5h") -> "plan-five-hour"
-            normalized.contains("total") -> "plan-total"
-            else -> "plan-" + normalized.replace('_', '-').filter { it.isLetterOrDigit() || it == '-' }
-        }.ifBlank { "plan-usage" }
-    }
-
-    private fun metricLabel(name: String): String {
-        val normalized = name.lowercase()
-        return when {
-            normalized.contains("five") || normalized.contains("5h") -> "每 5 小时"
-            normalized.contains("total") -> "套餐总量"
-            else -> name.replace('_', ' ').replace("token", "Credits", ignoreCase = true)
-        }
     }
 
     private fun percent(used: BigDecimal, limit: BigDecimal): Double =
@@ -332,11 +331,24 @@ class XiaomiUsageProvider(
 
     private fun planName(planCode: String?): String {
         val value = planCode?.takeIf { it.isNotBlank() } ?: return "Token Plan"
-        return value.replace("_year", " 年度套餐").replace('_', ' ')
+        val normalized = value.lowercase()
+        val suffix = listOf(
+            "_year" to " 年度套餐",
+            "_month" to " 月度套餐",
+            "_week" to " 周套餐",
+        ).firstOrNull { normalized.endsWith(it.first) }
+        if (suffix == null) return value.replace('_', ' ')
+        val base = normalized
+            .dropLast(suffix.first.length)
+            .replace('_', ' ')
+            .split(' ')
+            .joinToString(" ") { word -> word.replaceFirstChar { it.uppercaseChar() } }
+        return base + suffix.second
     }
 
     private companion object {
         val MATH_CONTEXT = java.math.MathContext(8)
+        const val OFFICIAL_USAGE_EARLIEST_DATE = "2026-09-01"
         val DEFAULT_MODELS = listOf(
             "mimo-v2.5-pro",
             "mimo-v2.5",

@@ -181,8 +181,9 @@ final class UsagePresentationPolicyTests: XCTestCase {
             encoding: .utf8
         )
 
-        XCTAssertTrue(source.contains(#"TextField("OpenCode Console API Key""#))
-        XCTAssertTrue(source.contains(#"SecureField("OpenCode Console API Key""#))
+        XCTAssertTrue(source.contains(#"return "OpenCode Console API Key""#))
+        XCTAssertTrue(source.contains("CredentialInputField("))
+        XCTAssertTrue(source.contains("isSecret: true"))
     }
 
     func testOpenCodeSubscriptionEndLabelDistinguishesRenewalAndExpiry() {

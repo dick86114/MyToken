@@ -10,8 +10,8 @@ MyToken 是一个 macOS 菜单栏用量监控工具，用于在本地查看多�
 - 刷新失败时头像右上角显示红色徽章，点击查看失败详情并一键重试。
 - 弹窗内百分比统一四舍五入为整数。
 - 支持 Routin、DeepSeek、GLM Coding Plan、火山方舟个人 Agent Plan/Coding Plan、New API、Command Code、小米 MiMo 和 OpenCode Go / Go Plus。
-- 小米 MiMo 可分别查询 API 按量余额/消费或 Token Plan 订阅 Credits，额度与余额不会混算。
-- 小米 MiMo API 卡片按“账户余额、累计消费、现金余额、赠送余额”和“历史消耗、输出、命中缓存、未命中缓存”两行展示，Token 数值使用千分位格式。
+- 小米 MiMo 仅使用官方 API Key 查询：`sk-` Key 读取 API 按量余额与最近 31 天用量，`tp-` Key 读取 Token Plan Credits、周期和过期时间；额度与余额不会混算。
+- 小米 MiMo API 卡片按“账户余额、消费、现金余额、赠送余额”和“Token 消耗、输出、命中缓存、未命中缓存”两行展示，Token 数值使用千分位格式。
 - 右键菜单支持切换账号、打开设置、检查更新和退出应用。
 - 支持从右键菜单或设置页提交问题，自动生成脱敏日志并打开 GitHub Issue 页面。
 - 支持 5 小时和周用量维度，以及别名、别名加竖向进度条等显示样式。
@@ -53,7 +53,7 @@ Android 端凭证密钥经 Android Keystore 加密保存在本机（不进入云
 1. 下载对应版本的安装包（例如 `MyToken-1.2.0-arm64.dmg`），或从 GitHub Release 下载正式版本。
 2. 打开 DMG，将 `MyToken` 拖入“应用程序”文件夹。
 3. 启动应用，在设置中选择供应商并手动添加 API Key 或 Access Key/SecretAccessKey。
-   小米 MiMo 当前需要从官方控制台复制网页 Cookie 或 `api-platform_serviceToken` 值，并选择 API 按量或 Token Plan。
+   小米 MiMo 需要在官方控制台创建 API Key：API 按量使用 `sk-` 开头的普通 Key，Token Plan 使用 `tp-` 开头的专用 Key。
    OpenCode 需要创建 Console service account API Key；应用读取账户级订阅状态，因此同一订阅在多台设备上的消耗都会计入。
 4. 点击菜单栏中的 MyToken 图标查看用量。
 
@@ -73,7 +73,18 @@ Android 端凭证密钥经 Android Keystore 加密保存在本机（不进入云
 
 升级过程中如果检测到上一轮测试版本遗留的 Keychain 项，应用只会尝试一次回迁到本地存储，成功后不再访问 Keychain。
 
-小米 MiMo 用量查询使用用户手动提供的网页 Cookie 或 `api-platform_serviceToken`。该值作为秘密凭证保存在本地存储中，仅用于直接请求小米官方平台，不会写入诊断日志。
+小米 MiMo 只支持官方 API Key：
+
+- `sk-` 开头：API 按量，读取账户余额与最近 31 天用量。
+- `tp-` 开头：Token Plan，读取 Credits 余量、订阅周期与过期时间。
+
+应用不再提供网页 Cookie、网页登录窗口或 Cookie 续期逻辑，只直接请求小米官方财务接口。
+
+升级后旧的网页 Cookie 凭证会被判定为无效，请在设置中编辑该凭证并替换为官方 API Key。
+
+官方 API Key 目前接入小米国内站点（`api.xiaomimimo.com` 与 `token-plan-cn.xiaomimimo.com`）；海外账号需使用对应区域的 Base URL。
+
+这些值作为秘密凭证保存在本地存储中，仅用于直接请求小米官方平台，不会写入诊断日志。
 
 OpenCode Go / Go Plus 用量查询使用用户手动提供的 Console service account API Key。该 Key 作为秘密凭证保存在本地存储中，仅用于直接请求 OpenCode Console 状态接口，不会写入诊断日志。OpenCode 的该接口当前属于内部 API，若供应商调整结构，应用会显示具体诊断错误。
 

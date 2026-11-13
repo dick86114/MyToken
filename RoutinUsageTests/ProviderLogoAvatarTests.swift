@@ -27,6 +27,18 @@ final class ProviderLogoAvatarTests: XCTestCase {
         }
     }
 
+    func test凭证编辑器供应商菜单使用品牌Logo() throws {
+        let editor = try TestSourceReader.read([
+            "RoutinUsage",
+            "Views",
+            "CredentialEditorView.swift"
+        ])
+
+        XCTAssertTrue(editor.contains("Label(displayName(for: id), image: id.logoAssetName)"))
+        XCTAssertTrue(editor.contains("ProviderLogoMark(providerID: providerID, size: 26"))
+        XCTAssertTrue(editor.contains("ProviderLogoMark(providerID: providerID, size: 38"))
+    }
+
     @MainActor
     func test简洁卡片头像按供应商Logo绘制() throws {
         for scheme in [ColorScheme.light, .dark] {

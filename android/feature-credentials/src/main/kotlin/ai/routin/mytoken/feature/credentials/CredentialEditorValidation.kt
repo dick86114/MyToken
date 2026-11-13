@@ -135,16 +135,22 @@ object CredentialEditorValidation {
                 )
             }
             ProviderId.Xiaomi -> {
-                val cookie = fields.apiKey.trim()
-                if (cookie.isEmpty()) throw CredentialValidationException("请输入网页 Cookie")
+                val secret = fields.apiKey.trim()
+                if (secret.isEmpty()) throw CredentialValidationException("请输入 API Key")
                 val usageKind = fields.xiaomiUsageKind.trim().lowercase()
                 if (usageKind !in setOf("api", "plan")) {
                     throw CredentialValidationException("请选择有效的查询方式")
                 }
+                when {
+                    usageKind == "api" && !secret.startsWith("sk-", ignoreCase = true) ->
+                        throw CredentialValidationException("API 按量请输入 sk- 开头的普通 API Key")
+                    usageKind == "plan" && !secret.startsWith("tp-", ignoreCase = true) ->
+                        throw CredentialValidationException("Token Plan 请输入 tp- 开头的专用 API Key")
+                }
                 ValidatedCredentialInput(
                     credentialKind = CredentialKind.BearerApiKey,
                     name = normalizedName,
-                    secret = CredentialSecret.BearerToken(cookie),
+                    secret = CredentialSecret.BearerToken(secret),
                     metadata = mapOf(CredentialMetadataKey.UsageKind to usageKind) + websiteMetadata,
                 )
             }

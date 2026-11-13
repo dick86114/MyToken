@@ -100,12 +100,6 @@ class HomeViewModelTest {
         repository.emit()
     }
 
-    private fun addXiaomiCredential(credential: Credential, secret: String = "old-cookie") {
-        repository.credentials[credential.id] = credential
-        repository.secrets[credential.id] = CredentialSecret.BearerToken(secret)
-        repository.emit()
-    }
-
     private fun progressMetric(
         id: String,
         label: String,
@@ -391,97 +385,6 @@ class HomeViewModelTest {
 
         assertEquals(2, attempts)
         assertEquals(RefreshStatus.Ready, vm.state.value.groups.single().cards.single().status)
-    }
-
-    @Test
-    fun `xiaomi retry stores webview cookie before refreshing`() = runTest {
-        val credential = credential("MIMO", ProviderId.Xiaomi).copy(
-            credentialKind = CredentialKind.BearerApiKey,
-            metadata = mapOf(ai.routin.mytoken.domain.model.CredentialMetadataKey.UsageKind to "api"),
-        )
-        addXiaomiCredential(credential)
-        providers[ProviderId.Xiaomi] = FakeUsageProvider(
-            ProviderId.Xiaomi,
-            Result.success(snapshot(credential.id, balanceMetric(12.0))),
-        )
-
-        val vm = viewModel()
-        backgroundScope.launch { vm.state.collect {} }
-        val result = vm.retryCredentialAndAwait(credential) { "new-cookie" }
-        advanceUntilIdle()
-
-        assertEquals(CredentialRetryResult.Completed, result)
-        assertEquals("new-cookie", (repository.secrets[credential.id] as CredentialSecret.BearerToken).token)
-        assertEquals(RefreshStatus.Ready, vm.state.value.groups.single().cards.single().status)
-    }
-
-    @Test
-    fun `xiaomi retry without cookie asks for login`() = runTest {
-        val credential = credential("MIMO", ProviderId.Xiaomi).copy(
-            credentialKind = CredentialKind.BearerApiKey,
-            metadata = mapOf(ai.routin.mytoken.domain.model.CredentialMetadataKey.UsageKind to "api"),
-        )
-        addXiaomiCredential(credential)
-        val provider = FakeUsageProvider(
-            ProviderId.Xiaomi,
-            Result.success(snapshot(credential.id, balanceMetric(12.0))),
-        )
-        providers[ProviderId.Xiaomi] = provider
-
-        val vm = viewModel()
-        backgroundScope.launch { vm.state.collect {} }
-        val result = vm.retryCredentialAndAwait(credential) { null }
-        advanceUntilIdle()
-
-        assertEquals(CredentialRetryResult.NeedsLogin, result)
-        assertEquals(0, provider.fetchCalls)
-        assertEquals("old-cookie", (repository.secrets[credential.id] as CredentialSecret.BearerToken).token)
-    }
-
-    @Test
-    fun `xiaomi retry with invalid cookie asks for login after authentication failure`() = runTest {
-        val credential = credential("MIMO", ProviderId.Xiaomi).copy(
-            credentialKind = CredentialKind.BearerApiKey,
-            metadata = mapOf(ai.routin.mytoken.domain.model.CredentialMetadataKey.UsageKind to "api"),
-        )
-        addXiaomiCredential(credential)
-        providers[ProviderId.Xiaomi] = FakeUsageProvider(
-            ProviderId.Xiaomi,
-            Result.failure(AppError.Authentication("小米 MiMo：未登录")),
-        )
-
-        val vm = viewModel()
-        backgroundScope.launch { vm.state.collect {} }
-        val result = vm.retryCredentialAndAwait(credential) { "invalid-cookie" }
-        advanceUntilIdle()
-
-        assertEquals(CredentialRetryResult.NeedsLogin, result)
-        assertEquals("invalid-cookie", (repository.secrets[credential.id] as CredentialSecret.BearerToken).token)
-    }
-
-    @Test
-    fun `xiaomi retry treats cookie reader failure as failed`() = runTest {
-        val credential = credential("MIMO", ProviderId.Xiaomi).copy(
-            credentialKind = CredentialKind.BearerApiKey,
-            metadata = mapOf(ai.routin.mytoken.domain.model.CredentialMetadataKey.UsageKind to "api"),
-        )
-        addXiaomiCredential(credential)
-        val provider = FakeUsageProvider(
-            ProviderId.Xiaomi,
-            Result.success(snapshot(credential.id, balanceMetric(12.0))),
-        )
-        providers[ProviderId.Xiaomi] = provider
-
-        val vm = viewModel()
-        backgroundScope.launch { vm.state.collect {} }
-        val result = vm.retryCredentialAndAwait(credential) {
-            throw IllegalStateException("CookieManager unavailable")
-        }
-        advanceUntilIdle()
-
-        assertEquals(CredentialRetryResult.Failed, result)
-        assertEquals(0, provider.fetchCalls)
-        assertEquals("old-cookie", (repository.secrets[credential.id] as CredentialSecret.BearerToken).token)
     }
 
     @Test

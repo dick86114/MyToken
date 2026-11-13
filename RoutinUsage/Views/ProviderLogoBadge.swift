@@ -24,3 +24,27 @@ struct ProviderLogoBadge: View {
             .accessibilityHidden(true)
     }
 }
+
+struct ProviderLogoMark: View {
+    let providerID: ProviderID
+    let size: CGFloat
+    var cornerRadius: CGFloat = 10
+
+    var body: some View {
+        Image(nsImage: NSImage(named: providerID.logoAssetName) ?? NSApp.applicationIconImage)
+            .resizable()
+            .interpolation(.high)
+            .scaledToFit()
+            .padding(size * 0.12)
+            .frame(width: size, height: size)
+            .background(Color.white)
+            .clipShape(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(Color.black.opacity(0.10), lineWidth: 0.5)
+            }
+            .accessibilityHidden(true)
+    }
+}

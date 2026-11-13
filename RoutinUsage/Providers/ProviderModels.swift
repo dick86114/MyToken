@@ -25,6 +25,20 @@ enum ProviderID: String, Codable, CaseIterable, Identifiable, Sendable {
         case .opencode: return "ProviderOpenCodeLogo"
         }
     }
+
+    /// 添加凭证时默认填入对应供应商的控制台地址；New API 为自建服务，由接口地址动态决定。
+    var defaultConsoleURL: String? {
+        switch self {
+        case .routin: return "https://routin.ai/dashboard"
+        case .deepseek: return "https://platform.deepseek.com"
+        case .glm: return "https://open.bigmodel.cn"
+        case .volcengine: return "https://console.volcengine.com/ark"
+        case .newAPI: return nil
+        case .commandCode: return "https://commandcode.ai"
+        case .xiaomi: return "https://platform.xiaomimimo.com"
+        case .opencode: return "https://opencode.ai/console"
+        }
+    }
 }
 
 enum CredentialKind: String, Codable, Sendable {

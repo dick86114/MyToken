@@ -2,7 +2,6 @@ package ai.routin.mytoken.feature.home
 
 import ai.routin.mytoken.domain.model.AppError
 import ai.routin.mytoken.domain.model.Credential
-import ai.routin.mytoken.domain.model.CredentialSecret
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageCardDensity
 import ai.routin.mytoken.domain.model.UsageSnapshot
@@ -41,13 +40,6 @@ import kotlinx.coroutines.sync.withLock
 
 /** Data freshness buckets, mirroring the macOS popover freshness semantics. */
 enum class FreshnessLevel { NEVER, JUST_NOW, RECENT, OLD, EXPIRED }
-
-/** Outcome of a credential retry, including the Xiaomi-specific recovery path. */
-sealed interface CredentialRetryResult {
-    data object Completed : CredentialRetryResult
-    data object NeedsLogin : CredentialRetryResult
-    data object Failed : CredentialRetryResult
-}
 
 @Immutable
 data class Freshness(val level: FreshnessLevel, val text: String)
@@ -302,11 +294,7 @@ class HomeViewModel(
         viewModelScope.launch { refreshCredentialAndAwait(credential) }
     }
 
-    /**
-     * Refreshes one credential and suspends until its state settles. Used by the
-     * retry flow when it must inspect the result before deciding whether to open
-     * the Xiaomi login dialog.
-     */
+    /** Refreshes one credential and suspends until its state settles. */
     suspend fun refreshCredentialAndAwait(credential: Credential) {
         if (tryBeginRefresh(credential.id)) {
             try {
@@ -314,68 +302,6 @@ class HomeViewModel(
             } finally {
                 endRefresh(credential.id)
             }
-        }
-    }
-
-    /**
-     * Retries one credential. Xiaomi MiMo first refreshes the saved secret from
-     * the current WebView cookie; a missing cookie or an authentication failure
-     * asks the UI to open the login dialog. Other providers keep the normal
-     * single-credential refresh path.
-     */
-    suspend fun retryCredentialAndAwait(
-        credential: Credential,
-        cookieReader: suspend () -> String?,
-    ): CredentialRetryResult {
-        if (credential.providerId != ProviderId.Xiaomi) {
-            refreshCredentialAndAwait(credential)
-            return CredentialRetryResult.Completed
-        }
-
-        val cookie = try {
-            cookieReader()?.trim().orEmpty()
-        } catch (error: kotlinx.coroutines.CancellationException) {
-            throw error
-        } catch (_: Throwable) {
-            return CredentialRetryResult.Failed
-        }
-        if (cookie.isEmpty()) {
-            return CredentialRetryResult.NeedsLogin
-        }
-
-        try {
-            repository.save(credential, CredentialSecret.BearerToken(cookie))
-        } catch (error: kotlinx.coroutines.CancellationException) {
-            throw error
-        } catch (_: Throwable) {
-            return CredentialRetryResult.Failed
-        }
-
-        refreshCredentialAndAwait(credential)
-        return if (refreshUseCase.states.value[credential.id]?.error is AppError.Authentication) {
-            CredentialRetryResult.NeedsLogin
-        } else {
-            CredentialRetryResult.Completed
-        }
-    }
-
-    /** Saves the cookie captured by the login dialog, then refreshes the credential. */
-    suspend fun completeXiaomiLoginAndAwait(
-        credential: Credential,
-        cookie: String,
-    ): CredentialRetryResult {
-        val normalized = cookie.trim()
-        if (normalized.isEmpty()) {
-            return CredentialRetryResult.NeedsLogin
-        }
-        return try {
-            repository.save(credential, CredentialSecret.BearerToken(normalized))
-            refreshCredentialAndAwait(credential)
-            CredentialRetryResult.Completed
-        } catch (error: kotlinx.coroutines.CancellationException) {
-            throw error
-        } catch (_: Throwable) {
-            CredentialRetryResult.Failed
         }
     }
 

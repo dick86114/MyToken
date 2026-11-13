@@ -9,7 +9,6 @@ final class RoutinUsageAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
-        Self.closeLegacySuppressedLaunchWindows()
         // 旧版本曾保存状态项位置；移除旧缓存，避免升级后状态项落到不可见位置。
         UserDefaults.standard.removeObject(forKey: Self.statusItemPositionCacheKey)
         UserDefaults.standard.removeObject(forKey: "NSStatusItem VisibleCC MyRoutinStatusBar")
@@ -31,13 +30,6 @@ final class RoutinUsageAppDelegate: NSObject, NSApplicationDelegate {
         Self.openURLsHandler?(urls)
     }
 
-    @MainActor
-    static func closeLegacySuppressedLaunchWindows() {
-        // SwiftUI 会把唯一窗口场景当作启动场景；登录窗口只能由用户明确重试触发。
-        NSApp.windows
-            .filter { $0.isVisible && $0.title == "登录小米 MiMo" }
-            .forEach { $0.close() }
-    }
 }
 
 @main

@@ -6,10 +6,7 @@ import ai.routin.mytoken.feature.credentials.CredentialEditorScreen
 import ai.routin.mytoken.feature.credentials.CredentialEditorViewModel
 import ai.routin.mytoken.feature.credentials.CredentialListScreen
 import ai.routin.mytoken.feature.credentials.CredentialListViewModel
-import ai.routin.mytoken.feature.credentials.XiaomiCookieReader
-import ai.routin.mytoken.feature.credentials.XiaomiLoginActivity
 import ai.routin.mytoken.feature.credentials.pruneCredential
-import ai.routin.mytoken.feature.home.CredentialRetryResult
 import ai.routin.mytoken.feature.home.HomeScreen
 import ai.routin.mytoken.feature.home.HomeViewModel
 import ai.routin.mytoken.feature.home.CredentialDetailScreen
@@ -22,7 +19,6 @@ import ai.routin.mytoken.feature.transfer.TransferScannerScreen
 import ai.routin.mytoken.feature.transfer.TransferUiState
 import ai.routin.mytoken.feature.transfer.TransferViewModel
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -93,7 +89,6 @@ fun MyTokenApp(
 ) {
     var selectedTab by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     var screen by remember { mutableStateOf<AppScreen>(AppScreen.Home) }
-    var xiaomiLoginCredential by remember { mutableStateOf<Credential?>(null) }
     val backStack = remember { mutableStateListOf<AppScreen>() }
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -270,14 +265,7 @@ fun MyTokenApp(
                                         .firstOrNull { it.credential.id == id }
                                         ?.credential
                                     credential?.let {
-                                        scope.launch {
-                                            val result = homeViewModel.retryCredentialAndAwait(it) {
-                                                XiaomiCookieReader.readCookieHeader()
-                                            }
-                                            if (result == CredentialRetryResult.NeedsLogin) {
-                                                xiaomiLoginCredential = it
-                                            }
-                                        }
+                                        homeViewModel.refreshCredential(it)
                                     }
                                 },
                                 onOpenCredential = { id -> navigate(AppScreen.Detail(id)) },
@@ -464,26 +452,5 @@ fun MyTokenApp(
         }
     }
 
-    val xiaomiLoginLauncher = rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
-    ) { result ->
-        val credential = xiaomiLoginCredential
-        xiaomiLoginCredential = null
-        val cookie = result.data?.getStringExtra(XiaomiLoginActivity.RESULT_COOKIE)
-        if (result.resultCode == android.app.Activity.RESULT_OK && credential != null && cookie != null) {
-            scope.launch {
-                homeViewModel.completeXiaomiLoginAndAwait(credential, cookie)
-            }
-        }
-    }
-
-    val context = androidx.compose.ui.platform.LocalContext.current
-    LaunchedEffect(xiaomiLoginCredential) {
-        if (xiaomiLoginCredential != null) {
-            xiaomiLoginLauncher.launch(
-                android.content.Intent(context, XiaomiLoginActivity::class.java)
-            )
-        }
-    }
 }
 }

@@ -197,19 +197,27 @@ class CredentialEditorValidationTest {
     }
 
     @Test
-    fun xiaomiRequiresCookieAndStoresQueryMode() {
-        assertEquals("请输入网页 Cookie", failure(ProviderId.Xiaomi, name = "小米 MiMo"))
+    fun xiaomiRequiresOfficialApiKeyAndStoresQueryMode() {
+        assertEquals("请输入 API Key", failure(ProviderId.Xiaomi, name = "小米 MiMo"))
         val input = validate(
             ProviderId.Xiaomi,
             name = "小米 MiMo",
-            apiKey = "Cookie: api-platform_serviceToken=abc",
+            apiKey = "tp-plan-key",
             xiaomiUsageKind = "plan",
         )
         assertEquals(CredentialKind.BearerApiKey, input.credentialKind)
         assertEquals("plan", input.metadata[CredentialMetadataKey.UsageKind])
         assertEquals(
-            "Cookie: api-platform_serviceToken=abc",
+            "tp-plan-key",
             (input.secret as CredentialSecret.BearerToken).token,
+        )
+        assertEquals(
+            "API 按量请输入 sk- 开头的普通 API Key",
+            failure(ProviderId.Xiaomi, name = "小米 MiMo", apiKey = "tp-plan-key", xiaomiUsageKind = "api"),
+        )
+        assertEquals(
+            "Token Plan 请输入 tp- 开头的专用 API Key",
+            failure(ProviderId.Xiaomi, name = "小米 MiMo", apiKey = "sk-api-key", xiaomiUsageKind = "plan"),
         )
     }
 

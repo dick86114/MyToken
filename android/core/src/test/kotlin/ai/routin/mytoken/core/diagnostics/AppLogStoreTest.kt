@@ -18,12 +18,12 @@ class AppLogStoreTest {
     fun `记录内容包含时间级别事件与详情`() {
         val store = temporaryStore()
 
-        store.log(AppLogLevel.Info, "xiaomi_login_page_started", "url=https://account.xiaomi.com/pass")
+        store.log(AppLogLevel.Info, "app_started", "source=test")
 
         val text = store.recentText()
         assertTrue(text.contains("[info]"))
-        assertTrue(text.contains("xiaomi_login_page_started"))
-        assertTrue(text.contains("url=https://account.xiaomi.com/pass"))
+        assertTrue(text.contains("app_started"))
+        assertTrue(text.contains("source=test"))
         // 时间戳能让用户和我对齐事件顺序。
         assertTrue(Regex("""\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}""").containsMatchIn(text))
     }

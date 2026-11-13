@@ -2,6 +2,47 @@ import XCTest
 @testable import RoutinUsage
 
 final class ProviderModelsTests: XCTestCase {
+    func test添加凭证默认填入供应商后台地址() {
+        XCTAssertEqual(
+            CredentialWebsiteDefaults.suggestedURL(for: .routin),
+            "https://routin.ai/dashboard"
+        )
+        XCTAssertEqual(
+            CredentialWebsiteDefaults.suggestedURL(for: .deepseek),
+            "https://platform.deepseek.com"
+        )
+        XCTAssertEqual(
+            CredentialWebsiteDefaults.suggestedURL(for: .glm),
+            "https://open.bigmodel.cn"
+        )
+        XCTAssertEqual(
+            CredentialWebsiteDefaults.suggestedURL(for: .volcengine),
+            "https://console.volcengine.com/ark"
+        )
+        XCTAssertEqual(
+            CredentialWebsiteDefaults.suggestedURL(for: .commandCode),
+            "https://commandcode.ai"
+        )
+        XCTAssertEqual(
+            CredentialWebsiteDefaults.suggestedURL(for: .xiaomi),
+            "https://platform.xiaomimimo.com"
+        )
+        XCTAssertEqual(
+            CredentialWebsiteDefaults.suggestedURL(for: .opencode),
+            "https://opencode.ai/console"
+        )
+    }
+
+    func testNewAPI默认官网跟随自定义接口地址() {
+        XCTAssertEqual(
+            CredentialWebsiteDefaults.suggestedURL(
+                for: .newAPI,
+                customBaseURL: "  https://newapi.example.com  "
+            ),
+            "https://newapi.example.com"
+        )
+    }
+
     func test凭证官网链接自动补全协议并保存到元数据() throws {
         let result = try CredentialEditorValidation.validate(
             providerID: .glm,

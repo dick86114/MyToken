@@ -127,7 +127,7 @@ export const SecuritySection: React.FC = () => {
               </div>
               <h4 className="font-semibold text-base text-[#F8FAFC]">零账号侵入</h4>
               <p className="text-xs sm:text-sm text-[#c1c6d7] leading-relaxed">
-                绝不收集登录密码、双重验证码、明文 Cookie 或账户邮箱原文。
+                绝不收集登录密码、双重验证码或账户邮箱原文。
               </p>
             </div>
 

@@ -338,7 +338,6 @@ struct CredentialManagementView: View {
         switch presentation {
         case .add:
             CredentialEditorView(
-                xiaomiWebSessionProvider: environment.xiaomiWebSessionProvider,
                 save: model.addValidatedCredential,
                 onClose: { editor = nil }
             )
@@ -348,8 +347,7 @@ struct CredentialManagementView: View {
                 initialProviderID: configuration.providerID,
                 initialName: configuration.displayName,
                 initialSecret: environment.readKey(id: configuration.id) ?? "",
-                initialMetadata: configuration.metadata,
-                xiaomiWebSessionProvider: environment.xiaomiWebSessionProvider
+                initialMetadata: configuration.metadata
             ) { input in
                 try await model.updateValidatedCredential(id: configuration.id, input: input)
             } onSaved: {} onClose: { editor = nil }

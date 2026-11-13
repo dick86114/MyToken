@@ -26,11 +26,11 @@ class LogExporterTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val logDirectory = Files.createTempDirectory("mytoken-export").toFile()
         AppLog.install(AppLogStore(logDirectory))
-        AppLog.log(AppLogLevel.Info, "xiaomi_login_page_started", "url=https://account.xiaomi.com/pass")
+        AppLog.log(AppLogLevel.Info, "app_started", "source=test")
 
         val result = LogExporter(
             context = context,
-            logcatReader = { "10-15 22:00:00.000 I XiaomiLogin: onPageStarted" },
+            logcatReader = { "10-15 22:00:00.000 I MyToken: app_started" },
             downloadsPublisher = { name, _ -> "下载/MyToken/$name" },
         ).export()
 
@@ -42,7 +42,7 @@ class LogExporterTest {
         val entries = ZipFile(result.shareFile).use { zip ->
             zip.entries().toList().associate { entry -> entry.name to zip.getInputStream(entry).readBytes().decodeToString() }
         }
-        assertTrue("应用日志要打进包里", entries.getValue("app.log").contains("xiaomi_login_page_started"))
+        assertTrue("应用日志要打进包里", entries.getValue("app.log").contains("app_started"))
         assertTrue(entries.contains("device.txt"))
         assertTrue(entries.contains("logcat.txt"))
         val device = entries.getValue("device.txt")
