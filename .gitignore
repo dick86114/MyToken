@@ -16,5 +16,8 @@ docs/MyToken-官网内容与图片素材说明.md
 /MyToken-android-*.apk
 .playwright-cli/
 
+# Local-only debug builds and visual verification artifacts
+output/
+
 # Build and deployment artifacts are generated locally or by CI
 dist/
