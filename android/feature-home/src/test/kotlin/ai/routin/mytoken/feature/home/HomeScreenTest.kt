@@ -222,6 +222,37 @@ class HomeScreenTest {
     }
 
     @Test
+    @Config(qualifiers = "w360dp-h800dp")
+    fun compactXiaomiBalanceShowsCashAndGiftBreakdown() {
+        val xiaomi = credential("小米 API 按量", ProviderId.Xiaomi)
+        val testCard = card(
+            xiaomi,
+            metrics = listOf(
+                balance(12.5).copy(id = "account-balance", label = "账户余额"),
+                balance(10.0).copy(id = "cash-balance", label = "现金余额"),
+                balance(2.5).copy(id = "gift-balance", label = "赠送余额"),
+            ),
+        )
+
+        composeRule.setContent {
+            MaterialTheme {
+                CredentialUsageCard(
+                    testCard,
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.COMPACT,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("¥12.50").assertIsDisplayed()
+        composeRule.onNodeWithText("现金").assertIsDisplayed()
+        composeRule.onNodeWithText("¥10.00").assertIsDisplayed()
+        composeRule.onNodeWithText("赠送").assertIsDisplayed()
+        composeRule.onNodeWithText("¥2.50").assertIsDisplayed()
+    }
+
+    @Test
     fun showsStandardCardWithMacStyleFields() {
         val credential = credential("熠")
         composeRule.setContent {

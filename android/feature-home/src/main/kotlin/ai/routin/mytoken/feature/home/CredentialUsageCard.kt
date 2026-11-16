@@ -498,6 +498,9 @@ private fun CompactUsageCardBody(card: CredentialCardUi, isDark: Boolean) {
     when (arrangement) {
         CompactUsageArrangement.Balance -> BalanceStrip(
             metric = metrics.first(),
+            composition = CompactBalanceCompositionPolicy.segments(
+                card.snapshot?.metrics.orEmpty()
+            ),
             isDark = isDark,
         )
         CompactUsageArrangement.HorizontalRings -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -633,7 +636,11 @@ private fun Modifier.usageTileGlass(isDark: Boolean): Modifier {
 }
 
 @Composable
-private fun BalanceStrip(metric: UsageMetric, isDark: Boolean) {
+private fun BalanceStrip(
+    metric: UsageMetric,
+    composition: List<CompactBalanceSegment>,
+    isDark: Boolean,
+) {
     val colors = statusColors()
     val statusColor = statusColor(metric, null, colors)
     val resetText = metric.windowEnd?.let { "重置 ${formatResetTime(it)}" }
@@ -661,11 +668,71 @@ private fun BalanceStrip(metric: UsageMetric, isDark: Boolean) {
                     fontWeight = FontWeight.Bold,
                     color = statusColor(metric, null, colors),
                 )
+                if (composition.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        composition.forEachIndexed { index, segment ->
+                            if (index > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(2.dp)
+                                        .background(
+                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                                            CircleShape,
+                                        )
+                                )
+                            }
+                            BalanceCompositionItem(
+                                segment = segment,
+                                currencyCode = metric.currencyCode,
+                            )
+                        }
+                    }
+                }
             }
             if (resetText != null) {
                 StatusPill(text = resetText, color = statusColor, isDark = isDark)
             }
         }
+    }
+}
+
+@Composable
+private fun BalanceCompositionItem(
+    segment: CompactBalanceSegment,
+    currencyCode: String?,
+) {
+    val colors = statusColors()
+    val tint = when (segment.kind) {
+        CompactBalanceSegmentKind.ToppedUp -> colors.positive
+        CompactBalanceSegmentKind.Granted -> colors.brand
+    }
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(5.dp)
+                .background(tint, CircleShape)
+        )
+        Text(
+            text = segment.label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Medium,
+            color = tint,
+            maxLines = 1,
+        )
+        Text(
+            text = formatCurrency(segment.value, currencyCode),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = tint,
+            maxLines = 1,
+        )
     }
 }
 
