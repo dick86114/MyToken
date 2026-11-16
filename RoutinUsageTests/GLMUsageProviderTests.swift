@@ -216,4 +216,46 @@ final class GLMUsageProviderTests: XCTestCase {
         XCTAssertFalse(mcp.label.contains("剩余"))
         XCTAssertEqual(weekly.label, "每周用量")
     }
+
+    func test积分套餐CREDIT_LIMIT按窗口转换为用量指标() async throws {
+        let stub = URLProtocolStub.makeSession { request in
+            let path = request.url?.path ?? ""
+            let body: String
+            if path.contains("quota/limit") {
+                body = #"""
+                {"code":200,"success":true,"data":{"level":"pro","limits":[
+                    {"type":"CREDIT_LIMIT","unit":3,"number":5,"usage":12000,"currentValue":2245,"remaining":9754,"percentage":18,"nextResetTime":1893456000000},
+                    {"type":"CREDIT_LIMIT","unit":6,"number":1,"usage":60000,"currentValue":2245,"remaining":57754,"percentage":3,"nextResetTime":1894060800000}
+                ]}}
+                """#
+            } else if path.contains("model-usage") {
+                body = #"{"data":{"totalUsage":{"totalModelCallCount":123}}}"#
+            } else {
+                body = #"{"data":{}}"#
+            }
+            let response = try XCTUnwrap(HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            ))
+            return (response, Data(body.utf8))
+        }
+        let provider = GLMUsageProvider(session: stub.session, baseURL: URL(string: "https://glm.test")!)
+        let credential = ProviderCredential(providerID: .glm, kind: .apiKey, secret: "glm-token")
+
+        let fetched = try await provider.fetchUsage(credential, now: .now)
+        let snapshot = try XCTUnwrap(fetched)
+        let fiveHour = try XCTUnwrap(snapshot.metrics.first(where: { $0.id == "five-hour" }))
+        let weekly = try XCTUnwrap(snapshot.metrics.first(where: { $0.id == "weekly" }))
+
+        XCTAssertEqual(fiveHour.used, 18)
+        XCTAssertEqual(fiveHour.remaining, 82)
+        XCTAssertEqual(fiveHour.windowEnd, Date(timeIntervalSince1970: 1_893_456_000))
+        XCTAssertEqual(fiveHour.presentation, .progress)
+        XCTAssertEqual(weekly.used, 3)
+        XCTAssertEqual(weekly.remaining, 97)
+        XCTAssertEqual(weekly.windowEnd, Date(timeIntervalSince1970: 1_894_060_800))
+        XCTAssertEqual(snapshot.metrics.map(\.id), ["five-hour", "weekly", "model-calls"])
+    }
 }

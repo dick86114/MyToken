@@ -352,27 +352,30 @@ struct GLMUsageProvider: UsageProvider {
             guard case let .object(object) = item,
                   let percentage = object["percentage"]?.numberValue()
             else { continue }
-            let type = object["type"]?.stringValue() ?? "quota"
+            let type = (object["type"]?.stringValue() ?? "quota").uppercased()
             let unit = object["unit"]?.numberValue().map { NSDecimalNumber(decimal: $0).intValue }
-            let number = object["number"]?.numberValue().map { NSDecimalNumber(decimal: $0).intValue }
             let windowEnd = Self.date(fromMilliseconds: object["nextResetTime"]?.numberValue())
 
-            switch (type, unit, number) {
-            case ("TOKENS_LIMIT", 3, 5):
-                fiveHour = Self.percentMetric(
-                    id: "five-hour",
-                    label: "5 小时用量",
-                    percentage: percentage,
-                    windowEnd: windowEnd
-                )
-            case ("TOKENS_LIMIT", 6, 1):
-                weekly = Self.percentMetric(
-                    id: "weekly",
-                    label: "每周用量",
-                    percentage: percentage,
-                    windowEnd: windowEnd
-                )
-            case ("TIME_LIMIT", _, _):
+            switch (type, unit) {
+            case ("TOKENS_LIMIT", 3), ("CREDIT_LIMIT", 3):
+                if fiveHour == nil {
+                    fiveHour = Self.percentMetric(
+                        id: "five-hour",
+                        label: "5 小时用量",
+                        percentage: percentage,
+                        windowEnd: windowEnd
+                    )
+                }
+            case ("TOKENS_LIMIT", 6), ("CREDIT_LIMIT", 6):
+                if weekly == nil {
+                    weekly = Self.percentMetric(
+                        id: "weekly",
+                        label: "每周用量",
+                        percentage: percentage,
+                        windowEnd: windowEnd
+                    )
+                }
+            case ("TIME_LIMIT", _):
                 let limit = object["usage"]?.numberValue() ?? 100
                 let used = object["currentValue"]?.numberValue() ?? percentage
                 let remaining = object["remaining"]?.numberValue() ?? max(0, limit - used)

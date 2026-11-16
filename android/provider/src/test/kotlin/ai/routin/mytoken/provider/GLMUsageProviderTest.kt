@@ -173,6 +173,37 @@ class GLMUsageProviderTest {
     }
 
     @Test
+    fun fetchUsage_mapsCreditLimitQuotaForNewPlans() = runTest {
+        transport.responses += ok("""{"data":{"totalUsage":{"totalModelCallCount":123}}}""")
+        transport.responses += ok(
+            """
+            {"code":200,"success":true,"data":{"level":"pro","limits":[
+                {"type":"CREDIT_LIMIT","unit":3,"number":5,"usage":12000,"currentValue":2245,"remaining":9754,"percentage":18,"nextResetTime":1893456000000},
+                {"type":"CREDIT_LIMIT","unit":6,"number":1,"usage":60000,"currentValue":2245,"remaining":57754,"percentage":3,"nextResetTime":1894060800000}
+            ]}}
+            """.trimIndent()
+        )
+        transport.responses += ok("""{"data":{"summary":{}}}""")
+        transport.responses += ok("""{"data":[]}""")
+
+        val snapshot = provider.fetchUsage(credential(), secret).getOrThrow()
+        val fiveHour = snapshot.metrics.first { it.id == "five-hour" }
+        val weekly = snapshot.metrics.first { it.id == "weekly" }
+
+        assertEquals(0, fiveHour.used!!.compareTo(BigDecimal("18")))
+        assertEquals(0, fiveHour.remaining!!.compareTo(BigDecimal("82")))
+        assertEquals(Instant.ofEpochMilli(1893456000000L), fiveHour.windowEnd)
+        assertEquals(UsageMetricPresentation.Progress, fiveHour.presentation)
+        assertEquals(0, weekly.used!!.compareTo(BigDecimal("3")))
+        assertEquals(0, weekly.remaining!!.compareTo(BigDecimal("97")))
+        assertEquals(Instant.ofEpochMilli(1894060800000L), weekly.windowEnd)
+        assertEquals(
+            listOf("five-hour", "weekly", "model-calls"),
+            snapshot.metrics.map { it.id }
+        )
+    }
+
+    @Test
     fun fetchUsage_keepsEmptyModelsWhenModelRequestFails() = runTest {
         transport.responses += ok(readFixture("usage/glm-model-usage.json"))
         transport.responses += ok(readFixture("usage/glm-quota-limit.json"))

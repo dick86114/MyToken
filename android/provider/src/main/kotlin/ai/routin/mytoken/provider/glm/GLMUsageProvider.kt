@@ -218,16 +218,25 @@ class GLMUsageProvider(
         for (item in limits) {
             val obj = item.asObjectOrNull() ?: continue
             val percentage = obj.decimalOrNull("percentage") ?: continue
-            val type = obj.stringOrNull("type") ?: "quota"
+            val type = (obj.stringOrNull("type") ?: "quota").uppercase()
             val unit = obj.intOrNull("unit")
-            val number = obj.intOrNull("number")
             val windowEnd = obj.longOrNull("nextResetTime")?.let { Instant.ofEpochMilli(it) }
 
             when {
-                type == "TOKENS_LIMIT" && unit == 3 && number == 5 ->
-                    fiveHour = percentMetric(id = "five-hour", label = "5 小时用量", percentage = percentage, windowEnd = windowEnd)
-                type == "TOKENS_LIMIT" && unit == 6 && number == 1 ->
-                    weekly = percentMetric(id = "weekly", label = "每周用量", percentage = percentage, windowEnd = windowEnd)
+                (type == "TOKENS_LIMIT" || type == "CREDIT_LIMIT") && unit == 3 ->
+                    fiveHour = fiveHour ?: percentMetric(
+                        id = "five-hour",
+                        label = "5 小时用量",
+                        percentage = percentage,
+                        windowEnd = windowEnd,
+                    )
+                (type == "TOKENS_LIMIT" || type == "CREDIT_LIMIT") && unit == 6 ->
+                    weekly = weekly ?: percentMetric(
+                        id = "weekly",
+                        label = "每周用量",
+                        percentage = percentage,
+                        windowEnd = windowEnd,
+                    )
                 type == "TIME_LIMIT" -> {
                     val limit = obj.decimalOrNull("usage") ?: BigDecimal(100)
                     val used = obj.decimalOrNull("currentValue") ?: percentage
