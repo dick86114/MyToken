@@ -477,8 +477,8 @@ final class UsagePresentationPolicyTests: XCTestCase {
         let compactStart = try XCTUnwrap(row.range(of: "private func compactCard(now: Date)"))
         let fullBody = row[fullStart.lowerBound..<compactStart.lowerBound]
 
-        XCTAssertTrue(fullBody.contains(".padding(.vertical, 10)"))
-        XCTAssertTrue(fullBody.contains(".padding(.horizontal, 8)"))
+        XCTAssertTrue(fullBody.contains(".padding(.vertical, 12)"))
+        XCTAssertTrue(fullBody.contains(".padding(.horizontal, 12)"))
     }
 
     func test简洁卡片统一纵向排列指标() throws {
