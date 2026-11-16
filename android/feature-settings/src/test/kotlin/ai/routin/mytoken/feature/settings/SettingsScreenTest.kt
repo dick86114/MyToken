@@ -109,6 +109,7 @@ class SettingsScreenTest {
         var opened = 0
         setContent(onOpenTransfer = { opened++ })
 
+        expandDataMigration()
         composeRule.onNodeWithText("从 Mac 导入").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("从 Mac 导入").performClick()
 
@@ -120,6 +121,7 @@ class SettingsScreenTest {
         var exportCalls = 0
         setContent(onExportLogs = { exportCalls++ })
 
+        expandAbout()
         composeRule.onNodeWithTag("settings_about_version")
             .performScrollTo()
             .performTouchInput { longClick() }
@@ -150,17 +152,20 @@ class SettingsScreenTest {
         setContent()
 
         scrollToAbout()
-        composeRule.onNodeWithText("关于").assertIsDisplayed()
-        composeRule.onNodeWithText("MyToken 0.1.0", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithText("当前版本修复内容").assertIsDisplayed()
+        expandAbout(alreadyScrolled = true)
+        composeRule.onNodeWithText("关于与更新").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_about_version").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("打开 GitHub").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("查看历史版本").assertIsDisplayed()
-        composeRule.onNodeWithText("更新日志").assertIsDisplayed()
+        composeRule.onNodeWithText("更新日志").assertExists()
+        composeRule.onNodeWithText("更新源与令牌").assertExists()
+        composeRule.onNodeWithText("当前版本修复内容").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("查看历史版本").assertDoesNotExist()
+        composeRule.onNodeWithText("GitHub 令牌").assertDoesNotExist()
         composeRule.onNodeWithText("当前版本更新日志").assertDoesNotExist()
         composeRule.onNodeWithText("应用更新").assertDoesNotExist()
         composeRule.onNodeWithText("查看历史版本").assertDoesNotExist()
-        composeRule.onNodeWithTag("update_channel_selector").assertIsDisplayed()
-        composeRule.onNodeWithTag("check_updates_button").assertIsDisplayed()
+        composeRule.onNodeWithTag("check_updates_button").assertExists()
+        composeRule.onNodeWithTag("update_channel_selector").assertDoesNotExist()
 
         // macOS-only settings must not appear on Android.
         composeRule.onNodeWithText("菜单栏").assertDoesNotExist()
@@ -171,9 +176,12 @@ class SettingsScreenTest {
     @Test
     fun historyIconOpensReleaseHistoryDialog() {
         setContent()
-        scrollToAbout()
+        expandAbout()
+        expandReleaseNotes()
 
-        composeRule.onNodeWithContentDescription("查看历史版本").performClick()
+        composeRule.onNodeWithContentDescription("查看历史版本")
+            .performScrollTo()
+            .performClick()
 
         composeRule.onNodeWithText("历史版本").assertIsDisplayed()
         composeRule.onNodeWithText("历史版本修复内容").assertIsDisplayed()
@@ -186,9 +194,9 @@ class SettingsScreenTest {
             updateState = AppUpdateUiState.NeedsInstallPermission("0.2.0"),
             onOpenInstallPermissionSettings = { openedPermissionSettings++ },
         )
-        scrollToAbout()
+        expandAbout()
 
-        composeRule.onNodeWithText("授权并安装").assertIsDisplayed()
+        composeRule.onNodeWithText("授权并安装").assertExists()
         composeRule.onNodeWithText("打开安装权限设置").assertDoesNotExist()
         composeRule.onNodeWithText("授权后继续安装").assertDoesNotExist()
         composeRule.onNodeWithTag("install_permission_button").performClick()
@@ -196,8 +204,83 @@ class SettingsScreenTest {
         assertEquals(1, openedPermissionSettings)
     }
 
+    @Test
+    fun advancedSettingsAreCollapsedUntilRequested() {
+        setContent()
+
+        composeRule.onNodeWithText("从 Mac 导入").assertDoesNotExist()
+        scrollToAbout()
+        composeRule.onNodeWithTag("settings_about_toggle").assertIsDisplayed()
+        composeRule.onNodeWithText("检测更新").assertDoesNotExist()
+        composeRule.onNodeWithText("更新日志").assertDoesNotExist()
+        composeRule.onNodeWithText("更新源与令牌").assertDoesNotExist()
+    }
+
+    @Test
+    fun collapsedAboutSummarySurfacesAvailableUpdate() {
+        setContent(
+            updateState = AppUpdateUiState.Available(
+                version = "0.2.0",
+                releaseNotes = "新版本说明",
+                downloadUrl = "https://example.com/MyToken.apk",
+            ),
+        )
+
+        scrollToAbout()
+        composeRule.onNodeWithText("MyToken 0.1.0 · 发现新版本 v0.2.0").assertIsDisplayed()
+        composeRule.onNodeWithText("下载并安装").assertDoesNotExist()
+    }
+
+    @Test
+    fun aboutAndUpdateDetailsDiscloseProgressively() {
+        setContent()
+        expandAbout()
+
+        composeRule.onNodeWithText("检测更新").assertIsDisplayed()
+        composeRule.onNodeWithText("更新日志").assertExists()
+        composeRule.onNodeWithText("更新源与令牌").assertExists()
+        composeRule.onNodeWithText("GitHub 令牌").assertDoesNotExist()
+
+        expandReleaseNotes()
+        composeRule.onNodeWithText("当前版本修复内容").assertExists()
+        composeRule.onNodeWithContentDescription("查看历史版本").assertExists()
+
+        expandUpdateAdvanced()
+        composeRule.onNodeWithText("GitHub 令牌").assertExists()
+        composeRule.onNodeWithTag("update_channel_selector").assertExists()
+    }
+
+    private fun expandDataMigration() {
+        composeRule.onNodeWithTag("settings_list")
+            .performScrollToNode(hasText("数据迁移"))
+        composeRule.onNodeWithTag("settings_migration_toggle").performClick()
+        composeRule.waitForIdle()
+    }
+
     private fun scrollToAbout() {
-        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText("关于"))
+        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText("关于与更新"))
+        composeRule.waitForIdle()
+    }
+
+    private fun expandAbout(alreadyScrolled: Boolean = false) {
+        if (!alreadyScrolled) {
+            scrollToAbout()
+        }
+        composeRule.onNodeWithTag("settings_about_toggle").performClick()
+        composeRule.waitForIdle()
+    }
+
+    private fun expandReleaseNotes() {
+        composeRule.onNodeWithTag("settings_release_notes_toggle")
+            .performScrollTo()
+            .performClick()
+        composeRule.waitForIdle()
+    }
+
+    private fun expandUpdateAdvanced() {
+        composeRule.onNodeWithTag("settings_update_advanced_toggle")
+            .performScrollTo()
+            .performClick()
         composeRule.waitForIdle()
     }
 }

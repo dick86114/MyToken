@@ -44,9 +44,10 @@ class MyTokenAppTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText("刷新").assertIsDisplayed()
 
-        // The notification section pushes transfer below the fold.
+        // 低频设置以摘要形式保留，展开后才出现具体操作。
         composeRule.onNodeWithTag("settings_list").performScrollToNode(
-            hasText("从 Mac 导入"),
+            hasText("数据迁移"),
         )
+        composeRule.onNodeWithText("从 Mac 扫码迁移凭证").assertIsDisplayed()
     }
 }

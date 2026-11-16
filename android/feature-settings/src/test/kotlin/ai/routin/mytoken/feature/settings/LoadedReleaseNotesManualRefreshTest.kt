@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.platform.testTag
 import java.util.concurrent.atomic.AtomicInteger
@@ -50,8 +51,16 @@ class LoadedReleaseNotesManualRefreshTest {
         }
 
         composeRule.onNodeWithTag("settings_list")
-            .performScrollToNode(hasText("关于"))
-        composeRule.onNodeWithContentDescription("获取当前版本日志").performClick()
+            .performScrollToNode(hasText("关于与更新"))
+        composeRule.onNodeWithTag("settings_about_toggle").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("settings_release_notes_toggle")
+            .performScrollTo()
+            .performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithContentDescription("获取当前版本日志")
+            .performScrollTo()
+            .performClick()
 
         assertEquals(1, refreshCount.get())
     }
