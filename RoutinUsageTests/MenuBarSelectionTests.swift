@@ -103,7 +103,26 @@ final class MenuBarSelectionTests: XCTestCase {
             capabilities: [disabledCapability, menuCapability(id: "weekly", label: "周", priority: 1)]
         )
 
-        XCTAssertEqual(options.map(\.metricID), ["monthly", "weekly"])
+        XCTAssertEqual(options.map(\.metricID), ["weekly", "monthly"])
+    }
+
+    func test指标选项按五小时周月优先级排序() {
+        let options = MenuBarMetricResolver.options(
+            metrics: [
+                menuMetric(id: "monthly", label: "月用量"),
+                menuMetric(id: "five-hour", label: "5 小时用量"),
+                menuMetric(id: "weekly", label: "周用量")
+            ],
+            capabilities: [
+                menuCapability(id: "five-hour", label: "5 小时用量", priority: 0),
+                menuCapability(id: "weekly", label: "周用量", priority: 1)
+            ]
+        )
+
+        XCTAssertEqual(
+            options.map(\.metricID),
+            ["five-hour", "weekly", "monthly"]
+        )
     }
 
     func test无供应商优先级的运行时指标排序不溢出() {
