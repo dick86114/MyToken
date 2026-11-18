@@ -11,7 +11,7 @@ final class CredentialDetailsViewTests: XCTestCase {
         ])
 
         XCTAssertTrue(source.contains("套餐与订阅"))
-        XCTAssertTrue(source.contains("账户与模型"))
+        XCTAssertTrue(source.contains("凭证与模型"))
         XCTAssertTrue(source.contains("5 小时结束"))
         XCTAssertTrue(source.contains("分组倍率"))
         XCTAssertTrue(source.contains("allowedModels"))
@@ -82,7 +82,7 @@ final class CredentialDetailsViewTests: XCTestCase {
         XCTAssertTrue(source.contains("hasAccountDetails"))
         XCTAssertTrue(source.contains("accountModelsBlock"))
         XCTAssertTrue(source.contains("allowedModels"))
-        XCTAssertTrue(source.contains("sectionHeader(\"账户与模型\""))
+        XCTAssertTrue(source.contains("title: \"凭证与模型\""))
     }
 
     func test详情状态使用语义色区分正常刷新失败和过期() throws {
@@ -97,12 +97,12 @@ final class CredentialDetailsViewTests: XCTestCase {
         XCTAssertTrue(source.contains("\"刷新失败\""))
         XCTAssertTrue(source.contains("\"数据过期\""))
         XCTAssertTrue(source.contains("\"正在刷新\""))
-        XCTAssertTrue(source.contains("CompactPopoverPalette.criticalColor"))
-        XCTAssertTrue(source.contains("CompactPopoverPalette.warningColor"))
-        XCTAssertTrue(source.contains("CompactPopoverPalette.positive"))
+        XCTAssertTrue(source.contains("return .error"))
+        XCTAssertTrue(source.contains("return .warning"))
+        XCTAssertTrue(source.contains(".success"))
     }
 
-    func test模型清单使用多色胶囊并支持点击复制() throws {
+    func test模型清单使用中性胶囊和供应商强调色并支持点击复制() throws {
         let source = try TestSourceReader.read([
             "RoutinUsage",
             "Views",
@@ -117,11 +117,13 @@ final class CredentialDetailsViewTests: XCTestCase {
             "ModelIDChipFlow.swift"
         ])
 
-        XCTAssertTrue(source.contains("ModelIDChipFlow(models:"))
+        XCTAssertTrue(source.contains("ModelIDChipFlow("))
+        XCTAssertTrue(source.contains("ProviderTheme.accentColor("))
         XCTAssertTrue(source.contains("copyModelID"))
         XCTAssertFalse(source.contains("allowedModels.joined(separator: \"、\")"))
         XCTAssertTrue(chipSource.contains("WrappingModelChips"))
         XCTAssertTrue(chipSource.contains("Capsule()"))
+        XCTAssertTrue(chipSource.contains("Color.primary.opacity"))
         XCTAssertTrue(chipSource.contains("NSPasteboard.general.setString(modelID, forType: .string)"))
         XCTAssertTrue(chipSource.contains("已复制模型 ID"))
         XCTAssertTrue(chipSource.contains("复制模型 ID"))

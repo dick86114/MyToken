@@ -18,6 +18,7 @@ struct CredentialCompactRow: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var isHovered = false
+    @State private var isMenuHovered = false
 
     var body: some View {
         HStack(spacing: 10) {
@@ -27,7 +28,7 @@ struct CredentialCompactRow: View {
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(state.configuration.displayName)
-                            .font(.system(size: 13.5, weight: .semibold))
+                            .font(SettingsTypography.rowTitle)
                             .lineLimit(1)
 
                         HStack(spacing: 4) {
@@ -44,7 +45,7 @@ struct CredentialCompactRow: View {
                                 .truncationMode(.tail)
                                 .layoutPriority(1)
                         }
-                        .font(.system(size: 11.5))
+                        .font(SettingsTypography.secondary)
                     }
                     .opacity(state.configuration.isEnabled ? 1 : 0.62)
 
@@ -52,13 +53,19 @@ struct CredentialCompactRow: View {
 
                     trailingSummary
                         .opacity(state.configuration.isEnabled ? 1 : 0.52)
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(SettingsPressFeedbackButtonStyle(pressedScale: 0.995))
             .help("查看 \(state.configuration.displayName) 的完整详情")
             .accessibilityLabel(accessibilityLabel)
+            .accessibilityHint("打开完整凭证详情")
 
             Toggle("", isOn: Binding(
                 get: { state.configuration.isEnabled },
@@ -67,7 +74,7 @@ struct CredentialCompactRow: View {
             .labelsHidden()
             .toggleStyle(.switch)
             .controlSize(.small)
-            .tint(.accentColor)
+            .tint(Color.accentColor)
             .help(state.configuration.isEnabled
                 ? "停用 \(state.configuration.displayName)"
                 : "启用 \(state.configuration.displayName)")
@@ -78,10 +85,10 @@ struct CredentialCompactRow: View {
             actionsMenu
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 9)
+        .padding(.vertical, 8)
         .background {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.primary.opacity(isHovered ? 0.045 : 0))
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(isHovered ? SettingsDesign.hoverFill(colorScheme) : .clear)
         }
         .onHover { isHovered = $0 }
     }
@@ -112,7 +119,7 @@ struct CredentialCompactRow: View {
 
             if let updateText {
                 Text(updateText)
-                    .font(.system(size: 10))
+                    .font(SettingsTypography.caption)
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
             }
@@ -157,13 +164,18 @@ struct CredentialCompactRow: View {
         } label: {
             Image(systemName: "ellipsis")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 24, height: 24)
+                .foregroundStyle(isMenuHovered ? Color.primary : Color.secondary)
+                .frame(width: 26, height: 26)
+                .background {
+                    Circle()
+                        .fill(isMenuHovered ? SettingsDesign.hoverFill(colorScheme) : .clear)
+                }
                 .contentShape(Circle())
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
+        .onHover { isMenuHovered = $0 }
         .help("管理 \(state.configuration.displayName)")
         .accessibilityLabel("管理 \(state.configuration.displayName)")
     }

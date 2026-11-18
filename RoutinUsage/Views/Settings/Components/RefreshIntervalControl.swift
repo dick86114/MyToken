@@ -26,20 +26,22 @@ struct RefreshIntervalControl: View {
             )
 
             if showsCustomField {
-                HStack(spacing: 4) {
+                SettingsFieldSurface(
+                    isFocused: isCustomFieldFocused
+                ) {
                     TextField("自定义", text: $customText)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
                         .multilineTextAlignment(.trailing)
                         .font(.system(size: 12, design: .monospaced))
                         .monospacedDigit()
-                        .frame(width: 52)
                         .focused($isCustomFieldFocused)
                         .accessibilityLabel("自定义刷新分钟数")
 
                     Text("分钟")
-                        .font(.system(size: 11))
+                        .font(SettingsTypography.secondary)
                         .foregroundStyle(.secondary)
                 }
+                .frame(width: 92)
                 .foregroundStyle(isCustomTextValid ? Color.primary : Color.red)
             }
         }

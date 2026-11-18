@@ -9,6 +9,7 @@ struct GeneralSettingsView: View {
     @State private var showsImportPicker = false
     @State private var showsImportConfirmation = false
     @State private var pendingImportURL: URL?
+    @State private var showsTransferToAndroid = false
 
     init(environment: AppEnvironment) {
         self.environment = environment
@@ -16,23 +17,17 @@ struct GeneralSettingsView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                SettingsPageHeader(
-                    title: "通用",
-                    subtitle: "刷新、外观、启动、提醒与显示"
-                )
+        SettingsPageScroll {
+            SettingsPageHeader(
+                title: "通用",
+                subtitle: "刷新、外观、启动与本地数据"
+            )
 
-                refreshSection
-                appearanceSection
-                launchSection
-                notificationSection
-                displaySection
-                colorRulesSection
-                backupSection
-            }
-            .padding(24)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            syncSection
+            appearanceSection
+            launchSection
+            dataMigrationSection
+            backupSection
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .fileImporter(
@@ -46,6 +41,11 @@ struct GeneralSettingsView: View {
                 showsImportConfirmation = pendingImportURL != nil
             case .failure(let error):
                 operationError = "无法选择备份文件：\(error.localizedDescription)"
+            }
+        }
+        .sheet(isPresented: $showsTransferToAndroid) {
+            TransferToAndroidView(environment: environment) {
+                showsTransferToAndroid = false
             }
         }
         .confirmationDialog(
@@ -89,64 +89,23 @@ struct GeneralSettingsView: View {
         }
     }
 
-    private var refreshSection: some View {
-        settingSection {
-            HStack(alignment: .center, spacing: 16) {
-                settingLabel(
-                    title: "刷新间隔",
-                    message: "只刷新已启用的凭证，每个凭证的用量保持独立。"
-                )
-
-                Spacer(minLength: 16)
-
+    private var syncSection: some View {
+        SettingsGroup(title: "同步与提醒") {
+            SettingsRow(
+                systemImage: "arrow.triangle.2.circlepath",
+                title: "刷新间隔",
+                detail: "只刷新已启用的凭证，每个凭证的用量保持独立。"
+            ) {
                 RefreshIntervalControl(minutes: $settings.refreshMinutes)
             }
-        }
-    }
 
-    private var appearanceSection: some View {
-        settingSection {
-            HStack(alignment: .center, spacing: 16) {
-                settingLabel(
-                    title: "外观",
-                    message: "跟随系统外观，或固定使用浅色、深色。"
-                )
+            SettingsRowDivider()
 
-                Spacer(minLength: 16)
-
-                AppAppearanceSegmentedControl(
-                    selection: $settings.appearance
-                )
-                .accessibilityLabel("外观")
-            }
-        }
-    }
-
-    private var launchSection: some View {
-        settingSection {
-            HStack {
-                settingLabel(title: "登录时启动", message: "开机后自动启动 MyToken")
-
-                Spacer(minLength: 16)
-
-                Toggle("登录时启动", isOn: launchAtLoginBinding)
-                    .toggleStyle(.switch)
-                    .labelsHidden()
-                    .accessibilityLabel("登录时启动")
-            }
-        }
-    }
-
-    private var notificationSection: some View {
-        settingSection {
-            HStack {
-                settingLabel(
-                    title: "启用通知",
-                    message: "额度接近限制或订阅即将到期时提醒"
-                )
-
-                Spacer(minLength: 16)
-
+            SettingsRow(
+                systemImage: "bell.badge",
+                title: "启用通知",
+                detail: "额度接近限制或订阅即将到期时提醒。"
+            ) {
                 Toggle("启用通知", isOn: $settings.notificationsEnabled)
                     .toggleStyle(.switch)
                     .labelsHidden()
@@ -155,16 +114,26 @@ struct GeneralSettingsView: View {
         }
     }
 
-    private var displaySection: some View {
-        settingSection {
-            HStack(alignment: .center, spacing: 16) {
-                settingLabel(
-                    title: "卡片显示",
-                    message: "简洁模式只保留各供应商最常用的用量信息。"
+    private var appearanceSection: some View {
+        SettingsGroup(title: "外观与显示") {
+            SettingsRow(
+                systemImage: "circle.lefthalf.filled",
+                title: "外观方案",
+                detail: "跟随系统，或固定使用浅色、深色。"
+            ) {
+                AppAppearanceSegmentedControl(
+                    selection: $settings.appearance
                 )
+                .accessibilityLabel("外观")
+            }
 
-                Spacer(minLength: 16)
+            SettingsRowDivider()
 
+            SettingsRow(
+                systemImage: "rectangle.grid.1x2",
+                title: "卡片显示",
+                detail: "简洁模式只保留各供应商最常用的用量信息。"
+            ) {
                 UsageCardDensitySegmentedControl(
                     selection: $settings.usageCardDensity
                 )
@@ -173,20 +142,33 @@ struct GeneralSettingsView: View {
         }
     }
 
-    private var backupSection: some View {
-        settingSection {
-            settingLabel(
-                title: "配置备份",
-                message: "导出全局偏好、展示顺序、提醒规则和凭证密钥；文件未加密，请勿发送给他人。"
-            )
+    private var launchSection: some View {
+        SettingsGroup(title: "启动") {
+            SettingsRow(
+                systemImage: "power",
+                title: "登录时启动",
+                detail: "开机后自动启动 MyToken。"
+            ) {
+                Toggle("登录时启动", isOn: launchAtLoginBinding)
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+                    .accessibilityLabel("登录时启动")
+            }
+        }
+    }
 
+    private var backupSection: some View {
+        SettingsGroup(
+            title: "配置备份",
+            subtitle: "导出全局偏好、展示顺序、提醒规则和凭证密钥。文件未加密，请勿发送给他人。"
+        ) {
             HStack(spacing: 12) {
                 Button {
                     exportConfiguration()
                 } label: {
                     Label("导出配置", systemImage: "square.and.arrow.up")
                 }
-                .buttonStyle(.bordered)
+                .liquidGlassButton()
                 .help("导出包含凭证密钥的完整配置备份")
 
                 Button {
@@ -194,7 +176,34 @@ struct GeneralSettingsView: View {
                 } label: {
                     Label("导入配置", systemImage: "square.and.arrow.down")
                 }
-                .buttonStyle(.bordered)
+                .liquidGlassButton()
+            }
+            .padding(.vertical, 7)
+
+            SettingsNotice(
+                tone: .warning,
+                message: "备份文件包含凭证密钥，请保存到可信位置。",
+                systemImage: "exclamationmark.shield.fill"
+            )
+            .padding(.bottom, 7)
+        }
+    }
+
+    private var dataMigrationSection: some View {
+        SettingsGroup(
+            title: "数据与迁移",
+            subtitle: "在设备之间转移凭证、偏好和展示顺序。"
+        ) {
+            SettingsRow(
+                systemImage: "iphone.and.arrow.forward",
+                title: "迁移到 Android",
+                detail: "通过同一局域网加密传输当前配置。"
+            ) {
+                Button("开始迁移") {
+                    showsTransferToAndroid = true
+                }
+                .liquidGlassButton()
+                .accessibilityLabel("迁移配置到 Android")
             }
         }
     }
@@ -237,39 +246,6 @@ struct GeneralSettingsView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd-HHmm"
         return "MyToken-Config-\(formatter.string(from: .now)).json"
-    }
-
-    private var colorRulesSection: some View {
-        settingSection {
-            settingLabel(
-                title: "进度颜色",
-                message: "拖动色带上的两个分界点，再为每个百分比区间选择颜色。"
-            )
-
-            MenuBarColorRulesEditor(rules: $settings.menuBarColorRules)
-                .frame(maxWidth: 520, alignment: .leading)
-        }
-    }
-
-    private func settingLabel(title: String, message: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.system(size: 14, weight: .semibold))
-            Text(message)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private func settingSection<Content: View>(
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            content()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
-        .liquidGlassSurface()
     }
 
     private var launchAtLoginBinding: Binding<Bool> {

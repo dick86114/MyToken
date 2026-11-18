@@ -5,9 +5,14 @@ enum CompactPopoverMetrics {
     static var cardCornerRadius: CGFloat { PopoverVisualPolicy.cornerRadius(for: .outer) }
     static var metricCornerRadius: CGFloat { PopoverVisualPolicy.cornerRadius(for: .inner) }
     static let avatarSize: CGFloat = 28
-    static let largeGaugeSize: CGFloat = 44
-    static let smallGaugeSize: CGFloat = 40
-    static let actionSize: CGFloat = 24
+    static let fullAvatarSize: CGFloat = 28
+    static let gaugeSize: CGFloat = 36
+    static let actionSize: CGFloat = 25
+    static let contentIndent: CGFloat = 38
+    static let fullContentIndent: CGFloat = 38
+    static let cardHorizontalPadding: CGFloat = 12
+    static let fullCardHorizontalPadding: CGFloat = 12
+    static let cardVerticalPadding: CGFloat = 10
 }
 
 
@@ -60,9 +65,9 @@ enum CompactPopoverPalette {
         }
     }
 
-    static func statusColor(for tone: UsageMetricTone) -> Color {
+    static func statusColor(for tone: UsageMetricTone, _ scheme: ColorScheme) -> Color {
         switch PopoverVisualPolicy.gaugeAccentRole(for: tone) {
-        case .brand: return brandLight
+        case .brand: return brand(scheme)
         case .warning: return warningColor
         case .critical: return criticalColor
         }
@@ -82,6 +87,10 @@ enum CompactPopoverPalette {
         case .modalGlass:
             return isDark(scheme) ? darkSurface.opacity(0.94) : .white.opacity(0.94)
         }
+    }
+
+    static func opaqueWindow(_ scheme: ColorScheme) -> Color {
+        isDark(scheme) ? darkCanvas : lightCanvas
     }
 
     static func isDark(_ scheme: ColorScheme) -> Bool { scheme == .dark }
@@ -149,11 +158,12 @@ enum CompactPopoverPalette {
 
 struct CompactAccountAvatar: View {
     let providerID: ProviderID
+    var size: CGFloat = CompactPopoverMetrics.avatarSize
 
     var body: some View {
         ProviderLogoBadge(
             providerID: providerID,
-            size: CompactPopoverMetrics.avatarSize,
+            size: size,
             cornerRadius: PopoverVisualPolicy.cornerRadius(for: .inner)
         )
     }
@@ -166,7 +176,6 @@ struct CompactCardActionButton<Label: View>: View {
     @ViewBuilder var label: () -> Label
 
     @State private var isHovered = false
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Button(action: action) {
@@ -175,11 +184,7 @@ struct CompactCardActionButton<Label: View>: View {
                 .frame(width: CompactPopoverMetrics.actionSize, height: CompactPopoverMetrics.actionSize)
                 .background {
                     Circle()
-                        .fill(Color.primary.opacity(isHovered ? 0.14 : 0.08))
-                }
-                .overlay {
-                    Circle()
-                        .strokeBorder(CompactPopoverPalette.actionStroke(colorScheme), lineWidth: 1)
+                        .fill(Color.primary.opacity(isHovered ? 0.08 : 0.001))
                 }
                 .contentShape(Circle())
         }
@@ -191,10 +196,9 @@ struct CompactCardActionButton<Label: View>: View {
 }
 
 struct CompactUsageGauge: View {
-    @Environment(\.menuBarColorRules) private var menuBarColorRules
     let percent: Double?
     let tone: UsageMetricTone
-    var size: CGFloat = CompactPopoverMetrics.largeGaugeSize
+    var size: CGFloat = CompactPopoverMetrics.gaugeSize
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
@@ -204,6 +208,10 @@ struct CompactUsageGauge: View {
             Circle()
                 .stroke(CompactPopoverPalette.gaugeTrack(colorScheme), lineWidth: lineWidth)
             if clamped > 0 {
+                GaugeSectorShape(progress: clamped / 100)
+                    .fill(ringColor.opacity(colorScheme == .dark ? 0.18 : 0.12))
+                    .padding(lineWidth + 0.5)
+
                 Circle()
                     .trim(from: 0, to: CGFloat(clamped / 100))
                     .stroke(
@@ -216,24 +224,24 @@ struct CompactUsageGauge: View {
                 .foregroundStyle(percentTextColor)
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
-                .frame(width: size - 8)
+                .frame(width: size - 10)
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
     }
 
     private var lineWidth: CGFloat {
-        size * 3.6 / 36
+        size * 3 / 36
     }
 
     private var gaugeColor: Color {
-        UsageMetricPresentation.color(for: tone, rules: menuBarColorRules)
+        CompactPopoverPalette.statusColor(for: tone, colorScheme)
     }
 
     /// 数字放大突出，百分号缩小并轻微上移。
     private var gaugeLabel: Text {
-        let numberSize: CGFloat = size > 42 ? 14 : 12
-        let percentSize: CGFloat = 10
+        let numberSize: CGFloat = 10.5
+        let percentSize: CGFloat = 8
         let numberWeight: Font.Weight = (percent ?? 0) <= 0 ? .semibold : .bold
 
         return Text(CompactUsageCardPresentation.compactPercentNumberText(percent))
@@ -251,6 +259,27 @@ struct CompactUsageGauge: View {
     }
 }
 
+/// 环内淡扇形：从圆心铺开，半径止于外圈内缘。
+private struct GaugeSectorShape: Shape {
+    let progress: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height) / 2
+        var path = Path()
+        path.move(to: center)
+        path.addArc(
+            center: center,
+            radius: radius,
+            startAngle: .degrees(-90),
+            endAngle: .degrees(-90 + 360 * progress),
+            clockwise: false
+        )
+        path.closeSubpath()
+        return path
+    }
+}
+
 struct CompactMetricGaugeTile: View {
     @Environment(\.menuBarColorRules) private var menuBarColorRules
     let metric: NormalizedUsageMetric
@@ -263,69 +292,91 @@ struct CompactMetricGaugeTile: View {
             for: metric,
             rules: menuBarColorRules
         ) ?? .normal
-        let subtitle = CompactUsageCardPresentation.subtitle(
-            for: metric,
-            now: now
-        )
-        ZStack(alignment: .trailing) {
+        let subtitle = style == .horizontal
+            ? CompactUsageCardPresentation.singleMetricSubtitle(for: metric, now: now)
+            : CompactUsageCardPresentation.subtitle(for: metric, now: now)
+        Group {
             if style == .horizontal {
-                HStack(spacing: 12) {
-                    CompactUsageGauge(
-                        percent: metric.displayedPercent,
-                        tone: tone,
-                        size: CompactPopoverMetrics.largeGaugeSize
-                    )
-                    VStack(alignment: .leading, spacing: 4) {
-                        labelRow()
-                        Text(subtitle)
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(subtitleColor())
-                            .monospacedDigit()
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .padding(10)
+                horizontalLayout(tone: tone, subtitle: subtitle)
             } else {
-                VStack(spacing: 6) {
-                    CompactUsageGauge(
-                        percent: metric.displayedPercent,
-                        tone: tone,
-                        size: CompactPopoverMetrics.smallGaugeSize
-                    )
-                    labelRow()
-                        .multilineTextAlignment(.center)
-                    Text(subtitle)
-                            .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(subtitleColor())
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                        .frame(maxWidth: .infinity)
-                }
-                .padding(8)
-            }
-            if !metric.resetCards.isEmpty {
-                UsageResetCardsBadge(resetCards: metric.resetCards, style: .compact)
-                    .padding(style == .horizontal ? 8 : 6)
+                verticalLayout(tone: tone, subtitle: subtitle)
             }
         }
-        .frame(maxWidth: .infinity, alignment: style == .horizontal ? .leading : .center)
-        .compactUsageGlass(cornerRadius: CompactPopoverMetrics.metricCornerRadius)
+        .padding(.horizontal, style == .horizontal ? 9 : 8)
+        .padding(.vertical, style == .horizontal ? 9 : 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            RoundedRectangle(
+                cornerRadius: CompactPopoverMetrics.metricCornerRadius,
+                style: .continuous
+            )
+            .fill(CompactPopoverPalette.surface(.metric, colorScheme))
+        }
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: CompactPopoverMetrics.metricCornerRadius,
+                style: .continuous
+            )
+            .strokeBorder(CompactPopoverPalette.cardStroke(colorScheme).opacity(0.72), lineWidth: 1)
+            .allowsHitTesting(false)
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText(subtitle: subtitle))
     }
 
-    @ViewBuilder
-    private func labelRow() -> some View {
-        HStack(spacing: 4) {
+    private func horizontalLayout(tone: UsageMetricTone, subtitle: String) -> some View {
+        HStack(alignment: .center, spacing: 7) {
+            CompactUsageGauge(
+                percent: metric.displayedPercent,
+                tone: tone,
+                size: CompactPopoverMetrics.gaugeSize
+            )
+
+            if !metric.resetCards.isEmpty {
+                UsageResetCardsBadge(resetCards: metric.resetCards, style: .compact)
+            }
+
+            metricBody(subtitle: subtitle)
+        }
+    }
+
+    private func verticalLayout(tone: UsageMetricTone, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .center, spacing: 7) {
+                CompactUsageGauge(
+                    percent: metric.displayedPercent,
+                    tone: tone,
+                    size: CompactPopoverMetrics.gaugeSize
+                )
+
+                if !metric.resetCards.isEmpty {
+                    UsageResetCardsBadge(resetCards: metric.resetCards, style: .compact)
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            metricBody(subtitle: subtitle)
+        }
+    }
+
+    private func metricBody(subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
             Text(metric.label)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Color.primary.opacity(0.82))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
+
+            UsageMetricProgressBar(percent: metric.displayedPercent ?? 0, height: 3)
+
+            Text(subtitle)
+                .font(.system(size: 10))
+                .foregroundStyle(subtitleColor())
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func subtitleColor() -> Color {
@@ -347,47 +398,95 @@ struct CompactValueTile: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 2) {
             Text(metric.label)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.secondary)
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundStyle(CompactPopoverPalette.subtitle(colorScheme))
                 .lineLimit(1)
             Text(valueText)
-                .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                .font(.system(size: 12.5, weight: .semibold, design: .monospaced))
                 .monospacedDigit()
                 .foregroundStyle(.primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .compactUsageGlass(cornerRadius: CompactPopoverMetrics.metricCornerRadius)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 5)
+        .background {
+            RoundedRectangle(
+                cornerRadius: CompactPopoverMetrics.metricCornerRadius,
+                style: .continuous
+            )
+            .fill(CompactPopoverPalette.surface(.metric, colorScheme))
+        }
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: CompactPopoverMetrics.metricCornerRadius,
+                style: .continuous
+            )
+            .strokeBorder(CompactPopoverPalette.cardStroke(colorScheme).opacity(0.72), lineWidth: 1)
+            .allowsHitTesting(false)
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(metric.label)，\(valueText)")
     }
 }
 
+enum BalanceSummaryStyle {
+    case compact
+    case full
+}
+
 struct CompactBalanceStrip: View {
     let metric: NormalizedUsageMetric
     var compositionMetrics: [NormalizedUsageMetric] = []
+    var style: BalanceSummaryStyle = .compact
+    var metaText: String? = nil
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        VStack(alignment: .center, spacing: BalanceCompositionDetailMetrics.contentSpacing) {
-            Text(UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode))
-                .font(.system(size: 20, weight: .bold))
-                .monospacedDigit()
-                .foregroundStyle(CompactPopoverPalette.amountGreen(colorScheme))
-                .minimumScaleFactor(0.7)
-                .lineLimit(1)
-                .frame(height: 24)
-            if let composition = balanceComposition {
-                BalanceCompositionDetails(composition: composition)
+        VStack(alignment: .leading, spacing: 4) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    amountText
+                    Spacer(minLength: 4)
+                    compositionDetails
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    amountText
+                    compositionDetails
+                }
+            }
+
+            if let metaText, !metaText.isEmpty {
+                Text(metaText)
+                    .font(.system(size: 10))
+                    .foregroundStyle(CompactPopoverPalette.subtitle(colorScheme))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
             }
         }
-        .frame(height: balanceComposition == nil ? 24 : BalanceCompositionDetailMetrics.contentHeight)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var amountText: some View {
+        Text(UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode))
+            .font(.system(size: style == .compact ? 19 : 15, weight: .bold))
+            .monospacedDigit()
+            .foregroundStyle(CompactPopoverPalette.amountGreen(colorScheme))
+            .minimumScaleFactor(0.7)
+            .lineLimit(1)
+    }
+
+    @ViewBuilder
+    private var compositionDetails: some View {
+        if let composition = balanceComposition {
+            BalanceCompositionDetails(composition: composition)
+        }
     }
 
     private var balanceComposition: BalanceComposition? {
@@ -458,14 +557,9 @@ private struct BalanceComposition: Equatable {
 }
 
 private enum BalanceCompositionDetailMetrics {
-    static let width: CGFloat = 164
-    static let height: CGFloat = 14
-    static let contentHeight: CGFloat = 46
-    static let contentSpacing: CGFloat = 4
-    static let groupSpacing: CGFloat = 6
-    static let itemSpacing: CGFloat = 3
+    static let groupSpacing: CGFloat = 8
+    static let itemSpacing: CGFloat = 2
     static let dotSize: CGFloat = 5
-    static let separatorSize: CGFloat = 2
 }
 
 private struct BalanceCompositionDetails: View {
@@ -473,25 +567,14 @@ private struct BalanceCompositionDetails: View {
 
     var body: some View {
         HStack(spacing: BalanceCompositionDetailMetrics.groupSpacing) {
-            ForEach(Array(composition.segments.enumerated()), id: \.element.id) { index, segment in
-                if index > 0 {
-                    Circle()
-                        .fill(Color.secondary.opacity(0.35))
-                        .frame(
-                            width: BalanceCompositionDetailMetrics.separatorSize,
-                            height: BalanceCompositionDetailMetrics.separatorSize
-                        )
-                }
+            ForEach(composition.segments) { segment in
                 BalanceCompositionDetailItem(
                     segment: segment,
                     currencyCode: composition.currencyCode
                 )
             }
         }
-        .frame(
-            width: BalanceCompositionDetailMetrics.width,
-            height: BalanceCompositionDetailMetrics.height
-        )
+        .fixedSize(horizontal: true, vertical: false)
     }
 }
 
@@ -510,32 +593,18 @@ private struct BalanceCompositionDetailItem: View {
                     height: BalanceCompositionDetailMetrics.dotSize
                 )
             Text(segment.compactLabel)
-                .font(.system(size: 9.5, weight: .medium))
+                .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(tint)
             Text(UsageFormatter.currencyText(segment.value, currencyCode: currencyCode))
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
                 .monospacedDigit()
                 .foregroundStyle(tint)
         }
         .lineLimit(1)
-        .minimumScaleFactor(0.78)
+        .minimumScaleFactor(0.75)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
             "\(segment.label)，\(UsageFormatter.currencyText(segment.value, currencyCode: currencyCode))"
         )
-    }
-}
-
-private extension View {
-    /// 用量小卡片只保留一层无色玻璃；旧系统退回系统超薄材质。
-    @ViewBuilder
-    func compactUsageGlass(cornerRadius: CGFloat) -> some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-
-        if #available(macOS 26.0, *) {
-            self.glassEffect(.regular, in: shape)
-        } else {
-            self.background(.ultraThinMaterial, in: shape)
-        }
     }
 }

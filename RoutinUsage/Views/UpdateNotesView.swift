@@ -274,6 +274,26 @@ struct UpdateReleaseSummaryItem: Identifiable, Equatable, Sendable {
 /// 把 GitHub Release 正文整理成更新完成弹窗里的简短条目。
 /// 双端共用发布说明时只展示 macOS 区，避免把 Android 变更混入 macOS 更新提示。
 enum UpdateReleaseSummaryBuilder {
+    /// 摘要行只负责规整的发布条目；复杂结构交给完整 Markdown 渲染，
+    /// 避免代码块、表格、引用或图片在扁平化过程中丢失语义。
+    static func supportsSummaryLayout(notes: String) -> Bool {
+        let lowercasedNotes = notes.lowercased()
+        let unsupportedHTML = ["<pre", "<table", "<img", "<blockquote"]
+        if lowercasedNotes.contains("```")
+            || unsupportedHTML.contains(where: lowercasedNotes.contains) {
+            return false
+        }
+
+        return !notes
+            .components(separatedBy: .newlines)
+            .contains { line in
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                return trimmed.hasPrefix(">")
+                    || trimmed.hasPrefix("![")
+                    || trimmed.hasPrefix("|")
+            }
+    }
+
     static func items(from notes: String) -> [UpdateReleaseSummaryItem] {
         let rendered = UpdateNotesRenderer.plainText(notes: notes)
         let lines = rendered
@@ -418,8 +438,32 @@ enum UpdateNotesAccessibility {
     }
 }
 
+enum UpdateNotesStyle {
+    case compact
+    case reading
+
+    var font: Font {
+        switch self {
+        case .compact:
+            return .caption
+        case .reading:
+            return .system(size: 12.5)
+        }
+    }
+
+    var lineSpacing: CGFloat {
+        switch self {
+        case .compact:
+            return 1
+        case .reading:
+            return 2
+        }
+    }
+}
+
 struct UpdateNotesView: View {
     let notes: String
+    var style: UpdateNotesStyle = .compact
 
     var body: some View {
         Group {
@@ -431,9 +475,11 @@ struct UpdateNotesView: View {
                 Text(notes)
             }
         }
-        .font(.caption)
+        .font(style.font)
         .foregroundStyle(.secondary)
+        .lineSpacing(style.lineSpacing)
         .fixedSize(horizontal: false, vertical: true)
+        .textSelection(.enabled)
         .accessibilityLabel(UpdateNotesAccessibility.label(notes: notes))
     }
 }

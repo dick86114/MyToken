@@ -117,7 +117,22 @@ struct ReorderableCredentialCardList<ID: Hashable, Card: View>: View {
                 dragTranslation = value.translation.height
                 updateTarget(for: id)
             }
-            .onEnded { _ in
+            .onEnded { value in
+                if let startIndex, !workingIDs.isEmpty {
+                    let projectedIndex = ReorderableCardGeometry.targetIndex(
+                        startIndex: startIndex,
+                        translation: value.predictedEndTranslation.height,
+                        step: step,
+                        count: workingIDs.count
+                    )
+                    withAnimation(
+                        reduceMotion
+                            ? nil
+                            : .interactiveSpring(response: 0.2, dampingFraction: 0.88)
+                    ) {
+                        currentIndex = projectedIndex
+                    }
+                }
                 commitMove(for: id)
             }
     }
@@ -179,12 +194,31 @@ struct ReorderableCredentialCardList<ID: Hashable, Card: View>: View {
               let index = displayedIDs.firstIndex(of: id)
         else { return 0 }
 
+        let translation = activeID == id
+            ? rubberBandedTranslation(dragTranslation, startIndex: startIndex)
+            : nil
+
         return ReorderableCardGeometry.offset(
             index: index,
             startIndex: startIndex,
             targetIndex: currentIndex,
             step: step,
-            activeTranslation: activeID == id ? dragTranslation : nil
+            activeTranslation: translation
         )
+    }
+
+    private func rubberBandedTranslation(
+        _ translation: CGFloat,
+        startIndex: Int
+    ) -> CGFloat {
+        let lowerBound = -CGFloat(startIndex) * step
+        let upperBound = CGFloat(max(0, displayedIDs.count - 1 - startIndex)) * step
+        if translation < lowerBound {
+            return lowerBound + (translation - lowerBound) * 0.24
+        }
+        if translation > upperBound {
+            return upperBound + (translation - upperBound) * 0.24
+        }
+        return translation
     }
 }

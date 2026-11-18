@@ -77,16 +77,30 @@ final class CredentialAlertSettingsViewTests: XCTestCase {
         )
 
         XCTAssertTrue(source.contains("let onClose: () -> Void"))
-        XCTAssertTrue(source.contains("Image(systemName: \"xmark\")"))
-        XCTAssertTrue(source.contains("Text(title).font(.title3.weight(.semibold))"))
+        XCTAssertTrue(source.contains("SettingsModalTitle("))
+        XCTAssertTrue(source.contains("SettingsCloseButton(action: onClose)"))
         XCTAssertTrue(source.contains("Spacer()"))
-        XCTAssertTrue(source.contains("onClose()"))
-        XCTAssertTrue(source.contains(".keyboardShortcut(.cancelAction)"))
+        XCTAssertTrue(source.contains("action: onClose"))
         XCTAssertFalse(source.contains("Button(\"关闭\")"))
         XCTAssertTrue(source.contains("LazyVGrid("))
         XCTAssertTrue(source.contains(".frame(width: 680)"))
-        XCTAssertTrue(source.contains(".fixedSize(horizontal: false, vertical: true)"))
         XCTAssertFalse(source.contains("Form {"))
-        XCTAssertFalse(source.contains("ScrollView"))
+        XCTAssertTrue(source.contains("ViewThatFits(in: .vertical)"))
+        XCTAssertTrue(source.contains(".fixedSize(horizontal: false, vertical: true)"))
+        XCTAssertTrue(source.contains("ScrollView(.vertical, showsIndicators: false)"))
+    }
+
+    func test提醒总开关关闭后隐藏规则并解释恢复方式() throws {
+        let source = try TestSourceReader.read([
+            "RoutinUsage", "Views", "Settings", "CredentialAlertSettingsView.swift"
+        ])
+
+        XCTAssertTrue(source.contains("if model.notificationsEnabled"))
+        XCTAssertTrue(source.contains("提醒已关闭"))
+        XCTAssertTrue(source.contains("暂无可提醒的指标"))
+        XCTAssertTrue(source.contains("开启总开关后"))
+        XCTAssertTrue(source.contains("Slider("))
+        XCTAssertTrue(source.contains("percentSliderBinding"))
+        XCTAssertFalse(source.contains("Stepper("))
     }
 }

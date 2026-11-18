@@ -1,7 +1,7 @@
 import XCTest
 
 final class ReleaseNotesAndUpdateFeedbackTests: XCTestCase {
-    func test当前版本日志使用本地缓存并提供手动获取入口() throws {
+    func test当前版本日志使用本地缓存并自动加载() throws {
         let environment = try TestSourceReader.read([
             "RoutinUsage", "App", "AppEnvironment.swift"
         ])
@@ -12,8 +12,9 @@ final class ReleaseNotesAndUpdateFeedbackTests: XCTestCase {
         XCTAssertTrue(environment.contains("releaseHistoryCache"))
         XCTAssertTrue(environment.contains("releaseHistoryCache?.load"))
         XCTAssertTrue(environment.contains("releaseHistoryCache?.save"))
-        XCTAssertTrue(view.contains("获取当前版本日志"))
-        XCTAssertTrue(view.contains("loadReleaseHistoryIfNeeded(force: true)"))
+        XCTAssertTrue(view.contains("loadReleaseHistoryIfNeeded()"))
+        XCTAssertTrue(view.contains("case let .failed(message)"))
+        XCTAssertTrue(view.contains("Button(\"重试\")"))
     }
 
     func test菜单栏版本号加载当前版本日志并打开应用内窗口() throws {
@@ -27,7 +28,7 @@ final class ReleaseNotesAndUpdateFeedbackTests: XCTestCase {
         XCTAssertTrue(environment.contains("UpdateCompletionNoticeWindowController.shared.present"))
     }
 
-    func test菜单栏检测更新失败显示可见提示() throws {
+    func test菜单栏检查更新失败显示可见提示() throws {
         let source = try TestSourceReader.read([
             "RoutinUsage", "Views", "UsagePopoverView.swift"
         ])
@@ -38,6 +39,6 @@ final class ReleaseNotesAndUpdateFeedbackTests: XCTestCase {
         XCTAssertTrue(toolbar.contains("if case let .failed(message)"))
         XCTAssertTrue(toolbar.contains("Label(message, systemImage:"))
         XCTAssertTrue(toolbar.contains("CompactPopoverPalette.criticalColor"))
-        XCTAssertFalse(toolbar.contains("检测更新失败，请稍后重试"))
+        XCTAssertFalse(toolbar.contains("检查更新失败，请稍后重试"))
     }
 }

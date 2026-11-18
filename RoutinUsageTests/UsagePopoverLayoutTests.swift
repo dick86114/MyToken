@@ -67,12 +67,17 @@ final class UsagePopoverLayoutTests: XCTestCase {
             encoding: .utf8
         )
 
-        XCTAssertTrue(popover.contains("usageCardDensity == .compact"))
-        XCTAssertTrue(popover.contains("LazyVGrid(columns: [GridItem(.flexible())], spacing: 14)"))
-        XCTAssertTrue(popover.contains("LazyVGrid(columns: [GridItem(.flexible())], spacing: 8)"))
+        XCTAssertTrue(popover.contains("switch settings.usageCardDensity"))
+        XCTAssertTrue(popover.contains("LazyVGrid(columns: [GridItem(.flexible())], spacing: 7)"))
+        XCTAssertTrue(popover.contains("fullCardViews"))
+        XCTAssertFalse(popover.contains("showsTopDivider: index > 0"))
         XCTAssertFalse(popover.contains("WaterfallLayout(columns: 2, spacing: 8)"))
         XCTAssertTrue(popover.contains(".id(settings.usageCardDensity)"))
-        XCTAssertTrue(segmented.contains("withAnimation(.spring(response: 0.35, dampingFraction: 0.8))"))
+        XCTAssertTrue(segmented.contains("response: 0.32"))
+        XCTAssertTrue(segmented.contains("dampingFraction: 0.86"))
+        XCTAssertTrue(segmented.contains("return \"rectangle.stack\""))
+        XCTAssertTrue(segmented.contains("return \"list.bullet.rectangle\""))
+        XCTAssertTrue(segmented.contains("DragGesture(minimumDistance: 6)"))
     }
 
     func test瀑布流布局按最短列放置卡片() {
@@ -158,9 +163,72 @@ final class UsagePopoverLayoutTests: XCTestCase {
         XCTAssertTrue(popover.contains("let checkForUpdates: CheckForUpdates"))
         XCTAssertTrue(toolbar.contains("if case let .available(update) = updateStatus"))
         XCTAssertTrue(toolbar.contains("selectedUpdate = update"))
-        XCTAssertTrue(toolbar.contains("Image(systemName: \"arrow.triangle.2.circlepath\")"))
+        XCTAssertTrue(toolbar.contains("Circle()"))
+        XCTAssertTrue(toolbar.contains(".trim(from: 0.08, to: 0.78)"))
         XCTAssertTrue(toolbar.contains("await checkForUpdates()"))
-        XCTAssertTrue(toolbar.contains("检测更新"))
+        XCTAssertTrue(toolbar.contains("检查更新"))
         XCTAssertTrue(controller.contains("checkForUpdates: environment.checkForUpdates"))
+    }
+
+    func test新版本提示位于左侧品牌区() throws {
+        let popover = try TestSourceReader.read([
+            "RoutinUsage", "Views", "UsagePopoverView.swift"
+        ])
+
+        let brand = try XCTUnwrap(
+            popover.range(of: "Link(destination: RoutinUsageApp.websiteURL)")
+        )
+        let updateControl = try XCTUnwrap(
+            popover.range(of: "versionOrUpdateControl")
+        )
+        let spacer = try XCTUnwrap(
+            popover.range(of: "Spacer(minLength: 8)")
+        )
+
+        XCTAssertLessThan(brand.lowerBound, updateControl.lowerBound)
+        XCTAssertLessThan(updateControl.lowerBound, spacer.lowerBound)
+        XCTAssertTrue(popover.contains("新版本"))
+        XCTAssertTrue(popover.contains("arrow.up.circle.fill"))
+        XCTAssertTrue(popover.contains("selectedUpdate = update"))
+        XCTAssertFalse(popover.contains(".overlay(alignment: .center)"))
+    }
+
+    func test完整信息使用独立供应商卡片() throws {
+        let popover = try TestSourceReader.read([
+            "RoutinUsage", "Views", "UsagePopoverView.swift"
+        ])
+        let row = try TestSourceReader.read([
+            "RoutinUsage", "Views", "UsageRowView.swift"
+        ])
+
+        XCTAssertTrue(popover.contains("fullCardViews"))
+        XCTAssertFalse(popover.contains("CompactPopoverPalette.surface(.card, colorScheme)"))
+        XCTAssertFalse(popover.contains("showsTopDivider: index > 0"))
+        XCTAssertFalse(row.contains("var showsTopDivider"))
+
+        let fullStart = try XCTUnwrap(row.range(of: "private func fullCard(now: Date)"))
+        let compactStart = try XCTUnwrap(row.range(of: "private func compactCard(now: Date)"))
+        let fullBody = String(row[fullStart.lowerBound..<compactStart.lowerBound])
+        XCTAssertTrue(fullBody.contains(".modifier(UsageCardChrome("))
+    }
+
+    func test底栏作为固定页脚不再悬浮覆盖内容() throws {
+        let popover = try TestSourceReader.read([
+            "RoutinUsage", "Views", "UsagePopoverView.swift"
+        ])
+
+        XCTAssertTrue(popover.contains("bottomBar"))
+        XCTAssertFalse(popover.contains(".overlay(alignment: .bottom)"))
+        XCTAssertTrue(popover.contains("PopoverFooterActionButton"))
+        XCTAssertTrue(popover.contains(".frame(height: 48)"))
+    }
+
+    func test供应商筛选使用设计稿漏斗图标() throws {
+        let source = try TestSourceReader.read([
+            "RoutinUsage", "Views", "ProviderFilterMenu.swift"
+        ])
+
+        XCTAssertTrue(source.contains("FunnelIcon()"))
+        XCTAssertFalse(source.contains("line.3.horizontal.decrease"))
     }
 }

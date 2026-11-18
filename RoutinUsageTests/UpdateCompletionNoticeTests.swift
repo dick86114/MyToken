@@ -72,6 +72,29 @@ final class UpdateCompletionNoticeTests: XCTestCase {
         XCTAssertTrue(UpdateReleaseSummaryBuilder.items(from: " \n ").isEmpty)
     }
 
+    func test摘要布局兼容普通列表并可回退复杂Markdown() {
+        let listNotes = """
+        ## macOS
+        ### 新增
+        - 支持 **加粗**、`行内代码` 和 [链接](https://example.com)
+        ### 修复
+        1. 修复多行
+           继续说明
+        """
+        XCTAssertTrue(UpdateReleaseSummaryBuilder.supportsSummaryLayout(notes: listNotes))
+
+        for complexNotes in [
+            "## macOS\n```swift\nlet version = 1\n```",
+            "## macOS\n| 项目 | 状态 |\n| --- | --- |\n| 更新 | 完成 |",
+            "## macOS\n> 兼容旧版本",
+            "## macOS\n<img src=\"preview.png\">"
+        ] {
+            XCTAssertFalse(
+                UpdateReleaseSummaryBuilder.supportsSummaryLayout(notes: complexNotes)
+            )
+        }
+    }
+
 
     func test更新完成弹窗高度随条目收紧且不会出现大段留白() {
         let notes = """

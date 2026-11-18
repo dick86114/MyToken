@@ -466,7 +466,12 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         window.title = "设置"
         window.isReleasedWhenClosed = false
         window.minSize = WindowFramePersistence.minimumSize
-        window.styleMask.remove(.fullSizeContentView)
+        window.styleMask.insert(.fullSizeContentView)
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.titlebarSeparatorStyle = .none
+        window.isMovableByWindowBackground = true
+        window.backgroundColor = .clear
         let hostingController = NSHostingController(
             rootView: SettingsWindowView(environment: environment)
         )

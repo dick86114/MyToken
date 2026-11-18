@@ -716,7 +716,7 @@ final class AppLifecycleTests: XCTestCase {
 
         XCTAssertEqual(
             environment.updateStatus,
-            .failed("检测更新失败：GitHub API 返回 HTTP 502")
+            .failed("检查更新失败：GitHub API 返回 HTTP 502")
         )
     }
 
@@ -744,7 +744,7 @@ final class AppLifecycleTests: XCTestCase {
         await 等待条件 { await service.checkCount == 2 }
         XCTAssertEqual(
             environment.updateStatus,
-            .failed("检测更新失败：GitHub API 返回 HTTP 502")
+            .failed("检查更新失败：GitHub API 返回 HTTP 502")
         )
 
         // 随后的自动检测失败不能抹掉刚才的原因。
@@ -753,7 +753,7 @@ final class AppLifecycleTests: XCTestCase {
 
         XCTAssertEqual(
             environment.updateStatus,
-            .failed("检测更新失败：GitHub API 返回 HTTP 502")
+            .failed("检查更新失败：GitHub API 返回 HTTP 502")
         )
     }
 

@@ -4,6 +4,7 @@ import SwiftUI
 struct ModelIDChipFlow: View {
     let models: [String]
     let copiedModelID: String?
+    var accentColor: Color = .accentColor
     let onCopied: (String) -> Void
 
     var body: some View {
@@ -12,6 +13,7 @@ struct ModelIDChipFlow: View {
                 ModelIDChip(
                     modelID: modelID,
                     isCopied: copiedModelID == modelID,
+                    accentColor: accentColor,
                     onCopied: onCopied
                 )
             }
@@ -19,45 +21,15 @@ struct ModelIDChipFlow: View {
     }
 }
 
-enum ModelIDChipPalette {
-    static let colorCount = 12
-
-    static func colorIndex(for modelID: String) -> Int {
-        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
-        for scalar in modelID.unicodeScalars {
-            hash = (hash ^ UInt64(scalar.value)) &* 0x0000_0100_0000_01b3
-        }
-        return Int(hash % UInt64(colorCount))
-    }
-
-    static func accentColor(for modelID: String) -> Color {
-        switch colorIndex(for: modelID) {
-        case 0: .blue
-        case 1: .teal
-        case 2: .indigo
-        case 3: .green
-        case 4: .orange
-        case 5: .purple
-        case 6: .pink
-        case 7: .cyan
-        case 8: .mint
-        case 9: .red
-        case 10: .brown
-        default: .yellow
-        }
-    }
-}
-
 private struct ModelIDChip: View {
     let modelID: String
     let isCopied: Bool
+    let accentColor: Color
     let onCopied: (String) -> Void
 
     @State private var isHovered = false
-
-    private var accent: Color {
-        ModelIDChipPalette.accentColor(for: modelID)
-    }
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button {
@@ -66,12 +38,22 @@ private struct ModelIDChip: View {
             onCopied(modelID)
         } label: {
             HStack(spacing: 4) {
+                Circle()
+                    .fill(accentColor)
+                    .frame(width: 5, height: 5)
+
                 Text(modelID)
                     .lineLimit(1)
                     .truncationMode(.middle)
+                    .foregroundStyle(.primary)
 
                 Image(systemName: isCopied ? "checkmark" : "doc.on.doc")
                     .font(.caption2.weight(.semibold))
+                    .foregroundStyle(
+                        isCopied
+                            ? CompactPopoverPalette.positive(colorScheme)
+                            : accentColor
+                    )
                     .opacity(isCopied ? 1 : 0.54)
             }
             .font(.caption.weight(.medium).monospaced())
@@ -79,21 +61,31 @@ private struct ModelIDChip: View {
             .padding(.vertical, 5)
             .background {
                 Capsule()
-                    .fill(accent.opacity(isCopied ? 0.25 : (isHovered ? 0.18 : 0.11)))
+                    .fill(
+                        Color.primary.opacity(
+                            isHovered ? 0.075 : 0.045
+                        )
+                    )
             }
             .overlay {
                 Capsule()
                     .strokeBorder(
-                        accent.opacity(isCopied ? 0.68 : (isHovered ? 0.48 : 0.28)),
-                        lineWidth: 1
+                        isCopied
+                            ? CompactPopoverPalette.positive(colorScheme).opacity(0.58)
+                            : accentColor.opacity(isHovered ? 0.34 : 0.22),
+                        lineWidth: 0.8
                     )
             }
-            .foregroundStyle(accent)
             .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SettingsPressFeedbackButtonStyle(pressedScale: 0.96))
         .onHover { isHovered = $0 }
-        .animation(.easeOut(duration: 0.14), value: isCopied)
+        .animation(
+            reduceMotion
+                ? nil
+                : .spring(response: 0.26, dampingFraction: 0.88),
+            value: isCopied
+        )
         .animation(.easeOut(duration: 0.12), value: isHovered)
         .help(isCopied ? "已复制模型 ID" : "复制模型 ID")
         .accessibilityLabel(isCopied ? "已复制模型 ID \(modelID)" : "复制模型 ID \(modelID)")

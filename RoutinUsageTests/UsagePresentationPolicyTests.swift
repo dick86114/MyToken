@@ -33,10 +33,33 @@ final class UsagePresentationPolicyTests: XCTestCase {
                 showsAmountDetails: false
             )
         )
-        XCTAssertEqual(UsageMetricGridPolicy.layout(providerID: .volcengine, metrics: metrics).columns, 2)
+        XCTAssertEqual(UsageMetricGridPolicy.layout(providerID: .volcengine, metrics: metrics).columns, 3)
         XCTAssertEqual(UsageMetricGridPolicy.layout(providerID: .deepseek, metrics: metrics).columns, 2)
         XCTAssertEqual(UsageMetricGridPolicy.layout(providerID: .routin, metrics: metrics).columns, 2)
         XCTAssertEqual(UsageMetricGridPolicy.layout(providerID: .newAPI, metrics: metrics).columns, 2)
+
+        let xiaomiMetrics = [
+            NormalizedUsageMetric(
+                id: "plan-total",
+                label: "套餐总量",
+                unit: .request,
+                presentation: .progress,
+                semantic: .usedQuota
+            ),
+            NormalizedUsageMetric(
+                id: "plan-status",
+                label: "订阅状态",
+                unit: .boolean,
+                presentation: .status,
+                semantic: .status
+            )
+        ]
+        let xiaomiLayout = UsageMetricGridPolicy.layout(
+            providerID: .xiaomi,
+            metrics: xiaomiMetrics
+        )
+        XCTAssertEqual(xiaomiLayout.metrics.map(\.id), ["plan-total"])
+        XCTAssertEqual(xiaomiLayout.columns, 1)
     }
 
     func test简洁模式按供应商返回写死字段() {
@@ -154,7 +177,7 @@ final class UsagePresentationPolicyTests: XCTestCase {
         let layout = UsageMetricGridPolicy.layout(providerID: .opencode, metrics: metrics)
 
         XCTAssertEqual(layout.metrics.map(\.id), ["fiveHour", "weekly", "monthly"])
-        XCTAssertEqual(layout.columns, 2)
+        XCTAssertEqual(layout.columns, 3)
         XCTAssertTrue(layout.metrics.allSatisfy { $0.currencyCode == "$" })
         XCTAssertTrue(layout.metrics.allSatisfy { $0.windowEnd != nil })
 
@@ -182,8 +205,9 @@ final class UsagePresentationPolicyTests: XCTestCase {
         )
 
         XCTAssertTrue(source.contains(#"return "OpenCode Console API Key""#))
-        XCTAssertTrue(source.contains("CredentialInputField("))
+        XCTAssertTrue(source.contains("SettingsLabeledTextField("))
         XCTAssertTrue(source.contains("isSecret: true"))
+        XCTAssertTrue(source.contains("credentialGroupSubtitle"))
     }
 
     func testOpenCodeSubscriptionEndLabelDistinguishesRenewalAndExpiry() {
@@ -393,7 +417,7 @@ final class UsagePresentationPolicyTests: XCTestCase {
         )
 
         XCTAssertTrue(
-            source.contains("Text(metric.label)\n                    .font(.system(size: 12))")
+            source.contains(".font(.system(size: visualStyle.valueLabelSize))")
         )
         XCTAssertFalse(source.contains(".font(.body)"))
         XCTAssertTrue(
@@ -461,8 +485,25 @@ final class UsagePresentationPolicyTests: XCTestCase {
         )
 
         XCTAssertTrue(row.contains("var density: UsageCardDensity = .full"))
-        XCTAssertTrue(popover.contains("density: settings.usageCardDensity"))
+        XCTAssertTrue(popover.contains("density: .compact"))
+        XCTAssertTrue(popover.contains("density: .full"))
+        XCTAssertTrue(popover.contains("density: density"))
         XCTAssertFalse(row.contains("groupMultiplierText(currentGroupMultiplier)"))
+    }
+
+    func test弹窗完整GLM默认收起并在展开后显示补充信息() throws {
+        let row = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("RoutinUsage/Views/UsageRowView.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(row.contains("showsSupplementaryMetrics: isDetailsExpanded"))
+        XCTAssertTrue(row.contains("visualStyle: .popover"))
+        XCTAssertTrue(row.contains("onTapGesture"))
+        XCTAssertTrue(row.contains("chevron.down"))
     }
 
     func test完整卡片保留内边距() throws {
@@ -477,8 +518,8 @@ final class UsagePresentationPolicyTests: XCTestCase {
         let compactStart = try XCTUnwrap(row.range(of: "private func compactCard(now: Date)"))
         let fullBody = row[fullStart.lowerBound..<compactStart.lowerBound]
 
-        XCTAssertTrue(fullBody.contains(".padding(.vertical, 12)"))
-        XCTAssertTrue(fullBody.contains(".padding(.horizontal, 12)"))
+        XCTAssertTrue(fullBody.contains(".padding(.vertical, 10)"))
+        XCTAssertTrue(fullBody.contains(".padding(.horizontal, CompactPopoverMetrics.fullCardHorizontalPadding)"))
     }
 
     func test简洁卡片统一纵向排列指标() throws {
@@ -534,6 +575,120 @@ final class UsagePresentationPolicyTests: XCTestCase {
         )
     }
 
+    func test供应商副标题组合套餐计费币种并去重() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let openCodeConfiguration = KeyConfiguration(
+            id: UUID(),
+            name: "洋2",
+            keySuffix: "8F2A",
+            sortOrder: 0,
+            providerID: .opencode
+        )
+        let openCodeSnapshot = UsageSnapshot(
+            planName: "OpenCode Go Plus",
+            kind: .periodic,
+            fiveHour: nil,
+            weekly: nil,
+            token: nil,
+            allowedModels: [],
+            fetchedAt: now,
+            billingMode: "自动续费"
+        )
+        XCTAssertEqual(
+            UsageRowPresentation.accountDescription(
+                configuration: openCodeConfiguration,
+                snapshot: openCodeSnapshot
+            ),
+            "OpenCode · Go Plus · 自动续费"
+        )
+
+        let deepSeekConfiguration = KeyConfiguration(
+            id: UUID(),
+            name: "亮",
+            keySuffix: "8F2A",
+            sortOrder: 0,
+            providerID: .deepseek
+        )
+        let balance = NormalizedUsageMetric(
+            id: "balance",
+            label: "余额",
+            value: 18.16,
+            unit: .currency,
+            presentation: .balance,
+            semantic: .balance,
+            currencyCode: "CNY",
+            healthState: .normal
+        )
+        let deepSeekSnapshot = UsageSnapshot(
+            planName: "API 余额",
+            kind: .tokenPack,
+            fiveHour: nil,
+            weekly: nil,
+            token: nil,
+            allowedModels: [],
+            fetchedAt: now,
+            metrics: [balance]
+        )
+        XCTAssertEqual(
+            UsageRowPresentation.accountDescription(
+                configuration: deepSeekConfiguration,
+                snapshot: deepSeekSnapshot
+            ),
+            "DeepSeek · API 余额 · CNY"
+        )
+
+        let xiaomiConfiguration = KeyConfiguration(
+            id: UUID(),
+            name: "亮",
+            keySuffix: "8F2A",
+            sortOrder: 0,
+            providerID: .xiaomi,
+            metadata: ["usageKind": "api"]
+        )
+        let xiaomiSnapshot = UsageSnapshot(
+            planName: "按量计费",
+            kind: .tokenPack,
+            fiveHour: nil,
+            weekly: nil,
+            token: nil,
+            allowedModels: [],
+            fetchedAt: now,
+            billingMode: "按量计费",
+            metrics: [balance]
+        )
+        XCTAssertEqual(
+            UsageRowPresentation.accountDescription(
+                configuration: xiaomiConfiguration,
+                snapshot: xiaomiSnapshot
+            ),
+            "小米 MiMo · 按量计费 · CNY"
+        )
+    }
+
+    func testCommandCode完整视图隐藏冗余剩余时长() {
+        let metric = NormalizedUsageMetric(
+            id: "five-hour",
+            label: "5 小时",
+            used: 1,
+            limit: 4,
+            remaining: 3,
+            unit: .currency,
+            windowEnd: Date(timeIntervalSince1970: 1_800_000_000),
+            presentation: .progress,
+            semantic: .usedQuota,
+            currencyCode: "USD"
+        )
+
+        XCTAssertEqual(
+            CommandCodeMetricLayoutPolicy.progressDetailLines(
+                for: metric,
+                now: Date(timeIntervalSince1970: 1_799_999_000),
+                showsRemainingDuration: false
+            ).count,
+            3
+        )
+    }
+
     func test凭证卡片供应商名称恢复官网链接交互() throws {
         let source = try TestSourceReader.read([
             "RoutinUsage", "Views", "UsageRowView.swift"
@@ -557,16 +712,15 @@ final class UsagePresentationPolicyTests: XCTestCase {
         let balanceStart = try XCTUnwrap(source.range(of: "private func compactBalanceCard"))
         let headerStart = try XCTUnwrap(source.range(of: "private func compactHeader"))
         let balanceCard = String(source[balanceStart.lowerBound..<headerStart.lowerBound])
-        XCTAssertTrue(
-            balanceCard.contains(
-                "compactIdentity(showsPlanBelowProvider: true, remainingText: remainingText)"
-            )
-        )
-        XCTAssertFalse(balanceCard.contains("compactIdentity(showsPlanBelowProvider: false)"))
+        XCTAssertTrue(balanceCard.contains("compactHeader()"))
+        XCTAssertTrue(balanceCard.contains("CompactBalanceStrip("))
+        XCTAssertFalse(balanceCard.contains("caption: balanceCaption"))
+        XCTAssertFalse(balanceCard.contains("caption:"))
+        XCTAssertFalse(balanceCard.contains("compactIdentity(showsPlanBelowProvider: true"))
 
         let standardStart = try XCTUnwrap(source.range(of: "private func compactStandardCard"))
         let standardCard = String(source[standardStart.lowerBound..<balanceStart.lowerBound])
-        XCTAssertTrue(standardCard.contains("compactHeader(remainingText: remainingText)"))
+        XCTAssertTrue(standardCard.contains("compactHeader()"))
 
         let headerEnd = try XCTUnwrap(
             source.range(
@@ -575,21 +729,16 @@ final class UsagePresentationPolicyTests: XCTestCase {
             )
         )
         let header = String(source[headerStart.lowerBound..<headerEnd.lowerBound])
-        XCTAssertTrue(
-            header.contains(
-                "compactIdentity(showsPlanBelowProvider: false, remainingText: remainingText)"
-            )
-        )
-        XCTAssertFalse(header.contains("compactIdentity(showsPlanBelowProvider: true)"))
+        XCTAssertTrue(header.contains("compactIdentity()"))
+        XCTAssertFalse(header.contains("remainingText"))
 
         let componentStart = try XCTUnwrap(source.range(of: "private struct ProviderWebsiteLink"))
         let component = String(source[componentStart.lowerBound...])
         XCTAssertTrue(component.contains("Link(destination: destination)"))
-        XCTAssertTrue(component.contains(".fixedSize(horizontal: true, vertical: false)"))
+        XCTAssertTrue(component.contains("Text(subtitle)"))
         XCTAssertTrue(component.contains(".help(\"打开 \\(providerName) 官网\")"))
         XCTAssertTrue(component.contains("Image(systemName: \"arrow.up.right\")"))
-        XCTAssertTrue(component.contains("Capsule().fill"))
-        XCTAssertTrue(component.contains("isHovering ? 0.14 : 0.06"))
+        XCTAssertFalse(component.contains("Capsule()"))
         XCTAssertTrue(component.contains("NSCursor.pointingHand.push()"))
         XCTAssertTrue(component.contains("NSCursor.pop()"))
         XCTAssertTrue(component.contains(".onDisappear"))
@@ -602,11 +751,8 @@ final class UsagePresentationPolicyTests: XCTestCase {
             )
         )
         let subtitle = String(source[subtitleStart.lowerBound..<subtitleEnd.lowerBound])
-        XCTAssertFalse(subtitle.contains("state.snapshot?.planName"))
-        XCTAssertFalse(subtitle.contains("Text(planName)"))
-        XCTAssertFalse(subtitle.contains("Text(\" · \\(planName)\")"))
-        XCTAssertFalse(subtitle.contains("subscriptionDescription"))
-        XCTAssertTrue(subtitle.contains("Text(providerName)"))
+        XCTAssertTrue(subtitle.contains("UsageRowPresentation.accountDescription("))
+        XCTAssertTrue(subtitle.contains("ProviderWebsiteLink("))
     }
 
     func test设置窗口存在时显示Dock图标关闭后恢复菜单栏形态() throws {

@@ -3,9 +3,11 @@ import SwiftUI
 
 struct MenuBarColorRulesEditor: View {
     @Binding var rules: MenuBarColorRules
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var workingThresholds: Thresholds?
     @State private var activeBoundary: MenuBarColorRulesEditorBoundary?
+    @State private var showsResetConfirmation = false
 
     private var displayedThresholds: Thresholds {
         workingThresholds ?? Thresholds(
@@ -15,7 +17,24 @@ struct MenuBarColorRulesEditor: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("颜色阈值")
+                    .font(SettingsTypography.secondary.weight(.medium))
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Button("恢复默认") {
+                    showsResetConfirmation = true
+                }
+                .buttonStyle(SettingsPressFeedbackButtonStyle(pressedScale: 0.98))
+                .font(SettingsTypography.secondary.weight(.medium))
+                .foregroundStyle(.secondary)
+                .disabled(rules == .standard)
+                .accessibilityLabel("恢复默认进度颜色")
+            }
+
             MenuBarThresholdDragGesture(
                 normalColor: rules.normalColor,
                 warningColor: rules.warningColor,
@@ -26,20 +45,20 @@ struct MenuBarColorRulesEditor: View {
                 commit: commitThresholds
             )
 
-            HStack(spacing: 10) {
-                ColorSwatchButton(
+            HStack(spacing: 8) {
+                colorLevelControl(
                     title: "正常",
-                    range: "0-\(displayedThresholds.warning)%",
+                    range: "0–\(displayedThresholds.warning)%",
                     components: binding(for: \.normalColor)
                 )
-                ColorSwatchButton(
+                colorLevelControl(
                     title: "提醒",
-                    range: "\(displayedThresholds.warning)-\(displayedThresholds.critical)%",
+                    range: "\(displayedThresholds.warning)–\(displayedThresholds.critical)%",
                     components: binding(for: \.warningColor)
                 )
-                ColorSwatchButton(
+                colorLevelControl(
                     title: "紧急",
-                    range: "\(displayedThresholds.critical)-100%",
+                    range: "\(displayedThresholds.critical)–100%",
                     components: binding(for: \.criticalColor)
                 )
             }
@@ -49,6 +68,54 @@ struct MenuBarColorRulesEditor: View {
             workingThresholds = nil
             activeBoundary = nil
         }
+        .confirmationDialog(
+            "恢复默认进度颜色？",
+            isPresented: $showsResetConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("恢复默认", role: .destructive, action: resetToDefaults)
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("将同时重置两个阈值和正常、提醒、紧急三种颜色。")
+        }
+    }
+
+    private func colorLevelControl(
+        title: String,
+        range: String,
+        components: Binding<MenuBarColorComponents>
+    ) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+
+        return HStack(spacing: 8) {
+            ColorWellButton(title: title, components: components)
+                .frame(width: 26, height: 26)
+            .accessibilityLabel("\(title)颜色")
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                Text(range)
+                    .font(.system(size: 10, design: .monospaced))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            shape.fill(SettingsDesign.fieldFill(colorScheme))
+        }
+        .overlay {
+            shape.strokeBorder(
+                SettingsDesign.fieldBorder(colorScheme),
+                lineWidth: 0.8
+            )
+        }
+        .accessibilityElement(children: .contain)
     }
 
     static func activeBoundary(
@@ -142,6 +209,18 @@ struct MenuBarColorRulesEditor: View {
         activeBoundary = nil
     }
 
+    private func resetToDefaults() {
+        withAnimation(
+            reduceMotion
+                ? nil
+                : .spring(response: 0.3, dampingFraction: 0.9)
+        ) {
+            rules = .standard
+        }
+        workingThresholds = nil
+        activeBoundary = nil
+    }
+
     struct Thresholds: Equatable {
         var warning: Int
         var critical: Int
@@ -153,6 +232,57 @@ enum MenuBarColorRulesEditorBoundary {
     case critical
 }
 
+private struct ColorWellButton: View {
+    let title: String
+    @Binding var components: MenuBarColorComponents
+    @State private var panelLauncher = MenuBarColorPanelLauncher()
+
+    var body: some View {
+        Button {
+            panelLauncher.onChange = { color in
+                components = color
+            }
+            panelLauncher.present(components)
+        } label: {
+            Circle()
+                .fill(Color(nsColor: components.nsColor))
+                .overlay {
+                    Circle()
+                        .strokeBorder(.white.opacity(0.48), lineWidth: 1)
+                }
+                .shadow(color: .black.opacity(0.14), radius: 2, y: 1)
+                .contentShape(Circle())
+        }
+        .buttonStyle(SettingsPressFeedbackButtonStyle(pressedScale: 0.92))
+        .help("选择\(title)颜色")
+        .accessibilityLabel("选择\(title)颜色")
+    }
+}
+
+private final class MenuBarColorPanelLauncher: NSObject {
+    var onChange: ((MenuBarColorComponents) -> Void)?
+
+    func present(_ color: MenuBarColorComponents) {
+        let panel = NSColorPanel.shared
+        panel.showsAlpha = false
+        panel.setTarget(self)
+        panel.setAction(#selector(colorDidChange(_:)))
+        panel.color = color.nsColor
+        panel.makeKeyAndOrderFront(nil)
+    }
+
+    @objc private func colorDidChange(_ sender: NSColorPanel) {
+        guard let rgb = sender.color.usingColorSpace(.sRGB) else { return }
+        onChange?(
+            MenuBarColorComponents(
+                red: Double(rgb.redComponent),
+                green: Double(rgb.greenComponent),
+                blue: Double(rgb.blueComponent)
+            )
+        )
+    }
+}
+
 private struct MenuBarThresholdDragGesture: View {
     let normalColor: MenuBarColorComponents
     let warningColor: MenuBarColorComponents
@@ -161,6 +291,7 @@ private struct MenuBarThresholdDragGesture: View {
     @Binding var activeBoundary: MenuBarColorRulesEditorBoundary?
     let update: (Double, MenuBarColorRulesEditorBoundary) -> Void
     let commit: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -207,13 +338,12 @@ private struct MenuBarThresholdDragGesture: View {
                         isActive: activeBoundary == .critical
                     )
                 }
-                .frame(height: 26)
+                .frame(height: 20)
                 .clipShape(Capsule())
                 .overlay {
-                    Capsule().strokeBorder(.white.opacity(0.22), lineWidth: 0.8)
+                    Capsule()
+                        .strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.8)
                 }
-                .padding(.vertical, 3)
-                .liquidGlassInteractiveControl(cornerRadius: 16)
                 .contentShape(Rectangle())
                 .gesture(
                     DragGesture(minimumDistance: 0)
@@ -239,7 +369,7 @@ private struct MenuBarThresholdDragGesture: View {
                         }
                 )
             }
-            .frame(height: 32)
+            .frame(height: 30)
 
             GeometryReader { geometry in
                 let labelWidth = CGFloat(geometry.size.width)
@@ -248,7 +378,7 @@ private struct MenuBarThresholdDragGesture: View {
                 let criticalX = labelWidth * CGFloat(thresholds.critical) / 100
                 ZStack {
                     thresholdLabel("0%", value: 0)
-                        .position(x: 0, y: labelHeight / 2)
+                        .position(x: 16, y: labelHeight / 2)
                     thresholdLabel("\(thresholds.warning)%", value: thresholds.warning)
                         .position(
                             x: warningX,
@@ -260,7 +390,7 @@ private struct MenuBarThresholdDragGesture: View {
                             y: labelHeight / 2
                         )
                     thresholdLabel("100%", value: 100)
-                        .position(x: labelWidth, y: labelHeight / 2)
+                        .position(x: labelWidth - 16, y: labelHeight / 2)
                 }
             }
             .frame(height: 15)
@@ -299,20 +429,29 @@ private struct MenuBarThresholdDragGesture: View {
     }
 
     private func boundaryHandle(x: CGFloat, isActive: Bool) -> some View {
-        Capsule()
-            .fill(.white.opacity(isActive ? 0.24 : 0.14))
+        Circle()
+            .fill(.white)
             .overlay {
-                Capsule()
+                Circle()
                     .strokeBorder(
-                        isActive ? Color.accentColor : .white.opacity(0.48),
+                        isActive
+                            ? Color.accentColor
+                            : Color.black.opacity(0.12),
                         lineWidth: isActive ? 2 : 1
                     )
             }
-            .frame(width: isActive ? 16 : 12, height: isActive ? 30 : 26)
-            .shadow(color: .black.opacity(isActive ? 0.18 : 0.10), radius: isActive ? 6 : 3, y: 2)
-            .liquidGlassInteractiveControl(cornerRadius: isActive ? 8 : 6)
-            .scaleEffect(isActive ? 1.04 : 1)
-            .offset(x: x - (isActive ? 8 : 6))
+            .frame(width: 18, height: 18)
+            .shadow(
+                color: .black.opacity(isActive ? 0.22 : 0.14),
+                radius: isActive ? 6 : 3,
+                y: 1
+            )
+            .scaleEffect(isActive ? 1.16 : 1)
+            .animation(
+                reduceMotion ? nil : .easeOut(duration: 0.12),
+                value: isActive
+            )
+            .offset(x: x - 9)
             .allowsHitTesting(false)
     }
 
@@ -340,161 +479,5 @@ private struct MenuBarThresholdDragGesture: View {
 
         guard updated.warning < updated.critical else { return }
         update(ratio, boundary)
-    }
-}
-
-private struct ColorSwatchButton: View {
-    let title: String
-    let range: String
-    @Binding var components: MenuBarColorComponents
-    @State private var showsChoices = false
-
-    var body: some View {
-        Button {
-            showsChoices = true
-        } label: {
-            HStack(spacing: 9) {
-                Circle()
-                    .fill(Color(nsColor: components.nsColor))
-                    .frame(width: 15, height: 15)
-                    .overlay {
-                        Circle().strokeBorder(.white.opacity(0.36), lineWidth: 0.8)
-                    }
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
-                        .font(.callout.weight(.medium))
-                        .foregroundStyle(.primary)
-                    Text(range)
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer(minLength: 0)
-
-                Image(systemName: "paintpalette")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 11)
-            .padding(.vertical, 7)
-            .background(.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(.primary.opacity(0.07), lineWidth: 0.6)
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(title)颜色")
-        .accessibilityValue(range)
-        .popover(
-            isPresented: $showsChoices,
-            attachmentAnchor: .point(.bottom),
-            arrowEdge: .bottom
-        ) {
-            ColorChoicePopover(title: title, selection: $components)
-        }
-    }
-}
-
-private struct ColorChoicePopover: View {
-    let title: String
-    @Binding var selection: MenuBarColorComponents
-    @Environment(\.dismiss) private var dismiss
-    @State private var panelLauncher = ColorPanelLauncher()
-
-    private var recommendations: [MenuBarColorComponents] {
-        switch title {
-        case "正常":
-            return [
-                .init(red: 0.20, green: 0.78, blue: 0.35),
-                .init(red: 0.08, green: 0.72, blue: 0.58),
-                .init(red: 0.12, green: 0.52, blue: 0.94),
-                .init(red: 0.34, green: 0.36, blue: 0.88),
-                .init(red: 0.56, green: 0.28, blue: 0.84)
-            ]
-        case "提醒":
-            return [
-                .init(red: 1.00, green: 0.78, blue: 0.12),
-                .init(red: 1.00, green: 0.62, blue: 0.04),
-                .init(red: 0.97, green: 0.47, blue: 0.16),
-                .init(red: 0.95, green: 0.36, blue: 0.34),
-                .init(red: 0.94, green: 0.33, blue: 0.58)
-            ]
-        default:
-            return [
-                .init(red: 1.00, green: 0.42, blue: 0.28),
-                .init(red: 0.97, green: 0.33, blue: 0.28),
-                .init(red: 0.90, green: 0.18, blue: 0.24),
-                .init(red: 0.82, green: 0.10, blue: 0.32),
-                .init(red: 0.58, green: 0.12, blue: 0.30)
-            ]
-        }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            Text("\(title)颜色")
-                .font(.headline)
-
-            HStack(spacing: 8) {
-                ForEach(Array(recommendations.enumerated()), id: \.offset) { index, color in
-                    Button {
-                        selection = color
-                        dismiss()
-                    } label: {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color(nsColor: color.nsColor))
-                            .frame(width: 31, height: 28)
-                            .overlay {
-                                if color == selection {
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .strokeBorder(.primary.opacity(0.62), lineWidth: 2)
-                                }
-                            }
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("\(title)推荐颜色 \(index + 1)")
-                }
-            }
-
-            Divider()
-
-            Button {
-                panelLauncher.onChange = { color in
-                    selection = color
-                }
-                panelLauncher.present(selection)
-            } label: {
-                Label("自定义色盘", systemImage: "drop.halved")
-            }
-            .liquidGlassButton()
-        }
-        .padding(15)
-        .frame(width: 238)
-    }
-}
-
-private final class ColorPanelLauncher: NSObject {
-    var onChange: ((MenuBarColorComponents) -> Void)?
-
-    func present(_ color: MenuBarColorComponents) {
-        let panel = NSColorPanel.shared
-        panel.showsAlpha = false
-        panel.setTarget(self)
-        panel.setAction(#selector(colorDidChange(_:)))
-        panel.color = color.nsColor
-        panel.makeKeyAndOrderFront(nil)
-    }
-
-    @objc private func colorDidChange(_ sender: NSColorPanel) {
-        guard let rgb = sender.color.usingColorSpace(.sRGB) else { return }
-        onChange?(
-            MenuBarColorComponents(
-                red: Double(rgb.redComponent),
-                green: Double(rgb.greenComponent),
-                blue: Double(rgb.blueComponent)
-            )
-        )
     }
 }

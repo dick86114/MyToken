@@ -72,7 +72,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(controller.contains("environment.presentCurrentVersionDetails"))
     }
 
-    func test菜单栏弹窗顶部使用左版本中彩色透明Logo右刷新布局() throws {
+    func test菜单栏弹窗顶部使用左侧品牌更新提示与右侧操作布局() throws {
         let popover = try sourceText(at: "RoutinUsage/Views/UsagePopoverView.swift")
         let app = try sourceText(at: "RoutinUsage/App/RoutinUsageApp.swift")
         let projectRoot = URL(fileURLWithPath: #filePath)
@@ -97,7 +97,7 @@ final class ProjectBootstrapTests: XCTestCase {
             )
         )
         let logoSource = String(popover[logoStart.lowerBound..<logoEnd.lowerBound])
-        XCTAssertTrue(logoSource.contains("frame(width: 36, height: 36)"))
+        XCTAssertTrue(logoSource.contains("frame(width: 25, height: 25)"))
         XCTAssertFalse(logoSource.contains("frame(width: 28, height: 28)"))
         XCTAssertFalse(logoSource.contains("clipShape"))
         XCTAssertFalse(logoSource.contains("logoBacking"))
@@ -145,9 +145,11 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertGreaterThan((darkCenter.redComponent + darkCenter.greenComponent + darkCenter.blueComponent) / 3, 0.75)
 
         XCTAssertFalse(popover.contains(".shadow(color: Color.black.opacity(0.25)"))
-        XCTAssertTrue(popover.contains("repeatForever"))
         XCTAssertTrue(popover.contains("打开 MyToken 官网"))
-        XCTAssertTrue(popover.contains(".overlay(alignment: .center)"))
+        XCTAssertFalse(popover.contains(".overlay(alignment: .center)"))
+        XCTAssertTrue(popover.contains("versionOrUpdateControl"))
+        XCTAssertTrue(popover.contains("新版本"))
+        XCTAssertTrue(popover.contains("arrow.up.circle.fill"))
         XCTAssertTrue(popover.contains("arrow.triangle.2.circlepath"))
         XCTAssertTrue(popover.contains("arrow.clockwise"))
         XCTAssertTrue(popover.contains("showRefreshSuccess"))
@@ -475,7 +477,9 @@ final class ProjectBootstrapTests: XCTestCase {
 
         XCTAssertTrue(source.contains("private var settingsWindow: NSWindow?"))
         XCTAssertTrue(source.contains("styleMask: [.titled, .closable, .miniaturizable, .resizable]"))
-        XCTAssertTrue(source.contains("window.styleMask.remove(.fullSizeContentView)"))
+        XCTAssertTrue(source.contains("window.styleMask.insert(.fullSizeContentView)"))
+        XCTAssertTrue(source.contains("window.titlebarAppearsTransparent = true"))
+        XCTAssertTrue(source.contains("window.titleVisibility = .hidden"))
         XCTAssertTrue(source.contains("WindowFramePersistence.loadSize()"))
         XCTAssertTrue(source.contains("window.minSize = WindowFramePersistence.minimumSize"))
     }
@@ -565,7 +569,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(popover.contains(".liquidGlassWindowBackground()"))
     }
 
-    func test设置页使用原生侧栏并避免嵌套玻璃容器() throws {
+    func test设置页使用品牌化分组侧栏并避免嵌套玻璃容器() throws {
         let settings = try sourceText(at: "RoutinUsage/Views/Settings/SettingsWindowView.swift")
         let credentials = try sourceText(at: "RoutinUsage/Views/Settings/CredentialManagementView.swift")
 
@@ -573,8 +577,10 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(settings.contains("NavigationSplitView"))
         XCTAssertTrue(settings.contains("SettingsSection"))
         XCTAssertTrue(settings.contains(".liquidGlassWindowBackground()"))
-        XCTAssertTrue(settings.contains("List(SettingsSection.allCases"))
+        XCTAssertTrue(settings.contains("SettingsSidebar(selection:"))
+        XCTAssertFalse(settings.contains("List(SettingsSection.allCases"))
         XCTAssertFalse(settings.contains(".liquidGlassSurface(cornerRadius:"))
+        XCTAssertTrue(credentials.contains("SettingsPageScroll"))
         XCTAssertTrue(credentials.contains("CredentialCompactRow("))
         XCTAssertFalse(credentials.contains("UsageRowView("))
         XCTAssertFalse(credentials.contains("LazyVGrid"))
@@ -627,7 +633,7 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertFalse(usageRowView.contains("details.append(UsageFormatter.groupMultiplierText"))
     }
 
-    func test弹窗将分组倍率置于百分比下方并右对齐() throws {
+    func test完整模式标题区显示套餐与周期() throws {
         let usageRowView = try sourceText(at: "RoutinUsage/Views/UsageRowView.swift")
 
         let headerStart = try XCTUnwrap(
@@ -636,9 +642,13 @@ final class ProjectBootstrapTests: XCTestCase {
         let progressStart = try XCTUnwrap(usageRowView.range(of: "UsageMetricProgressBar"))
         let header = usageRowView[headerStart.lowerBound..<progressStart.lowerBound]
 
-        XCTAssertTrue(header.contains("VStack(alignment: .trailing"))
+        XCTAssertTrue(header.contains("avatarSize: CompactPopoverMetrics.fullAvatarSize"))
+        XCTAssertTrue(header.contains("compactActionButtons"))
+        XCTAssertTrue(usageRowView.contains("fullCycleNote(now: now)"))
         XCTAssertFalse(header.contains("groupMultiplierText(currentGroupMultiplier)"))
-        XCTAssertTrue(header.contains("Spacer(minLength: 8)"))
+        XCTAssertTrue(usageRowView.contains("snapshot.subscriptionStartAt"))
+        XCTAssertTrue(usageRowView.contains("snapshot.subscriptionEndAt"))
+        XCTAssertTrue(usageRowView.contains("snapshot.planName"))
         XCTAssertFalse(usageRowView.contains("HStack {\n                    Spacer()\n                    Text(UsageFormatter.groupMultiplierText(groupMultipliers))"))
     }
 
@@ -790,7 +800,7 @@ final class ProjectBootstrapTests: XCTestCase {
         let updateNotes = try sourceText(at: "RoutinUsage/Views/UpdateNotesView.swift")
 
         XCTAssertTrue(settings.contains("当前版本"))
-        XCTAssertTrue(settings.contains("UpdateNotesView(notes: update.notes)"))
+        XCTAssertTrue(settings.contains("UpdateNotesView(notes: update.notes, style: .reading)"))
         XCTAssertFalse(updateNotes.contains(".lineLimit("))
     }
 

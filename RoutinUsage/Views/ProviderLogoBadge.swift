@@ -6,20 +6,31 @@ struct ProviderLogoBadge: View {
     let providerID: ProviderID
     let size: CGFloat
     var cornerRadius: CGFloat = 8
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Image(nsImage: NSImage(named: providerID.logoAssetName) ?? NSApp.applicationIconImage)
             .resizable()
             .interpolation(.high)
-            .scaledToFill()
+            .scaledToFit()
+            .padding(size * 0.12)
             .frame(width: size, height: size)
-            .background(Color.white)
+            .background(
+                colorScheme == .dark
+                    ? Color.white.opacity(0.92)
+                    : Color.white
+            )
             .clipShape(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(Color.black.opacity(0.12), lineWidth: 0.5)
+                    .strokeBorder(
+                        colorScheme == .dark
+                            ? Color.white.opacity(0.24)
+                            : Color.black.opacity(0.10),
+                        lineWidth: 0.5
+                    )
             }
             .accessibilityHidden(true)
     }

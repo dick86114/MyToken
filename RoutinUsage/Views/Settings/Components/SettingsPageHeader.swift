@@ -6,17 +6,23 @@ struct SettingsPageHeader: View {
     var trailing: AnyView? = nil
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(alignment: .center, spacing: 18) {
+            VStack(alignment: .leading, spacing: 5) {
                 Text(title)
-                    .font(.title2.weight(.semibold))
+                    .font(SettingsTypography.pageTitle)
+                    .tracking(-0.35)
+                    .accessibilityAddTraits(.isHeader)
+
                 Text(subtitle)
-                    .font(.subheadline)
+                    .font(SettingsTypography.body)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+
             Spacer(minLength: 12)
+
             trailing
         }
-        .padding(.bottom, 18)
+        .padding(.bottom, 6)
     }
 }

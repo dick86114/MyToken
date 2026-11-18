@@ -14,10 +14,10 @@ enum CompactUsageCardPresentation {
             return .balance
         }
         let allProgress = !metrics.isEmpty && metrics.allSatisfy { $0.presentation == .progress }
-        if allProgress, metrics.count <= 2 {
+        if allProgress, metrics.count == 1 {
             return .horizontalGauges
         }
-        if allProgress, metrics.count == 3 {
+        if allProgress, metrics.count <= 3 {
             return .verticalGauges
         }
         return .valueTiles
@@ -79,13 +79,73 @@ enum CompactUsageCardPresentation {
             return percent <= 0 ? "待命中" : "--"
         }
 
+        let interval = windowEnd.timeIntervalSince(now)
+        guard interval > 0 else {
+            return "等待刷新"
+        }
+
+        let totalMinutes = max(1, Int(interval / 60))
+        if totalMinutes < 60 {
+            return "\(totalMinutes) 分后重置"
+        }
+
+        let totalHours = totalMinutes / 60
+        if totalHours < 24 {
+            let minutes = totalMinutes % 60
+            return minutes == 0
+                ? "\(totalHours) 小时后重置"
+                : "\(totalHours) 小时 \(minutes) 分后重置"
+        }
+
+        let days = totalHours / 24
+        if days < 7 {
+            let hours = totalHours % 24
+            return hours == 0
+                ? "\(days) 天后重置"
+                : "\(days) 天 \(hours) 小时后重置"
+        }
+        return "\(UsageFormatter.resetTime(windowEnd, now: now, timeZone: timeZone)) 后重置"
+    }
+
+    static func singleMetricSubtitle(
+        for metric: NormalizedUsageMetric,
+        now: Date,
+        timeZone: TimeZone = .current
+    ) -> String {
+        guard metric.presentation == .progress else {
+            return subtitle(for: metric, now: now, timeZone: timeZone)
+        }
+
+        let remainingText = compactRemainingText(for: metric)
+        guard let remainingText else {
+            return subtitle(for: metric, now: now, timeZone: timeZone)
+        }
+
+        guard let windowEnd = metric.windowEnd else {
+            return "剩余 \(remainingText)"
+        }
+
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
-        let reset = UsageFormatter.resetTime(windowEnd, now: now, timeZone: timeZone)
-        if calendar.isDate(windowEnd, inSameDayAs: now) {
-            return "重置 \(reset)"
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = calendar.isDate(windowEnd, inSameDayAs: now)
+            ? "今天"
+            : "MM/dd"
+        return "剩余 \(remainingText) · \(formatter.string(from: windowEnd)) 到期"
+    }
+
+    private static func compactRemainingText(for metric: NormalizedUsageMetric) -> String? {
+        guard let remaining = metric.remaining else { return nil }
+        switch metric.unit {
+        case .currency:
+            return UsageFormatter.currencyText(remaining, currencyCode: metric.currencyCode)
+        case .token:
+            return UsageFormatter.compactMetricValue(remaining)
+        case .request, .boolean, .text:
+            return UsageFormatter.numberText(remaining, grouping: true)
         }
-        return reset
     }
 
     static func gaugeTone(
@@ -117,11 +177,47 @@ enum UsageResetCardPresentation {
     }
 
     static func detailText(cards: [UsageResetCard]) -> String {
-        "\(cards.count) 张重置卡"
+        guard let earliest = cards.map(\.expiresAt).min() else {
+            return "\(cards.count) 张重置卡"
+        }
+        return "\(cards.count) 张 · 最早 \(earliestExpiryText(earliest, now: .now))"
+    }
+
+    static func detailText(
+        cards: [UsageResetCard],
+        now: Date,
+        timeZone: TimeZone = .current
+    ) -> String {
+        guard let earliest = cards.map(\.expiresAt).min() else {
+            return "\(cards.count) 张重置卡"
+        }
+        return "\(cards.count) 张 · 最早 \(earliestExpiryText(earliest, now: now, timeZone: timeZone))"
     }
 
     static func accessibilityText(cards: [UsageResetCard]) -> String {
-        detailText(cards: cards)
+        guard let earliest = cards.map(\.expiresAt).min() else {
+            return "\(cards.count) 张重置卡"
+        }
+        return "\(cards.count) 张重置卡，最早 \(UsageFormatter.fullDateTime(earliest))"
+    }
+
+    static func earliestExpiryText(
+        _ date: Date,
+        now: Date,
+        timeZone: TimeZone = .current
+    ) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.timeZone = timeZone
+        if calendar.isDate(date, inSameDayAs: now) {
+            formatter.dateFormat = "今天 HH:mm"
+        } else {
+            formatter.dateFormat = "MM/dd HH:mm"
+        }
+        return formatter.string(from: date)
     }
 }
 

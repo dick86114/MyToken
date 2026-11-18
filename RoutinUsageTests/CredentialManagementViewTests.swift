@@ -20,7 +20,7 @@ final class CredentialManagementViewTests: XCTestCase {
         XCTAssertTrue(source.contains("model: presentation.model"))
     }
 
-    func test编辑添加和详情弹窗统一使用液态玻璃焦外关闭() throws {
+    func test编辑弹窗保护未保存内容且其他弹窗仍支持焦外关闭() throws {
         let source = try TestSourceReader.read([
             "RoutinUsage", "Views", "Settings", "CredentialManagementView.swift"
         ])
@@ -28,22 +28,51 @@ final class CredentialManagementViewTests: XCTestCase {
             "RoutinUsage", "Views", "LiquidGlassSurface.swift"
         ])
 
-        XCTAssertTrue(source.contains(".liquidGlassOverlay(item: $editor)"))
+        XCTAssertTrue(source.contains(".liquidGlassOverlay("))
+        XCTAssertTrue(source.contains("item: $editor"))
+        XCTAssertTrue(source.contains("dismissOnBackgroundTap: false"))
+        XCTAssertTrue(source.contains("dismissOnEscape: false"))
         XCTAssertTrue(source.contains(".liquidGlassOverlay(item: $detailsState)"))
         XCTAssertFalse(source.contains(".sheet(item: $editor)"))
         XCTAssertFalse(source.contains(".sheet(item: $alertSettingsPresentation)"))
         XCTAssertTrue(surface.contains("LiquidGlassOverlay"))
-        XCTAssertTrue(surface.contains("onTapGesture(perform: onDismiss)"))
+        XCTAssertTrue(surface.contains("onTapGesture {"))
+        XCTAssertTrue(surface.contains("dismissOnBackgroundTap"))
         XCTAssertTrue(surface.contains(".liquidGlassModalSurface()"))
     }
 
-    func test凭证编辑器弹窗高度贴合内容() throws {
+    func test凭证编辑器弹窗在固定宽度内滚动适配内容() throws {
         let source = try TestSourceReader.read([
             "RoutinUsage", "Views", "CredentialEditorView.swift"
         ])
 
         XCTAssertTrue(source.contains(".frame(width: 680)"))
-        XCTAssertTrue(source.contains(".fixedSize(horizontal: false, vertical: true)"))
+        XCTAssertTrue(source.contains("ScrollView(.vertical, showsIndicators: false)"))
+        XCTAssertTrue(source.contains(".frame(minHeight: 460, idealHeight: 560, maxHeight: 720)"))
+    }
+
+    func test凭证编辑器提供字段级校验和未保存关闭确认() throws {
+        let source = try TestSourceReader.read([
+            "RoutinUsage", "Views", "CredentialEditorView.swift"
+        ])
+
+        XCTAssertTrue(source.contains("private var fieldErrors"))
+        XCTAssertTrue(source.contains("hasAttemptedSubmit = true"))
+        XCTAssertTrue(source.contains("requestedScrollField = firstError"))
+        XCTAssertTrue(source.contains("errorText: fieldErrors[.name]"))
+        XCTAssertTrue(source.contains("放弃未保存的修改"))
+        XCTAssertTrue(source.contains("继续编辑"))
+        XCTAssertTrue(source.contains("if isDirty"))
+    }
+
+    func test凭证空状态提供添加或清除筛选动作() throws {
+        let source = try TestSourceReader.read([
+            "RoutinUsage", "Views", "Settings", "CredentialManagementView.swift"
+        ])
+
+        XCTAssertTrue(source.contains("Button(\"清除筛选\")"))
+        XCTAssertTrue(source.contains("Button(\"添加凭证\")"))
+        XCTAssertTrue(source.contains("添加第一个凭证"))
     }
 
     func test过滤状态供应商和搜索组合只保留匹配凭证() throws {
@@ -438,9 +467,6 @@ final class CredentialManagementViewTests: XCTestCase {
         let rowSource = try TestSourceReader.read([
             "RoutinUsage", "Views", "Settings", "Components", "CredentialCompactRow.swift"
         ])
-        let chipsSource = try TestSourceReader.read([
-            "RoutinUsage", "Views", "Settings", "Components", "ProviderFilterChips.swift"
-        ])
         let usageRowSource = try TestSourceReader.read([
             "RoutinUsage", "Views", "UsageRowView.swift"
         ])
@@ -456,7 +482,11 @@ final class CredentialManagementViewTests: XCTestCase {
         XCTAssertFalse(modelSource.contains("需要处理"))
         XCTAssertTrue(source.contains("summaryStrip"))
         XCTAssertTrue(source.contains("expandedProviderIDs"))
-        XCTAssertTrue(source.contains("ProviderFilterChips("))
+        XCTAssertTrue(source.contains("filterMenu"))
+        XCTAssertTrue(source.contains("Picker(\"状态\""))
+        XCTAssertTrue(source.contains("Picker(\"供应商\""))
+        XCTAssertTrue(source.contains("清除筛选"))
+        XCTAssertFalse(source.contains("ProviderFilterChips("))
         XCTAssertTrue(source.contains("CredentialCompactRow("))
         XCTAssertFalse(source.contains("LazyVGrid"))
         XCTAssertFalse(source.contains("UsageRowView("))
@@ -464,7 +494,7 @@ final class CredentialManagementViewTests: XCTestCase {
         XCTAssertTrue(source.contains(".liquidGlassOverlay(item: $detailsState)"))
         XCTAssertTrue(source.contains("closeDetails()"))
         XCTAssertTrue(source.contains("CredentialDetailsView(state: state, onClose: closeDetails)"))
-        XCTAssertTrue(source.contains(".frame(width: 640)"))
+        XCTAssertTrue(source.contains(".frame(width: 680)"))
         XCTAssertTrue(source.contains(".frame(minHeight: 500, maxHeight: 720)"))
         XCTAssertTrue(source.contains("accessibilitySummary("))
         XCTAssertTrue(usageRowSource.contains(".saturation(state.configuration.isEnabled ? 1 : 0)"))
@@ -473,10 +503,9 @@ final class CredentialManagementViewTests: XCTestCase {
         XCTAssertTrue(rowSource.contains("attentionMetric"))
         XCTAssertTrue(rowSource.contains("attentionProgressBar"))
         XCTAssertTrue(rowSource.contains("accessibilityLabel"))
-        XCTAssertTrue(chipsSource.contains("ScrollView(.horizontal"))
-        XCTAssertTrue(chipsSource.contains("ProviderLogoMark("))
-        XCTAssertTrue(chipsSource.contains("counts[provider.id, default: 0]"))
-        XCTAssertTrue(chipsSource.contains("accessibilityAddTraits(isSelected ? [.isSelected] : [])"))
+        XCTAssertTrue(rowSource.contains("chevron.right"))
+        XCTAssertTrue(source.contains("credentialHierarchyRail"))
+        XCTAssertTrue(source.contains(".padding(.leading, 20)"))
     }
 }
 

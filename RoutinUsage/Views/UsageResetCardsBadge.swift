@@ -8,6 +8,7 @@ struct UsageResetCardsBadge: View {
 
     let resetCards: [UsageResetCard]
     var style: Style = .compact
+    var now: Date = .now
 
     @State private var isPresented = false
     @Environment(\.colorScheme) private var colorScheme
@@ -18,27 +19,35 @@ struct UsageResetCardsBadge: View {
                 .font(.system(size: 8, weight: .semibold))
                 .foregroundStyle(CompactPopoverPalette.brand(colorScheme))
             if style == .detail {
-                Text(UsageResetCardPresentation.detailText(cards: resetCards))
+                Text(UsageResetCardPresentation.detailText(cards: resetCards, now: now))
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(Color.secondary)
+                    .foregroundStyle(CompactPopoverPalette.brand(colorScheme))
                     .monospacedDigit()
             } else {
                 Text(UsageResetCardPresentation.badgeText(cards: resetCards))
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Color.primary.opacity(0.78))
+                    .foregroundStyle(CompactPopoverPalette.brand(colorScheme))
                     .monospacedDigit()
             }
         }
-        .padding(.horizontal, style == .detail ? 5 : 4)
-        .padding(.vertical, 2)
+        .padding(.horizontal, style == .detail ? 6 : 5)
+        .padding(.vertical, 2.5)
         .background {
             Capsule()
-                .fill(CompactPopoverPalette.chipFill(hovered: isPresented, colorScheme))
+                .fill(
+                    CompactPopoverPalette.brand(colorScheme)
+                        .opacity(isPresented ? 0.15 : 0.09)
+                )
         }
         .overlay {
             Capsule()
-                .strokeBorder(Color.primary.opacity(isPresented ? 0.12 : 0.06), lineWidth: 1)
+                .strokeBorder(
+                    CompactPopoverPalette.brand(colorScheme)
+                        .opacity(isPresented ? 0.24 : 0.13),
+                    lineWidth: 1
+                )
         }
+        .fixedSize(horizontal: true, vertical: false)
         .contentShape(Capsule())
         .onHover { isPresented = $0 }
         .popover(isPresented: $isPresented, arrowEdge: .top) {

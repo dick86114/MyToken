@@ -14,60 +14,6 @@ private extension Color {
     }
 }
 
-struct UsageShareChrome {
-    let windowFill: Color
-    let titleBar: Color
-    let previewPane: Color
-    let editorPane: Color
-    let divider: Color
-    let fieldFill: Color
-    let inputFill: Color
-    let inputBorder: Color
-    let textPrimary: Color
-    let textSecondary: Color
-    let textTertiary: Color
-    let amber: Color
-    let amberSoft: Color
-    let blue: Color
-
-    static func make(_ scheme: ColorScheme) -> UsageShareChrome {
-        if scheme == .dark {
-            return UsageShareChrome(
-                windowFill: Color(rgb: 0x161922),
-                titleBar: Color(rgb: 0x1B1F2B),
-                previewPane: Color(rgb: 0x10121A),
-                editorPane: Color(rgb: 0x181B25),
-                divider: Color.white.opacity(0.08),
-                fieldFill: Color(rgb: 0x11131B),
-                inputFill: Color(rgb: 0x10121A),
-                inputBorder: Color.white.opacity(0.10),
-                textPrimary: Color.white,
-                textSecondary: Color(rgb: 0x94A3B8),
-                textTertiary: Color(rgb: 0x64748B),
-                amber: Color(rgb: 0xFBBF24),
-                amberSoft: Color(rgb: 0xFCD34D),
-                blue: Color(rgb: 0x3B82F6)
-            )
-        }
-        return UsageShareChrome(
-            windowFill: Color(rgb: 0xF4F6FA),
-            titleBar: Color(rgb: 0xECEFF5),
-            previewPane: Color(rgb: 0xF3F5F8),
-            editorPane: Color.white,
-            divider: Color.black.opacity(0.08),
-            fieldFill: Color(rgb: 0xF4F6FA),
-            inputFill: Color.white,
-            inputBorder: Color.black.opacity(0.10),
-            textPrimary: Color(rgb: 0x1B1F2B),
-            textSecondary: Color(rgb: 0x5B6575),
-            textTertiary: Color(rgb: 0x8B95A5),
-            amber: Color(rgb: 0xB45309),
-            amberSoft: Color(rgb: 0xD97706),
-            blue: Color(rgb: 0x2563EB)
-        )
-    }
-}
-
 struct UsageShareCardView: View {
     let card: UsageShareRenderedCard
 

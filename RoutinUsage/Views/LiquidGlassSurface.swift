@@ -6,40 +6,55 @@ private struct LiquidGlassSurfaceModifier: ViewModifier {
     let cornerRadius: CGFloat
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     @ViewBuilder
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         let material = PopoverVisualPolicy.material(for: role)
 
-        switch material {
-        case .solid:
+        if reduceTransparency {
             content
-                .background(shape.fill(CompactPopoverPalette.surface(role, colorScheme)))
-                .overlay {
-                    shape
-                        .strokeBorder(CompactPopoverPalette.cardStroke(colorScheme), lineWidth: 1)
-                        .allowsHitTesting(false)
+                .background {
+                    shape.fill(CompactPopoverPalette.surface(role, colorScheme))
                 }
-        case .windowGlass, .modalGlass:
-            if #available(macOS 26.0, *) {
-                content
-                    .glassEffect(
-                        .regular.tint(CompactPopoverPalette.surface(role, colorScheme)),
-                        in: shape
+                .overlay {
+                    shape.strokeBorder(
+                        CompactPopoverPalette.cardStroke(colorScheme),
+                        lineWidth: 1
                     )
-                    .overlay {
-                        shape.stroke(Color.white.opacity(0.34), lineWidth: 0.8)
-                    }
-                    .modifier(PopoverShadowModifier(role: role))
-            } else {
+                }
+                .modifier(PopoverShadowModifier(role: role))
+        } else {
+            switch material {
+            case .solid:
                 content
-                    .background(.regularMaterial, in: shape)
                     .background(shape.fill(CompactPopoverPalette.surface(role, colorScheme)))
                     .overlay {
-                        shape.stroke(Color.white.opacity(0.34), lineWidth: 0.8)
+                        shape
+                            .strokeBorder(CompactPopoverPalette.cardStroke(colorScheme), lineWidth: 1)
+                            .allowsHitTesting(false)
                     }
-                    .modifier(PopoverShadowModifier(role: role))
+            case .windowGlass, .modalGlass:
+                if #available(macOS 26.0, *) {
+                    content
+                        .glassEffect(
+                            .regular.tint(CompactPopoverPalette.surface(role, colorScheme)),
+                            in: shape
+                        )
+                        .overlay {
+                            shape.stroke(Color.white.opacity(0.34), lineWidth: 0.8)
+                        }
+                        .modifier(PopoverShadowModifier(role: role))
+                } else {
+                    content
+                        .background(.regularMaterial, in: shape)
+                        .background(shape.fill(CompactPopoverPalette.surface(role, colorScheme)))
+                        .overlay {
+                            shape.stroke(Color.white.opacity(0.34), lineWidth: 0.8)
+                        }
+                        .modifier(PopoverShadowModifier(role: role))
+                }
             }
         }
     }
@@ -61,21 +76,35 @@ private struct PopoverShadowModifier: ViewModifier {
 /// 为整个窗口提供透亮底层，窗口内卡片使用实色表面。
 private struct LiquidGlassWindowBackgroundModifier: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     @ViewBuilder
     func body(content: Content) -> some View {
         let tint = CompactPopoverPalette.surface(.window, colorScheme)
-        if #available(macOS 26.0, *) {
+        if reduceTransparency {
+            content.background {
+                Rectangle()
+                    .fill(CompactPopoverPalette.opaqueWindow(colorScheme))
+                    .ignoresSafeArea()
+            }
+        } else if #available(macOS 26.0, *) {
             content.background {
                 Rectangle()
                     .fill(.clear)
                     .glassEffect(.regular.tint(tint), in: Rectangle())
+                    .ignoresSafeArea()
             }
         } else {
             content
-                .background(.regularMaterial)
                 .background {
-                    Rectangle().fill(tint)
+                    Rectangle()
+                        .fill(.regularMaterial)
+                        .ignoresSafeArea()
+                }
+                .background {
+                    Rectangle()
+                        .fill(tint)
+                        .ignoresSafeArea()
                 }
         }
     }
@@ -99,14 +128,30 @@ private struct LiquidGlassInteractiveControlModifier: ViewModifier {
 /// 以居中弹层承载编辑、提醒等临时操作，并支持点击焦外背景关闭。
 private struct LiquidGlassOverlay<OverlayContent: View>: View {
     let onDismiss: () -> Void
+    let dismissOnBackgroundTap: Bool
+    let dismissOnEscape: Bool
     @ViewBuilder let content: () -> OverlayContent
 
+    @ViewBuilder
     var body: some View {
+        if dismissOnEscape {
+            overlayContent
+                .onExitCommand(perform: onDismiss)
+        } else {
+            overlayContent
+        }
+    }
+
+    private var overlayContent: some View {
         ZStack {
             Color.black.opacity(0.24)
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
-                .onTapGesture(perform: onDismiss)
+                .onTapGesture {
+                    if dismissOnBackgroundTap {
+                        onDismiss()
+                    }
+                }
 
             content()
                 .liquidGlassModalSurface()
@@ -119,16 +164,34 @@ private struct LiquidGlassOverlay<OverlayContent: View>: View {
 
 private struct LiquidGlassOverlayModifier<Item: Identifiable, OverlayContent: View>: ViewModifier {
     @Binding var item: Item?
+    let dismissOnBackgroundTap: Bool
+    let dismissOnEscape: Bool
     let content: (Item) -> OverlayContent
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
         content.overlay {
             if let item {
-                LiquidGlassOverlay(onDismiss: { self.item = nil }) {
+                LiquidGlassOverlay(
+                    onDismiss: { self.item = nil },
+                    dismissOnBackgroundTap: dismissOnBackgroundTap,
+                    dismissOnEscape: dismissOnEscape
+                ) {
                     self.content(item)
                 }
+                .transition(
+                    .opacity.combined(
+                        with: .scale(scale: 0.985, anchor: .center)
+                    )
+                )
             }
         }
+        .animation(
+            reduceMotion
+                ? nil
+                : .spring(response: 0.32, dampingFraction: 0.9),
+            value: item != nil
+        )
     }
 }
 
@@ -156,9 +219,18 @@ extension View {
 
     func liquidGlassOverlay<Item: Identifiable, OverlayContent: View>(
         item: Binding<Item?>,
+        dismissOnBackgroundTap: Bool = true,
+        dismissOnEscape: Bool = true,
         @ViewBuilder content: @escaping (Item) -> OverlayContent
     ) -> some View {
-        modifier(LiquidGlassOverlayModifier(item: item, content: content))
+        modifier(
+            LiquidGlassOverlayModifier(
+                item: item,
+                dismissOnBackgroundTap: dismissOnBackgroundTap,
+                dismissOnEscape: dismissOnEscape,
+                content: content
+            )
+        )
     }
 
     func liquidGlassControlSurface() -> some View {

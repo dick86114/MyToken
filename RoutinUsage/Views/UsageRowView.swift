@@ -4,6 +4,7 @@ import SwiftUI
 struct UsageRowView: View {
     @Environment(\.menuBarColorRules) private var menuBarColorRules
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let state: KeyUsageState
     var density: UsageCardDensity = .full
     var actions: AnyView?
@@ -12,6 +13,7 @@ struct UsageRowView: View {
     var onShare: (() -> Void)? = nil
 
     @State private var showsFailureDetails = false
+    @State private var isDetailsExpanded = false
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { timeline in
@@ -24,19 +26,32 @@ struct UsageRowView: View {
     }
 
     private func fullCard(now: Date) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            VStack(alignment: .leading, spacing: 7) {
-                headerView(now: now)
-                content(now: now)
-            }
-            if let actions {
-                actions
-                    .padding(.top, 2)
-            }
+        VStack(alignment: .leading, spacing: 6) {
+            headerView(now: now)
+
+            content(now: now)
+                .padding(.leading, CompactPopoverMetrics.fullContentIndent)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    toggleDetails()
+                }
+
+            fullCycleNote(now: now)
+                .padding(.leading, CompactPopoverMetrics.fullContentIndent)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    toggleDetails()
+                }
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .padding(.horizontal, CompactPopoverMetrics.fullCardHorizontalPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .modifier(UsageCardChrome(state: state, isExpired: isSubscriptionExpired(now: now)))
+        .accessibilityAction(
+            named: isDetailsExpanded ? "收起更多信息" : "展开更多信息"
+        ) {
+            toggleDetails()
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(accessibilityLabel(now: now))
         .accessibilityHint(accessibilityHint)
@@ -45,10 +60,6 @@ struct UsageRowView: View {
     private func compactCard(now: Date) -> some View {
         let metrics = compactOrderedMetrics
         let arrangement = CompactUsageCardPresentation.arrangement(for: metrics)
-        let remainingText = CompactUsageCardPresentation.nearlyExhaustedRemainingText(
-            metrics: metrics,
-            now: now
-        )
 
         return Group {
             if arrangement == .balance, let metric = metrics.first {
@@ -58,13 +69,14 @@ struct UsageRowView: View {
                 compactBalanceCard(
                     metric: metric,
                     compositionMetrics: compositionMetrics,
-                    remainingText: remainingText
+                    style: .compact
                 )
             } else {
-                compactStandardCard(now: now, remainingText: remainingText)
+                compactStandardCard(now: now)
             }
         }
-        .padding(14)
+        .padding(.horizontal, CompactPopoverMetrics.cardHorizontalPadding)
+        .padding(.vertical, CompactPopoverMetrics.cardVerticalPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .modifier(UsageCardChrome(state: state, isExpired: isSubscriptionExpired(now: now)))
         .accessibilityElement(children: .contain)
@@ -72,14 +84,16 @@ struct UsageRowView: View {
         .accessibilityHint(accessibilityHint)
     }
 
-    private func compactStandardCard(now: Date, remainingText: String?) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            compactHeader(remainingText: remainingText)
+    private func compactStandardCard(now: Date) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            compactHeader()
 
             if let snapshot = state.snapshot {
                 compactMetrics(snapshot: snapshot, now: now)
+                    .padding(.leading, CompactPopoverMetrics.contentIndent)
             } else {
                 statusLabel
+                    .padding(.leading, CompactPopoverMetrics.contentIndent)
             }
         }
     }
@@ -87,65 +101,60 @@ struct UsageRowView: View {
     private func compactBalanceCard(
         metric: NormalizedUsageMetric,
         compositionMetrics: [NormalizedUsageMetric],
-        remainingText: String?
+        style: BalanceSummaryStyle
     ) -> some View {
-        HStack(alignment: .center, spacing: 10) {
-            compactIdentity(showsPlanBelowProvider: true, remainingText: remainingText)
-            Spacer(minLength: 8)
+        VStack(alignment: .leading, spacing: 8) {
+            compactHeader()
             CompactBalanceStrip(
                 metric: metric,
-                compositionMetrics: compositionMetrics
+                compositionMetrics: compositionMetrics,
+                style: style,
+                metaText: style == .full ? "账户可用 · 余额不足时自动提醒" : nil
             )
-            Spacer(minLength: 8)
-            HStack(spacing: 8) {
-                compactActionButtons
-            }
+            .padding(.leading, style == .compact
+                ? CompactPopoverMetrics.contentIndent
+                : CompactPopoverMetrics.fullContentIndent)
         }
     }
 
-    private func compactHeader(remainingText: String?) -> some View {
+    private func compactHeader() -> some View {
         HStack(alignment: .center, spacing: 10) {
-            compactIdentity(showsPlanBelowProvider: false, remainingText: remainingText)
+            compactIdentity()
             Spacer(minLength: 8)
             compactActionButtons
         }
-        .padding(.bottom, 10)
+        .padding(.bottom, 8)
     }
 
     private func compactIdentity(
-        showsPlanBelowProvider: Bool,
-        remainingText: String? = nil
+        avatarSize: CGFloat = CompactPopoverMetrics.avatarSize,
+        onTitleTap: (() -> Void)? = nil
     ) -> some View {
-        HStack(alignment: .center, spacing: 10) {
-            avatarWithStatus
+        return HStack(alignment: .center, spacing: 10) {
+            avatarWithStatus(size: avatarSize)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    onTitleTap?()
+                }
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(state.configuration.displayName)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
+                        .tracking(-0.01)
                         .lineLimit(1)
 
-                    if let remainingText {
-                        Text(remainingText)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(CompactPopoverPalette.criticalColor)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 1)
-                            .background {
-                                Capsule()
-                                    .fill(CompactPopoverPalette.criticalColor.opacity(0.10))
-                            }
-                            .overlay {
-                                Capsule()
-                                    .strokeBorder(CompactPopoverPalette.criticalColor.opacity(0.22), lineWidth: 1)
-                            }
-                    }
+                    statusDot
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    onTitleTap?()
                 }
 
                 Group {
-                    providerSubtitle(showsPlanBelowProvider: showsPlanBelowProvider)
+                    providerSubtitle()
                 }
-                .font(.system(size: 10, weight: .medium))
+                .font(.system(size: 11))
                 .foregroundStyle(CompactPopoverPalette.subtitle(colorScheme))
                 .lineLimit(1)
             }
@@ -153,18 +162,7 @@ struct UsageRowView: View {
     }
 
     private var compactActionButtons: some View {
-        HStack(spacing: 6) {
-            if onShare != nil {
-                CompactCardActionButton(
-                    action: { onShare?() },
-                    help: "分享 \(state.configuration.displayName) 当前用量",
-                    disabled: state.snapshot == nil
-                ) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-                .accessibilityLabel("分享 \(state.configuration.displayName) 当前用量")
-            }
+        HStack(spacing: 2) {
             CompactCardActionButton(
                 action: refreshCredential,
                 help: "刷新 \(state.configuration.displayName)",
@@ -181,6 +179,18 @@ struct UsageRowView: View {
                 }
             }
             .accessibilityLabel("刷新 \(state.configuration.displayName)")
+
+            if onShare != nil {
+                CompactCardActionButton(
+                    action: { onShare?() },
+                    help: "分享 \(state.configuration.displayName) 当前用量",
+                    disabled: state.snapshot == nil
+                ) {
+                    Image(systemName: "arrow.up.right.square")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .accessibilityLabel("分享 \(state.configuration.displayName) 当前用量")
+            }
         }
     }
 
@@ -280,6 +290,7 @@ private struct RefreshingCardBorder: View {
 
 private struct ProviderWebsiteLink: View {
     let providerName: String
+    let subtitle: String
     let destination: URL
     let colorScheme: ColorScheme
 
@@ -288,26 +299,25 @@ private struct ProviderWebsiteLink: View {
     var body: some View {
         Link(destination: destination) {
             HStack(spacing: 2) {
-                Text(providerName)
+                Text(subtitle)
+                    .lineLimit(1)
 
-                Image(systemName: "arrow.up.right")
-                    .font(.system(size: 7, weight: .semibold))
+                if isHovering {
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 7, weight: .semibold))
+                        .transition(.opacity)
+                }
             }
-            .fixedSize(horizontal: true, vertical: false)
-            .padding(.horizontal, 4)
-            .padding(.vertical, 1)
-            .background {
-                Capsule().fill(
-                    CompactPopoverPalette.brand(colorScheme).opacity(
-                        isHovering ? 0.14 : 0.06
-                    )
-                )
-            }
+            .foregroundStyle(
+                isHovering
+                    ? CompactPopoverPalette.brand(colorScheme)
+                    : CompactPopoverPalette.subtitle(colorScheme)
+            )
         }
-        .foregroundStyle(CompactPopoverPalette.brand(colorScheme))
         .contentShape(Rectangle())
         .help("打开 \(providerName) 官网")
         .accessibilityLabel("打开 \(providerName) 官网")
+        .animation(.easeOut(duration: 0.14), value: isHovering)
         .onHover { hovering in
             isHovering = hovering
             if hovering {
@@ -429,14 +439,122 @@ enum UsageRowAccessibility {
 }
 
 enum UsageRowPresentation {
-    static func subscriptionDescription(providerID: ProviderID, planName: String) -> String {
-        let providerName = ProviderRegistry.builtInDescriptors
+    static func providerName(for providerID: ProviderID) -> String {
+        ProviderRegistry.builtInDescriptors
             .first(where: { $0.id == providerID })?
             .displayName ?? providerID.rawValue
+    }
+
+    static func subscriptionDescription(providerID: ProviderID, planName: String) -> String {
+        let providerName = providerName(for: providerID)
         guard !planName.isEmpty else {
             return providerName
         }
         return "\(providerName) · \(planName)"
+    }
+
+    static func accountDescription(
+        configuration: KeyConfiguration,
+        snapshot: UsageSnapshot?
+    ) -> String {
+        let providerName = providerName(for: configuration.providerID)
+        var parts = [providerName]
+
+        if let snapshot {
+            var planName = snapshot.planName.trimmingCharacters(in: .whitespacesAndNewlines)
+            if planName.lowercased().hasPrefix(providerName.lowercased()) {
+                planName = String(planName.dropFirst(providerName.count))
+                    .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters))
+            }
+            if !planName.isEmpty, planName != providerName {
+                parts.append(planName)
+            }
+
+            if let billingMode = snapshot.billingMode?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+               !billingMode.isEmpty,
+               !parts.contains(billingMode),
+               shouldAppendBillingMode(for: configuration) {
+                parts.append(billingMode)
+            }
+
+            if configuration.providerID == .deepseek || configuration.providerID == .xiaomi,
+               let currencyCode = snapshot.normalizedMetrics
+                .first(where: { $0.presentation == .balance })?
+                .currencyCode,
+               !currencyCode.isEmpty {
+                parts.append(currencyCode)
+            }
+        }
+
+        if parts.count == 1 {
+            if let fallback = fallbackPlanDescription(configuration: configuration) {
+                parts.append(fallback)
+            }
+        }
+
+        return parts.joined(separator: " · ")
+    }
+
+    static func cycleNote(
+        configuration: KeyConfiguration,
+        snapshot: UsageSnapshot?
+    ) -> String? {
+        guard let snapshot else { return nil }
+        let start = snapshot.subscriptionStartAt
+        let end = snapshot.subscriptionEndAt
+
+        switch configuration.providerID {
+        case .xiaomi where configuration.metadata["usageKind"] == "plan":
+            guard start != nil || end != nil else { return nil }
+            return "套餐周期 \(cycleDateText(start)) – \(cycleDateText(end))"
+        case .opencode:
+            guard let end else { return nil }
+            let cancelled = snapshot.billingMode == "取消续订"
+            return "\(UsageRowPresentation.subscriptionEndLabel(providerID: .opencode, billingMode: snapshot.billingMode)) \(cycleDateText(end)) · \(cancelled ? "已取消续订" : "当前未取消")"
+        case .volcengine:
+            guard start != nil || end != nil else { return nil }
+            return "订阅 \(cycleDateText(start)) – \(cycleDateText(end))"
+        case .commandCode, .deepseek, .glm, .newAPI, .routin, .xiaomi:
+            return nil
+        }
+    }
+
+    private static func fallbackPlanDescription(configuration: KeyConfiguration) -> String? {
+        switch configuration.providerID {
+        case .deepseek:
+            return "API 余额"
+        case .xiaomi:
+            return configuration.metadata["usageKind"] == "plan" ? "Token Plan" : "API 按量"
+        case .volcengine:
+            return configuration.metadata["planType"] == "coding" ? "Coding Plan" : "Agent Plan"
+        case .newAPI:
+            return "自建服务"
+        case .routin:
+            return configuration.metadata["usageKind"] == "tokenPack" ? "Token Pack" : "Plan Key"
+        case .glm, .commandCode, .opencode:
+            return nil
+        }
+    }
+
+    private static func shouldAppendBillingMode(for configuration: KeyConfiguration) -> Bool {
+        switch configuration.providerID {
+        case .opencode, .volcengine:
+            return true
+        case .xiaomi:
+            return configuration.metadata["usageKind"] == "plan"
+        case .routin, .deepseek, .glm, .newAPI, .commandCode:
+            return false
+        }
+    }
+
+    private static func cycleDateText(_ date: Date?) -> String {
+        guard let date else { return "—" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.timeZone = .current
+        formatter.dateFormat = "MM/dd"
+        return formatter.string(from: date)
     }
 
     static func subscriptionEndLabel(
@@ -450,117 +568,103 @@ enum UsageRowPresentation {
 
 private extension UsageRowView {
     func headerView(now: Date) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center, spacing: 10) {
-                compactIdentity(showsPlanBelowProvider: false)
-                Spacer(minLength: 8)
-                compactActionButtons
-            }
-
-            if fullHeaderShowsSummary {
-                HStack(alignment: .top, spacing: 8) {
-                    subscriptionPeriodDetails
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    VStack(alignment: .trailing, spacing: 3) {
-                        if let metric = validMetric(state.snapshot?.token),
-                           metric.percent.isFinite {
-                            Text(UsageFormatter.displayPercentText(metric.percent))
-                                .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                                .monospacedDigit()
-                                .foregroundStyle(progressColor(for: metric))
-                        }
-
-                        if let metric = state.snapshot?.normalizedMetrics.first,
-                           metric.presentation != .progress,
-                           state.configuration.providerID != .deepseek,
-                           state.configuration.providerID != .newAPI,
-                           state.configuration.providerID != .xiaomi {
-                            normalizedHeaderMetric(metric)
-                        }
+        HStack(alignment: .center, spacing: 10) {
+            compactIdentity(
+                avatarSize: CompactPopoverMetrics.fullAvatarSize,
+                onTitleTap: { toggleDetails() }
+            )
+            Spacer(minLength: 8)
+            if hasExpandableDetails {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                    .rotationEffect(.degrees(isDetailsExpanded ? 180 : 0))
+                    .frame(width: 20, height: 24)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        toggleDetails()
                     }
-                }
+                    .accessibilityHidden(true)
             }
+            if let actions {
+                actions
+            }
+            compactActionButtons
         }
     }
 
-    private var fullHeaderShowsSummary: Bool {
-        if validMetric(state.snapshot?.token) != nil {
-            return true
+    private var hasExpandableDetails: Bool {
+        guard let metrics = state.snapshot?.normalizedMetrics else { return false }
+        switch state.configuration.providerID {
+        case .glm:
+            return metrics.contains { metric in
+                metric.id == "model-calls"
+                    || metric.id == "zcode-mcp"
+                    || metric.id.hasPrefix("activity-")
+            }
+        case .newAPI:
+            return metrics.contains { metric in
+                metric.id == "rpm"
+                    || metric.id == "tpm"
+                    || metric.id == "request-count"
+            }
+        case .xiaomi:
+            return state.configuration.metadata["usageKind"] == "plan"
+                && metrics.contains { $0.id == "plan-status" }
+        case .routin, .deepseek, .volcengine, .commandCode, .opencode:
+            return false
         }
-        if state.snapshot?.metrics.isEmpty == false {
-            return true
-        }
-        if let snapshot = state.snapshot,
-           snapshot.kind == .periodic,
-           snapshot.subscriptionStartAt != nil || snapshot.subscriptionEndAt != nil {
-            return true
-        }
-        return false
     }
 
-    @ViewBuilder
-    var subscriptionPeriodDetails: some View {
-        if density == .full {
-            if let snapshot = state.snapshot,
-               snapshot.kind == .periodic,
-               snapshot.subscriptionStartAt != nil || snapshot.subscriptionEndAt != nil {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text("开始 " + UsageFormatter.subscriptionDateText(snapshot.subscriptionStartAt))
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Text(
-                        UsageRowPresentation.subscriptionEndLabel(
-                            providerID: state.configuration.providerID,
-                            billingMode: snapshot.billingMode
-                        ) + " " + UsageFormatter.subscriptionDateText(snapshot.subscriptionEndAt)
-                    )
-                        .fixedSize(horizontal: false, vertical: true)
-                        .multilineTextAlignment(.trailing)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-            }
+    private func toggleDetails() {
+        guard density == .full, hasExpandableDetails else { return }
+        withAnimation(
+            reduceMotion
+                ? .easeOut(duration: 0.16)
+                : .spring(response: 0.34, dampingFraction: 0.88)
+        ) {
+            isDetailsExpanded.toggle()
         }
     }
 
     @ViewBuilder
-    func normalizedHeaderMetric(_ metric: NormalizedUsageMetric) -> some View {
-        switch metric.presentation {
-        case .progress:
-            if let used = metric.used, let limit = metric.limit, limit > 0 {
-                let percent = NSDecimalNumber(decimal: used)
-                    .dividing(by: NSDecimalNumber(decimal: limit))
-                    .multiplying(by: 100)
-                    .doubleValue
-                Text(UsageFormatter.displayPercentText(percent))
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                    .monospacedDigit()
-                    .foregroundStyle(normalizedMetricColor(metric.healthState))
-            }
-        case .balance:
-            Text("余额 \(UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode))")
-                .font(.system(size: 12, weight: .semibold))
-                .monospacedDigit()
-                .foregroundStyle(normalizedMetricColor(metric.healthState))
-        case .status:
+    private func expandedPlanStatus(_ metric: NormalizedUsageMetric) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(metric.label)
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+
+            Spacer(minLength: 8)
+
             Text(metric.healthState == .unavailable ? "不可用" : "可用")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(normalizedMetricColor(metric.healthState))
-        case .value:
-            EmptyView()
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .foregroundStyle(
+                    CompactPopoverPalette.healthColor(
+                        for: metric.healthState,
+                        colorScheme
+                    )
+                )
+        }
+        .transition(.opacity.combined(with: .move(edge: .top)))
+    }
+
+    @ViewBuilder
+    func fullCycleNote(now: Date) -> some View {
+        if let note = UsageRowPresentation.cycleNote(
+            configuration: state.configuration,
+            snapshot: state.snapshot
+        ) {
+            Text(note)
+                .font(.system(size: 10))
+                .foregroundStyle(CompactPopoverPalette.subtitle(colorScheme))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .monospacedDigit()
         }
     }
 
     func decimalText(_ value: Decimal?) -> String {
         UsageFormatter.numberText(value)
-    }
-
-    func normalizedMetricColor(_ state: UsageMetricHealthState) -> Color {
-        CompactPopoverPalette.healthColor(for: state, colorScheme)
     }
 
     @ViewBuilder
@@ -569,6 +673,12 @@ private extension UsageRowView {
             VStack(alignment: .leading, spacing: 7) {
                 if !snapshot.metrics.isEmpty {
                     normalizedMetricsContent(snapshot: snapshot, now: now)
+                    if isDetailsExpanded,
+                       state.configuration.providerID == .xiaomi,
+                       state.configuration.metadata["usageKind"] == "plan",
+                       let status = snapshot.normalizedMetrics.first(where: { $0.id == "plan-status" }) {
+                        expandedPlanStatus(status)
+                    }
                 } else {
                     switch snapshot.kind {
                     case .periodic:
@@ -602,33 +712,33 @@ private extension UsageRowView {
             case .balance:
                 EmptyView()
             case .horizontalGauges:
-                HStack(alignment: .top, spacing: 10) {
-                    ForEach(metrics) { metric in
-                        compactMetricRow(metric, now: now)
-                    }
-                }
+                compactMetricRow(metrics[0], now: now)
             case .verticalGauges:
-                HStack(alignment: .top, spacing: 8) {
+                HStack(alignment: .top, spacing: 7) {
                     ForEach(metrics) { metric in
-                    CompactMetricGaugeTile(
+                        CompactMetricGaugeTile(
                             metric: metric,
                             now: now,
                             style: .vertical,
                         )
+                        .frame(maxWidth: .infinity)
                     }
                 }
             case .valueTiles:
                 LazyVGrid(
-                    columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)],
-                    spacing: 8
+                    columns: [
+                        GridItem(.flexible(), spacing: 10),
+                        GridItem(.flexible(), spacing: 10)
+                    ],
+                    spacing: 7
                 ) {
                     ForEach(metrics) { metric in
-                            if metric.presentation == .progress {
-                                CompactMetricGaugeTile(
-                                    metric: metric,
-                                    now: now,
-                                    style: metrics.count > 2 ? .vertical : .horizontal,
-                                )
+                        if metric.presentation == .progress {
+                            CompactMetricGaugeTile(
+                                metric: metric,
+                                now: now,
+                                style: .vertical,
+                            )
                         } else {
                             CompactValueTile(metric: metric, valueText: compactValueText(for: metric))
                         }
@@ -636,7 +746,7 @@ private extension UsageRowView {
                 }
             }
         } else if snapshot.kind == .periodic {
-            HStack(alignment: .top, spacing: 10) {
+            HStack(alignment: .top, spacing: 7) {
                 compactLegacyMetricRow(title: "5 小时", metric: validMetric(snapshot.fiveHour), now: now)
                 compactLegacyMetricRow(title: "周", metric: validMetric(snapshot.weekly), now: now)
             }
@@ -734,10 +844,30 @@ private extension UsageRowView {
     }
 
     func normalizedMetricsContent(snapshot: UsageSnapshot, now: Date) -> some View {
+        if state.configuration.providerID == .deepseek,
+           let balance = snapshot.normalizedMetrics.first(where: {
+               $0.id == "balance" && $0.presentation == .balance
+           }) {
+            let compositionMetrics = Self.balanceCompositionMetrics(
+                in: snapshot.normalizedMetrics
+            )
+            return AnyView(
+                CompactBalanceStrip(
+                    metric: balance,
+                    compositionMetrics: compositionMetrics,
+                    style: .full,
+                    metaText: "账户可用 · 余额不足时自动提醒"
+                )
+            )
+        }
+
         if state.configuration.providerID == .xiaomi,
            state.configuration.metadata["usageKind"] != "plan" {
             return AnyView(
-                XiaomiAPIMetricsView(metrics: snapshot.normalizedMetrics)
+                XiaomiAPIMetricsView(
+                    metrics: snapshot.normalizedMetrics,
+                    visualStyle: .popover
+                )
             )
         }
         if state.configuration.providerID == .commandCode {
@@ -745,20 +875,31 @@ private extension UsageRowView {
                 CommandCodeUsageMetricsView(
                     metrics: snapshot.normalizedMetrics,
                     now: now,
-                    displayMode: .card
+                    displayMode: .details,
+                    visualStyle: .popover
                 )
             )
         }
 
         if state.configuration.providerID == .glm {
             return AnyView(
-                GLMUsageMetricsView(metrics: snapshot.normalizedMetrics, now: now)
+                GLMUsageMetricsView(
+                    metrics: snapshot.normalizedMetrics,
+                    now: now,
+                    showsSupplementaryMetrics: isDetailsExpanded,
+                    visualStyle: .popover
+                )
             )
         }
 
         if state.configuration.providerID == .newAPI {
             return AnyView(
-                NewAPIUsageMetricsView(metrics: snapshot.normalizedMetrics, now: now)
+                NewAPIUsageMetricsView(
+                    metrics: snapshot.normalizedMetrics,
+                    now: now,
+                    visualStyle: .popover,
+                    showsActivityDetails: isDetailsExpanded
+                )
             )
         }
 
@@ -767,7 +908,8 @@ private extension UsageRowView {
                 return AnyView(
                     VolcengineCodingPlanMetricsView(
                         metrics: snapshot.normalizedMetrics,
-                        now: now
+                        now: now,
+                        visualStyle: .popover
                     )
                 )
             }
@@ -788,7 +930,10 @@ private extension UsageRowView {
                 metrics: layout.metrics,
                 columns: layout.columns,
                 resetTimeStyle: .relativeDuration,
-                now: now
+                now: now,
+                showsRemainingDuration: layout.columns <= 2
+                    && state.configuration.providerID != .xiaomi,
+                visualStyle: .popover
             )
         )
     }
@@ -864,27 +1009,67 @@ private extension UsageRowView {
         return end <= now
     }
 
+    var statusDot: some View {
+        Circle()
+            .fill(cardStatusColor)
+            .frame(width: 5, height: 5)
+            .overlay {
+                Circle()
+                    .stroke(cardStatusColor.opacity(0.16), lineWidth: 2)
+            }
+            .accessibilityHidden(true)
+    }
+
+    var cardStatusColor: Color {
+        if state.error != nil {
+            return CompactPopoverPalette.criticalColor
+        }
+        if state.isStale {
+            return CompactPopoverPalette.warningColor
+        }
+
+        let healthStates = state.snapshot?.normalizedMetrics.map(\.healthState) ?? []
+        if healthStates.contains(where: { $0 == .critical || $0 == .unavailable }) {
+            return CompactPopoverPalette.criticalColor
+        }
+        if healthStates.contains(.warning) {
+            return CompactPopoverPalette.warningColor
+        }
+        if healthStates.contains(.normal) {
+            return CompactPopoverPalette.positive(colorScheme)
+        }
+        return Color.secondary.opacity(0.55)
+    }
+
     @ViewBuilder
-    func providerSubtitle(showsPlanBelowProvider: Bool) -> some View {
-        let providerName = ProviderRegistry.builtInDescriptors
-            .first(where: { $0.id == state.configuration.providerID })?
-            .displayName ?? state.configuration.providerID.rawValue
+    func providerSubtitle() -> some View {
+        let providerName = UsageRowPresentation.providerName(
+            for: state.configuration.providerID
+        )
+        let description = UsageRowPresentation.accountDescription(
+            configuration: state.configuration,
+            snapshot: state.snapshot
+        )
 
         if let websiteURL = state.configuration.websiteURL {
             ProviderWebsiteLink(
                 providerName: providerName,
+                subtitle: description,
                 destination: websiteURL,
                 colorScheme: colorScheme
             )
         } else {
-            Text(providerName)
+            Text(description)
         }
     }
 
     /// 失败徽章挂在别名头像右上角，点击头像即可查看失败详情。
     @ViewBuilder
-    var avatarWithStatus: some View {
-        let avatar = CompactAccountAvatar(providerID: state.configuration.providerID)
+    func avatarWithStatus(size: CGFloat) -> some View {
+        let avatar = CompactAccountAvatar(
+            providerID: state.configuration.providerID,
+            size: size
+        )
 
         if state.error != nil {
             Button {
@@ -911,6 +1096,10 @@ private extension UsageRowView {
         } else {
             avatar
         }
+    }
+
+    var avatarWithStatus: some View {
+        avatarWithStatus(size: CompactPopoverMetrics.avatarSize)
     }
 
     var refreshFailureIndicator: some View {
@@ -945,10 +1134,12 @@ private extension UsageRowView {
     }
 
     func progressColor(for metric: UsageMetric) -> Color {
-        UsageMetricPresentation.color(
-            for: metric.percent,
-            scheme: colorScheme,
-            rules: menuBarColorRules
+        CompactPopoverPalette.statusColor(
+            for: UsageMetricPresentation.tone(
+                for: metric.percent,
+                rules: menuBarColorRules
+            ),
+            colorScheme
         )
     }
 

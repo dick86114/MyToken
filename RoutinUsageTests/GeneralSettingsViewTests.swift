@@ -9,9 +9,11 @@ final class GeneralSettingsViewTests: XCTestCase {
         XCTAssertTrue(source.contains("刷新"))
         XCTAssertTrue(source.contains("登录时启动"))
         XCTAssertTrue(source.contains("notificationsEnabled"))
-        XCTAssertTrue(source.contains("settingSection"))
-        XCTAssertTrue(source.contains("MenuBarColorRulesEditor"))
-        XCTAssertTrue(source.contains(".liquidGlassSurface()"))
+        XCTAssertTrue(source.contains("SettingsPageScroll"))
+        XCTAssertTrue(source.contains("SettingsGroup"))
+        XCTAssertTrue(source.contains("SettingsRow"))
+        XCTAssertTrue(source.contains("dataMigrationSection"))
+        XCTAssertTrue(source.contains("TransferToAndroidView"))
         XCTAssertFalse(source.contains("Form {"))
         XCTAssertFalse(source.contains(".formStyle(.grouped)"))
         XCTAssertFalse(source.contains("displayDimension"))
@@ -27,14 +29,23 @@ final class GeneralSettingsViewTests: XCTestCase {
         ])
 
         XCTAssertTrue(editor.contains("MenuBarThresholdDragGesture"))
-        XCTAssertTrue(editor.contains("ColorSwatchButton"))
-        XCTAssertTrue(editor.contains("liquidGlassInteractiveControl("))
+        XCTAssertTrue(editor.contains("ColorWellButton"))
+        XCTAssertTrue(editor.contains("MenuBarColorPanelLauncher"))
+        XCTAssertTrue(editor.contains("colorLevelControl"))
         XCTAssertTrue(editor.contains("workingThresholds"))
         XCTAssertTrue(editor.contains("interactiveSpring"))
-        XCTAssertTrue(editor.contains("ColorPanelLauncher"))
+        XCTAssertTrue(editor.contains("恢复默认"))
+        XCTAssertTrue(editor.contains("showsResetConfirmation"))
+        XCTAssertTrue(editor.contains("恢复默认进度颜色？"))
+        XCTAssertTrue(editor.contains("将同时重置两个阈值和正常、提醒、紧急三种颜色"))
         XCTAssertTrue(editor.contains("maxWidth: 520"))
         XCTAssertFalse(editor.contains("Slider("))
-        XCTAssertFalse(menuBar.contains("colorRulesSection"))
+        XCTAssertTrue(menuBar.contains("colorRulesSection"))
+        XCTAssertTrue(menuBar.contains("MenuBarColorRulesEditor"))
+        let general = try TestSourceReader.read([
+            "RoutinUsage", "Views", "Settings", "GeneralSettingsView.swift"
+        ])
+        XCTAssertFalse(general.contains("MenuBarColorRulesEditor"))
         XCTAssertFalse(menuBar.contains("ColorPicker("))
     }
 
@@ -80,7 +91,8 @@ final class GeneralSettingsViewTests: XCTestCase {
         ])
 
         XCTAssertTrue(source.contains("GitHub 令牌"))
-        XCTAssertTrue(source.contains("SecureField"))
+        XCTAssertTrue(source.contains("SettingsLabeledTextField("))
+        XCTAssertTrue(source.contains("isSecret: true"))
         XCTAssertTrue(source.contains("Button(\"移除\")"))
         XCTAssertTrue(source.contains("tokenMask()"))
         XCTAssertTrue(source.contains("应用本地存储"))
@@ -109,8 +121,7 @@ final class GeneralSettingsViewTests: XCTestCase {
             source.range(of: "Label(\"导入配置\"")
         )
 
-        XCTAssertFalse(source.contains(".buttonStyle(.borderedProminent)"))
-        XCTAssertTrue(source[exportStart.lowerBound...].contains(".buttonStyle(.bordered)"))
-        XCTAssertTrue(source[importStart.lowerBound...].contains(".buttonStyle(.bordered)"))
+        XCTAssertTrue(source[exportStart.lowerBound...].contains(".liquidGlassButton()"))
+        XCTAssertTrue(source[importStart.lowerBound...].contains(".liquidGlassButton()"))
     }
 }

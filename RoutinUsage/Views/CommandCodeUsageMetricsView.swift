@@ -33,7 +33,8 @@ enum CommandCodeMetricLayoutPolicy {
 
     static func progressDetailLines(
         for metric: NormalizedUsageMetric,
-        now: Date
+        now: Date,
+        showsRemainingDuration: Bool = true
     ) -> [ProgressDetailLine] {
         var lines = [
             ProgressDetailLine(
@@ -47,13 +48,15 @@ enum CommandCodeMetricLayoutPolicy {
             lines.append(ProgressDetailLine(
                 text: "重置 \(UsageFormatter.resetTime(windowEnd, now: now))"
             ))
-            lines.append(ProgressDetailLine(
-                text: "剩余 \(UsageFormatter.remainingDurationText(until: windowEnd, now: now))",
-                highlights: UsageFormatter.shouldHighlightRemainingDuration(
-                    for: metric,
-                    now: now
-                )
-            ))
+            if showsRemainingDuration {
+                lines.append(ProgressDetailLine(
+                    text: "剩余 \(UsageFormatter.remainingDurationText(until: windowEnd, now: now))",
+                    highlights: UsageFormatter.shouldHighlightRemainingDuration(
+                        for: metric,
+                        now: now
+                    )
+                ))
+            }
         }
         return lines
     }
@@ -119,15 +122,18 @@ struct CommandCodeUsageMetricsView: View {
     let metrics: [NormalizedUsageMetric]
     let now: Date
     let displayMode: CommandCodeUsageMetricsDisplayMode
+    let visualStyle: UsageMetricsVisualStyle
 
     init(
         metrics: [NormalizedUsageMetric],
         now: Date,
-        displayMode: CommandCodeUsageMetricsDisplayMode = .details
+        displayMode: CommandCodeUsageMetricsDisplayMode = .details,
+        visualStyle: UsageMetricsVisualStyle = .standard
     ) {
         self.metrics = metrics
         self.now = now
         self.displayMode = displayMode
+        self.visualStyle = visualStyle
     }
 
     private var layout: CommandCodeMetricLayout {
@@ -135,19 +141,29 @@ struct CommandCodeUsageMetricsView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 16) {
-                progressCell(layout.fiveHour, fallbackLabel: "5 小时")
-                progressCell(layout.weekly, fallbackLabel: "周")
-            }
+        Group {
+            switch displayMode {
+            case .card:
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .top, spacing: 16) {
+                        progressCell(layout.fiveHour, fallbackLabel: "5 小时")
+                        progressCell(layout.weekly, fallbackLabel: "周")
+                    }
 
-            HStack(alignment: .top, spacing: 16) {
-                monthlyCell(layout.monthly)
-                switch displayMode {
-                case .card:
-                    requestCountSummaryCell(layout.requestCount)
-                case .details:
-                    summaryMetricsCell
+                    HStack(alignment: .top, spacing: 16) {
+                        monthlyCell(layout.monthly)
+                        requestCountSummaryCell(layout.requestCount)
+                    }
+                }
+            case .details:
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack(alignment: .top, spacing: visualStyle.columnSpacing) {
+                        progressCell(layout.fiveHour, fallbackLabel: "5 小时")
+                        progressCell(layout.weekly, fallbackLabel: "周")
+                        progressCell(layout.monthly, fallbackLabel: "月")
+                    }
+
+                    summaryLine
                 }
             }
         }
@@ -159,11 +175,11 @@ struct CommandCodeUsageMetricsView: View {
         if let metric {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text(metric.label.isEmpty ? "累计请求" : metric.label)
-                    .font(.system(size: 12))
+                    .font(.system(size: visualStyle.valueLabelSize))
                     .foregroundStyle(.tertiary)
                 Spacer(minLength: 12)
                 Text("\(numberText(metric.value)) 次")
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .font(.system(size: visualStyle.valueSize, weight: .semibold, design: .monospaced))
                     .foregroundStyle(.primary)
                     .monospacedDigit()
             }
@@ -175,11 +191,11 @@ struct CommandCodeUsageMetricsView: View {
         } else {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text("累计请求")
-                    .font(.system(size: 12))
+                    .font(.system(size: visualStyle.valueLabelSize))
                     .foregroundStyle(.tertiary)
                 Spacer(minLength: 12)
                 Text("—")
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .font(.system(size: visualStyle.valueSize, weight: .semibold, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -195,6 +211,33 @@ struct CommandCodeUsageMetricsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private var summaryLine: some View {
+        HStack(spacing: 5) {
+            if let requestCount = layout.requestCount {
+                Text("累计请求 \(numberText(requestCount.value)) 次")
+            }
+            if let purchased = layout.purchasedRemaining {
+                summarySeparator
+                Text("购买剩余 \(UsageFormatter.currencyText(purchased.value, currencyCode: purchased.currencyCode))")
+            }
+            if let free = layout.freeRemaining {
+                summarySeparator
+                Text("赠送剩余 \(UsageFormatter.currencyText(free.value, currencyCode: free.currencyCode))")
+            }
+        }
+        .font(.system(size: visualStyle.detailSize))
+        .foregroundStyle(.tertiary)
+        .monospacedDigit()
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var summarySeparator: some View {
+        Text("·")
+            .foregroundStyle(Color.secondary.opacity(0.5))
+    }
+
     @ViewBuilder
     private func progressCell(
         _ metric: NormalizedUsageMetric?,
@@ -203,7 +246,10 @@ struct CommandCodeUsageMetricsView: View {
         if let metric {
             VStack(alignment: .leading, spacing: 5) {
                 cellHeader(metric, fallbackLabel: fallbackLabel)
-                UsageMetricProgressBar(percent: metric.displayedPercent ?? 0)
+                UsageMetricProgressBar(
+                    percent: metric.displayedPercent ?? 0,
+                    height: visualStyle.progressHeight
+                )
                 progressDetailStack(metric)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -217,7 +263,10 @@ struct CommandCodeUsageMetricsView: View {
         if let metric {
             VStack(alignment: .leading, spacing: 5) {
                 cellHeader(metric, fallbackLabel: "月")
-                UsageMetricProgressBar(percent: metric.displayedPercent ?? 0)
+            UsageMetricProgressBar(
+                percent: metric.displayedPercent ?? 0,
+                height: visualStyle.progressHeight
+            )
                 progressDetailStack(metric)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -231,10 +280,10 @@ struct CommandCodeUsageMetricsView: View {
         if let metric {
             VStack(alignment: .leading, spacing: 5) {
                 Text(metric.label.isEmpty ? "累计请求" : metric.label)
-                    .font(.system(size: 12))
+                    .font(.system(size: visualStyle.valueLabelSize))
                     .foregroundStyle(.tertiary)
                 Text("\(numberText(metric.value)) 次")
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .font(.system(size: visualStyle.valueSize, weight: .semibold, design: .monospaced))
                     .foregroundStyle(.primary)
                     .monospacedDigit()
             }
@@ -253,7 +302,8 @@ struct CommandCodeUsageMetricsView: View {
             ForEach(
                 CommandCodeMetricLayoutPolicy.progressDetailLines(
                     for: metric,
-                    now: now
+                    now: now,
+                    showsRemainingDuration: displayMode == .card
                 ),
                 id: \.text
             ) { line in
@@ -265,7 +315,7 @@ struct CommandCodeUsageMetricsView: View {
                     )
             }
         }
-        .font(.system(size: 10))
+        .font(.system(size: visualStyle.detailSize))
         .monospacedDigit()
     }
 
@@ -277,10 +327,10 @@ struct CommandCodeUsageMetricsView: View {
         if let metric {
             VStack(alignment: .leading, spacing: 5) {
                 Text(metric.label.isEmpty ? fallbackLabel : metric.label)
-                    .font(.system(size: 12))
+                    .font(.system(size: visualStyle.valueLabelSize))
                     .foregroundStyle(.tertiary)
                 Text(UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode))
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .font(.system(size: visualStyle.valueSize, weight: .semibold, design: .monospaced))
                     .foregroundStyle(color(metric.healthState))
                     .monospacedDigit()
             }
@@ -300,11 +350,11 @@ struct CommandCodeUsageMetricsView: View {
     ) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text(metric.label.isEmpty ? fallbackLabel : metric.label)
-                .font(.system(size: 12))
+                .font(.system(size: visualStyle.valueLabelSize))
                 .foregroundStyle(.tertiary)
             Spacer(minLength: 4)
             Text(percentText(metric))
-                .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                .font(.system(size: visualStyle.valueSize, weight: .semibold, design: .monospaced))
                 .foregroundStyle(color(metric.healthState))
                 .monospacedDigit()
         }
@@ -313,10 +363,10 @@ struct CommandCodeUsageMetricsView: View {
     private func placeholderCell(label: String) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(label)
-                .font(.system(size: 12))
+                .font(.system(size: visualStyle.valueLabelSize))
                 .foregroundStyle(.tertiary)
             Text("—")
-                .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                .font(.system(size: visualStyle.valueSize, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

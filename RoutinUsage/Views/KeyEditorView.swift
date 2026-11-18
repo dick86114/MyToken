@@ -223,15 +223,12 @@ struct KeyEditorView: View {
                 Text(title)
                     .font(.title3.weight(.semibold))
                 Spacer()
-                Button {
-                    model.cancelSaving()
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                }
-                .buttonStyle(.borderless)
-                .help("关闭")
-                .accessibilityLabel("关闭")
+                SettingsCloseButton(
+                    action: {
+                        model.cancelSaving()
+                        dismiss()
+                    }
+                )
             }
 
             Form {

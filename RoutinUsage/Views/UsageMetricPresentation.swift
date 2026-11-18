@@ -6,6 +6,82 @@ enum UsageMetricTone: Equatable {
     case critical
 }
 
+/// 量指标在不同页面的排版层级；弹窗完整视图采用设计稿的紧凑规格。
+enum UsageMetricsVisualStyle: Equatable {
+    case standard
+    case popover
+
+    var progressLabelSize: CGFloat {
+        switch self {
+        case .standard: return 11
+        case .popover: return 11
+        }
+    }
+
+    var valueLabelSize: CGFloat {
+        switch self {
+        case .standard: return 12
+        case .popover: return 11
+        }
+    }
+
+    var valueSize: CGFloat {
+        switch self {
+        case .standard: return 14
+        case .popover: return 12
+        }
+    }
+
+    var detailSize: CGFloat {
+        switch self {
+        case .standard: return 10.5
+        case .popover: return 11
+        }
+    }
+
+    var progressHeight: CGFloat {
+        switch self {
+        case .standard: return 3
+        case .popover: return 2
+        }
+    }
+
+    var columnSpacing: CGFloat {
+        switch self {
+        case .standard: return 16
+        case .popover: return 7
+        }
+    }
+
+    var rowSpacing: CGFloat {
+        switch self {
+        case .standard: return 14
+        case .popover: return 10
+        }
+    }
+
+    var balanceAmountSize: CGFloat {
+        switch self {
+        case .standard: return 20
+        case .popover: return 16
+        }
+    }
+
+    var compactValueLabelSize: CGFloat {
+        switch self {
+        case .standard: return 10
+        case .popover: return 10
+        }
+    }
+
+    var compactValueSize: CGFloat {
+        switch self {
+        case .standard: return 14
+        case .popover: return 11
+        }
+    }
+}
+
 enum UsageMetricPresentation {
     static func tone(for percent: Double, rules: MenuBarColorRules) -> UsageMetricTone {
         switch MenuBarUsageRisk.level(for: percent, rules: rules) {
@@ -69,13 +145,16 @@ struct UsageMetricProgressBar: View {
     @Environment(\.menuBarColorRules) private var menuBarColorRules
     @Environment(\.colorScheme) private var colorScheme
     let percent: Double
+    let height: CGFloat
 
-    init(percent: Double) {
+    init(percent: Double, height: CGFloat = 6) {
         self.percent = percent
+        self.height = height
     }
 
-    init(metric: UsageMetric) {
+    init(metric: UsageMetric, height: CGFloat = 6) {
         percent = metric.percent
+        self.height = height
     }
 
     var body: some View {
@@ -85,13 +164,13 @@ struct UsageMetricProgressBar: View {
                 Capsule()
                     .fill(Color.primary.opacity(0.12))
                 Capsule()
-                    .fill(
-                        UsageMetricPresentation.color(
+                    .fill(CompactPopoverPalette.statusColor(
+                        for: UsageMetricPresentation.tone(
                             for: percent,
-                            scheme: colorScheme,
                             rules: menuBarColorRules
-                        )
-                    )
+                        ),
+                        colorScheme
+                    ))
                     .frame(
                         width: max(
                             clampedPercent == 0 ? 0 : 2,
@@ -100,7 +179,7 @@ struct UsageMetricProgressBar: View {
                     )
             }
         }
-        .frame(height: 6)
+        .frame(height: height)
         .accessibilityHidden(true)
     }
 }

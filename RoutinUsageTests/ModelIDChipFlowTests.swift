@@ -1,25 +1,19 @@
 import XCTest
-@testable import RoutinUsage
 
 final class ModelIDChipFlowTests: XCTestCase {
-    func test同一模型ID生成稳定配色索引() {
-        let first = ModelIDChipPalette.colorIndex(for: "doubao-seed-2-1-turbo")
-        let second = ModelIDChipPalette.colorIndex(for: "doubao-seed-2-1-turbo")
+    func test模型标签使用中性表面和供应商强调色点缀() throws {
+        let source = try TestSourceReader.read([
+            "RoutinUsage",
+            "Views",
+            "Settings",
+            "Components",
+            "ModelIDChipFlow.swift"
+        ])
 
-        XCTAssertEqual(first, second)
-        XCTAssertTrue(first >= 0)
-        XCTAssertTrue(first < ModelIDChipPalette.colorCount)
-    }
-
-    func test不同模型ID使用多种配色索引() {
-        let values = [
-            "ark-code-latest",
-            "doubao-seed-2-0-lite",
-            "glm-5.3",
-            "kimi-k2.7-code",
-            "deepseek-v4-pro"
-        ].map(ModelIDChipPalette.colorIndex(for:))
-
-        XCTAssertEqual(Set(values).count, values.count)
+        XCTAssertTrue(source.contains("accentColor: Color = .accentColor"))
+        XCTAssertTrue(source.contains("Color.primary.opacity"))
+        XCTAssertTrue(source.contains("accentColor.opacity"))
+        XCTAssertFalse(source.contains("ModelIDChipPalette"))
+        XCTAssertFalse(source.contains("colorCount"))
     }
 }

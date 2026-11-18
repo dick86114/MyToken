@@ -428,23 +428,45 @@ final class UsageShareCardTests: XCTestCase {
     func test分享功能已接入弹窗和凭证页() throws {
         let popover = try TestSourceReader.read(["RoutinUsage", "Views", "UsagePopoverView.swift"])
         let row = try TestSourceReader.read(["RoutinUsage", "Views", "UsageRowView.swift"])
-        XCTAssertTrue(row.contains("square.and.arrow.up"))
+        XCTAssertTrue(row.contains("arrow.up.right.square"))
         XCTAssertTrue(row.contains("onShare"))
         XCTAssertTrue(popover.contains("UsageSharePanelController"))
     }
 
-    func test字段开关按票面顺序单列展示() throws {
+    func test分享字段按基本信息用量指标和品牌水印分组() throws {
         let source = try TestSourceReader.read([
             "RoutinUsage", "Views", "UsageShareEditorView.swift"
         ])
 
-        XCTAssertTrue(source.contains("展示字段开关 (按票面顺序，隐藏即不导出)"))
+        XCTAssertTrue(source.contains("更多字段"))
+        XCTAssertTrue(source.contains("basicFieldToggles"))
+        XCTAssertTrue(source.contains("metricFieldToggles"))
+        XCTAssertTrue(source.contains("moreUsageFieldToggles"))
+        XCTAssertTrue(source.contains("brandFieldToggles"))
+        XCTAssertTrue(source.contains("基本信息"))
+        XCTAssertTrue(source.contains("用量指标"))
+        XCTAssertTrue(source.contains("品牌与水印"))
         XCTAssertTrue(source.contains("LazyVStack(alignment: .leading, spacing: 8)"))
         let statusIndex = try XCTUnwrap(source.range(of: "可用状态徽章")?.lowerBound)
         let planIndex = try XCTUnwrap(source.range(of: "套餐规格")?.lowerBound)
         let watermarkIndex = try XCTUnwrap(source.range(of: "快照水印与防伪")?.lowerBound)
         XCTAssertLessThan(statusIndex, planIndex)
         XCTAssertLessThan(planIndex, watermarkIndex)
+    }
+
+    func test分享编辑器快捷键和单一关闭入口() throws {
+        let source = try TestSourceReader.read([
+            "RoutinUsage", "Views", "UsageShareEditorView.swift"
+        ])
+
+        XCTAssertTrue(source.contains("keyboardShortcut(\"c\", modifiers: [.command, .shift])"))
+        XCTAssertTrue(source.contains("keyboardShortcut(\"s\", modifiers: .command)"))
+        XCTAssertFalse(source.contains("SettingsCloseButton"))
+        XCTAssertFalse(source.contains("windowShouldClose"))
+        XCTAssertFalse(source.contains("confirmDiscardIfNeeded"))
+        XCTAssertFalse(source.contains("放弃未保存的分享设置"))
+        XCTAssertTrue(source.contains("window.contentViewController = nil"))
+        XCTAssertTrue(source.contains("⌘⇧C 复制"))
     }
 
     private func makeState(

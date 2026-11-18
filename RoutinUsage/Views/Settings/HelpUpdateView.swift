@@ -2,28 +2,27 @@ import SwiftUI
 
 struct HelpUpdateView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var environment: AppEnvironment
     @State private var showingReleaseHistory = false
+    @State private var showsAdvancedSettings = false
     @State private var githubTokenInput = ""
     @State private var githubTokenMask: String?
     @State private var githubTokenMessage: String?
+    @State private var githubTokenMessageTone: SettingsNoticeTone = .info
+    @State private var isStarHovered = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                SettingsPageHeader(
-                    title: "帮助与更新",
-                    subtitle: "版本维护和问题反馈"
-                )
+        SettingsPageScroll {
+            SettingsPageHeader(
+                title: "帮助与更新",
+                subtitle: "版本维护、更新通道与问题反馈"
+            )
 
-                currentVersionSection
-                starPromptSection
-                githubTokenSection
-                updateSection
-                feedbackSection
-            }
-            .padding(24)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            currentVersionSection
+            updateSection
+            advancedSection
+            feedbackSection
         }
         .task {
             await environment.loadReleaseHistoryIfNeeded()
@@ -37,48 +36,77 @@ struct HelpUpdateView: View {
     }
 
     private var currentVersionSection: some View {
-        settingSection {
-            HStack(spacing: 12) {
-                Text("当前版本")
+        SettingsGroup(
+            title: "当前版本"
+        ) {
+            HStack(spacing: 6) {
+                Text("MyToken")
+                    .font(SettingsTypography.body.weight(.medium))
 
                 Text(RoutinUsageApp.currentVersion)
+                    .font(SettingsTypography.numeric.weight(.semibold))
                     .monospacedDigit()
 
+                Link(destination: RoutinUsageApp.githubURL) {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(CompactPopoverPalette.warningColor)
+                        .frame(width: 22, height: 22)
+                        .background {
+                            Circle()
+                                .fill(
+                                    CompactPopoverPalette.warningColor.opacity(
+                                        isStarHovered ? 0.14 : 0
+                                    )
+                                )
+                        }
+                        .scaleEffect(
+                            isStarHovered && !reduceMotion ? 1.18 : 1
+                        )
+                        .rotationEffect(
+                            .degrees(isStarHovered && !reduceMotion ? -8 : 0)
+                        )
+                        .shadow(
+                            color: CompactPopoverPalette.warningColor.opacity(
+                                isStarHovered ? 0.28 : 0
+                            ),
+                            radius: isStarHovered ? 6 : 0
+                        )
+                        .contentShape(Circle())
+                }
+                .buttonStyle(SettingsPressFeedbackButtonStyle(pressedScale: 0.92))
+                .onHover { isStarHovered = $0 }
+                .animation(
+                    reduceMotion
+                        ? nil
+                        : .spring(response: 0.28, dampingFraction: 0.72),
+                    value: isStarHovered
+                )
+                .help("在 GitHub 为 MyToken 点 Star")
+                .accessibilityLabel("在 GitHub 为 MyToken 点 Star")
+
                 Spacer(minLength: 12)
-
-                Link(destination: currentReleaseURL) {
-                    Label("GitHub", systemImage: "arrow.up.right.square")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .accessibilityLabel("在 GitHub 查看当前版本")
-
-                Button {
-                    Task { await environment.loadReleaseHistoryIfNeeded(force: true) }
-                } label: {
-                    Label("获取当前版本日志", systemImage: "arrow.clockwise")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .accessibilityLabel("获取当前版本日志")
             }
+            .padding(.vertical, 7)
 
-            Divider()
+            SettingsRowDivider()
 
-            Text("当前版本更新日志")
-                .font(.system(size: 14, weight: .semibold))
+            VStack(alignment: .leading, spacing: 10) {
+                SettingsSectionHeader(
+                    title: "更新内容",
+                    systemImage: "doc.text"
+                )
 
-            currentReleaseNotes
+                currentReleaseNotes
 
-            HStack {
                 Button("查看历史版本") {
                     showingReleaseHistory = true
                 }
                 .liquidGlassButton()
                 .accessibilityLabel("查看历史版本更新日志")
-
-                Spacer(minLength: 0)
             }
+            .padding(.top, 12)
+            .padding(.bottom, 7)
         }
     }
 
@@ -105,81 +133,112 @@ struct HelpUpdateView: View {
             }
         case let .loaded(releases):
             if let current = releases.first(where: { $0.version == RoutinUsageApp.currentVersion }) {
-                UpdateNotesView(notes: current.notes)
+                CurrentReleaseNotesView(notes: current.notes)
             } else {
                 Text("此版本未提供更新日志")
-                    .font(.system(size: 12))
+                    .font(SettingsTypography.secondary)
                     .foregroundStyle(.secondary)
             }
         }
     }
 
-    /// 版本区块下方的 GitHub Star 引导；用户关闭后不再显示。
-    @ViewBuilder
-    private var starPromptSection: some View {
-        if !environment.settings.starPromptDismissed {
-            StarPromptBanner {
-                environment.settings.starPromptDismissed = true
+    private var advancedSection: some View {
+        SettingsGroup(
+            title: "高级",
+            subtitle: "仅当更新检查频繁受限或网络环境特殊时使用。"
+        ) {
+            Button {
+                withAnimation(
+                    reduceMotion
+                        ? nil
+                        : .spring(response: 0.3, dampingFraction: 0.9)
+                ) {
+                    showsAdvancedSettings.toggle()
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    SettingsIconBadge(
+                        systemImage: "key.horizontal",
+                        tint: Color.accentColor
+                    )
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("GitHub 令牌")
+                            .font(SettingsTypography.rowTitle)
+                        Text("公开仓库只读令牌即可；配置后可提高更新检查频率。")
+                            .font(SettingsTypography.secondary)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer(minLength: 12)
+
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(showsAdvancedSettings ? 180 : 0))
+                }
+                .padding(.vertical, 9)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(SettingsPressFeedbackButtonStyle(pressedScale: 0.995))
+            .accessibilityLabel("GitHub 令牌高级设置")
+            .accessibilityValue(showsAdvancedSettings ? "已展开" : "已收起")
+
+            if showsAdvancedSettings {
+                SettingsRowDivider()
+                    .padding(.top, 2)
+
+                githubTokenContent
+                    .padding(.top, 10)
+                    .padding(.bottom, 5)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
     }
 
-    private var currentReleaseURL: URL {
-        guard case let .loaded(releases) = environment.releaseHistoryState,
-              let current = releases.first(where: { $0.version == RoutinUsageApp.currentVersion }) else {
-            return RoutinUsageApp.releasesURL
-        }
-        return current.releaseURL
-    }
-
-    private var githubTokenSection: some View {
-        settingSection {
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("GitHub 令牌")
-                        .font(.system(size: 14, weight: .semibold))
-
-                    Text("检查更新时使用。带令牌每小时 5000 次请求，不带仅 60 次；公开仓库只读权限即可。")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer(minLength: 12)
-
+    private var githubTokenContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
                 if let githubTokenMask {
                     Text(githubTokenMask)
-                        .font(.system(size: 13, design: .monospaced))
+                        .font(.system(size: 12.5, design: .monospaced))
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                         .accessibilityLabel("已保存 GitHub 令牌")
+
+                    Spacer(minLength: 12)
 
                     Button("移除") {
                         removeGitHubToken()
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+                    .liquidGlassButton()
                     .accessibilityLabel("移除 GitHub 令牌")
-                }
-            }
-
-            if githubTokenMask == nil {
-                HStack(spacing: 12) {
-                    SecureField("ghp_ 或 github_pat_ 令牌", text: $githubTokenInput)
-                        .textFieldStyle(.roundedBorder)
-                        .accessibilityLabel("GitHub 令牌输入框")
+                } else {
+                    SettingsLabeledTextField(
+                        text: $githubTokenInput,
+                        prompt: "ghp_ 或 github_pat_ 令牌",
+                        isSecret: true,
+                        canReveal: !githubTokenInput.isEmpty
+                    )
+                    .accessibilityLabel("GitHub 令牌输入框")
 
                     Button("保存") {
                         saveGitHubToken()
                     }
-                    .buttonStyle(.bordered)
+                    .liquidGlassButton(prominent: true)
                     .disabled(githubTokenInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .accessibilityLabel("保存 GitHub 令牌")
                 }
             }
+            .padding(.vertical, 7)
 
             if let githubTokenMessage {
-                Text(githubTokenMessage)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                SettingsNotice(
+                    tone: githubTokenMessageTone,
+                    message: githubTokenMessage
+                )
+                .padding(.bottom, 7)
             }
         }
     }
@@ -190,8 +249,10 @@ struct HelpUpdateView: View {
             githubTokenInput = ""
             githubTokenMask = environment.gitHubTokenStore.tokenMask()
             githubTokenMessage = "GitHub 令牌已保存到应用本地存储"
+            githubTokenMessageTone = .success
         } catch {
             githubTokenMessage = "GitHub 令牌保存失败，请重试"
+            githubTokenMessageTone = .error
         }
     }
 
@@ -199,37 +260,42 @@ struct HelpUpdateView: View {
         environment.gitHubTokenStore.removeToken()
         githubTokenMask = nil
         githubTokenMessage = nil
+        githubTokenMessageTone = .info
     }
 
     private var updateSection: some View {
         @Bindable var settings = environment.settings
-        return settingSection {
-            Text("应用更新")
-                .font(.system(size: 14, weight: .semibold))
+        return SettingsGroup(
+            title: "应用更新",
+            subtitle: "选择检查与下载更新时使用的网络通道。"
+        ) {
+            VStack(alignment: .leading, spacing: 10) {
+                SettingsSegmentedControl(
+                    options: UpdateChannel.allCases,
+                    selection: $settings.updateChannel,
+                    title: { channel in
+                        channel == .direct ? "GitHub 直连" : "CDN 加速"
+                    },
+                    accessibilityLabel: "更新通道"
+                )
 
-            Picker("更新通道", selection: $settings.updateChannel) {
-                Text("GitHub 直连").tag(UpdateChannel.direct)
-                Text("CDN 加速").tag(UpdateChannel.cdn)
-            }
-            .pickerStyle(.segmented)
-            .accessibilityLabel("更新通道")
-
-            if environment.settings.updateChannel == .cdn {
-                Picker("CDN 源", selection: $settings.updateCDNBase) {
-                    ForEach(AppSettings.cdnBases, id: \.self) { base in
-                        Text(base.replacingOccurrences(of: "https://", with: "")).tag(base)
+                if environment.settings.updateChannel == .cdn {
+                    Picker("CDN 源", selection: $settings.updateCDNBase) {
+                        ForEach(AppSettings.cdnBases, id: \.self) { base in
+                            Text(base.replacingOccurrences(of: "https://", with: "")).tag(base)
+                        }
                     }
+                    .accessibilityLabel("CDN 加速源")
+
+                    SettingsHintText(text: "大陆网络建议选择 CDN 加速；若某镜像不可用可切换其他源。")
                 }
-                .accessibilityLabel("CDN 加速源")
 
-                Text("大陆网络建议选择 CDN 加速；若某镜像不可用可切换其他源。")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                SettingsRowDivider()
+                    .padding(.vertical, 2)
+
+                updateStatusContent
             }
-
-            Divider()
-
-            updateStatusContent
+            .padding(.bottom, 7)
         }
     }
 
@@ -238,17 +304,18 @@ struct HelpUpdateView: View {
         switch environment.updateStatus {
         case .idle:
             HStack(spacing: 12) {
-                Button("检测更新") {
+                Button("检查更新") {
                     Task { await environment.checkForUpdates() }
                 }
                 .liquidGlassButton()
-                .accessibilityLabel("检测更新")
+                .accessibilityLabel("检查更新")
 
                 Spacer(minLength: 0)
             }
         case .checking:
             HStack {
                 Text("正在检查更新")
+                    .font(SettingsTypography.body)
                 Spacer(minLength: 8)
                 ProgressView()
                     .controlSize(.small)
@@ -260,17 +327,18 @@ struct HelpUpdateView: View {
         case let .downloading(progress):
             downloadingUpdate(progress)
         case let .completed(version):
-            HStack(spacing: 8) {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(CompactPopoverPalette.positive(colorScheme))
-                    .accessibilityHidden(true)
-                Text("更新完成，当前版本 \(version)")
-            }
-            .accessibilityElement(children: .combine)
+            SettingsNotice(
+                tone: .success,
+                message: "当前版本 \(version)",
+                title: "更新完成"
+            )
         case let .failed(message):
             VStack(alignment: .leading, spacing: 12) {
-                Text(message)
-                    .foregroundStyle(CompactPopoverPalette.criticalColor)
+                SettingsNotice(
+                    tone: .error,
+                    message: message,
+                    title: "检查更新失败"
+                )
 
                 Button("重试") {
                     Task { await environment.checkForUpdates() }
@@ -282,10 +350,14 @@ struct HelpUpdateView: View {
 
     private func availableUpdate(_ update: AppUpdate) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("发现新版本 \(update.version)")
-                .font(.system(size: 14, weight: .semibold))
+            SettingsNotice(
+                tone: .info,
+                message: "下载完成后可替换当前版本。",
+                title: "发现新版本 \(update.version)",
+                systemImage: "arrow.down.circle.fill"
+            )
 
-            UpdateNotesView(notes: update.notes)
+            UpdateNotesView(notes: update.notes, style: .reading)
 
             HStack(spacing: 12) {
                 Button("安装更新") {
@@ -295,7 +367,8 @@ struct HelpUpdateView: View {
                 .accessibilityLabel("安装更新")
 
                 Link("查看发布说明", destination: update.releaseURL)
-                    .font(.system(size: 12))
+                    .font(SettingsTypography.secondary)
+                    .buttonStyle(SettingsPressFeedbackButtonStyle(pressedScale: 0.99))
                     .accessibilityLabel("查看发布说明")
 
                 Spacer(minLength: 0)
@@ -307,10 +380,12 @@ struct HelpUpdateView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("正在下载更新")
+                    .font(SettingsTypography.body)
                 Spacer(minLength: 8)
 
                 if let progress {
                     Text("\(Int(progress * 100))%")
+                        .font(SettingsTypography.numeric)
                         .monospacedDigit()
                 }
             }
@@ -328,127 +403,145 @@ struct HelpUpdateView: View {
     }
 
     private var feedbackSection: some View {
-        settingSection {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("遇到问题？")
-                        .font(.system(size: 14, weight: .semibold))
+        SettingsGroup(
+            title: "帮助与反馈",
+            subtitle: "发送问题描述和本地诊断日志，帮助我们定位问题。"
+        ) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    Button("导出诊断日志") {
+                        Task { await environment.exportDiagnosticsLog() }
+                    }
+                    .liquidGlassButton()
+                    .accessibilityLabel("导出诊断日志")
 
-                    Text("发送问题描述和本地诊断日志")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                    Button("提交问题") {
+                        Task { await environment.openIssueReport() }
+                    }
+                    .liquidGlassButton()
+                    .accessibilityLabel("提交问题")
+
+                    Spacer(minLength: 0)
                 }
+                .padding(.vertical, 7)
 
-                Spacer(minLength: 16)
-
-                Button("导出诊断日志") {
-                    Task { await environment.exportDiagnosticsLog() }
+                if let message = environment.diagnosticsExportMessage {
+                    SettingsNotice(tone: .info, message: message)
+                        .padding(.bottom, 7)
                 }
-                .liquidGlassButton()
-                .accessibilityLabel("导出诊断日志")
-
-                Button("提交问题") {
-                    Task { await environment.openIssueReport() }
-                }
-                .liquidGlassButton()
-                .accessibilityLabel("提交问题")
-            }
-
-            if let message = environment.diagnosticsExportMessage {
-                Text(message)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
             }
         }
-    }
-
-    private func settingSection<Content: View>(
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            content()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
-        .liquidGlassSurface()
     }
 }
 
-/// 版本区块附近的 GitHub Star 引导条：星标图标 + 引导文案 + 去点 Star 按钮 + 关闭按钮。
-private struct StarPromptBanner: View {
+private struct CurrentReleaseNotesView: View {
+    let notes: String
+
     @Environment(\.colorScheme) private var colorScheme
-    let onDismiss: () -> Void
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            Image(systemName: "star.fill")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(CompactPopoverPalette.warningColor)
+        let items = UpdateReleaseSummaryBuilder.items(from: notes)
+        if items.isEmpty || !UpdateReleaseSummaryBuilder.supportsSummaryLayout(notes: notes) {
+            UpdateNotesView(notes: notes, style: .reading)
+        } else {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    summaryRow(item)
+                    .padding(.vertical, 8)
+
+                    if index < items.count - 1 {
+                        SettingsRowDivider()
+                            .padding(.leading, 31)
+                    }
+                }
+            }
+        }
+    }
+
+    private func summaryRow(_ item: UpdateReleaseSummaryItem) -> some View {
+        HStack(alignment: .center, spacing: 9) {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(item.category.tint(colorScheme).opacity(0.12))
+                .frame(width: 22, height: 22)
+                .overlay {
+                    Image(systemName: item.category.systemImage)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(item.category.tint(colorScheme))
+                }
                 .accessibilityHidden(true)
 
-            Text("如果 MyToken 帮到了你，请在 GitHub 点个 Star，这对我们意义重大")
-                .font(.system(size: 13))
+            Text(item.text)
+                .font(SettingsTypography.body)
+                .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
-
-            Spacer(minLength: 12)
-
-            Link(destination: RoutinUsageApp.githubURL) {
-                Label("去点 Star", systemImage: "arrow.up.right.square")
-                    .font(.system(size: 12, weight: .semibold))
-            }
-            .liquidGlassButton(prominent: true)
-            .accessibilityLabel("在 GitHub 打开 MyToken 仓库并为项目点 Star")
-
-            Button(action: onDismiss) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .semibold))
-                    .frame(width: 20, height: 20)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-            .accessibilityLabel("关闭 Star 引导")
+                .textSelection(.enabled)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(CompactPopoverPalette.warningColor.opacity(colorScheme == .dark ? 0.14 : 0.10))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(CompactPopoverPalette.warningColor.opacity(0.28), lineWidth: 1)
-        )
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(item.category.title)，\(item.text)")
+    }
+}
+
+private extension UpdateReleaseChangeCategory {
+    var systemImage: String {
+        switch self {
+        case .added:
+            return "plus"
+        case .fixed:
+            return "wrench.and.screwdriver"
+        case .improved:
+            return "sparkles"
+        case .other:
+            return "circle.fill"
+        }
+    }
+
+    func tint(_ colorScheme: ColorScheme) -> Color {
+        switch self {
+        case .added:
+            return .accentColor
+        case .fixed:
+            return CompactPopoverPalette.warningColor
+        case .improved:
+            return CompactPopoverPalette.positive(colorScheme)
+        case .other:
+            return .secondary
+        }
     }
 }
 
 private struct ReleaseHistorySheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
 
     let state: AppReleaseHistoryState
     let onRetry: () async -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text("历史版本更新日志")
-                    .font(.system(size: 20, weight: .semibold))
+            HStack(alignment: .center, spacing: 12) {
+                SettingsModalTitle(
+                    "历史版本更新日志",
+                    subtitle: "按发布时间倒序展示 macOS 版本"
+                )
 
                 Spacer(minLength: 16)
 
-                Button("完成") {
-                    dismiss()
-                }
-                .keyboardShortcut(.cancelAction)
+                SettingsCloseButton(action: { dismiss() })
             }
-            .padding(20)
+            .padding(.horizontal, SettingsDesign.modalPadding)
+            .padding(.top, SettingsDesign.modalPadding)
+            .padding(.bottom, SettingsDesign.modalHeaderSpacing)
 
-            Divider()
+            Rectangle()
+                .fill(Color.primary.opacity(0.08))
+                .frame(height: 0.8)
 
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .frame(minWidth: 560, minHeight: 520)
+        .frame(minWidth: 600, minHeight: 540)
+        .onExitCommand(perform: { dismiss() })
     }
 
     @ViewBuilder
@@ -459,13 +552,17 @@ private struct ReleaseHistorySheet: View {
                 ProgressView()
                     .controlSize(.small)
                 Text("正在加载更新日志")
+                    .font(SettingsTypography.body)
                     .foregroundStyle(.secondary)
             }
             .padding(24)
         case let .failed(message):
             VStack(alignment: .leading, spacing: 12) {
-                Text(message)
-                    .foregroundStyle(CompactPopoverPalette.criticalColor)
+                SettingsNotice(
+                    tone: .error,
+                    message: message,
+                    title: "无法加载更新日志"
+                )
 
                 Button("重试") {
                     Task { await onRetry() }
@@ -475,48 +572,58 @@ private struct ReleaseHistorySheet: View {
             .padding(24)
         case let .loaded(releases):
             if releases.isEmpty {
-                Text("暂无历史版本更新日志")
-                    .foregroundStyle(.secondary)
-                    .padding(24)
+                ContentUnavailableView(
+                    "暂无历史版本更新日志",
+                    systemImage: "clock.arrow.circlepath"
+                )
+                .padding(24)
             } else {
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(Array(releases.enumerated()), id: \.element.id) { index, release in
+                    LazyVStack(alignment: .leading, spacing: 12) {
+                        ForEach(releases, id: \.id) { release in
                             releaseRow(release)
-
-                            if index < releases.count - 1 {
-                                Divider()
-                            }
                         }
                     }
-                    .padding(.horizontal, 24)
+                    .padding(SettingsDesign.modalPadding)
                 }
             }
         }
     }
 
     private func releaseRow(_ release: AppReleaseHistoryItem) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("v\(release.version)")
-                    .font(.system(size: 14, weight: .semibold))
-
-                Spacer(minLength: 12)
-
-                if let publishedAt = release.publishedAt {
-                    Text(UsageFormatter.shortDateText(publishedAt))
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+        SettingsPanel {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("v\(release.version)")
+                        .font(.system(size: 12.5, weight: .semibold, design: .monospaced))
                         .monospacedDigit()
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(
+                            Color.primary.opacity(0.055),
+                            in: Capsule()
+                        )
+
+                    Spacer(minLength: 12)
+
+                    if let publishedAt = release.publishedAt {
+                        Text(UsageFormatter.shortDateText(publishedAt))
+                            .font(SettingsTypography.secondary)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
                 }
+
+                UpdateNotesView(notes: release.notes, style: .reading)
+
+                Link(destination: release.releaseURL) {
+                    Label("在 GitHub 查看", systemImage: "arrow.up.right")
+                        .font(SettingsTypography.secondary.weight(.medium))
+                }
+                .buttonStyle(SettingsPressFeedbackButtonStyle(pressedScale: 0.99))
+                .foregroundStyle(Color.accentColor)
             }
-
-            UpdateNotesView(notes: release.notes)
-
-            Link("在 GitHub 查看", destination: release.releaseURL)
-                .font(.system(size: 12))
         }
-        .padding(.vertical, 16)
         .accessibilityElement(children: .contain)
     }
 }

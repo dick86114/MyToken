@@ -16,7 +16,7 @@ final class CompactUsageCardPresentationTests: XCTestCase {
                 progressMetric(id: "five-hour", percent: 10),
                 progressMetric(id: "weekly", percent: 20)
             ]),
-            .horizontalGauges
+            .verticalGauges
         )
         XCTAssertEqual(
             CompactUsageCardPresentation.arrangement(for: [
@@ -122,27 +122,62 @@ final class CompactUsageCardPresentationTests: XCTestCase {
             windowEnd: date("2026-09-24 18:29:00")
         )
         let idle = progressMetric(id: "five-hour", percent: 0)
+        let longWindow = progressMetric(
+            id: "monthly",
+            percent: 20,
+            windowEnd: date("2026-10-02 12:30:00")
+        )
 
         let zone = TimeZone(secondsFromGMT: 8 * 3600)!
         XCTAssertEqual(
             CompactUsageCardPresentation.subtitle(for: sameDay, now: now, timeZone: zone),
-            "重置 17:22"
+            "22 分后重置"
         )
         XCTAssertEqual(
             CompactUsageCardPresentation.subtitle(for: nextDay, now: now, timeZone: zone),
-            "09-28 00:00"
+            "5 天 7 小时后重置"
         )
         XCTAssertEqual(
             CompactUsageCardPresentation.subtitle(for: warning, now: now, timeZone: zone),
-            "09-24 18:29"
+            "2 天 1 小时后重置"
         )
         XCTAssertEqual(
             CompactUsageCardPresentation.subtitle(for: idle, now: now, timeZone: zone),
             "待命中"
         )
+        XCTAssertEqual(
+            CompactUsageCardPresentation.subtitle(for: longWindow, now: now, timeZone: zone),
+            "10-02 12:30 后重置"
+        )
+    }
+
+    func test单套餐简洁卡片显示剩余额度与到期日() {
+        let zone = TimeZone(secondsFromGMT: 8 * 3600)!
+        let now = date("2026-11-17 12:00:00")
+        let metric = NormalizedUsageMetric(
+            id: "plan-total",
+            label: "套餐总量",
+            used: 5_000,
+            limit: 20_000,
+            remaining: 15_000,
+            unit: .request,
+            windowEnd: date("2026-12-01 00:00:00"),
+            presentation: .progress,
+            semantic: .usedQuota
+        )
+
+        XCTAssertEqual(
+            CompactUsageCardPresentation.singleMetricSubtitle(
+                for: metric,
+                now: now,
+                timeZone: zone
+            ),
+            "剩余 15,000 · 12/01 到期"
+        )
     }
 
     func test重置卡文案无卡隐藏有卡展示数量和到期清单() {
+        let now = date("2026-11-07 12:00:00")
         let cards = [
             UsageResetCard(expiresAt: date("2026-11-07 17:42:45")),
             UsageResetCard(expiresAt: date("2026-12-22 23:59:59"))
@@ -151,11 +186,15 @@ final class CompactUsageCardPresentationTests: XCTestCase {
         XCTAssertFalse(UsageResetCardPresentation.isVisible(cards: []))
         XCTAssertTrue(UsageResetCardPresentation.isVisible(cards: cards))
         XCTAssertEqual(UsageResetCardPresentation.badgeText(cards: cards), "2")
-        XCTAssertEqual(UsageResetCardPresentation.detailText(cards: cards), "2 张重置卡")
         XCTAssertEqual(
-            UsageResetCardPresentation.accessibilityText(cards: cards),
-            "2 张重置卡"
+            UsageResetCardPresentation.detailText(
+                cards: cards,
+                now: now,
+                timeZone: TimeZone(secondsFromGMT: 8 * 3600)!
+            ),
+            "2 张 · 最早 今天 17:42"
         )
+        XCTAssertTrue(UsageResetCardPresentation.accessibilityText(cards: cards).contains("2 张重置卡"))
     }
 
     private func balanceMetric() -> NormalizedUsageMetric {

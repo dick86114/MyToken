@@ -531,8 +531,8 @@ final class TransferCryptoTests: XCTestCase {
         let source = try TestSourceReader.read([
             "RoutinUsage", "Views", "Settings", "TransferToAndroidView.swift"
         ])
-        let managementSource = try TestSourceReader.read([
-            "RoutinUsage", "Views", "Settings", "CredentialManagementView.swift"
+        let generalSource = try TestSourceReader.read([
+            "RoutinUsage", "Views", "Settings", "GeneralSettingsView.swift"
         ])
 
         XCTAssertTrue(source.contains("qrCodeGenerator"))
@@ -542,8 +542,16 @@ final class TransferCryptoTests: XCTestCase {
         XCTAssertTrue(source.contains("onDisappear"))
         XCTAssertTrue(source.contains("stop()"))
         XCTAssertTrue(source.contains("迁移到 Android"))
-        XCTAssertTrue(managementSource.contains("TransferToAndroidView"))
-        XCTAssertTrue(managementSource.contains("迁移到 Android"))
+        XCTAssertTrue(source.contains("重新生成二维码"))
+        XCTAssertTrue(source.contains("func restart() async"))
+        XCTAssertTrue(source.contains("private var canRetry"))
+        XCTAssertTrue(source.contains("Button(\"完成\", action: onClose)"))
+        XCTAssertTrue(source.contains(".frame(minHeight: 620, idealHeight: 680, maxHeight: 820)"))
+        let qrIndex = try XCTUnwrap(source.range(of: "qrSection(payload: encoded)")?.lowerBound)
+        let summaryIndex = try XCTUnwrap(source.range(of: "credentialSummary")?.lowerBound)
+        XCTAssertLessThan(qrIndex, summaryIndex)
+        XCTAssertTrue(generalSource.contains("TransferToAndroidView"))
+        XCTAssertTrue(generalSource.contains("迁移到 Android"))
     }
 
     // MARK: - Helpers

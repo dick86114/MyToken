@@ -25,19 +25,32 @@ enum UsageMetricGridPolicy {
                 showsAmountDetails: false
             )
         case .volcengine:
-            return UsageMetricGridLayout(metrics: metrics, columns: 2)
+            return UsageMetricGridLayout(
+                metrics: metrics,
+                columns: metrics.count >= 3 ? 3 : 2
+            )
         case .deepseek:
-            return UsageMetricGridLayout(metrics: metrics, columns: 2)
+            return UsageMetricGridLayout(
+                metrics: metrics,
+                columns: metrics.count == 1 ? 1 : 2
+            )
         case .routin:
-            return UsageMetricGridLayout(metrics: metrics, columns: 2)
+            return UsageMetricGridLayout(
+                metrics: metrics,
+                columns: metrics.count == 1 ? 1 : 2
+            )
         case .newAPI:
             return UsageMetricGridLayout(metrics: metrics, columns: 2)
         case .commandCode:
-            return UsageMetricGridLayout(metrics: metrics, columns: 2)
+            return UsageMetricGridLayout(metrics: metrics, columns: 3)
         case .xiaomi:
-            return UsageMetricGridLayout(metrics: metrics, columns: 2)
+            let visibleMetrics = metrics.filter { $0.presentation != .status }
+            return UsageMetricGridLayout(
+                metrics: visibleMetrics,
+                columns: visibleMetrics.count == 1 ? 1 : 2
+            )
         case .opencode:
-            return UsageMetricGridLayout(metrics: metrics, columns: 2)
+            return UsageMetricGridLayout(metrics: metrics, columns: 3)
         }
     }
 }
@@ -48,13 +61,16 @@ struct NormalizedUsageMetricGrid: View {
     var resetTimeStyle: NormalizedUsageMetricResetStyle = .fullDateTime
     var now: Date = .now
     var showsAmountDetails: Bool = true
+    var showsRemainingDuration: Bool = true
+    var visualStyle: UsageMetricsVisualStyle = .standard
+    var showsResetCards: Bool = true
 
     var body: some View {
         let rows = stride(from: 0, to: metrics.count, by: columns).map {
             Array(metrics[$0..<min($0 + columns, metrics.count)])
         }
 
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: visualStyle.rowSpacing) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 if row.count == 1, let metric = row.first, metric.id == "monthly" {
                     NormalizedUsageMetricCell(
@@ -62,18 +78,24 @@ struct NormalizedUsageMetricGrid: View {
                         resetTimeStyle: resetTimeStyle,
                         now: now,
                         showsAmountDetails: showsAmountDetails,
-                        spansAllColumns: true
+                        showsRemainingDuration: showsRemainingDuration,
+                        spansAllColumns: true,
+                        visualStyle: visualStyle,
+                        showsResetCards: showsResetCards
                     )
                     .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    HStack(alignment: .top, spacing: 16) {
+                    HStack(alignment: .top, spacing: visualStyle.columnSpacing) {
                         ForEach(0..<columns, id: \.self) { columnIndex in
                             if columnIndex < row.count {
                                 NormalizedUsageMetricCell(
                                     metric: row[columnIndex],
                                     resetTimeStyle: resetTimeStyle,
                                     now: now,
-                                    showsAmountDetails: showsAmountDetails
+                                    showsAmountDetails: showsAmountDetails,
+                                    showsRemainingDuration: showsRemainingDuration,
+                                    visualStyle: visualStyle,
+                                    showsResetCards: showsResetCards
                                 )
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             } else {
@@ -94,7 +116,10 @@ private struct NormalizedUsageMetricCell: View {
     let resetTimeStyle: NormalizedUsageMetricResetStyle
     let now: Date
     var showsAmountDetails: Bool = true
+    var showsRemainingDuration: Bool = true
     var spansAllColumns: Bool = false
+    var visualStyle: UsageMetricsVisualStyle = .standard
+    var showsResetCards: Bool = true
 
     var body: some View {
         switch metric.presentation {
@@ -112,27 +137,27 @@ private struct NormalizedUsageMetricCell: View {
     private var progressCell: some View {
         let percent = metric.displayedPercent ?? 0
         let percentText = UsageFormatter.displayPercentText(metric.displayedPercent)
-        let usesFullWidthDetails = spansAllColumns || metric.id == "monthly"
+        let usesFullWidthDetails = spansAllColumns
 
         return VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(metric.label)
-                    .font(.system(size: 12))
+                    .font(.system(size: visualStyle.progressLabelSize, weight: .medium))
                     .foregroundStyle(.tertiary)
                 Spacer(minLength: 4)
                 Text(percentText)
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .font(.system(size: visualStyle.valueSize, weight: .semibold, design: .monospaced))
                     .foregroundStyle(.primary)
                     .monospacedDigit()
             }
 
-            UsageMetricProgressBar(percent: percent)
+            UsageMetricProgressBar(percent: percent, height: visualStyle.progressHeight)
 
             if showsAmountDetails, let used = metric.used, let limit = metric.limit {
                 if usesFullWidthDetails {
                     HStack(alignment: .firstTextBaseline, spacing: 12) {
                         Text("已用 \(decimalText(used)) / \(decimalText(limit))")
-                            .font(.system(size: 10))
+                            .font(.system(size: visualStyle.detailSize))
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
                             .fixedSize(horizontal: false, vertical: true)
@@ -141,7 +166,7 @@ private struct NormalizedUsageMetricCell: View {
 
                         if let remaining = metric.remaining {
                             Text("剩余 \(decimalText(remaining))")
-                                .font(.system(size: 10))
+                                .font(.system(size: visualStyle.detailSize))
                                 .foregroundStyle(.secondary)
                                 .monospacedDigit()
                                 .fixedSize(horizontal: false, vertical: true)
@@ -149,14 +174,14 @@ private struct NormalizedUsageMetricCell: View {
                     }
                 } else {
                     Text("已用 \(decimalText(used)) / \(decimalText(limit))")
-                        .font(.system(size: 10))
+                        .font(.system(size: visualStyle.detailSize))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                         .fixedSize(horizontal: false, vertical: true)
 
                     if let remaining = metric.remaining {
                         Text("剩余 \(decimalText(remaining))")
-                            .font(.system(size: 10))
+                            .font(.system(size: visualStyle.detailSize))
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
                     }
@@ -167,22 +192,22 @@ private struct NormalizedUsageMetricCell: View {
                 switch resetTimeStyle {
                 case .fullDateTime:
                     Text("重置 \(UsageFormatter.fullDateTime(windowEnd))")
-                        .font(.system(size: 10))
+                        .font(.system(size: visualStyle.detailSize))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                         .fixedSize(horizontal: false, vertical: true)
                 case .resetTimeOnly:
                     Text("重置 \(UsageFormatter.resetTime(windowEnd, now: now))")
-                        .font(.system(size: 10))
+                        .font(.system(size: visualStyle.detailSize))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                         .fixedSize(horizontal: false, vertical: true)
                         .help("重置 \(UsageFormatter.fullDateTime(windowEnd))")
                 case .relativeDuration:
-                    if usesFullWidthDetails {
+                    if usesFullWidthDetails && showsRemainingDuration {
                         HStack(alignment: .firstTextBaseline, spacing: 12) {
                             Text("重置 \(UsageFormatter.resetTime(windowEnd, now: now))")
-                                .font(.system(size: 10))
+                                .font(.system(size: visualStyle.detailSize))
                                 .foregroundStyle(.secondary)
                                 .monospacedDigit()
                                 .fixedSize(horizontal: false, vertical: true)
@@ -191,7 +216,7 @@ private struct NormalizedUsageMetricCell: View {
                             Spacer(minLength: 12)
 
                             Text("剩余 \(UsageFormatter.remainingDurationText(until: windowEnd, now: now))")
-                                .font(.system(size: 10))
+                                .font(.system(size: visualStyle.detailSize))
                                 .foregroundStyle(
                                     UsageFormatter.shouldHighlightRemainingDuration(
                                         for: metric,
@@ -203,27 +228,33 @@ private struct NormalizedUsageMetricCell: View {
                         }
                     } else {
                         Text("重置 \(UsageFormatter.resetTime(windowEnd, now: now))")
-                            .font(.system(size: 10))
+                            .font(.system(size: visualStyle.detailSize))
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
                             .fixedSize(horizontal: false, vertical: true)
                             .help("重置 \(UsageFormatter.fullDateTime(windowEnd))")
 
-                        Text("剩余 \(UsageFormatter.remainingDurationText(until: windowEnd, now: now))")
-                            .font(.system(size: 10))
-                            .foregroundStyle(
-                                UsageFormatter.shouldHighlightRemainingDuration(
-                                    for: metric,
-                                    now: now
-                                ) ? CompactPopoverPalette.positive(colorScheme) : Color.secondary
-                            )
-                            .monospacedDigit()
-                            .fixedSize(horizontal: false, vertical: true)
+                        if showsRemainingDuration {
+                            Text("剩余 \(UsageFormatter.remainingDurationText(until: windowEnd, now: now))")
+                                .font(.system(size: visualStyle.detailSize))
+                                .foregroundStyle(
+                                    UsageFormatter.shouldHighlightRemainingDuration(
+                                        for: metric,
+                                        now: now
+                                    ) ? CompactPopoverPalette.positive(colorScheme) : Color.secondary
+                                )
+                                .monospacedDigit()
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                 }
             }
-            if !metric.resetCards.isEmpty {
-                UsageResetCardsBadge(resetCards: metric.resetCards, style: .detail)
+            if showsResetCards, !metric.resetCards.isEmpty {
+                UsageResetCardsBadge(
+                    resetCards: metric.resetCards,
+                    style: .detail,
+                    now: now
+                )
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -244,7 +275,7 @@ private struct NormalizedUsageMetricCell: View {
         if isDeepSeekSummary {
             VStack(alignment: .leading, spacing: 4) {
                 Text(UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode))
-                    .font(.system(size: 20, weight: .semibold, design: .monospaced))
+                    .font(.system(size: visualStyle.balanceAmountSize, weight: .semibold, design: .monospaced))
                     .foregroundStyle(healthColor)
                     .monospacedDigit()
                     .lineLimit(1)
@@ -259,11 +290,11 @@ private struct NormalizedUsageMetricCell: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(metric.label)
-                    .font(.system(size: 12))
+                    .font(.system(size: visualStyle.valueLabelSize))
                     .foregroundStyle(.tertiary)
                 Spacer(minLength: 4)
                 Text(UsageFormatter.currencyText(metric.value, currencyCode: metric.currencyCode))
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .font(.system(size: visualStyle.valueSize, weight: .semibold, design: .monospaced))
                     .foregroundStyle(healthColor)
                     .monospacedDigit()
             }
@@ -281,7 +312,7 @@ private struct NormalizedUsageMetricCell: View {
         if isDeepSeekSummary {
             VStack(alignment: .leading, spacing: 4) {
                 Text(metric.healthState == .unavailable ? "不可用" : "可用")
-                    .font(.system(size: 20, weight: .semibold, design: .monospaced))
+                    .font(.system(size: visualStyle.balanceAmountSize, weight: .semibold, design: .monospaced))
                     .foregroundStyle(metric.healthState == .unavailable ? CompactPopoverPalette.criticalColor : Color.primary)
                     .lineLimit(1)
 
@@ -296,11 +327,11 @@ private struct NormalizedUsageMetricCell: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(metric.label)
-                    .font(.system(size: 12))
+                    .font(.system(size: visualStyle.valueLabelSize))
                     .foregroundStyle(.tertiary)
                 Spacer(minLength: 4)
                 Text(metric.healthState == .unavailable ? "不可用" : "可用")
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .font(.system(size: visualStyle.valueSize, weight: .semibold, design: .monospaced))
                     .foregroundStyle(healthColor)
             }
             Text("账户状态")
@@ -320,7 +351,7 @@ private struct NormalizedUsageMetricCell: View {
         if isDeepSeekSummary {
             VStack(alignment: .leading, spacing: 4) {
                 Text(valueText)
-                    .font(.system(size: 20, weight: .semibold, design: .monospaced))
+                    .font(.system(size: visualStyle.balanceAmountSize, weight: .semibold, design: .monospaced))
                     .foregroundStyle(healthColor)
                     .monospacedDigit()
                     .lineLimit(1)
@@ -335,11 +366,11 @@ private struct NormalizedUsageMetricCell: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(metric.label)
-                        .font(.system(size: 12))
+                        .font(.system(size: visualStyle.valueLabelSize))
                         .foregroundStyle(.tertiary)
                     Spacer(minLength: 4)
                     Text(valueText)
-                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                        .font(.system(size: visualStyle.valueSize, weight: .semibold, design: .monospaced))
                         .monospacedDigit()
                 }
             }

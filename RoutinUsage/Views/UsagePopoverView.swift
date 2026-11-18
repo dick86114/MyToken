@@ -20,11 +20,9 @@ struct UsagePopoverView: View {
 
     @State private var providerFilter: ProviderID?
     @State private var selectedUpdate: AppUpdate?
-    @State private var isUpdateIndicatorVisible = true
     @State private var showRefreshSuccess = false
-    @State private var isVersionButtonHovered = false
-    @State private var isUpdateBadgeHovered = false
-    @State private var isCheckForUpdatesHovered = false
+    @State private var isUpdateChipHovered = false
+    @State private var isBrandLogoHovered = false
 
     init(
         store: UsageStore,
@@ -51,8 +49,8 @@ struct UsagePopoverView: View {
     var body: some View {
         VStack(spacing: 0) {
             toolbar
-                .padding(.horizontal, 14)
-                .padding(.top, 14)
+                .padding(.horizontal, 15)
+                .padding(.top, 13)
                 .padding(.bottom, 8)
 
             ScrollView(.vertical, showsIndicators: false) {
@@ -61,14 +59,11 @@ struct UsagePopoverView: View {
 
                     usageList
                         .padding(.top, 2)
-                        .padding(.bottom, 8)
+                        .padding(.bottom, 10)
 
                     footerStatuses
                         .padding(.horizontal, 16)
-                        .padding(.bottom, 8)
-
-                    Color.clear
-                        .frame(height: 58)
+                        .padding(.bottom, 10)
                 }
                 .background(
                     GeometryReader { geometry in
@@ -88,11 +83,8 @@ struct UsagePopoverView: View {
                     .frame(width: 4)
                     .padding(.trailing, 1)
             }
-            .overlay(alignment: .bottom) {
-                bottomBar
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 12)
-            }
+
+            bottomBar
         }
         .frame(width: 440)
         .environment(\.menuBarColorRules, settings.menuBarColorRules)
@@ -111,173 +103,168 @@ private extension UsagePopoverView {
             .resizable()
             .interpolation(.high)
             .scaledToFit()
-            .frame(width: 36, height: 36)
+            .frame(width: 25, height: 25)
     }
 
     var toolbar: some View {
         VStack(alignment: .leading, spacing: 6) {
-        HStack(spacing: 10) {
-            HStack(spacing: 6) {
-                Button {
-                    showVersionDetails()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "tag")
-                            .imageScale(.small)
-                        Text("v\(RoutinUsageApp.currentVersion)")
-                            .monospacedDigit()
-                    }
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .foregroundStyle(CompactPopoverPalette.chipText(colorScheme))
-                    .background {
-                        Capsule()
-                            .fill(CompactPopoverPalette.chipFill(hovered: isVersionButtonHovered, colorScheme))
-                    }
-                    .overlay {
-                        Capsule()
-                            .strokeBorder(CompactPopoverPalette.cardStroke(colorScheme), lineWidth: 1)
-                    }
-                    .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .onHover { isVersionButtonHovered = $0 }
-                .animation(.easeInOut(duration: 0.15), value: isVersionButtonHovered)
-                .help("查看当前版本更新内容")
-                .accessibilityLabel("当前版本 v\(RoutinUsageApp.currentVersion)，查看版本更新内容")
-
-                if case let .available(update) = updateStatus {
-                    Button {
-                        selectedUpdate = update
-                    } label: {
-                        Image(systemName: "arrow.up")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 22, height: 22)
-                            .background {
-                                Circle()
-                                    .fill(CompactPopoverPalette.brand(colorScheme))
-                            }
-                            .overlay {
-                                Circle()
-                                    .strokeBorder(CompactPopoverPalette.brand(colorScheme).opacity(0.45), lineWidth: 1)
-                            }
-                            .opacity(isUpdateIndicatorVisible ? 1 : 0.28)
-                            .scaleEffect(isUpdateBadgeHovered ? 1.08 : isUpdateIndicatorVisible ? 1 : 0.94)
-                            .onAppear {
-                                withAnimation(.easeInOut(duration: 0.72).repeatForever(autoreverses: true)) {
-                                    isUpdateIndicatorVisible = false
-                                }
-                            }
-                    }
-                    .buttonStyle(.plain)
-                    .onHover { isUpdateBadgeHovered = $0 }
-                    .help("查看 v\(update.version) 更新详情")
-                    .accessibilityLabel("发现新版本 v\(update.version)，查看更新详情")
-                } else {
+            HStack(spacing: 8) {
+                HStack(spacing: 7) {
                     Button {
                         Task { await checkForUpdates() }
                     } label: {
-                        Group {
-                            if updateStatus == .checking {
-                                TimelineView(.animation) { timeline in
-                                    let angle = timeline.date.timeIntervalSinceReferenceDate
-                                        .truncatingRemainder(dividingBy: 1) * 360
-                                    Image(systemName: "arrow.triangle.2.circlepath")
-                                        .rotationEffect(.degrees(angle))
+                        popoverBrandLogo
+                            .overlay {
+                                if updateStatus == .checking {
+                                    TimelineView(.animation) { timeline in
+                                        let angle = timeline.date.timeIntervalSinceReferenceDate
+                                            .truncatingRemainder(dividingBy: 1) * 360
+                                        Circle()
+                                            .trim(from: 0.08, to: 0.78)
+                                            .stroke(
+                                                CompactPopoverPalette.brand(colorScheme),
+                                                style: StrokeStyle(lineWidth: 1.6, lineCap: .round)
+                                            )
+                                            .rotationEffect(.degrees(angle))
+                                            .padding(-3)
+                                    }
+                                    .allowsHitTesting(false)
                                 }
-                            } else {
-                                Image(systemName: "arrow.triangle.2.circlepath")
                             }
-                        }
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(CompactPopoverPalette.chipText(colorScheme))
-                        .frame(width: 22, height: 22)
-                        .background {
-                            Circle()
-                                .fill(CompactPopoverPalette.chipFill(hovered: isCheckForUpdatesHovered, colorScheme))
-                        }
-                        .overlay {
-                            Circle()
-                                .strokeBorder(CompactPopoverPalette.cardStroke(colorScheme), lineWidth: 1)
-                        }
-                        .scaleEffect(isCheckForUpdatesHovered ? 1.06 : 1)
+                            .scaleEffect(isBrandLogoHovered ? 1.05 : 1)
+                            .animation(
+                                .spring(response: 0.3, dampingFraction: 0.9),
+                                value: isBrandLogoHovered
+                            )
                     }
                     .buttonStyle(.plain)
                     .disabled(updateStatus == .checking || isDownloadingUpdate)
-                    .onHover { isCheckForUpdatesHovered = $0 }
-                    .animation(.easeInOut(duration: 0.15), value: isCheckForUpdatesHovered)
+                    .onHover { isBrandLogoHovered = $0 }
                     .help(checkForUpdatesHelp)
                     .accessibilityLabel(checkForUpdatesAccessibilityLabel)
+
+                    Link(destination: RoutinUsageApp.websiteURL) {
+                        Text("MyToken")
+                            .font(.system(size: 13, weight: .semibold))
+                            .tracking(-0.01)
+                            .foregroundStyle(.primary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("打开 MyToken 官网")
+                    .accessibilityLabel("打开 MyToken 官网")
+                }
+
+                versionOrUpdateControl
+
+                Spacer(minLength: 8)
+
+                HStack(spacing: 6) {
+                    UsageCardDensitySegmentedControl(
+                        selection: $settings.usageCardDensity
+                    )
+
+                    GlassIconButton(
+                        action: { openSettings() },
+                        help: "设置"
+                    ) {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 14, weight: .medium))
+                    }
+                    .keyboardShortcut(",")
+                    .accessibilityLabel("打开设置")
                 }
             }
-            .overlay(alignment: .leading) {
-                EmptyView()
-            }
 
-            Spacer()
-
-            HStack(spacing: 8) {
-                UsageCardDensitySegmentedControl(
-                    selection: $settings.usageCardDensity
-                )
-
-                GlassIconButton(
-                    action: { openSettings() },
-                    help: "设置"
-                ) {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 14, weight: .medium))
-                }
-                .keyboardShortcut(",")
-                .accessibilityLabel("打开设置")
+            if case let .failed(message) = updateStatus {
+                // 失败只会在手动检测后出现，这里直接把具体原因交给用户。
+                Label(message, systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(CompactPopoverPalette.criticalColor)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(2)
+                    .help(message)
+                    .accessibilityElement(children: .combine)
             }
         }
-        .overlay(alignment: .center) {
-            Link(destination: RoutinUsageApp.websiteURL) {
-                popoverBrandLogo
+    }
+
+    @ViewBuilder
+    private var versionOrUpdateControl: some View {
+        if case let .available(update) = updateStatus {
+            Button {
+                selectedUpdate = update
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text("新版本")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text(update.version)
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .monospacedDigit()
+                }
+                .foregroundStyle(CompactPopoverPalette.brand(colorScheme))
+                .padding(.horizontal, 7)
+                .frame(height: 22)
+                .background {
+                    Capsule(style: .continuous)
+                        .fill(CompactPopoverPalette.brand(colorScheme).opacity(isUpdateChipHovered ? 0.16 : 0.10))
+                }
+                .overlay {
+                    Capsule(style: .continuous)
+                        .strokeBorder(
+                            CompactPopoverPalette.brand(colorScheme).opacity(isUpdateChipHovered ? 0.28 : 0.16),
+                            lineWidth: 1
+                        )
+                }
+                .contentShape(Capsule(style: .continuous))
             }
             .buttonStyle(.plain)
-            .help("打开 MyToken 官网")
-            .accessibilityLabel("打开 MyToken 官网")
-        }
-        if case let .failed(message) = updateStatus {
-            // 失败只会在手动检测后出现，这里直接把具体原因交给用户。
-            Label(message, systemImage: "exclamationmark.triangle.fill")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(CompactPopoverPalette.criticalColor)
-                .multilineTextAlignment(.leading)
-                .lineLimit(2)
-                .help(message)
-                .accessibilityElement(children: .combine)
+            .onHover { isUpdateChipHovered = $0 }
+            .animation(.easeOut(duration: 0.14), value: isUpdateChipHovered)
+            .help("查看 v\(update.version) 更新详情")
+            .accessibilityLabel("发现新版本 v\(update.version)，查看更新详情")
+        } else {
+            Button {
+                showVersionDetails()
+            } label: {
+                Text("v\(RoutinUsageApp.currentVersion)")
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .monospacedDigit()
+                    .foregroundStyle(CompactPopoverPalette.subtitle(colorScheme))
+                    .padding(.horizontal, 3)
+                    .frame(height: 22)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("查看当前版本更新内容")
+            .accessibilityLabel("当前版本 v\(RoutinUsageApp.currentVersion)，查看版本更新内容")
         }
     }
 
-    }
     var checkForUpdatesHelp: String {
         switch updateStatus {
         case .checking:
-            return "正在检测更新"
+            return "正在检查更新"
         case .downloading:
             return "正在下载更新"
         case .failed:
-            return "检测更新（上次检测失败）"
+            return "检查更新（上次检查失败）"
         case .idle, .available, .completed:
-            return "检测更新"
+            return "检查更新"
         }
     }
 
     var checkForUpdatesAccessibilityLabel: String {
         switch updateStatus {
         case .checking:
-            return "正在检测更新"
+            return "正在检查更新"
         case .downloading:
             return "正在下载更新"
         case .failed:
-            return "检测更新，上次检测失败，点击重试"
+            return "检查更新，上次检查失败，点击重试"
         case .idle, .available, .completed:
-            return "检测更新"
+            return "检查更新"
         }
     }
 
@@ -315,38 +302,54 @@ private extension UsagePopoverView {
 
     @ViewBuilder
     private var densityListContent: some View {
-        if settings.usageCardDensity == .compact {
-            LazyVGrid(columns: [GridItem(.flexible())], spacing: 14) {
-                cardViews
+        switch settings.usageCardDensity {
+        case .compact:
+            LazyVGrid(columns: [GridItem(.flexible())], spacing: 7) {
+                compactCardViews
             }
-        } else {
-            LazyVGrid(columns: [GridItem(.flexible())], spacing: 8) {
-                cardViews
+        case .full:
+            LazyVGrid(columns: [GridItem(.flexible())], spacing: 7) {
+                fullCardViews
             }
         }
     }
 
     @ViewBuilder
-    private var cardViews: some View {
+    private var compactCardViews: some View {
         ForEach(filteredPopoverKeyIDs, id: \.self) { id in
-            if let state = store.state(for: id) {
-                UsageRowView(
-                    state: state,
-                    density: settings.usageCardDensity,
-                    actions: nil,
-                    refreshCredential: {
-                        Task { await refreshCredential(id) }
-                    },
-                    retryCredential: {
-                        Task { await retryCredential(id) }
-                    },
-                    onShare: {
-                        if let content = UsageShareContentBuilder.build(state: state) {
-                            UsageSharePanelController.shared.present(content: content)
-                        }
+            usageRow(for: id, density: .compact)
+        }
+    }
+
+    @ViewBuilder
+    private var fullCardViews: some View {
+        ForEach(Array(filteredPopoverKeyIDs.enumerated()), id: \.element) { index, id in
+            usageRow(for: id, density: .full)
+        }
+    }
+
+    @ViewBuilder
+    private func usageRow(
+        for id: UUID,
+        density: UsageCardDensity
+    ) -> some View {
+        if let state = store.state(for: id) {
+            UsageRowView(
+                state: state,
+                density: density,
+                actions: nil,
+                refreshCredential: {
+                    Task { await refreshCredential(id) }
+                },
+                retryCredential: {
+                    Task { await retryCredential(id) }
+                },
+                onShare: {
+                    if let content = UsageShareContentBuilder.build(state: state) {
+                        UsageSharePanelController.shared.present(content: content)
                     }
-                )
-            }
+                }
+            )
         }
     }
 
@@ -364,25 +367,35 @@ private extension UsagePopoverView {
 
     var usageListHeader: some View {
         HStack(alignment: .bottom, spacing: 10) {
-            HStack(alignment: .center, spacing: 8) {
+            VStack(alignment: .leading, spacing: 5) {
                 Text("账户用量")
-                    .font(.system(size: 20, weight: .bold))
+                    .font(.system(size: 23, weight: .bold))
+                    .tracking(-0.02)
                     .foregroundStyle(.primary)
 
-                Text("\(filteredPopoverKeyIDs.count) 个 Key")
-                    .font(.system(size: 12, weight: .medium))
-                    .monospacedDigit()
-                    .foregroundStyle(CompactPopoverPalette.chipSecondary(colorScheme))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background {
-                        Capsule()
-                            .fill(CompactPopoverPalette.chipFill(hovered: false, colorScheme))
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(accountStatusColor)
+                        .frame(width: 5, height: 5)
+                        .overlay {
+                            Circle()
+                                .stroke(accountStatusColor.opacity(0.16), lineWidth: 2)
+                        }
+
+                    Text("\(filteredPopoverKeyIDs.count) 个账户")
+                        .monospacedDigit()
+
+                    if accountAttentionCount > 0 {
+                        Text("· \(accountAttentionCount) 个需注意")
+                            .monospacedDigit()
+                            .foregroundStyle(CompactPopoverPalette.warningColor)
                     }
-                    .overlay {
-                        Capsule()
-                            .strokeBorder(CompactPopoverPalette.cardStroke(colorScheme), lineWidth: 1)
-                    }
+
+                    Text("· \(shortSyncDescription)")
+                        .monospacedDigit()
+                }
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(CompactPopoverPalette.subtitle(colorScheme))
             }
 
             Spacer(minLength: 8)
@@ -391,13 +404,43 @@ private extension UsagePopoverView {
                 selection: $providerFilter,
                 options: filterOptions
             )
-            .frame(maxWidth: 210, alignment: .trailing)
+            .frame(maxWidth: 180, alignment: .trailing)
         }
         .padding(.horizontal, 16)
-        .padding(.top, 4)
-        .padding(.bottom, 12)
+        .padding(.top, 6)
+        .padding(.bottom, 10)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("账户用量，共 \(filteredPopoverKeyIDs.count) 个 Key")
+        .accessibilityLabel(
+            "账户用量，共 \(filteredPopoverKeyIDs.count) 个账户"
+                + (accountAttentionCount > 0 ? "，\(accountAttentionCount) 个需注意" : "")
+                + "，\(shortSyncDescription)"
+        )
+    }
+
+    var accountStatusColor: Color {
+        if filteredPopoverKeyIDs.isEmpty {
+            return Color.secondary.opacity(0.55)
+        }
+        return accountAttentionCount > 0
+            ? CompactPopoverPalette.warningColor
+            : CompactPopoverPalette.positive(colorScheme)
+    }
+
+    var accountAttentionCount: Int {
+        filteredPopoverKeyIDs.reduce(into: 0) { count, id in
+            guard let state = store.state(for: id) else { return }
+            let unhealthyMetric = state.snapshot?.normalizedMetrics.contains { metric in
+                switch metric.healthState {
+                case .warning, .critical, .unavailable:
+                    return true
+                case .normal, .stale, .unknown:
+                    return false
+                }
+            } ?? false
+            if state.error != nil || state.isStale || unhealthyMetric {
+                count += 1
+            }
+        }
     }
 
     @ViewBuilder
@@ -487,79 +530,97 @@ private extension UsagePopoverView {
     }
 
     var bottomBar: some View {
-        HStack(spacing: 10) {
-            GlassIconButton(
-                action: { Task { await store.refreshAll() } },
-                help: "刷新全部 Key"
-            ) {
-                Group {
-                    if store.isRefreshing {
-                        TimelineView(.animation) { timeline in
-                            let angle = timeline.date.timeIntervalSinceReferenceDate
-                                .truncatingRemainder(dividingBy: 1) * 360
-                            Image(systemName: "arrow.triangle.2.circlepath")
-                                .rotationEffect(.degrees(angle))
-                        }
-                    } else if showRefreshSuccess {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(CompactPopoverPalette.positive(colorScheme))
-                            .transition(.scale.combined(with: .opacity))
-                    } else {
-                        Image(systemName: "arrow.clockwise")
-                            .transition(.opacity)
-                    }
-                }
-                .font(.system(size: 14, weight: .medium))
-            }
-            .disabled(store.isRefreshing || store.visibleKeyIDs.isEmpty)
-            .accessibilityLabel(store.isRefreshing ? "正在刷新全部 Key" : "刷新全部 Key")
-            .onChange(of: store.isRefreshing) { _, isRefreshing in
-                if !isRefreshing {
-                    withAnimation(.spring(duration: 0.3)) {
-                        showRefreshSuccess = true
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                        withAnimation(.easeOut(duration: 0.35)) {
-                            showRefreshSuccess = false
-                        }
-                    }
-                }
-            }
+        VStack(spacing: 0) {
+            Rectangle()
+            .fill(CompactPopoverPalette.cardStroke(colorScheme).opacity(0.72))
+            .frame(height: 1)
 
-            Spacer(minLength: 4)
+            HStack(spacing: 8) {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(footerStatusColor)
+                        .frame(width: 5, height: 5)
+                        .overlay {
+                            Circle()
+                                .stroke(footerStatusColor.opacity(0.16), lineWidth: 2)
+                        }
 
-            GlassIconButton(
-                action: { NSApplication.shared.terminate(nil) },
-                help: "退出 MyToken"
-            ) {
-                Image(systemName: "power")
+                    Text(refreshDescription)
+                        .lineLimit(1)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(CompactPopoverPalette.subtitle(colorScheme))
+                        .monospacedDigit()
+                        .allowsHitTesting(false)
+                        .accessibilityLabel(refreshAccessibilityLabel)
+                }
+
+                Spacer(minLength: 8)
+
+                PopoverFooterActionButton(
+                    action: { Task { await store.refreshAll() } },
+                    help: "刷新全部 Key"
+                ) {
+                    Group {
+                        if store.isRefreshing {
+                            TimelineView(.animation) { timeline in
+                                let angle = timeline.date.timeIntervalSinceReferenceDate
+                                    .truncatingRemainder(dividingBy: 1) * 360
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                    .rotationEffect(.degrees(angle))
+                            }
+                        } else if showRefreshSuccess {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(CompactPopoverPalette.positive(colorScheme))
+                                .transition(.scale.combined(with: .opacity))
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                                .transition(.opacity)
+                        }
+                    }
                     .font(.system(size: 14, weight: .medium))
+                }
+                .disabled(store.isRefreshing || store.visibleKeyIDs.isEmpty)
+                .accessibilityLabel(store.isRefreshing ? "正在刷新全部 Key" : "刷新全部 Key")
+                .onChange(of: store.isRefreshing) { _, isRefreshing in
+                    if !isRefreshing {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 1)) {
+                            showRefreshSuccess = true
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                            withAnimation(.easeOut(duration: 0.3)) {
+                                showRefreshSuccess = false
+                            }
+                        }
+                    }
+                }
+
+                Rectangle()
+                    .fill(CompactPopoverPalette.cardStroke(colorScheme))
+                    .frame(width: 1, height: 15)
+                    .padding(.horizontal, 2)
+
+                PopoverFooterActionButton(
+                    action: { NSApplication.shared.terminate(nil) },
+                    help: "退出 MyToken"
+                ) {
+                    Image(systemName: "power")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .keyboardShortcut("q")
+                .accessibilityLabel("退出 MyToken")
             }
-            .keyboardShortcut("q")
-            .accessibilityLabel("退出 MyToken")
+            .padding(.horizontal, 15)
+            .frame(height: 48)
         }
-        .overlay {
-            Text(refreshDescription)
-                .lineLimit(1)
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(CompactPopoverPalette.subtitle(colorScheme))
-                .allowsHitTesting(false)
-                .accessibilityLabel(refreshAccessibilityLabel)
+    }
+
+    var footerStatusColor: Color {
+        if store.isRefreshing {
+            return CompactPopoverPalette.brand(colorScheme)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background {
-            Capsule(style: .continuous)
-                .fill(CompactPopoverPalette.surface(.control, colorScheme))
-        }
-        .overlay {
-            Capsule(style: .continuous)
-                .strokeBorder(
-                    CompactPopoverPalette.cardStroke(colorScheme),
-                    lineWidth: 1
-                )
-                .allowsHitTesting(false)
-        }
+        return latestRefreshDate == nil
+            ? Color.secondary.opacity(0.35)
+            : CompactPopoverPalette.positive(colorScheme)
     }
 
     @ViewBuilder
@@ -595,7 +656,7 @@ private extension UsagePopoverView {
 
     var refreshDescription: String {
         if store.isRefreshing {
-            return "正在刷新"
+            return "正在刷新用量"
         }
         guard let latestRefreshDate else {
             return "尚未刷新"
@@ -603,8 +664,32 @@ private extension UsagePopoverView {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "zh_CN")
         formatter.timeZone = .current
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        return "最后刷新 \(formatter.string(from: latestRefreshDate))"
+        let calendar = Calendar.current
+        if calendar.isDateInToday(latestRefreshDate) {
+            formatter.dateFormat = "HH:mm"
+            return "今天 \(formatter.string(from: latestRefreshDate)) 已同步"
+        }
+        formatter.dateFormat = "MM-dd HH:mm"
+        return "\(formatter.string(from: latestRefreshDate)) 已同步"
+    }
+
+    var shortSyncDescription: String {
+        if store.isRefreshing {
+            return "正在同步"
+        }
+        guard let latestRefreshDate else {
+            return "尚未同步"
+        }
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.timeZone = .current
+        if Calendar.current.isDateInToday(latestRefreshDate) {
+            formatter.dateFormat = "HH:mm"
+            return "\(formatter.string(from: latestRefreshDate)) 同步"
+        }
+        formatter.dateFormat = "MM-dd HH:mm"
+        return "\(formatter.string(from: latestRefreshDate)) 同步"
     }
 
     var refreshAccessibilityLabel: String {
@@ -971,6 +1056,32 @@ private struct UpdateReleasePopup: View {
     }
 }
 
+/// 底栏操作保持无边框，只在悬停时出现轻量圆形反馈。
+private struct PopoverFooterActionButton<Label: View>: View {
+    var action: () -> Void
+    var help: String
+    @ViewBuilder var label: () -> Label
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            label()
+                .foregroundStyle(isHovered ? Color.primary : Color.secondary)
+                .frame(width: 28, height: 28)
+                .background {
+                    Circle()
+                        .fill(Color.primary.opacity(isHovered ? 0.08 : 0.001))
+                }
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .animation(.easeOut(duration: 0.14), value: isHovered)
+        .help(help)
+    }
+}
+
 /// 弹窗内统一的实色图标按钮：整个 30×30 边框区域都是点击热区，
 /// 悬停时底色和描边加深，按下时再加深，给出明确的可点击反馈。
 private struct GlassIconButton<Label: View>: View {
@@ -990,7 +1101,7 @@ private struct GlassIconButton<Label: View>: View {
                 .frame(width: 28, height: 28)
                 .background {
                     Circle()
-                        .fill(Color.primary.opacity(isPressed ? 0.10 : isHovered ? 0.08 : 0.035))
+                        .fill(Color.primary.opacity(isPressed ? 0.10 : isHovered ? 0.075 : 0.05))
                 }
                 .overlay {
                     Circle()

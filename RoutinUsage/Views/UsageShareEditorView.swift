@@ -6,10 +6,15 @@ struct UsageShareEditorView: View {
     var onClose: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var draft: UsageShareDraft
     @State private var copyStatus: String?
+    @State private var showsMoreFields = false
 
-    init(content: UsageShareContent, onClose: @escaping () -> Void) {
+    init(
+        content: UsageShareContent,
+        onClose: @escaping () -> Void
+    ) {
         self.content = content
         self.onClose = onClose
         _draft = State(initialValue: UsageShareDraft.make(from: content))
@@ -19,39 +24,55 @@ struct UsageShareEditorView: View {
         UsageShareContentBuilder.render(content: content, draft: draft)
     }
 
-    private var chrome: UsageShareChrome { .make(colorScheme) }
-
     var body: some View {
-        HStack(spacing: 0) {
-            previewPane
-            editorPane
+        VStack(spacing: 0) {
+            header
+
+            Rectangle()
+                .fill(SettingsDesign.dividerColor(colorScheme))
+                .frame(height: 0.8)
+
+            HStack(spacing: 0) {
+                previewPane
+                editorPane
+            }
         }
+        .liquidGlassWindowBackground()
         .frame(minWidth: 860, minHeight: 640)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onExitCommand(perform: onClose)
+    }
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: 12) {
+            SettingsModalTitle(
+                "分享用量",
+                subtitle: "\(rendered.displayName) · \(draft.template.title)"
+            )
+
+            Spacer(minLength: 16)
+        }
+        .padding(.horizontal, 22)
+        .padding(.top, 18)
+        .padding(.bottom, 14)
+        .background(CompactPopoverPalette.surface(.window, colorScheme))
     }
 
     private var previewPane: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 HStack(spacing: 8) {
-                    Text("实时导出预览")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(chrome.textSecondary)
-                    Text(draft.template.previewTag)
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(chrome.amber)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(chrome.amber.opacity(0.12), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                .strokeBorder(chrome.amber.opacity(0.25), lineWidth: 1)
-                        }
+                    Text("实时预览")
+                        .font(SettingsTypography.sectionTitle)
+                    SettingsStatusPill(
+                        text: draft.template.previewTag,
+                        tone: .info
+                    )
                 }
                 Spacer()
                 Text("自适应高度 · 100% 完整视图")
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(chrome.textTertiary)
+                    .font(SettingsTypography.caption)
+                    .foregroundStyle(.tertiary)
             }
             ScrollView(.vertical, showsIndicators: false) {
                 UsageShareCardView(card: rendered)
@@ -60,19 +81,20 @@ struct UsageShareEditorView: View {
             }
             HStack {
                 Label("数字完全来自本地快照，真实用量不可篡改", systemImage: "info.circle")
-                    .font(.system(size: 11))
-                    .foregroundStyle(chrome.textSecondary)
+                    .font(SettingsTypography.secondary)
+                    .foregroundStyle(.secondary)
                 Spacer()
                 if let copyStatus {
-                    Text(copyStatus)
-                        .font(.system(size: 11))
-                        .foregroundStyle(chrome.textTertiary)
+                    SettingsStatusPill(
+                        text: copyStatus,
+                        tone: copyStatus == "已复制到剪贴板" ? .success : .error
+                    )
                 }
             }
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(chrome.previewPane)
+        .background(CompactPopoverPalette.surface(.metric, colorScheme))
     }
 
     private var editorPane: some View {
@@ -90,99 +112,147 @@ struct UsageShareEditorView: View {
         .padding(20)
         .frame(width: 420)
         .frame(maxHeight: .infinity)
-        .background(chrome.editorPane)
-        .overlay(alignment: .leading) { Rectangle().fill(chrome.divider).frame(width: 1) }
+        .background(CompactPopoverPalette.surface(.card, colorScheme))
+        .overlay(alignment: .leading) {
+            Rectangle()
+                .fill(SettingsDesign.dividerColor(colorScheme))
+                .frame(width: 0.8)
+        }
     }
 
     private var templatePicker: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("模板风格选择 (实时切换)")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(chrome.textSecondary)
-            HStack(spacing: 6) {
+            SettingsSectionHeader(
+                title: "模板风格",
+                systemImage: "rectangle.3.group"
+            )
+
+            Picker("模板风格", selection: $draft.template) {
                 ForEach(UsageShareTemplate.allCases) { template in
-                    let selected = draft.template == template
-                    Button {
-                        draft.template = template
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: templateIcon(template))
-                                .font(.system(size: 11, weight: .semibold))
-                            Text(template.title)
-                                .lineLimit(1)
-                        }
-                        .font(.system(size: 11, weight: selected ? .semibold : .medium))
-                        .foregroundStyle(selected ? chrome.amber : chrome.textSecondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background {
-                            if selected {
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(Color(red: 0.96, green: 0.62, blue: 0.04).opacity(colorScheme == .dark ? 0.20 : 0.12))
-                            }
-                        }
-                        .overlay {
-                            if selected {
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .strokeBorder(Color(red: 0.96, green: 0.62, blue: 0.04).opacity(0.35), lineWidth: 1)
-                            }
-                        }
-                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    Label(template.title, systemImage: templateIcon(template))
+                        .tag(template)
                 }
             }
-            .padding(4)
-            .background(chrome.inputFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(chrome.inputBorder, lineWidth: 1)
-            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .accessibilityLabel("模板风格")
         }
     }
 
     private var customFields: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("自定义文案与备注 (不影响云端账户)")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(chrome.textSecondary)
-            editorField("显示名称", hint: "仅用于本次图片展示", text: $draft.displayName)
-            editorField("套餐文案", hint: "可补充团队说明", text: $draft.subtitle)
-            editorField("卡片附注说明 (可选)", hint: "仅出现在分享图", text: $draft.note, hintAccent: true)
+            SettingsSectionHeader(
+                title: "文案与备注",
+                systemImage: "textformat"
+            )
+            editorField(
+                "显示名称",
+                hint: "仅用于本次图片展示",
+                text: $draft.displayName
+            )
+            editorField(
+                "套餐文案",
+                hint: "可补充团队说明",
+                text: $draft.subtitle
+            )
+            editorField(
+                "卡片附注",
+                hint: "仅出现在分享图",
+                text: $draft.note,
+                hintAccent: true
+            )
         }
         .padding(.top, 4)
-        .overlay(alignment: .top) { Rectangle().fill(chrome.divider).frame(height: 1) }
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(SettingsDesign.dividerColor(colorScheme))
+                .frame(height: 0.8)
+        }
         .padding(.top, 16)
     }
 
     private var fieldToggles: some View {
-        let cells = visibleFieldToggles
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack {
-            Text("展示字段开关 (按票面顺序，隐藏即不导出)")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(chrome.textSecondary)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Image(systemName: "checklist")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("显示内容")
+                        .font(SettingsTypography.sectionTitle)
+                    Text("关闭的字段不会出现在分享图中")
+                        .font(SettingsTypography.caption)
+                        .foregroundStyle(.secondary)
+                }
+
                 Spacer()
                 Button("全部显示") {
                     draft.showAll(from: content)
                 }
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(chrome.blue)
-                .buttonStyle(.plain)
+                .font(SettingsTypography.secondary.weight(.medium))
+                .foregroundStyle(Color.accentColor)
+                .buttonStyle(SettingsPressFeedbackButtonStyle(pressedScale: 0.98))
             }
-            LazyVStack(alignment: .leading, spacing: 8) {
-                ForEach(Array(cells.enumerated()), id: \.offset) { _, cell in
-                    toggleCell(cell.title, isOn: cell.binding)
+
+            fieldSection(title: "基本信息", cells: basicFieldToggles)
+            fieldSection(title: "用量指标", cells: metricFieldToggles)
+
+            Button {
+                withAnimation(
+                    reduceMotion
+                        ? nil
+                        : .spring(response: 0.3, dampingFraction: 0.9)
+                ) {
+                    showsMoreFields.toggle()
                 }
+            } label: {
+                HStack(spacing: 8) {
+                    Text("更多字段")
+                        .font(.system(size: 11.5, weight: .semibold))
+                    Spacer()
+                    Text("\(moreUsageFieldToggles.count + brandFieldToggles.count) 项")
+                        .font(SettingsTypography.caption)
+                        .foregroundStyle(.secondary)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(showsMoreFields ? 180 : 0))
+                }
+                .padding(.horizontal, 10)
+                .frame(minHeight: 34)
+                .background(
+                    SettingsDesign.fieldFill(colorScheme),
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(SettingsDesign.fieldBorder(colorScheme), lineWidth: 0.8)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(SettingsPressFeedbackButtonStyle(pressedScale: 0.99))
+            .accessibilityLabel("更多分享字段")
+            .accessibilityValue(showsMoreFields ? "已展开" : "已收起")
+
+            if showsMoreFields {
+                VStack(alignment: .leading, spacing: 14) {
+                    fieldSection(title: "用量细节", cells: moreUsageFieldToggles)
+                    fieldSection(title: "品牌与水印", cells: brandFieldToggles)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .padding(.top, 4)
-        .overlay(alignment: .top) { Rectangle().fill(chrome.divider).frame(height: 1) }
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(SettingsDesign.dividerColor(colorScheme))
+                .frame(height: 0.8)
+        }
         .padding(.top, 16)
     }
 
-    private var visibleFieldToggles: [(title: String, binding: Binding<Bool>)] {
+    private var basicFieldToggles: [(title: String, binding: Binding<Bool>)] {
         var cells: [(title: String, binding: Binding<Bool>)] = []
 
         cells.append(("可用状态徽章", $draft.showsStatus))
@@ -192,16 +262,30 @@ struct UsageShareEditorView: View {
         if content.cycleRemainingText != nil || content.subscriptionStartText != nil || content.subscriptionEndText != nil {
             cells.append(("订阅周期/到期", $draft.showsSubscriptionDates))
         }
-        cells.append(("附加备注框", $draft.showsNote))
-        if content.metrics.contains(where: { $0.resetBadgeText != nil || !$0.timeDetails.isEmpty }) {
-            cells.append(("重置时间与倒计时", $draft.showsResetTimes))
+        if content.expiryText != nil || content.cycleRemainingText != nil {
+            cells.append(("到期与续费状态", $draft.showsExpiry))
         }
+        cells.append(("附加备注框", $draft.showsNote))
+        return cells
+    }
+
+    private var metricFieldToggles: [(title: String, binding: Binding<Bool>)] {
+        var cells: [(title: String, binding: Binding<Bool>)] = []
+        cells.append(("金额与数值明细", $draft.showsAmounts))
 
         let progressMetrics = content.metrics.filter { $0.percent != nil }
         let tileMetrics = content.metrics.filter { $0.percent == nil }
         for item in progressMetrics + tileMetrics {
             let id = item.id
             cells.append((item.title, metricVisibleBinding(id)))
+        }
+        return cells
+    }
+
+    private var moreUsageFieldToggles: [(title: String, binding: Binding<Bool>)] {
+        var cells: [(title: String, binding: Binding<Bool>)] = []
+        if content.metrics.contains(where: { $0.resetBadgeText != nil || !$0.timeDetails.isEmpty }) {
+            cells.append(("重置时间与倒计时", $draft.showsResetTimes))
         }
 
         if content.tokenPercentText != nil {
@@ -215,9 +299,30 @@ struct UsageShareEditorView: View {
                 }
             )))
         }
+        return cells
+    }
 
+    private var brandFieldToggles: [(title: String, binding: Binding<Bool>)] {
+        var cells: [(title: String, binding: Binding<Bool>)] = []
         cells.append(("快照水印与防伪", $draft.showsWatermark))
         return cells
+    }
+
+    private func fieldSection(
+        title: String,
+        cells: [(title: String, binding: Binding<Bool>)]
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            LazyVStack(alignment: .leading, spacing: 8) {
+                ForEach(Array(cells.enumerated()), id: \.offset) { _, cell in
+                    toggleCell(cell.title, isOn: cell.binding)
+                }
+            }
+        }
     }
 
     private var actionBar: some View {
@@ -225,104 +330,61 @@ struct UsageShareEditorView: View {
             HStack(spacing: 10) {
                 Button(action: copyImage) {
                     Label("复制图片到剪贴板", systemImage: "doc.on.doc")
-                        .font(.system(size: 12, weight: .semibold))
-                        .frame(maxWidth: .infinity, minHeight: 46)
-                        .background(chrome.blue, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .foregroundStyle(.white)
-                        .contentShape(Rectangle())
+                        .font(SettingsTypography.button)
+                        .frame(maxWidth: .infinity, minHeight: 32)
                 }
-                .buttonStyle(.plain)
+                .liquidGlassButton(prominent: true)
+                .keyboardShortcut("c", modifiers: [.command, .shift])
                 Button(action: saveImage) {
                     Label("保存 PNG 到本地", systemImage: "square.and.arrow.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .frame(maxWidth: .infinity, minHeight: 46)
-                        .background(chrome.fieldFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .strokeBorder(chrome.inputBorder, lineWidth: 1)
-                        }
-                        .foregroundStyle(chrome.textPrimary)
-                        .contentShape(Rectangle())
+                        .font(SettingsTypography.button)
+                        .frame(maxWidth: .infinity, minHeight: 32)
                 }
-                .buttonStyle(.plain)
+                .liquidGlassButton()
+                .keyboardShortcut("s", modifiers: .command)
             }
-            Text("快捷键: ⌘C 复制 · ⌘S 保存")
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(chrome.textTertiary)
+            Text("快捷键: ⌘⇧C 复制 · ⌘S 保存")
+                .font(SettingsTypography.caption)
+                .foregroundStyle(.tertiary)
         }
         .padding(.top, 16)
-        .overlay(alignment: .top) { Rectangle().fill(chrome.divider).frame(height: 1) }
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(SettingsDesign.dividerColor(colorScheme))
+                .frame(height: 0.8)
+        }
     }
 
     private func editorField(_ title: String, hint: String, text: Binding<String>, hintAccent: Bool = false) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(title)
-                    .font(.system(size: 12))
-                    .foregroundStyle(chrome.textPrimary)
-                Spacer()
-                Text(hint)
-                    .font(.system(size: 10))
-                    .foregroundStyle(hintAccent ? chrome.amber : chrome.textTertiary)
-            }
-            TextField("", text: text)
-                .textFieldStyle(.plain)
-                .font(.system(size: 12))
-                .foregroundStyle(chrome.textPrimary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(chrome.inputFill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(chrome.inputBorder, lineWidth: 1)
-                }
-        }
+        SettingsLabeledTextField(
+            label: title,
+            text: text,
+            prompt: "",
+            helpText: hint,
+            accentColor: hintAccent
+                ? CompactPopoverPalette.warningColor
+                : Color.accentColor
+        )
     }
 
     private func toggleCell(_ title: String, isOn: Binding<Bool>) -> some View {
-        Button {
-            isOn.wrappedValue.toggle()
-        } label: {
-            HStack(spacing: 9) {
-                Image(systemName: isOn.wrappedValue ? "checkmark.square.fill" : "square")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(isOn.wrappedValue ? chrome.blue : chrome.textTertiary)
-                Text(title)
-                    .font(.system(size: 11))
-                    .foregroundStyle(chrome.textPrimary)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 12)
-            .background(chrome.fieldFill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(chrome.inputBorder.opacity(0.7), lineWidth: 1)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(title)
-        .accessibilityValue(isOn.wrappedValue ? "已显示" : "已隐藏")
-        .accessibilityAddTraits(.isButton)
-    }
-
-    private func legacyToggleCell(_ title: String, isOn: Binding<Bool>) -> some View {
         Toggle(isOn: isOn) {
             Text(title)
-                .font(.system(size: 11))
-                .foregroundStyle(chrome.textPrimary)
+                .font(SettingsTypography.secondary)
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .toggleStyle(.checkbox)
-        .padding(8)
-        .background(chrome.fieldFill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .toggleStyle(.switch)
+        .controlSize(.small)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            SettingsDesign.fieldFill(colorScheme),
+            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+        )
         .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(chrome.inputBorder.opacity(0.7), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(SettingsDesign.fieldBorder(colorScheme), lineWidth: 0.8)
         }
     }
 
@@ -527,6 +589,7 @@ final class UsageSharePanelController: NSObject, NSWindowDelegate {
         saveFrame()
         canPersistFrame = false
         if let window {
+            window.contentViewController = nil
             SettingsWindowActivationPolicy.unregister(window)
         }
     }
@@ -535,6 +598,11 @@ final class UsageSharePanelController: NSObject, NSWindowDelegate {
         window.title = "分享用量"
         window.hasShadow = true
         window.isMovableByWindowBackground = true
+        window.styleMask.insert(.fullSizeContentView)
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.titlebarSeparatorStyle = .none
+        window.backgroundColor = .clear
     }
 
     private func resetLayout(for content: UsageShareContent) {

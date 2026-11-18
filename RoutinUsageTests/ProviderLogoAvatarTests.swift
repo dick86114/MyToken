@@ -36,7 +36,7 @@ final class ProviderLogoAvatarTests: XCTestCase {
 
         XCTAssertTrue(editor.contains("Label(displayName(for: id), image: id.logoAssetName)"))
         XCTAssertTrue(editor.contains("ProviderLogoMark(providerID: providerID, size: 26"))
-        XCTAssertTrue(editor.contains("ProviderLogoMark(providerID: providerID, size: 38"))
+        XCTAssertTrue(editor.contains("ProviderLogoMark(providerID: providerID, size: 36"))
     }
 
     @MainActor
@@ -52,7 +52,7 @@ final class ProviderLogoAvatarTests: XCTestCase {
             )
             XCTAssertGreaterThan(
                 meanPixelDifference(glm, openCode),
-                12,
+                8,
                 "不同供应商应绘制不同 Logo"
             )
         }

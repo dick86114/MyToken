@@ -4,7 +4,7 @@ enum CredentialDetailsLayout {
     static let minWidth: CGFloat = 500
     static let idealWidth: CGFloat = 680
     static let maxWidth: CGFloat = 820
-    static let minHeight: CGFloat = 560
+    static let minHeight: CGFloat = 500
 }
 
 struct CredentialDetailsView: View {
@@ -17,15 +17,25 @@ struct CredentialDetailsView: View {
     @State private var copyResetTask: Task<Void, Never>?
 
     var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 22) {
-                header
-                statusOverview
-                usageSection
-                detailsPanel
+        VStack(spacing: 0) {
+            header
+                .padding(.horizontal, SettingsDesign.modalPadding)
+                .padding(.top, SettingsDesign.modalPadding)
+                .padding(.bottom, SettingsDesign.modalHeaderSpacing)
+
+            Rectangle()
+                .fill(SettingsDesign.dividerColor(colorScheme))
+                .frame(height: 0.8)
+
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 16) {
+                    statusOverview
+                    usageSection
+                    detailsPanel
+                }
+                .padding(SettingsDesign.modalPadding)
+                .frame(maxWidth: CredentialDetailsLayout.maxWidth, alignment: .leading)
             }
-            .padding(28)
-            .frame(maxWidth: CredentialDetailsLayout.maxWidth, alignment: .leading)
         }
         .frame(
             minWidth: CredentialDetailsLayout.minWidth,
@@ -47,10 +57,11 @@ struct CredentialDetailsView: View {
                 cornerRadius: 11
             )
 
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
                     Text(state.configuration.displayName)
-                        .font(.system(size: 22, weight: .semibold))
+                        .font(.system(size: 21, weight: .semibold))
+                        .tracking(-0.2)
                         .lineLimit(1)
                         .truncationMode(.tail)
 
@@ -58,69 +69,55 @@ struct CredentialDetailsView: View {
                 }
 
                 Text("\(descriptor.displayName) · \(planName)")
-                    .font(.subheadline)
+                    .font(SettingsTypography.secondary)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
 
             Spacer(minLength: 16)
 
-            Button {
-                if let onClose {
-                    onClose()
-                } else {
-                    dismiss()
-                }
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .semibold))
-                    .frame(width: 30, height: 30)
-                    .background {
-                        Circle()
-                            .fill(Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.06))
+            SettingsCloseButton(
+                action: {
+                    if let onClose {
+                        onClose()
+                    } else {
+                        dismiss()
                     }
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-            .help("关闭凭证详情")
-            .accessibilityLabel("关闭凭证详情")
+                },
+                help: "关闭凭证详情",
+                accessibilityLabel: "关闭凭证详情"
+            )
         }
     }
 
     private var enabledBadge: some View {
-        HStack(spacing: 5) {
-            Circle()
-                .fill(state.configuration.isEnabled ? positiveColor : Color.secondary)
-                .frame(width: 6, height: 6)
-
-            Text(state.configuration.isEnabled ? "已启用" : "已停用")
-                .font(.caption.weight(.medium))
-        }
-        .foregroundStyle(state.configuration.isEnabled ? positiveColor : Color.secondary)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background {
-            Capsule()
-                .fill((state.configuration.isEnabled ? positiveColor : Color.secondary).opacity(0.10))
-        }
+        SettingsStatusPill(
+            text: state.configuration.isEnabled ? "已启用" : "已停用",
+            tone: state.configuration.isEnabled ? .success : .neutral
+        )
     }
 
     private var statusOverview: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        SettingsPanel(
+            title: "状态概览",
+            systemImage: "waveform.path.ecg"
+        ) {
             HStack(alignment: .top, spacing: 10) {
                 statusBadge
 
-                Text(statusDetail)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if !statusDetail.isEmpty {
+                    Text(statusDetail)
+                        .font(SettingsTypography.body)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 Spacer(minLength: 12)
             }
 
-            Divider()
-                .overlay(providerAccent.opacity(0.16))
+            Rectangle()
+                .fill(SettingsDesign.dividerColor(colorScheme))
+                .frame(height: 0.8)
 
             LazyVGrid(
                 columns: overviewColumns,
@@ -142,58 +139,26 @@ struct CredentialDetailsView: View {
                 }
             }
         }
-        .padding(18)
-        .background {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(providerAccent.opacity(colorScheme == .dark ? 0.09 : 0.055))
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(providerAccent.opacity(colorScheme == .dark ? 0.20 : 0.14), lineWidth: 1)
-        }
     }
 
     private var statusBadge: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(statusTone)
-                .frame(width: 7, height: 7)
-
-            Text(statusLabel)
-                .font(.caption.weight(.semibold))
-        }
-        .foregroundStyle(statusTone)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background {
-            Capsule()
-                .fill(statusTone.opacity(0.11))
-        }
-        .accessibilityElement(children: .combine)
+        SettingsStatusPill(
+            text: statusLabel,
+            tone: statusTone
+        )
     }
 
     private var usageSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            sectionHeader(
-                "用量指标",
-                symbol: "chart.bar.xaxis",
-                trailing: state.snapshot.map { "\($0.normalizedMetrics.count) 项" }
-            )
-
+        SettingsPanel(
+            title: "用量指标",
+            systemImage: "chart.bar.xaxis",
+            trailingText: state.snapshot.map { "\($0.normalizedMetrics.count) 项" }
+        ) {
             if let snapshot = state.snapshot, !snapshot.normalizedMetrics.isEmpty {
                 usageMetrics(snapshot.normalizedMetrics)
             } else {
                 emptyMetrics
             }
-        }
-        .padding(18)
-        .background {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(panelFill)
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(panelStroke, lineWidth: 1)
         }
     }
 
@@ -214,53 +179,37 @@ struct CredentialDetailsView: View {
     }
 
     private var emptyMetrics: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "chart.bar.xaxis")
-                .font(.title3)
-                .foregroundStyle(.tertiary)
-                .frame(width: 24)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("暂无可展示的用量指标")
-                    .font(.callout.weight(.medium))
-                Text("完成首次刷新后会在这里显示额度、余额和重置时间。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, minHeight: 62, alignment: .leading)
+        SettingsNotice(
+            tone: .neutral,
+            message: "完成首次刷新后会在这里显示额度、余额和重置时间。",
+            title: "暂无可展示的用量指标",
+            systemImage: "chart.bar.xaxis"
+        )
     }
 
     @ViewBuilder
     private var detailsPanel: some View {
         if hasPlanDetails || hasAccountDetails || !configurationRows.isEmpty {
-            VStack(alignment: .leading, spacing: 0) {
-                if hasPlanDetails {
-                    planDetailsBlock
-                    if hasAccountDetails || !configurationRows.isEmpty {
-                        blockDivider
+            SettingsPanel {
+                VStack(alignment: .leading, spacing: 0) {
+                    if hasPlanDetails {
+                        planDetailsBlock
+                        if hasAccountDetails || !configurationRows.isEmpty {
+                            blockDivider
+                        }
                     }
-                }
 
-                if hasAccountDetails {
-                    accountModelsBlock
+                    if hasAccountDetails {
+                        accountModelsBlock
+                        if !configurationRows.isEmpty {
+                            blockDivider
+                        }
+                    }
+
                     if !configurationRows.isEmpty {
-                        blockDivider
+                        configurationBlock
                     }
                 }
-
-                if !configurationRows.isEmpty {
-                    configurationBlock
-                }
-            }
-            .padding(20)
-            .background {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(panelFill)
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(panelStroke, lineWidth: 1)
             }
         }
     }
@@ -269,7 +218,10 @@ struct CredentialDetailsView: View {
     private var planDetailsBlock: some View {
         if let snapshot = state.snapshot {
             VStack(alignment: .leading, spacing: 14) {
-                sectionHeader("套餐与订阅", symbol: "calendar.badge.clock")
+                SettingsSectionHeader(
+                    title: "套餐与订阅",
+                    systemImage: "calendar.badge.clock"
+                )
 
                 LazyVGrid(
                     columns: [
@@ -291,19 +243,22 @@ struct CredentialDetailsView: View {
     private var accountModelsBlock: some View {
         if let snapshot = state.snapshot {
             VStack(alignment: .leading, spacing: 14) {
-                sectionHeader("账户与模型", symbol: "person.crop.circle")
+                SettingsSectionHeader(
+                    title: "凭证与模型",
+                    systemImage: "person.crop.circle"
+                )
 
                 if state.configuration.providerID == .routin,
                    !snapshot.groupMultipliers.isEmpty {
                     HStack(alignment: .firstTextBaseline, spacing: 12) {
                         Text("分组倍率")
-                            .font(.caption)
+                            .font(SettingsTypography.secondary)
                             .foregroundStyle(.secondary)
 
                         Spacer()
 
                         Text(UsageFormatter.groupMultiplierText(snapshot.groupMultipliers))
-                            .font(.callout.weight(.medium))
+                            .font(SettingsTypography.body.weight(.medium))
                             .multilineTextAlignment(.trailing)
                             .textSelection(.enabled)
                     }
@@ -316,13 +271,16 @@ struct CredentialDetailsView: View {
 
     private var configurationBlock: some View {
         VStack(alignment: .leading, spacing: 14) {
-            sectionHeader("配置", symbol: "slider.horizontal.3")
+            SettingsSectionHeader(
+                title: "配置",
+                systemImage: "slider.horizontal.3"
+            )
 
             Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 10) {
                 ForEach(configurationRows) { row in
                     GridRow(alignment: .firstTextBaseline) {
                         Text(metadataLabel(for: row.key))
-                            .font(.caption)
+                            .font(SettingsTypography.secondary)
                             .foregroundStyle(.secondary)
                             .gridColumnAlignment(.leading)
 
@@ -336,13 +294,13 @@ struct CredentialDetailsView: View {
                                         .font(.system(size: 9, weight: .semibold))
                                 }
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(SettingsPressFeedbackButtonStyle(pressedScale: 0.99))
                             .foregroundStyle(providerAccent)
                             .help("在浏览器中打开 \(url.absoluteString)")
                             .accessibilityLabel("打开官网地址 \(url.absoluteString)")
                         } else {
                             Text(metadataValue(for: row.key, value: row.value))
-                                .font(.callout)
+                                .font(SettingsTypography.body)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .textSelection(.enabled)
                         }
@@ -356,24 +314,31 @@ struct CredentialDetailsView: View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(alignment: .firstTextBaseline) {
                 Text("允许模型")
-                    .font(.caption)
+                    .font(SettingsTypography.secondary)
                     .foregroundStyle(.secondary)
 
                 Spacer()
 
                 if !models.isEmpty {
                     Text("\(models.count) 个 · 点击复制")
-                        .font(.caption2)
+                        .font(SettingsTypography.caption)
                         .foregroundStyle(.tertiary)
                 }
             }
 
             if models.isEmpty {
                 Text("接口未返回")
-                    .font(.callout.weight(.medium))
+                    .font(SettingsTypography.body.weight(.medium))
                     .foregroundStyle(.secondary)
             } else {
-                ModelIDChipFlow(models: models, copiedModelID: copiedModelID, onCopied: copyModelID)
+                ModelIDChipFlow(
+                    models: models,
+                    copiedModelID: copiedModelID,
+                    accentColor: ProviderTheme.accentColor(
+                        for: state.configuration.providerID
+                    ),
+                    onCopied: copyModelID
+                )
             }
         }
     }
@@ -388,36 +353,13 @@ struct CredentialDetailsView: View {
         }
     }
 
-    private func sectionHeader(
-        _ title: String,
-        symbol: String,
-        trailing: String? = nil
-    ) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: symbol)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(providerAccent)
-
-            Text(title)
-                .font(.system(size: 15, weight: .semibold))
-
-            Spacer(minLength: 12)
-
-            if let trailing {
-                Text(trailing)
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
-        }
-    }
-
     private func overviewFact(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
-                .font(.caption)
+                .font(SettingsTypography.secondary)
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.callout.weight(.medium))
+                .font(SettingsTypography.body.weight(.medium))
                 .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)
         }
@@ -427,10 +369,10 @@ struct CredentialDetailsView: View {
     private func detailFact(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
-                .font(.caption2.weight(.medium))
+                .font(SettingsTypography.caption)
                 .foregroundStyle(.tertiary)
             Text(value)
-                .font(.callout.weight(.medium))
+                .font(SettingsTypography.body.weight(.medium))
                 .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)
         }
@@ -438,8 +380,9 @@ struct CredentialDetailsView: View {
     }
 
     private var blockDivider: some View {
-        Divider()
-            .overlay(panelStroke)
+        Rectangle()
+            .fill(SettingsDesign.dividerColor(colorScheme))
+            .frame(height: 0.8)
             .padding(.vertical, 18)
     }
 
@@ -472,20 +415,20 @@ struct CredentialDetailsView: View {
         return state.snapshot == nil ? "等待刷新" : "数据正常"
     }
 
-    private var statusTone: Color {
+    private var statusTone: SettingsNoticeTone {
         if !state.configuration.isEnabled {
-            return .secondary
+            return .neutral
         }
         if state.isRefreshing {
-            return providerAccent
+            return .info
         }
         if state.error != nil {
-            return CompactPopoverPalette.criticalColor
+            return .error
         }
         if state.isStale {
-            return CompactPopoverPalette.warningColor
+            return .warning
         }
-        return state.snapshot == nil ? Color.secondary : positiveColor
+        return state.snapshot == nil ? .neutral : .success
     }
 
     private var statusDetail: String {
@@ -497,23 +440,11 @@ struct CredentialDetailsView: View {
         if state.isRefreshing || state.error != nil || state.isStale || state.snapshot == nil {
             return UsageFormatter.statusText(state: state)
         }
-        return "最近一次刷新已成功，当前显示官方接口返回的数据。"
-    }
-
-    private var positiveColor: Color {
-        CompactPopoverPalette.positive(colorScheme)
+        return ""
     }
 
     private var providerAccent: Color {
-        ProviderTheme.accentColor(for: state.configuration.providerID)
-    }
-
-    private var panelFill: Color {
-        colorScheme == .dark ? Color.white.opacity(0.045) : Color.black.opacity(0.025)
-    }
-
-    private var panelStroke: Color {
-        colorScheme == .dark ? Color.white.opacity(0.10) : Color.black.opacity(0.075)
+        Color.accentColor
     }
 
     private var hasPlanDetails: Bool {

@@ -19,9 +19,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
-        case .credentials: "key.horizontal"
+        case .credentials: "key.horizontal.fill"
         case .menuBar: "menubar.rectangle"
-        case .general: "switch.2"
+        case .general: "slider.horizontal.3"
         case .help: "questionmark.circle"
         }
     }
@@ -49,23 +49,24 @@ struct SettingsWindowView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            List(SettingsSection.allCases, selection: $selectedSection) { section in
-                Label(section.title, systemImage: section.symbol)
-                    .tag(section)
+            SettingsSidebar(selection: $selectedSection)
+
+            ZStack(alignment: .topTrailing) {
+                SettingsDetailBackdrop()
+
+                detail
+                    .frame(
+                        maxWidth: .infinity,
+                        maxHeight: .infinity,
+                        alignment: .topLeading
+                    )
             }
-            .listStyle(.sidebar)
-            .frame(width: 220)
-
-            Divider()
-
-            detail
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .liquidGlassWindowBackground()
         .environment(\.menuBarColorRules, environment.settings.menuBarColorRules)
         .background(WindowFramePersistence())
         .background(SettingsWindowDockIconAnchor())
-        .frame(minWidth: 820, idealWidth: 880, minHeight: 560, idealHeight: 640)
+        .frame(minWidth: 820, idealWidth: 900, minHeight: 580, idealHeight: 660)
     }
 
     @ViewBuilder
@@ -74,7 +75,11 @@ struct SettingsWindowView: View {
         case .credentials:
             CredentialManagementView(environment: environment, ordering: ordering)
         case .menuBar:
-            MenuBarManagementView(environment: environment, ordering: ordering)
+            MenuBarManagementView(
+                environment: environment,
+                ordering: ordering,
+                openCredentials: { selectedSection = .credentials }
+            )
         case .general:
             GeneralSettingsView(environment: environment)
         case .help:

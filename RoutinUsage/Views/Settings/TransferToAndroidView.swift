@@ -232,6 +232,14 @@ final class TransferToAndroidModel {
         Task { await stop() }
     }
 
+    func restart() async {
+        await stop()
+        payload = nil
+        expiresAt = nil
+        phase = .idle
+        await start()
+    }
+
     func makeTransferPackage() throws -> TransferPackageV1 {
         try TransferPackageBuilder.makePackage(
             credentials: currentConfigurations,
@@ -297,6 +305,8 @@ final class TransferToAndroidModel {
 struct TransferToAndroidView: View {
     @State private var model: TransferToAndroidModel
     var onClose: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(environment: AppEnvironment, onClose: @escaping () -> Void) {
         _model = State(initialValue: TransferToAndroidModel(store: environment.store))
@@ -304,71 +314,109 @@ struct TransferToAndroidView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("迁移到 Android")
-                    .font(.title2.weight(.semibold))
-                Spacer()
-                Button {
-                    onClose()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                }
-                .buttonStyle(.borderless)
-                .help("关闭迁移页面")
-                .accessibilityLabel("关闭迁移页面")
-            }
-
-            if model.hasCredentials {
-                credentialSummary
-            } else {
-                ContentUnavailableView(
-                    "没有可迁移的凭证",
-                    systemImage: "key.slash",
-                    description: Text("请先添加供应商凭证")
+        VStack(spacing: 0) {
+            HStack(alignment: .center, spacing: 12) {
+                SettingsModalTitle(
+                    "迁移到 Android",
+                    subtitle: "同一局域网内加密传输，完成后自动关闭通道"
                 )
-                .frame(minHeight: 180)
+
+                Spacer()
+
+                SettingsCloseButton(
+                    action: onClose,
+                    help: "关闭迁移页面",
+                    accessibilityLabel: "关闭迁移页面"
+                )
+            }
+            .padding(.horizontal, SettingsDesign.modalPadding)
+            .padding(.top, SettingsDesign.modalPadding)
+            .padding(.bottom, SettingsDesign.modalHeaderSpacing)
+
+            Rectangle()
+                .fill(SettingsDesign.dividerColor(colorScheme))
+                .frame(height: 0.8)
+
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 14) {
+                    if model.hasCredentials {
+                        if let payload = model.payload, let encoded = try? payload.encodedString() {
+                            qrSection(payload: encoded)
+                        }
+
+                        credentialSummary
+                    } else {
+                        ContentUnavailableView(
+                            "没有可迁移的凭证",
+                            systemImage: "key.slash",
+                            description: Text("请先添加供应商凭证")
+                        )
+                        .frame(minHeight: 180)
+                    }
+                }
+                .padding(.horizontal, SettingsDesign.modalPadding)
+                .padding(.vertical, 18)
             }
 
             if model.hasCredentials {
-                if let payload = model.payload, let encoded = try? payload.encodedString() {
-                    qrSection(payload: encoded)
-                }
+                VStack(alignment: .leading, spacing: 10) {
+                    statusSection
 
-                statusSection
-                    .padding(.top, 12)
+                    HStack(spacing: 10) {
+                        if canRetry {
+                            Button("重新生成二维码") {
+                                Task { await model.restart() }
+                            }
+                            .liquidGlassButton(prominent: true)
+                            .accessibilityLabel("重新生成迁移二维码")
+                        }
 
-                HStack {
-                    Spacer()
-                    Button(role: .destructive) {
-                        model.cancelTapped()
-                        onClose()
-                    } label: {
-                        Text("取消迁移")
+                        Spacer()
+
+                        if isSent {
+                            Button("完成", action: onClose)
+                                .liquidGlassButton()
+                                .accessibilityLabel("完成迁移")
+                        } else {
+                            Button(role: .destructive) {
+                                model.cancelTapped()
+                                onClose()
+                            } label: {
+                                Text("取消迁移")
+                            }
+                            .buttonStyle(SettingsPressFeedbackButtonStyle(pressedScale: 0.98))
+                            .font(SettingsTypography.button)
+                            .accessibilityLabel("取消迁移")
+                        }
                     }
-                    .accessibilityLabel("取消迁移")
                 }
-                .padding(.top, 16)
+                .padding(.horizontal, SettingsDesign.modalPadding)
+                .padding(.vertical, 16)
+                .background(Color.primary.opacity(colorScheme == .dark ? 0.018 : 0.010))
+                .overlay(alignment: .top) {
+                    Rectangle()
+                        .fill(SettingsDesign.dividerColor(colorScheme))
+                        .frame(height: 0.8)
+                }
             }
         }
-        .padding(24)
-        .frame(width: 400)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: 440)
+        .frame(minHeight: 620, idealHeight: 680, maxHeight: 820)
         .task { await model.start() }
+        .onExitCommand(perform: onClose)
         .onDisappear {
             Task { await model.stop() }
         }
     }
 
     private var credentialSummary: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(model.migrationSummaryText)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
+        SettingsGroup(
+            title: "迁移内容",
+            subtitle: model.migrationSummaryText
+        ) {
             providerChips
+                .padding(.vertical, 5)
         }
-        .padding(.top, 12)
     }
 
     @ViewBuilder
@@ -401,59 +449,105 @@ struct TransferToAndroidView: View {
         .font(.caption.weight(.medium))
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(.quaternary, in: Capsule())
+        .background(Color.primary.opacity(0.055), in: Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8)
+        }
     }
 
     private func qrSection(payload: String) -> some View {
-        VStack(spacing: 10) {
-            TransferQRCodeImageView(string: payload)
+        SettingsGroup(
+            title: "在 Android 上扫码",
+            subtitle: "二维码只用于当前迁移会话，过期后需要重新发起。"
+        ) {
+            VStack(spacing: 12) {
+                TransferQRCodeImageView(string: payload)
+                    .padding(12)
+                    .background {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(.white)
+                    }
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(Color.black.opacity(0.08), lineWidth: 0.8)
+                    }
+                    .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
 
-            TimelineView(.periodic(from: .now, by: 1)) { context in
-                let seconds = model.remainingSeconds(now: context.date)
-                HStack(spacing: 4) {
-                    Image(systemName: "clock")
-                        .font(.caption2)
-                    Text(countdownText(seconds))
-                        .font(.caption.monospacedDigit().weight(.medium))
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    let seconds = model.remainingSeconds(now: context.date)
+                    SettingsStatusPill(
+                        text: countdownText(seconds),
+                        tone: seconds < 60 ? .warning : .neutral,
+                        systemImage: "clock"
+                    )
+                    .accessibilityLabel("剩余有效时间 \(countdownText(seconds))")
                 }
-                .foregroundStyle(seconds < 60 ? Color.orange : Color.secondary)
-                .accessibilityLabel("剩余有效时间 \(countdownText(seconds))")
             }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
         }
-        .frame(maxWidth: .infinity)
-        .padding(16)
-        .background {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.background)
-                .strokeBorder(.quaternary, lineWidth: 1)
-        }
-        .padding(.top, 16)
     }
 
     @ViewBuilder
     private var statusSection: some View {
         let (title, symbol) = statusDescription
-        HStack(spacing: 6) {
-            Image(systemName: symbol)
-                .foregroundStyle(statusColor)
-                .font(.callout)
-            Text(title)
-                .font(.callout.weight(.medium))
-                .accessibilityLabel("连接状态：\(title)")
+        SettingsNotice(
+            tone: statusTone,
+            message: title,
+            systemImage: symbol
+        )
+        .overlay(alignment: .trailing) {
+            if isTransferring {
+                ProgressView()
+                    .controlSize(.small)
+                    .padding(.trailing, 12)
+                    .accessibilityHidden(true)
+            }
+        }
+        .contentTransition(reduceMotion ? .identity : .opacity)
+        .animation(.easeOut(duration: 0.2), value: title)
+        .accessibilityLabel("连接状态：\(title)")
+    }
+
+    private var statusTone: SettingsNoticeTone {
+        switch model.phase {
+        case .idle, .preparing, .waiting, .cancelled:
+            return .neutral
+        case .connected, .sending:
+            return .info
+        case .sent:
+            return .success
+        case .expired:
+            return .warning
+        case .failed:
+            return .error
         }
     }
 
-    private var statusColor: Color {
+    private var isTransferring: Bool {
         switch model.phase {
-        case .idle, .preparing, .waiting:
-            .secondary
-        case .connected, .sending:
-            .blue
-        case .sent:
-            .green
-        case .cancelled, .expired, .failed:
-            .red
+        case .preparing, .connected, .sending:
+            return true
+        case .idle, .waiting, .sent, .cancelled, .expired, .failed:
+            return false
         }
+    }
+
+    private var canRetry: Bool {
+        switch model.phase {
+        case .cancelled, .expired, .failed:
+            return true
+        case .idle, .preparing, .waiting, .connected, .sending, .sent:
+            return false
+        }
+    }
+
+    private var isSent: Bool {
+        if case .sent = model.phase {
+            return true
+        }
+        return false
     }
 
     private var statusDescription: (String, String) {

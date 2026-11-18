@@ -121,7 +121,6 @@ targets:
           cp "$PROJECT_DIR/RoutinUsage/Views/Settings/CredentialAlertSettingsModel.swift" "$resource_dir/CredentialAlertSettingsModel.swift.txt"
           cp "$PROJECT_DIR/RoutinUsage/Views/Settings/CredentialAlertSettingsView.swift" "$resource_dir/CredentialAlertSettingsView.swift.txt"
           cp "$PROJECT_DIR/RoutinUsage/Views/Settings/Components/CredentialCompactRow.swift" "$resource_dir/CredentialCompactRow.swift.txt"
-          cp "$PROJECT_DIR/RoutinUsage/Views/Settings/Components/ProviderFilterChips.swift" "$resource_dir/ProviderFilterChips.swift.txt"
           cp "$PROJECT_DIR/RoutinUsage/Views/Settings/Components/MenuBarIndicatorPreview.swift" "$resource_dir/MenuBarIndicatorPreview.swift.txt"
           cp "$PROJECT_DIR/RoutinUsage/Views/Settings/Components/ReorderableCredentialCardList.swift" "$resource_dir/ReorderableCredentialCardList.swift.txt"
           cp "$PROJECT_DIR/RoutinUsage/Views/Settings/Components/SettingsPageHeader.swift" "$resource_dir/SettingsPageHeader.swift.txt"

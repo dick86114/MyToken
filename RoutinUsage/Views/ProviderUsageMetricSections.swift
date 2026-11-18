@@ -3,6 +3,7 @@ import SwiftUI
 struct XiaomiAPIMetricsView: View {
     @Environment(\.colorScheme) private var colorScheme
     let metrics: [NormalizedUsageMetric]
+    var visualStyle: UsageMetricsVisualStyle = .standard
 
     private let accountIDs = [
         "account-balance",
@@ -43,11 +44,11 @@ struct XiaomiAPIMetricsView: View {
     private func metricCell(_ metric: NormalizedUsageMetric?) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(metric?.label ?? "—")
-                .font(.system(size: 12))
+                .font(.system(size: visualStyle.valueLabelSize))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
             Text(valueText(metric))
-                .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                .font(.system(size: visualStyle.valueSize, weight: .semibold, design: .monospaced))
                 .foregroundStyle(color(metric?.healthState))
                 .monospacedDigit()
                 .lineLimit(1)
@@ -81,6 +82,7 @@ struct VolcengineCodingPlanMetricsView: View {
     @Environment(\.colorScheme) private var colorScheme
     let metrics: [NormalizedUsageMetric]
     let now: Date
+    var visualStyle: UsageMetricsVisualStyle = .standard
 
     private var session: NormalizedUsageMetric? { metric("fiveHour") }
     private var weekly: NormalizedUsageMetric? { metric("weekly") }
@@ -106,15 +108,18 @@ struct VolcengineCodingPlanMetricsView: View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(alignment: .firstTextBaseline) {
                 Text(metric?.label ?? fallbackTitle)
-                    .font(.system(size: 12))
+                    .font(.system(size: visualStyle.valueLabelSize))
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 4)
                 Text(percentText(metric))
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .font(.system(size: visualStyle.valueSize, weight: .semibold, design: .monospaced))
                     .foregroundStyle(color(metric))
                     .monospacedDigit()
             }
-            UsageMetricProgressBar(percent: metric?.displayedPercent ?? 0)
+            UsageMetricProgressBar(
+                percent: metric?.displayedPercent ?? 0,
+                height: visualStyle.progressHeight
+            )
             detailLines(metric)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -124,15 +129,18 @@ struct VolcengineCodingPlanMetricsView: View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(alignment: .firstTextBaseline) {
                 Text(metric.label)
-                    .font(.system(size: 12))
+                    .font(.system(size: visualStyle.valueLabelSize))
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 4)
                 Text(percentText(metric))
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .font(.system(size: visualStyle.valueSize, weight: .semibold, design: .monospaced))
                     .foregroundStyle(color(metric))
                     .monospacedDigit()
             }
-            UsageMetricProgressBar(percent: metric.displayedPercent ?? 0)
+            UsageMetricProgressBar(
+                percent: metric.displayedPercent ?? 0,
+                height: visualStyle.progressHeight
+            )
             HStack(alignment: .top, spacing: 16) {
                 VStack(alignment: .leading, spacing: 5) {
                     amountText("已用", metric.used, metric.limit)
@@ -228,6 +236,8 @@ struct NewAPIUsageMetricsView: View {
     @Environment(\.colorScheme) private var colorScheme
     let metrics: [NormalizedUsageMetric]
     let now: Date
+    var visualStyle: UsageMetricsVisualStyle = .standard
+    var showsActivityDetails: Bool = false
 
     private var quotaMetric: NormalizedUsageMetric? {
         metric("quota-progress")
@@ -249,17 +259,25 @@ struct NewAPIUsageMetricsView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if let quotaMetric {
-                quotaCard(quotaMetric)
-            }
-
-            if !consumptionMetrics.isEmpty {
+        VStack(alignment: .leading, spacing: 7) {
+            if consumptionMetrics.isEmpty {
+                if let quotaMetric {
+                    quotaCard(quotaMetric)
+                }
+            } else {
                 consumptionSection
             }
 
-            activitySection
+            activitySummaryLine
+
+            if showsActivityDetails, hasActivityDetails {
+                activitySection
+            }
         }
+    }
+
+    private var hasActivityDetails: Bool {
+        metric("rpm") != nil || metric("tpm") != nil || metric("request-count") != nil
     }
 
     private func quotaCard(_ metric: NormalizedUsageMetric) -> some View {
@@ -271,18 +289,18 @@ struct NewAPIUsageMetricsView: View {
         return VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(metric.label)
-                    .font(.system(size: 12))
+                    .font(.system(size: visualStyle.valueLabelSize))
                     .foregroundStyle(.tertiary)
 
                 Spacer(minLength: 4)
 
                 Text(percentText)
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .font(.system(size: visualStyle.valueSize, weight: .semibold, design: .monospaced))
                     .foregroundStyle(healthColor(metric.healthState))
                     .monospacedDigit()
             }
 
-            UsageMetricProgressBar(percent: percent)
+            UsageMetricProgressBar(percent: percent, height: visualStyle.progressHeight)
 
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text("已用 \(quotaText(metric.used)) / \(quotaText(metric.limit))")
@@ -308,26 +326,14 @@ struct NewAPIUsageMetricsView: View {
     }
 
     private var consumptionSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text("Token 消耗")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.tertiary)
-
-                Spacer(minLength: 4)
-
-                Text("单位 Token")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
+        Grid(horizontalSpacing: 10, verticalSpacing: 7) {
+            GridRow {
+                ForEach(Array(consumptionMetrics.prefix(2))) { metric in
+                    consumptionCell(metric)
+                }
             }
 
-            Grid(horizontalSpacing: 12, verticalSpacing: 8) {
-                GridRow {
-                    ForEach(Array(consumptionMetrics.prefix(2))) { metric in
-                        consumptionCell(metric)
-                    }
-                }
-
+            if consumptionMetrics.count > 2 {
                 GridRow {
                     ForEach(Array(consumptionMetrics.dropFirst(2))) { metric in
                         consumptionCell(metric)
@@ -339,36 +345,69 @@ struct NewAPIUsageMetricsView: View {
     }
 
     private func consumptionCell(_ metric: NormalizedUsageMetric) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 2) {
             Text(metric.label)
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
+                .font(.system(size: visualStyle.compactValueLabelSize))
+                .foregroundStyle(.tertiary)
                 .lineLimit(1)
 
             Text(UsageFormatter.exactTokenText(metric.value))
-                .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                .font(.system(size: visualStyle.compactValueSize, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.primary)
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
 
-            Text("≈ \(costText(for: metric))")
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
+            if visualStyle != .popover {
+                Text("≈ \(costText(for: metric))")
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(.tertiary)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(metric.label)，\(UsageFormatter.exactTokenText(metric.value))，约 \(costText(for: metric))")
     }
 
+    private var activitySummaryLine: some View {
+        HStack(spacing: 4) {
+            if let quotaMetric {
+                Text("账户额度 \(quotaText(quotaMetric.used)) / \(quotaText(quotaMetric.limit))")
+            }
+            if let rpm = metric("rpm")?.value {
+                summarySeparator
+                Text("RPM \(UsageFormatter.compactMetricValue(rpm))")
+            }
+            if let tpm = metric("tpm")?.value {
+                summarySeparator
+                Text("TPM \(UsageFormatter.compactMetricValue(tpm))")
+            }
+            if let requests = metric("request-count")?.value {
+                summarySeparator
+                Text("请求 \(UsageFormatter.compactMetricValue(requests))")
+            }
+        }
+        .font(.system(size: 10))
+        .foregroundStyle(.tertiary)
+        .monospacedDigit()
+        .lineLimit(1)
+        .minimumScaleFactor(0.65)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var summarySeparator: some View {
+        Text("·")
+            .foregroundStyle(Color.secondary.opacity(0.5))
+    }
+
     private var activitySection: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text("请求活动")
-                    .font(.system(size: 12))
+                    .font(.system(size: visualStyle.valueLabelSize))
                     .foregroundStyle(.tertiary)
 
                 Spacer(minLength: 4)
@@ -406,18 +445,18 @@ struct NewAPIUsageMetricsView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
-                .font(.system(size: 10))
+                .font(.system(size: visualStyle.compactValueLabelSize))
                 .foregroundStyle(.secondary)
 
             Text(UsageFormatter.compactMetricValue(value))
-                .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                .font(.system(size: visualStyle.compactValueSize, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.primary)
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
 
             Text(detail)
-                .font(.system(size: 10))
+                .font(.system(size: visualStyle.detailSize))
                 .foregroundStyle(.tertiary)
                 .lineLimit(1)
         }
@@ -452,6 +491,8 @@ struct NewAPIUsageMetricsView: View {
 struct GLMUsageMetricsView: View {
     let metrics: [NormalizedUsageMetric]
     let now: Date
+    var showsSupplementaryMetrics: Bool = true
+    var visualStyle: UsageMetricsVisualStyle = .standard
 
     private var progressMetrics: [NormalizedUsageMetric] {
         metrics.filter { $0.presentation == .progress }
@@ -479,16 +520,24 @@ struct GLMUsageMetricsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             if !progressMetrics.isEmpty {
-                NormalizedUsageMetricGrid(
-                    metrics: progressMetrics,
-                    columns: 2,
-                    resetTimeStyle: .relativeDuration,
-                    now: now,
-                    showsAmountDetails: false
-                )
+                VStack(alignment: .leading, spacing: 4) {
+                    NormalizedUsageMetricGrid(
+                        metrics: progressMetrics,
+                        columns: 2,
+                        resetTimeStyle: .relativeDuration,
+                        now: now,
+                        showsAmountDetails: false,
+                        visualStyle: visualStyle,
+                        showsResetCards: false
+                    )
+
+                    if hasResetCards {
+                        resetCardsFooter
+                    }
+                }
             }
 
-            if !callMetrics.isEmpty {
+            if showsSupplementaryMetrics, !callMetrics.isEmpty {
                 Grid(horizontalSpacing: 16, verticalSpacing: 8) {
                     GridRow {
                         callCell(callMetrics[safe: 0])
@@ -497,7 +546,7 @@ struct GLMUsageMetricsView: View {
                 }
             }
 
-            if !activityMetrics.isEmpty {
+            if showsSupplementaryMetrics, !activityMetrics.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("活跃度")
                         .font(.system(size: 10, weight: .semibold))
@@ -517,18 +566,50 @@ struct GLMUsageMetricsView: View {
         }
     }
 
+    private var hasResetCards: Bool {
+        progressMetrics.contains { !$0.resetCards.isEmpty }
+    }
+
+    private var resetCardsFooter: some View {
+        let rows = stride(from: 0, to: progressMetrics.count, by: 2).map {
+            Array(progressMetrics[$0..<min($0 + 2, progressMetrics.count)])
+        }
+
+        return VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                HStack(alignment: .center, spacing: visualStyle.columnSpacing) {
+                    ForEach(0..<2, id: \.self) { index in
+                        Group {
+                            if index < row.count, !row[index].resetCards.isEmpty {
+                                UsageResetCardsBadge(
+                                    resetCards: row[index].resetCards,
+                                    style: .detail,
+                                    now: now
+                                )
+                            } else {
+                                Color.clear
+                                    .frame(height: 18)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+        }
+    }
+
     @ViewBuilder
     private func callCell(_ metric: NormalizedUsageMetric?) -> some View {
         if let metric {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(metric.label)
-                    .font(.system(size: 12))
+                    .font(.system(size: visualStyle.valueLabelSize))
                     .foregroundStyle(.tertiary)
 
                 Spacer(minLength: 4)
 
                 Text("\(UsageFormatter.compactMetricValue(metric.value)) 次")
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .font(.system(size: visualStyle.valueSize, weight: .semibold, design: .monospaced))
                     .foregroundStyle(.primary)
                     .monospacedDigit()
                     .lineLimit(1)
@@ -546,12 +627,12 @@ struct GLMUsageMetricsView: View {
         let text = activityValueText(metric)
         return VStack(alignment: .leading, spacing: 3) {
             Text(text)
-                .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                .font(.system(size: visualStyle.valueSize, weight: .semibold, design: .monospaced))
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.65)
             Text(metric.label)
-                .font(.system(size: 10))
+                .font(.system(size: visualStyle.detailSize))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
         }

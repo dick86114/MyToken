@@ -826,7 +826,7 @@ private extension AppEnvironment {
                     event: "update_check_failed",
                     details: String(describing: error)
                 )
-                outcome = .failed("检测更新失败：\(GitHubUpdateService.errorReason(for: error))")
+                outcome = .failed("检查更新失败：\(GitHubUpdateService.errorReason(for: error))")
             }
             guard let self else { return }
             self.finishUpdateCheck(
@@ -944,7 +944,7 @@ private extension AppEnvironment {
     static func updateErrorDescription(_ error: UpdateServiceError) -> String {
         switch error {
         case let .unavailable(reason):
-            return "检测更新失败：\(reason)"
+            return "检查更新失败：\(reason)"
         case let .invalidResponse(reason):
             return "更新信息无效：\(reason)。请前往 GitHub 手动下载"
         case let .downloadFailed(reason):

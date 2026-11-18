@@ -70,29 +70,21 @@ final class SettingsAndCardAppearanceTests: XCTestCase {
             at: "RoutinUsage/Views/CompactUsageCardViews.swift"
         )
 
-        let balanceStart = try XCTUnwrap(compactViews.range(of: "private struct BalanceCompositionSegment"))
-        let balanceEnd = try XCTUnwrap(
-            compactViews.range(of: "private extension View", range: balanceStart.lowerBound..<compactViews.endIndex)
-        )
-        let balanceViews = String(compactViews[balanceStart.lowerBound..<balanceEnd.lowerBound])
-
         XCTAssertTrue(compactViews.contains("struct BalanceCompositionDetails"))
         XCTAssertTrue(compactViews.contains("struct BalanceCompositionDetailItem"))
-        XCTAssertTrue(compactViews.contains("static let width: CGFloat = 164"))
-        XCTAssertTrue(compactViews.contains("static let height: CGFloat = 14"))
-        XCTAssertTrue(compactViews.contains("static let contentHeight: CGFloat = 46"))
-        XCTAssertTrue(compactViews.contains(".frame(height: balanceComposition == nil ? 24 : BalanceCompositionDetailMetrics.contentHeight)"))
+        XCTAssertTrue(compactViews.contains("ViewThatFits(in: .horizontal)"))
+        XCTAssertFalse(compactViews.contains("caption: String = \"可用余额\""))
+        XCTAssertFalse(compactViews.contains("Text(caption)"))
+        XCTAssertTrue(compactViews.contains("HStack(alignment: .firstTextBaseline, spacing: 6)"))
         XCTAssertTrue(compactViews.contains("Text(segment.compactLabel)"))
         XCTAssertTrue(compactViews.contains("UsageFormatter.currencyText(segment.value, currencyCode: currencyCode)"))
         XCTAssertTrue(compactViews.contains("case \"toppedUpBalance\":"))
         XCTAssertTrue(compactViews.contains("case \"grantedBalance\":"))
         XCTAssertTrue(compactViews.contains("case \"cash-balance\":"))
         XCTAssertTrue(compactViews.contains("case \"gift-balance\":"))
-        XCTAssertTrue(balanceViews.contains("Circle()"))
-        XCTAssertTrue(balanceViews.contains("separatorSize"))
-        XCTAssertFalse(balanceViews.contains("RoundedRectangle"))
-        XCTAssertFalse(balanceViews.contains(".background"))
-        XCTAssertFalse(balanceViews.contains(".overlay"))
+        XCTAssertTrue(compactViews.contains("Circle()"))
+        XCTAssertFalse(compactViews.contains("separatorSize"))
+        XCTAssertFalse(compactViews.contains("static let width: CGFloat = 164"))
         XCTAssertFalse(compactViews.contains("BalanceCompositionBar"))
         XCTAssertFalse(compactViews.contains("BalanceCompositionHoverRegion"))
         XCTAssertFalse(compactViews.contains("BalanceCompositionDetailCard"))
@@ -126,7 +118,7 @@ final class SettingsAndCardAppearanceTests: XCTestCase {
         XCTAssertTrue(selector.contains("[\"toppedUpBalance\", \"grantedBalance\", \"cash-balance\", \"gift-balance\"]"))
     }
 
-    func test简洁用量卡片不叠加内层描边() throws {
+    func test简洁指标卡使用一层细描边() throws {
         let source = try sourceText(
             at: "RoutinUsage/Views/CompactUsageCardViews.swift"
         )
@@ -142,14 +134,14 @@ final class SettingsAndCardAppearanceTests: XCTestCase {
         let gaugeTile = source[gaugeStart.lowerBound..<valueStart.lowerBound]
         let valueTile = source[valueStart.lowerBound..<balanceStart.lowerBound]
 
-        XCTAssertFalse(gaugeTile.contains(".overlay"))
-        XCTAssertFalse(gaugeTile.contains("strokeBorder"))
-        XCTAssertFalse(valueTile.contains(".overlay"))
-        XCTAssertFalse(valueTile.contains("strokeBorder"))
+        XCTAssertTrue(gaugeTile.contains(".overlay"))
+        XCTAssertTrue(gaugeTile.contains("strokeBorder"))
+        XCTAssertTrue(valueTile.contains(".overlay"))
+        XCTAssertTrue(valueTile.contains("strokeBorder"))
         XCTAssertFalse(source.contains("static func tileStroke"))
     }
 
-    func test简洁用量卡片不绘制内层底卡() throws {
+    func test简洁指标卡使用实色底卡() throws {
         let source = try sourceText(
             at: "RoutinUsage/Views/CompactUsageCardViews.swift"
         )
@@ -165,11 +157,13 @@ final class SettingsAndCardAppearanceTests: XCTestCase {
         let gaugeTile = source[gaugeStart.lowerBound..<valueStart.lowerBound]
         let valueTile = source[valueStart.lowerBound..<balanceStart.lowerBound]
 
-        XCTAssertFalse(gaugeTile.contains(".background"))
-        XCTAssertFalse(valueTile.contains(".background"))
+        XCTAssertTrue(gaugeTile.contains(".background"))
+        XCTAssertTrue(gaugeTile.contains("CompactPopoverPalette.surface(.metric, colorScheme)"))
+        XCTAssertTrue(valueTile.contains(".background"))
+        XCTAssertTrue(valueTile.contains("CompactPopoverPalette.surface(.metric, colorScheme)"))
     }
 
-    func test用量小卡片使用无色液态玻璃() throws {
+    func test简洁指标卡不再叠加玻璃材质() throws {
         let source = try sourceText(
             at: "RoutinUsage/Views/CompactUsageCardViews.swift"
         )
@@ -184,14 +178,11 @@ final class SettingsAndCardAppearanceTests: XCTestCase {
         )
         let gaugeTile = source[gaugeStart.lowerBound..<valueStart.lowerBound]
         let valueTile = source[valueStart.lowerBound..<balanceStart.lowerBound]
-        let glassModifier = ".compactUsageGlass(cornerRadius: CompactPopoverMetrics.metricCornerRadius)"
-
-        XCTAssertTrue(gaugeTile.contains(glassModifier))
-        XCTAssertTrue(valueTile.contains(glassModifier))
-        XCTAssertTrue(source.contains("if #available(macOS 26.0, *)"))
-        XCTAssertTrue(source.contains(".glassEffect(.regular, in: shape)"))
-        XCTAssertFalse(gaugeTile.contains(".regular.tint"))
-        XCTAssertFalse(valueTile.contains(".regular.tint"))
+        XCTAssertFalse(source.contains(".compactUsageGlass"))
+        XCTAssertFalse(source.contains(".glassEffect(.regular, in: shape)"))
+        XCTAssertTrue(gaugeTile.contains("RoundedRectangle("))
+        XCTAssertTrue(gaugeTile.contains(".fill(CompactPopoverPalette.surface(.metric, colorScheme))"))
+        XCTAssertTrue(valueTile.contains(".fill(CompactPopoverPalette.surface(.metric, colorScheme))"))
     }
 
     func test进度状态色只作用于进度本体() throws {
@@ -220,7 +211,7 @@ final class SettingsAndCardAppearanceTests: XCTestCase {
         )
         let gauge = compactSource[gaugeStart.lowerBound..<gaugeEnd.lowerBound]
         let statusColorCount = gauge.components(
-            separatedBy: "UsageMetricPresentation.color"
+            separatedBy: "CompactPopoverPalette.statusColor"
         ).count - 1
         let labelStart = try XCTUnwrap(
             gauge.range(of: "private var gaugeLabel")
@@ -228,7 +219,7 @@ final class SettingsAndCardAppearanceTests: XCTestCase {
         XCTAssertEqual(statusColorCount, 1)
         XCTAssertTrue(gauge.contains("private var gaugeColor"))
         XCTAssertLessThan(
-            try XCTUnwrap(gauge.range(of: "UsageMetricPresentation.color")).lowerBound,
+            try XCTUnwrap(gauge.range(of: "CompactPopoverPalette.statusColor")).lowerBound,
             labelStart.lowerBound
         )
 
@@ -239,8 +230,26 @@ final class SettingsAndCardAppearanceTests: XCTestCase {
             compactSource.range(of: "struct CompactValueTile")
         )
         let gaugeTile = compactSource[tileStart.lowerBound..<valueStart.lowerBound]
-        XCTAssertFalse(gaugeTile.contains("UsageMetricPresentation.color"))
+        XCTAssertTrue(gaugeTile.contains("CompactUsageCardPresentation.gaugeTone"))
         XCTAssertFalse(gaugeTile.contains("Circle()"))
+    }
+
+    func test深色供应商Logo使用明亮底板避免失去对比度() throws {
+        let source = try sourceText(
+            at: "RoutinUsage/Views/ProviderLogoBadge.swift"
+        )
+
+        XCTAssertTrue(source.contains("Color.white.opacity(0.92)"))
+    }
+
+    func test简洁仪表使用扇形填充面积() throws {
+        let source = try sourceText(
+            at: "RoutinUsage/Views/CompactUsageCardViews.swift"
+        )
+
+        XCTAssertTrue(source.contains("GaugeSectorShape(progress: clamped / 100)"))
+        XCTAssertTrue(source.contains(".fill(ringColor.opacity("))
+        XCTAssertTrue(source.contains("style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)"))
     }
 
     private func sourceText(at relativePath: String) throws -> String {

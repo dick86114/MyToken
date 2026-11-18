@@ -197,6 +197,18 @@ enum CredentialEditorValidation {
 
 @MainActor
 struct CredentialEditorView: View {
+    private enum Field: CaseIterable, Hashable {
+        case provider
+        case name
+        case website
+        case newAPIBaseURL
+        case newAPIUserID
+        case apiKey
+        case accessKeyID
+        case secretAccessKey
+        case balanceWarningThreshold
+    }
+
     let title: String
     let initialProviderID: ProviderID
     let initialName: String
@@ -224,6 +236,9 @@ struct CredentialEditorView: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var autoSuggestedWebsiteURL: String
+    @State private var hasAttemptedSubmit = false
+    @State private var showsDiscardConfirmation = false
+    @State private var requestedScrollField: Field?
 
     init(
         title: String = "添加凭证",
@@ -265,56 +280,72 @@ struct CredentialEditorView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(spacing: 0) {
             header
+                .padding(.horizontal, SettingsDesign.modalPadding)
+                .padding(.top, SettingsDesign.modalPadding)
+                .padding(.bottom, SettingsDesign.modalHeaderSpacing)
 
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 14) {
-                    providerField
-                        .frame(maxWidth: .infinity)
-                    CredentialInputField(
-                        label: "名称",
-                        text: $name,
-                        prompt: "例如：工作账号",
-                        accentColor: providerAccent,
-                        autoFocus: true
-                    )
-                    .frame(maxWidth: .infinity)
-                }
+            Rectangle()
+                .fill(SettingsDesign.dividerColor(colorScheme))
+                .frame(height: 0.8)
 
-                CredentialInputField(
-                    label: "官网 / 后台地址（可选）",
-                    text: $websiteURL,
-                    prompt: websitePrompt,
-                    accentColor: providerAccent,
-                    helpText: "显示在用量详情和分享卡片中，可替换为你的自定义地址。"
-                )
-            }
+            ScrollViewReader { proxy in
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        basicInformationSection
+                        providerCredentialFields
 
-            Divider()
-                .overlay(fieldBorder.opacity(0.8))
-
-            providerCredentialFields
-
-            if let errorMessage {
-                Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
-                    .font(.callout)
-                    .foregroundStyle(.red)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.red.opacity(colorScheme == .dark ? 0.12 : 0.07))
+                        if let errorMessage {
+                            SettingsNotice(
+                                tone: .error,
+                                message: errorMessage,
+                                title: "无法保存凭证"
+                            )
+                        }
                     }
+                    .padding(.horizontal, SettingsDesign.modalPadding)
+                    .padding(.vertical, 18)
+                }
+                .onChange(of: requestedScrollField) { _, field in
+                    guard let field else { return }
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        proxy.scrollTo(field, anchor: .center)
+                    }
+                    DispatchQueue.main.async {
+                        requestedScrollField = nil
+                    }
+                }
             }
 
             footer
+                .padding(.horizontal, SettingsDesign.modalPadding)
+                .padding(.vertical, 16)
+                .background {
+                    Rectangle()
+                        .fill(Color.primary.opacity(colorScheme == .dark ? 0.018 : 0.010))
+                }
+                .overlay(alignment: .top) {
+                    Rectangle()
+                        .fill(SettingsDesign.dividerColor(colorScheme))
+                        .frame(height: 0.8)
+                }
         }
-        .padding(24)
         .frame(width: 680)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(minHeight: 460, idealHeight: 560, maxHeight: 720)
+        .confirmationDialog(
+            "放弃未保存的修改？",
+            isPresented: $showsDiscardConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("放弃修改", role: .destructive, action: onClose)
+            Button("继续编辑", role: .cancel) {}
+        } message: {
+            Text("当前填写的凭证信息尚未保存，关闭后会丢失。")
+        }
+        .onExitCommand(perform: close)
         .onChange(of: providerID) { _, newProviderID in
+            hasAttemptedSubmit = false
             isSecretVisible = false
             let suggestion = CredentialWebsiteDefaults.suggestedURL(
                 for: newProviderID,
@@ -354,42 +385,57 @@ struct CredentialEditorView: View {
         }
     }
 
+    private var basicInformationSection: some View {
+        SettingsGroup(title: "基本信息") {
+            HStack(alignment: .top, spacing: 14) {
+                providerField
+                    .frame(maxWidth: .infinity)
+                    .id(Field.provider)
+
+                SettingsLabeledTextField(
+                    label: "名称",
+                    text: $name,
+                    prompt: "例如：主力凭证",
+                    errorText: fieldErrors[.name],
+                    accentColor: providerAccent,
+                    autoFocus: true
+                )
+                .frame(maxWidth: .infinity)
+                .id(Field.name)
+            }
+
+            SettingsLabeledTextField(
+                label: "官网 / 后台地址（可选）",
+                text: $websiteURL,
+                prompt: websitePrompt,
+                helpText: "显示在用量详情和分享卡片中，可替换为你的自定义地址。",
+                errorText: fieldErrors[.website],
+                accentColor: providerAccent
+            )
+            .padding(.top, 10)
+            .id(Field.website)
+        }
+    }
+
     private var header: some View {
         HStack(spacing: 12) {
-            ProviderLogoMark(providerID: providerID, size: 38, cornerRadius: 10)
+            ProviderLogoMark(providerID: providerID, size: 36, cornerRadius: 10)
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.title3.weight(.semibold))
-                Text("配置 \(providerName) 的查询凭证")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
+            SettingsModalTitle(
+                title,
+                subtitle: "配置 \(providerName) 的查询凭证"
+            )
 
             Spacer()
 
-            Button {
-                close()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .semibold))
-                    .frame(width: 28, height: 28)
-                    .background {
-                        Circle()
-                            .fill(Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.06))
-                    }
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-            .help("关闭")
-            .accessibilityLabel("关闭")
+            SettingsCloseButton(action: close)
+                .disabled(isSaving)
         }
     }
 
     private var providerField: some View {
         VStack(alignment: .leading, spacing: 6) {
-            CredentialFieldLabel(text: "供应商")
+            SettingsFieldLabel(text: "供应商")
 
             Menu {
                 Picker(selection: $providerID) {
@@ -415,55 +461,63 @@ struct CredentialEditorView: View {
                         .foregroundStyle(.tertiary)
                 }
                 .padding(.horizontal, 10)
-                .frame(height: 40)
+                .frame(minHeight: SettingsDesign.fieldHeight)
                 .background {
-                    fieldShape.fill(fieldFill)
+                    RoundedRectangle(
+                        cornerRadius: SettingsDesign.controlCornerRadius,
+                        style: .continuous
+                    )
+                    .fill(SettingsDesign.fieldFill(colorScheme))
                 }
                 .overlay {
-                    fieldShape.strokeBorder(fieldBorder, lineWidth: 1)
+                    RoundedRectangle(
+                        cornerRadius: SettingsDesign.controlCornerRadius,
+                        style: .continuous
+                    )
+                    .strokeBorder(SettingsDesign.fieldBorder(colorScheme), lineWidth: 1)
                 }
-                .contentShape(fieldShape)
+                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(SettingsPressFeedbackButtonStyle(pressedScale: 0.99))
             .menuIndicator(.hidden)
             .accessibilityLabel("供应商，当前：\(providerName)")
         }
     }
 
     private var providerCredentialFields: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("接入凭证")
-                    .font(.headline)
-                Spacer()
-                Text(credentialKindLabel)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
+        SettingsGroup(
+            title: "接入凭证",
+            subtitle: credentialGroupSubtitle
+        ) {
+            VStack(alignment: .leading, spacing: 14) {
+                credentialFieldsContent
             }
-
-            credentialFieldsContent
         }
     }
 
     @ViewBuilder
     private var credentialFieldsContent: some View {
         if providerID == .newAPI {
-            CredentialInputField(
+            SettingsLabeledTextField(
                 label: "New API 地址",
                 text: $newAPIBaseURL,
                 prompt: "https://your-new-api.com",
+                errorText: fieldErrors[.newAPIBaseURL],
                 accentColor: providerAccent
             )
+            .id(Field.newAPIBaseURL)
 
-            CredentialInputField(
+            SettingsLabeledTextField(
                 label: "数字用户 ID",
                 text: $newAPIUserID,
                 prompt: "例如：1024",
+                errorText: fieldErrors[.newAPIUserID],
                 accentColor: providerAccent
             )
+            .id(Field.newAPIUserID)
 
             HStack(spacing: 8) {
-                CredentialHint(text: "只支持数字用户 ID，个人资料页会显示该值。")
+                SettingsHintText(text: "只支持数字用户 ID，个人资料页会显示该值。")
                 Spacer()
                 Button {
                     if let url = newAPIProfileURL {
@@ -472,29 +526,33 @@ struct CredentialEditorView: View {
                 } label: {
                     Label("打开个人资料", systemImage: "arrow.up.right.square")
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(SettingsPressFeedbackButtonStyle(pressedScale: 0.99))
                 .font(.caption.weight(.medium))
                 .foregroundStyle(newAPIProfileURL == nil ? Color.secondary.opacity(0.45) : providerAccent)
                 .disabled(newAPIProfileURL == nil)
             }
 
-            CredentialInputField(
+            SettingsLabeledTextField(
                 label: "用户访问令牌",
                 text: $apiKey,
                 prompt: "粘贴 New API 用户访问令牌",
                 isSecret: true,
                 visibility: $isSecretVisible,
                 canReveal: CredentialVisibility.canToggle(secret: apiKey),
+                errorText: fieldErrors[.apiKey],
                 accentColor: providerAccent
             )
+            .id(Field.apiKey)
 
-            CredentialInputField(
+            SettingsLabeledTextField(
                 label: "低额度预警值（可选）",
                 text: $balanceWarningThreshold,
                 prompt: "例如：10",
                 suffix: "额度",
+                errorText: fieldErrors[.balanceWarningThreshold],
                 accentColor: providerAccent
             )
+            .id(Field.balanceWarningThreshold)
         } else if providerID == .volcengine {
             CredentialSegmentedField(
                 label: "计划类型",
@@ -502,37 +560,41 @@ struct CredentialEditorView: View {
                 options: [
                     CredentialSegmentOption(id: "agent", title: "Agent Plan"),
                     CredentialSegmentOption(id: "coding", title: "Coding Plan")
-                ],
-                accentColor: providerAccent
+                ]
             )
 
             HStack(alignment: .top, spacing: 14) {
-                CredentialInputField(
+                SettingsLabeledTextField(
                     label: "AccessKey ID",
                     text: $accessKeyID,
                     prompt: "AKLT...",
+                    errorText: fieldErrors[.accessKeyID],
                     accentColor: providerAccent
                 )
                 .frame(maxWidth: .infinity)
+                .id(Field.accessKeyID)
 
-                CredentialInputField(
+                SettingsLabeledTextField(
                     label: "区域（可选）",
                     text: $region,
                     prompt: "cn-beijing",
+                    errorText: nil,
                     accentColor: providerAccent
                 )
                 .frame(maxWidth: .infinity)
             }
 
-            CredentialInputField(
+            SettingsLabeledTextField(
                 label: "SecretAccessKey",
                 text: $secretAccessKey,
                 prompt: "粘贴 SecretAccessKey",
                 isSecret: true,
                 visibility: $isSecretVisible,
                 canReveal: CredentialVisibility.canToggle(secret: secretAccessKey),
+                errorText: fieldErrors[.secretAccessKey],
                 accentColor: providerAccent
             )
+            .id(Field.secretAccessKey)
         } else if providerID == .xiaomi {
             CredentialSegmentedField(
                 label: "查询方式",
@@ -540,58 +602,65 @@ struct CredentialEditorView: View {
                 options: [
                     CredentialSegmentOption(id: "api", title: "API 按量"),
                     CredentialSegmentOption(id: "plan", title: "Token Plan")
-                ],
-                accentColor: providerAccent
+                ]
             )
 
-            CredentialInputField(
+            SettingsLabeledTextField(
                 label: "API Key",
                 text: $apiKey,
                 prompt: xiaomiAPIKeyPrompt,
                 isSecret: true,
                 visibility: $isSecretVisible,
                 canReveal: CredentialVisibility.canToggle(secret: apiKey),
+                errorText: fieldErrors[.apiKey],
                 accentColor: providerAccent
             )
+            .id(Field.apiKey)
 
-            CredentialHint(text: "API 按量使用 sk- 开头的普通 API Key；Token Plan 使用 tp- 开头的专用 API Key。")
+            SettingsHintText(text: "API 按量使用 sk- 开头的普通 API Key；Token Plan 使用 tp- 开头的专用 API Key。")
 
             if xiaomiUsageKind == "api" {
-                CredentialInputField(
+                SettingsLabeledTextField(
                     label: "低余额预警值（可选）",
                     text: $balanceWarningThreshold,
                     prompt: "例如：20",
                     suffix: "元",
+                    errorText: fieldErrors[.balanceWarningThreshold],
                     accentColor: providerAccent
                 )
+                .id(Field.balanceWarningThreshold)
             }
         } else {
-            CredentialInputField(
+            SettingsLabeledTextField(
                 label: apiKeyLabel,
                 text: $apiKey,
                 prompt: apiKeyPrompt,
                 isSecret: true,
                 visibility: $isSecretVisible,
                 canReveal: CredentialVisibility.canToggle(secret: apiKey),
+                errorText: fieldErrors[.apiKey],
                 accentColor: providerAccent
             )
+            .id(Field.apiKey)
 
             if providerID == .deepseek {
-                CredentialInputField(
+                SettingsLabeledTextField(
                     label: "低余额预警值（可选）",
                     text: $balanceWarningThreshold,
                     prompt: "例如：10",
                     suffix: "元",
+                    errorText: fieldErrors[.balanceWarningThreshold],
                     accentColor: providerAccent
                 )
+                .id(Field.balanceWarningThreshold)
             }
         }
     }
 
     private var footer: some View {
         HStack(spacing: 12) {
-            Label("凭证仅保存在本机", systemImage: "lock.fill")
-                .font(.caption)
+            Label("凭证仅保存在此 Mac", systemImage: "lock.shield")
+                .font(SettingsTypography.secondary)
                 .foregroundStyle(.secondary)
 
             Spacer()
@@ -599,8 +668,9 @@ struct CredentialEditorView: View {
             Button("取消") {
                 close()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(SettingsPressFeedbackButtonStyle(pressedScale: 0.98))
             .foregroundStyle(.secondary)
+            .disabled(isSaving)
             .keyboardShortcut(.cancelAction)
 
             Button {
@@ -620,12 +690,121 @@ struct CredentialEditorView: View {
         }
     }
 
+    private var fieldErrors: [Field: String] {
+        guard hasAttemptedSubmit else { return [:] }
+        var errors: [Field: String] = [:]
+
+        if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            errors[.name] = "请输入名称"
+        }
+
+        do {
+            _ = try CredentialEditorValidation.websiteMetadata(from: websiteURL)
+        } catch {
+            errors[.website] = "请输入有效的 HTTP(S) 地址"
+        }
+
+        let threshold = balanceWarningThreshold
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let showsBalanceThreshold = providerID == .deepseek
+            || providerID == .glm
+            || providerID == .newAPI
+            || (providerID == .xiaomi && xiaomiUsageKind == "api")
+        if showsBalanceThreshold, !threshold.isEmpty, Decimal(string: threshold) == nil {
+            errors[.balanceWarningThreshold] = "请输入有效数字"
+        }
+
+        switch providerID {
+        case .routin:
+            let key = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+            if key.isEmpty {
+                errors[.apiKey] = "请输入 plan Key"
+            } else if !KeyCredentialPolicy.hasValidPrefix(key)
+                || !KeyCredentialPolicy.hasSufficientSecretPayload(key) {
+                errors[.apiKey] = "plan Key 必须以 plan- 开头并包含完整密钥"
+            }
+        case .deepseek, .glm, .commandCode, .opencode:
+            if apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                errors[.apiKey] = "请输入 API Key"
+            }
+        case .volcengine:
+            if accessKeyID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                errors[.accessKeyID] = "请输入 AccessKey ID"
+            }
+            if secretAccessKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                errors[.secretAccessKey] = "请输入 SecretAccessKey"
+            }
+        case .newAPI:
+            let rawURL = newAPIBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let url = URL(string: rawURL), url.scheme != nil, url.host != nil {
+                errors.removeValue(forKey: .newAPIBaseURL)
+            } else {
+                errors[.newAPIBaseURL] = "请输入有效的 API 地址"
+            }
+
+            let userID = newAPIUserID.trimmingCharacters(in: .whitespacesAndNewlines)
+            if Int(userID).map({ $0 > 0 }) != true {
+                errors[.newAPIUserID] = "请输入大于 0 的数字用户 ID"
+            }
+
+            if apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                errors[.apiKey] = "请输入用户访问令牌"
+            }
+        case .xiaomi:
+            let key = apiKey
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            if key.isEmpty {
+                errors[.apiKey] = "请输入 API Key"
+            } else if xiaomiUsageKind == "plan", !key.hasPrefix("tp-") {
+                errors[.apiKey] = "Token Plan 需要使用 tp- 开头的 Key"
+            } else if xiaomiUsageKind == "api", !key.hasPrefix("sk-") {
+                errors[.apiKey] = "API 按量需要使用 sk- 开头的 Key"
+            }
+        }
+
+        return errors
+    }
+
+    private var isDirty: Bool {
+        if providerID != initialProviderID {
+            return true
+        }
+        if name != initialName {
+            return true
+        }
+
+        let initialWebsite = (initialMetadata["websiteURL"] ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let suggestedWebsite = CredentialWebsiteDefaults.suggestedURL(
+            for: initialProviderID,
+            customBaseURL: initialMetadata["baseURL"] ?? ""
+        )
+        let expectedInitialWebsite = initialWebsite.isEmpty
+            ? suggestedWebsite
+            : initialWebsite
+
+        let initialAPIKey = initialProviderID == .volcengine ? "" : initialSecret
+        let initialSecretKey = initialProviderID == .volcengine ? initialSecret : ""
+
+        return websiteURL != expectedInitialWebsite
+            || apiKey != initialAPIKey
+            || accessKeyID != (initialMetadata["accessKeyID"] ?? "")
+            || secretAccessKey != initialSecretKey
+            || region != (initialMetadata["region"] ?? "cn-beijing")
+            || balanceWarningThreshold != (initialMetadata["balanceWarningThreshold"] ?? "")
+            || planType != (initialMetadata["planType"] ?? "agent")
+            || newAPIBaseURL != (initialMetadata["baseURL"] ?? "")
+            || newAPIUserID != (initialMetadata["userID"] ?? "")
+            || xiaomiUsageKind != (initialMetadata["usageKind"] ?? "api")
+    }
+
     private var providerName: String {
         displayName(for: providerID)
     }
 
     private var providerAccent: Color {
-        ProviderTheme.accentColor(for: providerID)
+        Color.accentColor
     }
 
     private var websitePrompt: String {
@@ -677,16 +856,10 @@ struct CredentialEditorView: View {
         }
     }
 
-    private var fieldFill: Color {
-        colorScheme == .dark ? Color.white.opacity(0.055) : Color.black.opacity(0.035)
-    }
-
-    private var fieldBorder: Color {
-        colorScheme == .dark ? Color.white.opacity(0.16) : Color.black.opacity(0.14)
-    }
-
-    private var fieldShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
+    private var credentialGroupSubtitle: String? {
+        credentialKindLabel.caseInsensitiveCompare(apiKeyLabel) == .orderedSame
+            ? nil
+            : credentialKindLabel
     }
 
     private func displayName(for id: ProviderID) -> String {
@@ -695,6 +868,15 @@ struct CredentialEditorView: View {
 
     private func submit() async {
         guard !isSaving else { return }
+        hasAttemptedSubmit = true
+        errorMessage = nil
+
+        let errors = fieldErrors
+        if let firstError = Field.allCases.first(where: { errors[$0] != nil }) {
+            requestedScrollField = firstError
+            return
+        }
+
         do {
             let input = try CredentialEditorValidation.validate(
                 providerID: providerID,
@@ -715,7 +897,7 @@ struct CredentialEditorView: View {
             _ = try await save(input)
             isSaving = false
             onSaved()
-            close()
+            onClose()
         } catch is CancellationError {
             isSaving = false
         } catch {
@@ -738,17 +920,12 @@ struct CredentialEditorView: View {
     }
 
     private func close() {
-        onClose()
-    }
-}
-
-private struct CredentialFieldLabel: View {
-    let text: String
-
-    var body: some View {
-        Text(text)
-            .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(.secondary)
+        guard !isSaving else { return }
+        if isDirty {
+            showsDiscardConfirmation = true
+        } else {
+            onClose()
+        }
     }
 }
 
@@ -761,166 +938,19 @@ private struct CredentialSegmentedField: View {
     let label: String
     @Binding var selection: String
     let options: [CredentialSegmentOption]
-    let accentColor: Color
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            CredentialFieldLabel(text: label)
+            SettingsFieldLabel(text: label)
 
-            Picker("", selection: $selection) {
-                ForEach(options) { option in
-                    Text(option.title)
-                        .tag(option.id)
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.segmented)
-            .tint(accentColor)
+            SettingsSegmentedControl(
+                options: options.map(\.id),
+                selection: $selection,
+                title: { id in
+                    options.first(where: { $0.id == id })?.title ?? id
+                },
+                accessibilityLabel: label
+            )
         }
-    }
-}
-
-private struct CredentialHint: View {
-    let text: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 6) {
-            Image(systemName: "info.circle")
-                .font(.caption)
-                .padding(.top, 1)
-            Text(text)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .font(.caption)
-        .foregroundStyle(.secondary)
-    }
-}
-
-private struct CredentialInputField: View {
-    let label: String
-    @Binding var text: String
-    let prompt: String
-    let isSecret: Bool
-    let visibility: Binding<Bool>?
-    let canReveal: Bool
-    let suffix: String?
-    let accentColor: Color
-    let helpText: String?
-    let autoFocus: Bool
-
-    @FocusState private var isFocused: Bool
-    @Environment(\.colorScheme) private var colorScheme
-
-    init(
-        label: String,
-        text: Binding<String>,
-        prompt: String,
-        isSecret: Bool = false,
-        visibility: Binding<Bool>? = nil,
-        canReveal: Bool = true,
-        suffix: String? = nil,
-        accentColor: Color = .accentColor,
-        helpText: String? = nil,
-        autoFocus: Bool = false
-    ) {
-        self.label = label
-        _text = text
-        self.prompt = prompt
-        self.isSecret = isSecret
-        self.visibility = visibility
-        self.canReveal = canReveal
-        self.suffix = suffix
-        self.accentColor = accentColor
-        self.helpText = helpText
-        self.autoFocus = autoFocus
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            CredentialFieldLabel(text: label)
-
-            HStack(spacing: 8) {
-                inputField
-
-                if isSecret, let visibility {
-                    Button {
-                        visibility.wrappedValue.toggle()
-                    } label: {
-                        Image(systemName: CredentialVisibility.iconName(isVisible: visibility.wrappedValue))
-                            .font(.system(size: 12, weight: .medium))
-                            .frame(width: 22, height: 22)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(canReveal ? Color.secondary : Color.secondary.opacity(0.35))
-                    .disabled(!canReveal)
-                    .help(visibility.wrappedValue ? "隐藏\(label)" : "显示\(label)")
-                    .accessibilityLabel(visibility.wrappedValue ? "隐藏\(label)" : "显示\(label)")
-                }
-
-                if let suffix {
-                    Rectangle()
-                        .fill(fieldBorder)
-                        .frame(width: 1, height: 18)
-                    Text(suffix)
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .padding(.trailing, 2)
-                }
-            }
-            .padding(.horizontal, 11)
-            .frame(height: 40)
-            .background {
-                fieldShape.fill(fieldFill)
-            }
-            .overlay {
-                fieldShape.strokeBorder(
-                    isFocused ? accentColor.opacity(0.78) : fieldBorder,
-                    lineWidth: isFocused ? 1.5 : 1
-                )
-            }
-
-            if let helpText {
-                Text(helpText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .onAppear {
-            guard autoFocus else { return }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                isFocused = true
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var inputField: some View {
-        if isSecret, let visibility, !visibility.wrappedValue {
-            SecureField("", text: $text, prompt: Text(prompt))
-                .textFieldStyle(.plain)
-                .font(.system(size: 13))
-                .focused($isFocused)
-                .accessibilityLabel(label)
-        } else {
-            TextField("", text: $text, prompt: Text(prompt))
-                .textFieldStyle(.plain)
-                .font(.system(size: 13))
-                .focused($isFocused)
-                .accessibilityLabel(label)
-        }
-    }
-
-    private var fieldFill: Color {
-        colorScheme == .dark ? Color.white.opacity(0.055) : Color.black.opacity(0.035)
-    }
-
-    private var fieldBorder: Color {
-        colorScheme == .dark ? Color.white.opacity(0.16) : Color.black.opacity(0.14)
-    }
-
-    private var fieldShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
     }
 }
