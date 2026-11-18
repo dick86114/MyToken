@@ -49,6 +49,8 @@ final class SettingsWindowShellTests: XCTestCase {
         XCTAssertTrue(design.contains("SettingsPageScroll"))
         XCTAssertTrue(design.contains("SettingsGroup"))
         XCTAssertTrue(design.contains("SettingsRow"))
+        XCTAssertTrue(design.contains("SettingsDetailBackdrop"))
+        XCTAssertTrue(design.contains("CompactPopoverPalette.opaqueWindow(colorScheme)"))
         XCTAssertTrue(design.contains("liquidGlassSurface(cornerRadius:"))
         XCTAssertFalse(design.contains("cardShadowColor"))
     }

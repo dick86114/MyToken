@@ -758,7 +758,21 @@ struct SettingsDetailBackdrop: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            Color.clear
+            CompactPopoverPalette.opaqueWindow(colorScheme)
+
+            LinearGradient(
+                colors: colorScheme == .dark
+                    ? [
+                        Color.white.opacity(0.035),
+                        .clear
+                    ]
+                    : [
+                        Color.white.opacity(0.52),
+                        .clear
+                    ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
 
             RadialGradient(
                 colors: [
