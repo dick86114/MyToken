@@ -66,7 +66,7 @@ struct SettingsWindowView: View {
         .environment(\.menuBarColorRules, environment.settings.menuBarColorRules)
         .background(WindowFramePersistence())
         .background(SettingsWindowDockIconAnchor())
-        .frame(minWidth: 820, idealWidth: 900, minHeight: 580, idealHeight: 660)
+        .frame(minWidth: 1120, idealWidth: 1180, minHeight: 640, idealHeight: 720)
     }
 
     @ViewBuilder

@@ -218,6 +218,7 @@ final class SettingsAndCardAppearanceTests: XCTestCase {
         )
         XCTAssertEqual(statusColorCount, 1)
         XCTAssertTrue(gauge.contains("private var gaugeColor"))
+        XCTAssertTrue(gauge.contains("var color: Color? = nil"))
         XCTAssertLessThan(
             try XCTUnwrap(gauge.range(of: "CompactPopoverPalette.statusColor")).lowerBound,
             labelStart.lowerBound
@@ -231,6 +232,7 @@ final class SettingsAndCardAppearanceTests: XCTestCase {
         )
         let gaugeTile = compactSource[tileStart.lowerBound..<valueStart.lowerBound]
         XCTAssertTrue(gaugeTile.contains("CompactUsageCardPresentation.gaugeTone"))
+        XCTAssertTrue(gaugeTile.contains("UsageMetricPresentation.color("))
         XCTAssertFalse(gaugeTile.contains("Circle()"))
     }
 

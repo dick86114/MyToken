@@ -34,6 +34,11 @@ final class SettingsWindowShellTests: XCTestCase {
 
         XCTAssertTrue(shell.contains("SettingsSidebar(selection:"))
         XCTAssertTrue(shell.contains("SettingsDetailBackdrop()"))
+        XCTAssertTrue(
+            shell.contains(
+                ".frame(minWidth: 1120, idealWidth: 1180, minHeight: 640, idealHeight: 720)"
+            )
+        )
         XCTAssertTrue(sidebar.contains("PopoverColorBrandLogo"))
         XCTAssertTrue(sidebar.contains("lock.shield"))
         XCTAssertTrue(sidebar.contains("accessibilityReduceMotion"))

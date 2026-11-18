@@ -198,6 +198,7 @@ struct CompactCardActionButton<Label: View>: View {
 struct CompactUsageGauge: View {
     let percent: Double?
     let tone: UsageMetricTone
+    var color: Color? = nil
     var size: CGFloat = CompactPopoverMetrics.gaugeSize
     @Environment(\.colorScheme) private var colorScheme
 
@@ -235,7 +236,7 @@ struct CompactUsageGauge: View {
     }
 
     private var gaugeColor: Color {
-        CompactPopoverPalette.statusColor(for: tone, colorScheme)
+        color ?? CompactPopoverPalette.statusColor(for: tone, colorScheme)
     }
 
     /// 数字放大突出，百分号缩小并轻微上移。
@@ -329,6 +330,10 @@ struct CompactMetricGaugeTile: View {
             CompactUsageGauge(
                 percent: metric.displayedPercent,
                 tone: tone,
+                color: UsageMetricPresentation.color(
+                    for: tone,
+                    rules: menuBarColorRules
+                ),
                 size: CompactPopoverMetrics.gaugeSize
             )
 
@@ -346,6 +351,10 @@ struct CompactMetricGaugeTile: View {
                 CompactUsageGauge(
                     percent: metric.displayedPercent,
                     tone: tone,
+                    color: UsageMetricPresentation.color(
+                        for: tone,
+                        rules: menuBarColorRules
+                    ),
                     size: CompactPopoverMetrics.gaugeSize
                 )
 

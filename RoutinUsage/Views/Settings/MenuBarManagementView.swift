@@ -9,6 +9,9 @@ struct MenuBarManagementView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hoveredManagementID: UUID?
 
+    private let orderRowHeight: CGFloat = 52
+    private let appearancePanelWidth: CGFloat = 310
+
     private var displayOrder: CredentialDisplayOrder {
         environment.settings.displayOrder
     }
@@ -37,11 +40,11 @@ struct MenuBarManagementView: View {
         SettingsPageScroll {
             SettingsPageHeader(
                 title: "菜单栏管理",
-                subtitle: "最多显示 \(CredentialDisplayOrder.maximumMenuBarCount) 个菜单栏指标"
+                subtitle: "拖动调整显示顺序，右侧实时调整指示器外观",
+                trailing: AnyView(headerSummary)
             )
 
             workspace
-            colorRulesSection
         }
         .onAppear(perform: pruneDisabledDisplayOrder)
         .onChange(of: enabledIDs) { _, _ in
@@ -52,19 +55,116 @@ struct MenuBarManagementView: View {
     private var workspace: some View {
         VStack(alignment: .leading, spacing: 14) {
             systemMenuBarStrip(highlightIndicator: true)
-            cardList
+
+            HStack(alignment: .top, spacing: 14) {
+                cardList
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+
+                appearancePanel
+                    .frame(width: appearancePanelWidth, alignment: .topLeading)
+            }
+        }
+    }
+
+    private var headerSummary: some View {
+        HStack(spacing: 8) {
+            headerSummaryChip(
+                value: "\(menuBarStates.count) / \(CredentialDisplayOrder.maximumMenuBarCount)",
+                title: "显示中"
+            )
+            headerSummaryChip(
+                value: "\(unifiedStates.count)",
+                title: "个凭证"
+            )
+        }
+    }
+
+    private func headerSummaryChip(value: String, title: String) -> some View {
+        HStack(spacing: 5) {
+            Text(value)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(.primary)
+
+            Text(title)
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 9)
+        .frame(minHeight: 30)
+        .background {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(SettingsDesign.fieldFill(colorScheme))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(SettingsDesign.fieldBorder(colorScheme), lineWidth: 0.8)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title) \(value)")
+    }
+
+    private var appearancePanel: some View {
+        let shape = RoundedRectangle(
+            cornerRadius: SettingsDesign.cardCornerRadius,
+            style: .continuous
+        )
+
+        return VStack(spacing: 0) {
+            SettingsSectionHeader(
+                title: "指示器外观",
+                systemImage: "chart.bar.xaxis",
+                trailingText: "实时预览"
+            )
+            .padding(.horizontal, 14)
+            .frame(minHeight: 44)
+
+            Divider()
+                .overlay(SettingsDesign.dividerColor(colorScheme))
+
+            VStack(alignment: .leading, spacing: 14) {
+                usageCardPreview
+                colorRulesSection
+
+                Text("同步用于菜单栏与用量卡片")
+                    .font(SettingsTypography.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(14)
+        }
+        .background {
+            shape.fill(CompactPopoverPalette.surface(.card, colorScheme))
+        }
+        .overlay {
+            shape.strokeBorder(SettingsDesign.fieldBorder(colorScheme), lineWidth: 0.8)
+        }
+    }
+
+    private var usageCardPreview: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text("用量卡片预览")
+                    .font(SettingsTypography.secondary.weight(.medium))
+                    .foregroundStyle(.secondary)
+
+                Spacer(minLength: 8)
+
+                Text("模拟数据")
+                    .font(SettingsTypography.caption)
+                    .foregroundStyle(.tertiary)
+            }
+
+            MenuBarUsageCardThresholdPreview(
+                rules: environment.settings.menuBarColorRules
+            )
         }
     }
 
     private var colorRulesSection: some View {
-        SettingsGroup(
-            title: "指示器外观",
-            subtitle: "进度颜色只影响菜单栏指标；拖动色带上的两个分界点调整区间。"
-        ) {
-            MenuBarColorRulesEditor(rules: menuBarColorRulesBinding)
-                .frame(maxWidth: 520, alignment: .leading)
-                .padding(.vertical, 6)
-        }
+        MenuBarColorRulesEditor(
+            rules: menuBarColorRulesBinding,
+            layout: .compact
+        )
     }
 
     private var menuBarColorRulesBinding: Binding<MenuBarColorRules> {
@@ -106,11 +206,11 @@ struct MenuBarManagementView: View {
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .padding(.horizontal, 12)
+        .frame(minHeight: 52)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
                 .strokeBorder(.primary.opacity(0.09), lineWidth: 0.5)
         }
     }
@@ -140,11 +240,23 @@ struct MenuBarManagementView: View {
     }
 
     private var cardList: some View {
-        SettingsPanel(
-            title: "凭证顺序",
-            systemImage: "line.3.horizontal",
-            trailingText: "\(unifiedStates.count) 个"
-        ) {
+        let shape = RoundedRectangle(
+            cornerRadius: SettingsDesign.cardCornerRadius,
+            style: .continuous
+        )
+
+        return VStack(spacing: 0) {
+            SettingsSectionHeader(
+                title: "凭证顺序",
+                systemImage: "arrow.up.arrow.down",
+                trailingText: "拖动排序 · 前 \(CredentialDisplayOrder.maximumMenuBarCount) 个显示"
+            )
+            .padding(.horizontal, 14)
+            .frame(minHeight: 44)
+
+            Divider()
+                .overlay(SettingsDesign.dividerColor(colorScheme))
+
             if unifiedStates.isEmpty {
                 VStack(spacing: 14) {
                     ContentUnavailableView(
@@ -157,20 +269,52 @@ struct MenuBarManagementView: View {
                         .liquidGlassButton()
                         .accessibilityLabel("打开凭证管理")
                 }
-                .frame(maxWidth: .infinity, minHeight: 180)
+                .frame(maxWidth: .infinity, minHeight: 220)
             } else {
                 ReorderableCredentialCardList(
                     ids: unifiedStates.map(\.configuration.id),
-                    itemHeight: 72,
-                    itemSpacing: 10,
+                    itemHeight: orderRowHeight,
+                    itemSpacing: 0,
                     move: moveDisplay,
                     card: { (state: UUID) in
                         managementCard(state)
                     }
                 )
+
+                Divider()
+                    .overlay(SettingsDesign.dividerColor(colorScheme))
+
+                orderSummaryFooter
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            shape.fill(CompactPopoverPalette.surface(.card, colorScheme))
+        }
+        .overlay {
+            shape.strokeBorder(SettingsDesign.fieldBorder(colorScheme), lineWidth: 0.8)
+        }
+    }
+
+    private var orderSummaryFooter: some View {
+        HStack(spacing: 4) {
+            Text("已显示 \(menuBarStates.count) 个")
+                .font(SettingsTypography.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Text("· 最多 \(CredentialDisplayOrder.maximumMenuBarCount) 个")
+                .font(SettingsTypography.caption)
+                .foregroundStyle(.tertiary)
+
+            Spacer(minLength: 8)
+
+            Text("拖动行调整顺序")
+                .font(SettingsTypography.caption)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 14)
+        .frame(minHeight: 34)
+        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder
@@ -185,12 +329,13 @@ struct MenuBarManagementView: View {
     private func managementCardContent(_ state: KeyUsageState) -> some View {
         let id = state.configuration.id
         let isInMenuBar = displayOrder.menuBarCredentialIDs.contains(id)
+        let isLast = unifiedStates.last?.configuration.id == id
 
-        return HStack(spacing: 11) {
+        return HStack(spacing: 6) {
             Image(systemName: "line.3.horizontal")
-                .font(.body.weight(.medium))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
-                .frame(width: 20)
+                .frame(width: 14)
 
             if let descriptor = descriptor(for: state) {
                 MenuBarIndicatorPreview(
@@ -201,13 +346,13 @@ struct MenuBarManagementView: View {
                     colorRules: environment.settings.menuBarColorRules
                 )
                 .equatable()
-                .frame(width: 36, height: 28)
+                .frame(width: 44, height: 26)
             }
 
-            providerLogo(for: state, size: 28)
+            providerLogo(for: state, size: 24)
 
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 7) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 5) {
                     Text(state.configuration.displayName)
                         .font(SettingsTypography.rowTitle)
                         .lineLimit(1)
@@ -215,9 +360,9 @@ struct MenuBarManagementView: View {
                     if isInMenuBar {
                         Text("菜单栏")
                             .font(SettingsTypography.caption)
-                            .padding(.horizontal, 7)
+                            .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(.tint.opacity(0.14), in: Capsule())
+                            .background(Color.accentColor.opacity(0.14), in: Capsule())
                     }
                 }
 
@@ -229,7 +374,7 @@ struct MenuBarManagementView: View {
             .lineLimit(1)
             .layoutPriority(1)
 
-            Spacer(minLength: 8)
+            Spacer(minLength: 4)
 
             metricMenu(for: state)
             styleMenu(for: state)
@@ -242,9 +387,9 @@ struct MenuBarManagementView: View {
                         ? "checkmark.circle.fill"
                         : "plus.circle.fill"
                 )
-                .font(.system(size: 26, weight: .semibold))
+                .font(.system(size: 21, weight: .semibold))
                 .foregroundStyle(isInMenuBar ? CompactPopoverPalette.positive(colorScheme) : Color.accentColor)
-                .frame(width: 34, height: 34)
+                .frame(width: 28, height: 28)
                 .background {
                     Circle()
                         .fill(
@@ -261,8 +406,8 @@ struct MenuBarManagementView: View {
             .help(isInMenuBar ? "从菜单栏移除 \(state.configuration.displayName)" : "添加到菜单栏 \(state.configuration.displayName)")
             .accessibilityLabel(isInMenuBar ? "从菜单栏移除" : "添加到菜单栏")
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 9)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             RoundedRectangle(cornerRadius: 9, style: .continuous)
@@ -271,6 +416,14 @@ struct MenuBarManagementView: View {
                         ? SettingsDesign.hoverFill(colorScheme)
                         : Color.clear
                 )
+        }
+        .overlay(alignment: .bottom) {
+            if !isLast {
+                Rectangle()
+                    .fill(SettingsDesign.dividerColor(colorScheme))
+                    .frame(height: 0.7)
+                    .padding(.leading, 57)
+            }
         }
         .onHover { isHovered in
             hoveredManagementID = isHovered
@@ -375,44 +528,25 @@ struct MenuBarManagementView: View {
     private func metricMenu(for state: KeyUsageState) -> some View {
         let resolution = menuBarResolution(for: state)
 
-        return Menu {
-            Button("自动") {
-                setMenuBarMetric(nil, for: state.configuration.id)
-            }
-
+        return MenuBarSelectionControl(
+            systemImage: "gauge.with.dots.needle.33percent",
+            value: selectedMetricTitle(for: state, resolution: resolution),
+            maxValueWidth: 96,
+            help: "选择 \(state.configuration.displayName) 的菜单栏指标",
+            accessibilityLabel: "菜单栏指标"
+        ) {
             ForEach(metricOptions(for: state)) { option in
-                Button(option.label) {
+                Button {
                     setMenuBarMetric(option.metricID, for: state.configuration.id)
+                } label: {
+                    if option.metricID == resolution.metric?.id {
+                        Label(option.label, systemImage: "checkmark")
+                    } else {
+                        Text(option.label)
+                    }
                 }
             }
-        } label: {
-            HStack(spacing: 5) {
-                Label(
-                    selectedMetricTitle(for: state, resolution: resolution),
-                    systemImage: "gauge.with.dots.needle.33percent"
-                )
-                .font(.system(size: 11.5, weight: .medium))
-                .lineLimit(1)
-
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 8, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 8)
-            .frame(minHeight: 28)
-            .background(
-                SettingsDesign.fieldFill(colorScheme),
-                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(SettingsDesign.fieldBorder(colorScheme), lineWidth: 0.8)
-            }
-            .contentShape(Rectangle())
         }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
-        .help("设置 \(state.configuration.displayName) 的菜单栏指标")
     }
 
     private func metricOptions(for state: KeyUsageState) -> [UsageMetricCapability] {
@@ -426,11 +560,11 @@ struct MenuBarManagementView: View {
         for state: KeyUsageState,
         resolution: MenuBarMetricResolution
     ) -> String {
-        if resolution.isFallback {
-            return "自动（原指标当前不可用）"
+        if let metric = resolution.metric {
+            return metric.label
         }
         guard let selectedMetricID = resolution.selectedMetricID else {
-            return "自动"
+            return "选择指标"
         }
         let metricTitle = state.snapshot?.normalizedMetrics.first { $0.id == selectedMetricID }?.label
         let capabilityTitle = environment.providerRegistry?
@@ -454,7 +588,13 @@ struct MenuBarManagementView: View {
             ? storedStyle
             : availableStyles[0]
 
-        return Menu {
+        return MenuBarSelectionControl(
+            systemImage: selectedStyle.systemImage(for: metric),
+            value: selectedStyle.title(for: metric),
+            maxValueWidth: 72,
+            help: "选择菜单栏指标样式：\(selectedStyle.title(for: metric))",
+            accessibilityLabel: "菜单栏指标样式"
+        ) {
             ForEach(availableStyles, id: \.self) { style in
                 Button {
                     setMenuBarStyle(style, for: state.configuration.id)
@@ -466,35 +606,7 @@ struct MenuBarManagementView: View {
                     }
                 }
             }
-        } label: {
-            HStack(spacing: 3) {
-                Image(systemName: selectedStyle.systemImage(for: metric))
-                    .font(.system(size: 13, weight: .medium))
-
-                Text(selectedStyle.title(for: metric))
-                    .font(.system(size: 11.5, weight: .medium))
-                    .lineLimit(1)
-
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 8, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 8)
-            .frame(minHeight: 28)
-            .background(
-                SettingsDesign.fieldFill(colorScheme),
-                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(SettingsDesign.fieldBorder(colorScheme), lineWidth: 0.8)
-            }
-            .contentShape(Rectangle())
         }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
-        .help("菜单栏指标样式：\(selectedStyle.title(for: metric))")
-        .accessibilityLabel("菜单栏指标样式")
     }
 
     private func setMenuBarStyle(_ style: MenuBarIndicatorStyle, for id: UUID) {
@@ -519,5 +631,198 @@ struct MenuBarManagementView: View {
         case .accessKeyPair:
             return "Access Key Pair"
         }
+    }
+}
+
+private struct MenuBarSelectionControl<MenuContent: View>: View {
+    let systemImage: String
+    let value: String
+    let maxValueWidth: CGFloat
+    let help: String
+    let accessibilityLabel: String
+    private let menuContent: MenuContent
+
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var isHovered = false
+
+    init(
+        systemImage: String,
+        value: String,
+        maxValueWidth: CGFloat,
+        help: String,
+        accessibilityLabel: String,
+        @ViewBuilder menuContent: () -> MenuContent
+    ) {
+        self.systemImage = systemImage
+        self.value = value
+        self.maxValueWidth = maxValueWidth
+        self.help = help
+        self.accessibilityLabel = accessibilityLabel
+        self.menuContent = menuContent()
+    }
+
+    var body: some View {
+        Menu {
+            menuContent
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(isHovered ? Color.primary : Color.secondary)
+
+                Text(value)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: maxValueWidth, alignment: .leading)
+
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9.5, weight: .semibold))
+                    .foregroundStyle(isHovered ? Color.accentColor : Color.secondary)
+            }
+            .padding(.horizontal, 8)
+            .frame(minHeight: 28)
+            .background {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(
+                        isHovered
+                            ? SettingsDesign.hoverFill(colorScheme)
+                            : SettingsDesign.fieldFill(colorScheme)
+                    )
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(
+                        isHovered
+                            ? Color.accentColor.opacity(0.24)
+                            : SettingsDesign.fieldBorder(colorScheme),
+                        lineWidth: 0.8
+                    )
+            }
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize(horizontal: true, vertical: false)
+        .onHover { isHovered = $0 }
+        .animation(.easeOut(duration: 0.12), value: isHovered)
+        .help(help)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(value)
+    }
+}
+
+private struct MenuBarUsageCardThresholdPreview: View {
+    let rules: MenuBarColorRules
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var samples: [Sample] {
+        let warning = Double(rules.warningThreshold)
+        let critical = Double(rules.criticalThreshold)
+        let normalUpper = max(0, warning - 1)
+
+        return [
+            Sample(
+                id: "normal",
+                title: "正常区间",
+                tone: .normal,
+                percent: normalUpper == 0 ? 0 : max(1, normalUpper * 0.5)
+            ),
+            Sample(
+                id: "warning",
+                title: "提醒区间",
+                tone: .warning,
+                percent: (warning + critical) / 2
+            ),
+            Sample(
+                id: "critical",
+                title: "紧急区间",
+                tone: .critical,
+                percent: min(100, (critical + 100) / 2)
+            )
+        ]
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(samples.enumerated()), id: \.element.id) { index, sample in
+                sampleRow(sample)
+
+                if index < samples.count - 1 {
+                    Rectangle()
+                        .fill(SettingsDesign.dividerColor(colorScheme))
+                        .frame(height: 0.7)
+                        .padding(.leading, 40)
+                }
+            }
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background {
+            RoundedRectangle(
+                cornerRadius: PopoverVisualPolicy.cornerRadius(for: .outer),
+                style: .continuous
+            )
+            .fill(CompactPopoverPalette.surface(.card, colorScheme))
+        }
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: PopoverVisualPolicy.cornerRadius(for: .outer),
+                style: .continuous
+            )
+            .strokeBorder(CompactPopoverPalette.cardStroke(colorScheme), lineWidth: 1)
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private func sampleRow(_ sample: Sample) -> some View {
+        let color = UsageMetricPresentation.color(
+            for: sample.tone,
+            rules: rules
+        )
+
+        return HStack(spacing: 8) {
+            CompactUsageGauge(
+                percent: sample.percent,
+                tone: sample.tone,
+                color: color,
+                size: 32
+            )
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text(sample.title)
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundStyle(.secondary)
+
+                    Spacer(minLength: 4)
+
+                    Text(
+                        CompactUsageCardPresentation.compactPercentText(
+                            sample.percent
+                        )
+                    )
+                    .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                    .monospacedDigit()
+                    .foregroundStyle(color)
+                }
+
+                UsageMetricProgressBar(percent: sample.percent, height: 3)
+            }
+        }
+        .padding(.vertical, 6)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "\(sample.title)，\(CompactUsageCardPresentation.compactPercentText(sample.percent))"
+        )
+    }
+
+    private struct Sample: Identifiable {
+        let id: String
+        let title: String
+        let tone: UsageMetricTone
+        let percent: Double
     }
 }

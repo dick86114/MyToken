@@ -33,7 +33,13 @@ enum MenuBarMetricResolver {
                 menuOrder($0) < menuOrder($1)
             }
 
-        return options + declaredOptions
+        return (options + declaredOptions).sorted {
+            let lhsOrder = menuOrder($0)
+            let rhsOrder = menuOrder($1)
+            return lhsOrder == rhsOrder
+                ? $0.metricID < $1.metricID
+                : lhsOrder < rhsOrder
+        }
     }
 
     static func resolve(

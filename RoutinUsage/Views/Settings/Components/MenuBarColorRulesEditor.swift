@@ -1,8 +1,14 @@
 import AppKit
 import SwiftUI
 
+enum MenuBarColorRulesEditorLayout {
+    case wide
+    case compact
+}
+
 struct MenuBarColorRulesEditor: View {
     @Binding var rules: MenuBarColorRules
+    var layout: MenuBarColorRulesEditorLayout = .wide
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var workingThresholds: Thresholds?
@@ -45,25 +51,12 @@ struct MenuBarColorRulesEditor: View {
                 commit: commitThresholds
             )
 
-            HStack(spacing: 8) {
-                colorLevelControl(
-                    title: "正常",
-                    range: "0–\(displayedThresholds.warning)%",
-                    components: binding(for: \.normalColor)
-                )
-                colorLevelControl(
-                    title: "提醒",
-                    range: "\(displayedThresholds.warning)–\(displayedThresholds.critical)%",
-                    components: binding(for: \.warningColor)
-                )
-                colorLevelControl(
-                    title: "紧急",
-                    range: "\(displayedThresholds.critical)–100%",
-                    components: binding(for: \.criticalColor)
-                )
-            }
+            colorLevelControls
         }
-        .frame(maxWidth: 520, alignment: .leading)
+        .frame(
+            maxWidth: layout == .wide ? 520 : .infinity,
+            alignment: .leading
+        )
         .onChange(of: rules) { _, _ in
             workingThresholds = nil
             activeBoundary = nil
@@ -80,6 +73,95 @@ struct MenuBarColorRulesEditor: View {
         }
     }
 
+    @ViewBuilder
+    private var colorLevelControls: some View {
+        if layout == .compact {
+            HStack(spacing: 0) {
+                compactColorLevelControl(
+                    title: "正常",
+                    range: "0–\(displayedThresholds.warning)%",
+                    components: binding(for: \.normalColor)
+                )
+                compactColorDivider
+                compactColorLevelControl(
+                    title: "提醒",
+                    range: "\(displayedThresholds.warning)–\(displayedThresholds.critical)%",
+                    components: binding(for: \.warningColor)
+                )
+                compactColorDivider
+                compactColorLevelControl(
+                    title: "紧急",
+                    range: "\(displayedThresholds.critical)–100%",
+                    components: binding(for: \.criticalColor)
+                )
+            }
+        } else {
+            HStack(spacing: 8) {
+                normalColorControl
+                warningColorControl
+                criticalColorControl
+            }
+        }
+    }
+
+    private var compactColorDivider: some View {
+        Rectangle()
+            .fill(SettingsDesign.dividerColor(colorScheme))
+            .frame(width: 0.7, height: 28)
+            .padding(.horizontal, 7)
+            .accessibilityHidden(true)
+    }
+
+    private func compactColorLevelControl(
+        title: String,
+        range: String,
+        components: Binding<MenuBarColorComponents>
+    ) -> some View {
+        HStack(spacing: 6) {
+            ColorWellButton(title: title, components: components)
+                .frame(width: 20, height: 20)
+                .accessibilityLabel("\(title)颜色")
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 10.5, weight: .semibold))
+                Text(range)
+                    .font(.system(size: 9, design: .monospaced))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .contain)
+    }
+
+    private var normalColorControl: some View {
+        colorLevelControl(
+            title: "正常",
+            range: "0–\(displayedThresholds.warning)%",
+            components: binding(for: \.normalColor)
+        )
+    }
+
+    private var warningColorControl: some View {
+        colorLevelControl(
+            title: "提醒",
+            range: "\(displayedThresholds.warning)–\(displayedThresholds.critical)%",
+            components: binding(for: \.warningColor)
+        )
+    }
+
+    private var criticalColorControl: some View {
+        colorLevelControl(
+            title: "紧急",
+            range: "\(displayedThresholds.critical)–100%",
+            components: binding(for: \.criticalColor)
+        )
+    }
+
     private func colorLevelControl(
         title: String,
         range: String,
@@ -89,8 +171,11 @@ struct MenuBarColorRulesEditor: View {
 
         return HStack(spacing: 8) {
             ColorWellButton(title: title, components: components)
-                .frame(width: 26, height: 26)
-            .accessibilityLabel("\(title)颜色")
+                .frame(
+                    width: layout == .compact ? 24 : 26,
+                    height: layout == .compact ? 24 : 26
+                )
+                .accessibilityLabel("\(title)颜色")
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
@@ -104,7 +189,7 @@ struct MenuBarColorRulesEditor: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 9)
-        .padding(.vertical, 8)
+        .padding(.vertical, layout == .compact ? 7 : 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             shape.fill(SettingsDesign.fieldFill(colorScheme))
