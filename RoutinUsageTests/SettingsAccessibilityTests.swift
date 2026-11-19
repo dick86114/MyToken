@@ -109,8 +109,12 @@ final class SettingsAccessibilityTests: XCTestCase {
         XCTAssertTrue(density.contains("strokeBorder(Color.accentColor"))
 
         XCTAssertTrue(credentials.contains("Menu {"))
-        XCTAssertTrue(credentials.contains("Picker(\"状态\""))
-        XCTAssertTrue(credentials.contains("Picker(\"供应商\""))
+        XCTAssertTrue(credentials.contains("CredentialFilterMenuControl("))
+        XCTAssertTrue(credentials.contains("title: \"状态\""))
+        XCTAssertTrue(credentials.contains("title: \"供应商\""))
+        XCTAssertTrue(credentials.contains("Picker(selection: $model.filter.status)"))
+        XCTAssertTrue(credentials.contains("Picker(selection: $model.filter.provider)"))
+        XCTAssertTrue(credentials.contains(".pickerStyle(.inline)"))
         XCTAssertFalse(credentials.contains("ProviderFilterChips("))
 
         XCTAssertTrue(sidebar.contains("Color.accentColor"))

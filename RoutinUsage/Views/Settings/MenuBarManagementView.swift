@@ -9,7 +9,7 @@ struct MenuBarManagementView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hoveredManagementID: UUID?
 
-    private let orderRowHeight: CGFloat = 52
+    private let orderRowHeight: CGFloat = 56
     private let appearancePanelWidth: CGFloat = 310
 
     private var displayOrder: CredentialDisplayOrder {
@@ -274,12 +274,14 @@ struct MenuBarManagementView: View {
                 ReorderableCredentialCardList(
                     ids: unifiedStates.map(\.configuration.id),
                     itemHeight: orderRowHeight,
-                    itemSpacing: 0,
+                    itemSpacing: 2,
                     move: moveDisplay,
                     card: { (state: UUID) in
                         managementCard(state)
                     }
                 )
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
 
                 Divider()
                     .overlay(SettingsDesign.dividerColor(colorScheme))
@@ -406,8 +408,8 @@ struct MenuBarManagementView: View {
             .help(isInMenuBar ? "从菜单栏移除 \(state.configuration.displayName)" : "添加到菜单栏 \(state.configuration.displayName)")
             .accessibilityLabel(isInMenuBar ? "从菜单栏移除" : "添加到菜单栏")
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             RoundedRectangle(cornerRadius: 9, style: .continuous)
@@ -808,8 +810,6 @@ private struct MenuBarUsageCardThresholdPreview: View {
                     .monospacedDigit()
                     .foregroundStyle(color)
                 }
-
-                UsageMetricProgressBar(percent: sample.percent, height: 3)
             }
         }
         .padding(.vertical, 6)

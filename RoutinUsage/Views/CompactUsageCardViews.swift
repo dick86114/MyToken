@@ -296,13 +296,7 @@ struct CompactMetricGaugeTile: View {
         let subtitle = style == .horizontal
             ? CompactUsageCardPresentation.singleMetricSubtitle(for: metric, now: now)
             : CompactUsageCardPresentation.subtitle(for: metric, now: now)
-        Group {
-            if style == .horizontal {
-                horizontalLayout(tone: tone, subtitle: subtitle)
-            } else {
-                verticalLayout(tone: tone, subtitle: subtitle)
-            }
-        }
+        metricLayout(tone: tone, subtitle: subtitle)
         .padding(.horizontal, style == .horizontal ? 9 : 8)
         .padding(.vertical, style == .horizontal ? 9 : 8)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -325,29 +319,9 @@ struct CompactMetricGaugeTile: View {
         .accessibilityLabel(accessibilityText(subtitle: subtitle))
     }
 
-    private func horizontalLayout(tone: UsageMetricTone, subtitle: String) -> some View {
-        HStack(alignment: .center, spacing: 7) {
-            CompactUsageGauge(
-                percent: metric.displayedPercent,
-                tone: tone,
-                color: UsageMetricPresentation.color(
-                    for: tone,
-                    rules: menuBarColorRules
-                ),
-                size: CompactPopoverMetrics.gaugeSize
-            )
-
-            if !metric.resetCards.isEmpty {
-                UsageResetCardsBadge(resetCards: metric.resetCards, style: .compact)
-            }
-
-            metricBody(subtitle: subtitle)
-        }
-    }
-
-    private func verticalLayout(tone: UsageMetricTone, subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(alignment: .center, spacing: 7) {
+    private func metricLayout(tone: UsageMetricTone, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .center, spacing: 6) {
                 CompactUsageGauge(
                     percent: metric.displayedPercent,
                     tone: tone,
@@ -358,26 +332,19 @@ struct CompactMetricGaugeTile: View {
                     size: CompactPopoverMetrics.gaugeSize
                 )
 
+                Text(CompactUsageCardPresentation.compactPeriodLabel(for: metric))
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color.primary.opacity(0.82))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .layoutPriority(1)
+
                 if !metric.resetCards.isEmpty {
                     UsageResetCardsBadge(resetCards: metric.resetCards, style: .compact)
                 }
 
                 Spacer(minLength: 0)
             }
-
-            metricBody(subtitle: subtitle)
-        }
-    }
-
-    private func metricBody(subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(metric.label)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Color.primary.opacity(0.82))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-
-            UsageMetricProgressBar(percent: metric.displayedPercent ?? 0, height: 3)
 
             Text(subtitle)
                 .font(.system(size: 10))
@@ -394,10 +361,11 @@ struct CompactMetricGaugeTile: View {
 
     private func accessibilityText(subtitle: String) -> String {
         let percent = CompactUsageCardPresentation.compactPercentText(metric.displayedPercent)
+        let period = CompactUsageCardPresentation.compactPeriodLabel(for: metric)
         if subtitle.isEmpty {
-            return "\(metric.label)，已使用 \(percent)"
+            return "\(period)，已使用 \(percent)"
         }
-        return "\(metric.label)，已使用 \(percent)，\(subtitle)"
+        return "\(period)，已使用 \(percent)，\(subtitle)"
     }
 }
 

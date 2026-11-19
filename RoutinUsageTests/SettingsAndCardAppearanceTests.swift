@@ -233,6 +233,9 @@ final class SettingsAndCardAppearanceTests: XCTestCase {
         let gaugeTile = compactSource[tileStart.lowerBound..<valueStart.lowerBound]
         XCTAssertTrue(gaugeTile.contains("CompactUsageCardPresentation.gaugeTone"))
         XCTAssertTrue(gaugeTile.contains("UsageMetricPresentation.color("))
+        XCTAssertTrue(gaugeTile.contains("compactPeriodLabel(for: metric)"))
+        XCTAssertTrue(gaugeTile.contains("UsageResetCardsBadge("))
+        XCTAssertFalse(gaugeTile.contains("UsageMetricProgressBar"))
         XCTAssertFalse(gaugeTile.contains("Circle()"))
     }
 

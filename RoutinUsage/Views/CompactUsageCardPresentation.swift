@@ -59,6 +59,27 @@ enum CompactUsageCardPresentation {
         UsageFormatter.displayPercentText(value)
     }
 
+    /// 简洁卡片只展示周期本身，统一为 5小时、周、月。
+    static func compactPeriodLabel(for metric: NormalizedUsageMetric) -> String {
+        let identifier = metric.id.lowercased()
+        let label = metric.label
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: "　", with: "")
+
+        if identifier.contains("five")
+            || identifier.contains("5h")
+            || label.contains("5小时") {
+            return "5小时"
+        }
+        if identifier.contains("week") || label.contains("周") {
+            return "周"
+        }
+        if identifier.contains("month") || label.contains("月") {
+            return "月"
+        }
+        return metric.label
+    }
+
     /// 环形图内只取数字部分，百分号由视图单独缩小排版。
     static func compactPercentNumberText(_ value: Double?) -> String {
         let text = compactPercentText(value)

@@ -38,7 +38,6 @@ struct CredentialManagementView: View {
     @State private var alertSettingsPresentation: CredentialAlertSettingsPresentation?
     @State private var detailsState: KeyUsageState?
     @State private var hoveredProviderID: ProviderID?
-    @State private var isFilterMenuHovered = false
     @FocusState private var isSearchFocused: Bool
 
     @Environment(\.colorScheme) private var colorScheme
@@ -219,24 +218,58 @@ struct CredentialManagementView: View {
     }
 
     private var filterBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             searchField
             Spacer(minLength: 8)
-            filterMenu
+            statusFilterMenu
+            providerFilterMenu
+
+            if hasActiveFilter {
+                Button {
+                    model.filter = CredentialFilter()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 28, height: 28)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(SettingsPressFeedbackButtonStyle(pressedScale: 0.94))
+                .help("清除状态和供应商筛选")
+                .accessibilityLabel("清除状态和供应商筛选")
+            }
         }
     }
 
-    private var filterMenu: some View {
-        Menu {
-            Picker("状态", selection: $model.filter.status) {
+    private var statusFilterMenu: some View {
+        CredentialFilterMenuControl(
+            title: "状态",
+            value: model.filter.status == .all ? "全部" : model.filter.status.title,
+            systemImage: "circle.dashed",
+            isActive: model.filter.status != .all,
+            help: "按凭证状态筛选"
+        ) {
+            Picker(selection: $model.filter.status) {
                 ForEach(CredentialStatusFilter.allCases) { status in
                     Text(status.title).tag(status)
                 }
+            } label: {
+                EmptyView()
             }
+            .labelsHidden()
+            .pickerStyle(.inline)
+        }
+    }
 
-            Divider()
-
-            Picker("供应商", selection: $model.filter.provider) {
+    private var providerFilterMenu: some View {
+        CredentialFilterMenuControl(
+            title: "供应商",
+            value: model.filter.provider.map(providerDisplayName) ?? "全部",
+            systemImage: "square.stack.3d.up",
+            isActive: model.filter.provider != nil,
+            help: "按供应商筛选"
+        ) {
+            Picker(selection: $model.filter.provider) {
                 Text("全部供应商").tag(ProviderID?.none)
 
                 ForEach(model.providerFilterDescriptors) { provider in
@@ -245,75 +278,23 @@ struct CredentialManagementView: View {
                     )
                     .tag(Optional(provider.id))
                 }
+            } label: {
+                EmptyView()
             }
-
-            if hasActiveFilter {
-                Divider()
-
-                Button("清除筛选") {
-                    model.filter = CredentialFilter()
-                }
-            }
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "line.3.horizontal.decrease.circle")
-                    .font(.system(size: 12, weight: .medium))
-
-                Text(filterSummary)
-                    .font(.system(size: 12, weight: .medium))
-                    .lineLimit(1)
-
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 8, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 10)
-            .frame(minHeight: 32)
-            .background {
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(
-                        Color.primary.opacity(
-                            isFilterMenuHovered ? 0.07 : 0.035
-                        )
-                    )
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .strokeBorder(
-                        hasActiveFilter
-                            ? Color.accentColor.opacity(0.28)
-                            : Color.secondary.opacity(0.13),
-                        lineWidth: 0.8
-                    )
-            }
-            .contentShape(Rectangle())
+            .labelsHidden()
+            .pickerStyle(.inline)
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .buttonStyle(SettingsPressFeedbackButtonStyle(pressedScale: 0.98))
-        .onHover { isFilterMenuHovered = $0 }
-        .accessibilityLabel("筛选凭证")
-        .accessibilityValue(filterSummary)
+    }
+
+    private func providerDisplayName(_ providerID: ProviderID) -> String {
+        model.providerFilterDescriptors
+            .first(where: { $0.id == providerID })?
+            .displayName
+            ?? providerID.rawValue
     }
 
     private var hasActiveFilter: Bool {
         model.filter.status != .all || model.filter.provider != nil
-    }
-
-    private var filterSummary: String {
-        var parts: [String] = []
-        if model.filter.status != .all {
-            parts.append(model.filter.status.title)
-        }
-        if let providerID = model.filter.provider {
-            parts.append(
-                model.providerFilterDescriptors
-                    .first(where: { $0.id == providerID })?
-                    .displayName
-                    ?? providerID.rawValue
-            )
-        }
-        return parts.isEmpty ? "筛选" : parts.joined(separator: " · ")
     }
 
     private var searchField: some View {
@@ -344,7 +325,7 @@ struct CredentialManagementView: View {
                 .accessibilityLabel("清除搜索")
             }
         }
-        .frame(minWidth: 170, idealWidth: 300, maxWidth: 360)
+        .frame(minWidth: 170, idealWidth: 280, maxWidth: 340)
     }
 
     @ViewBuilder
@@ -442,56 +423,30 @@ struct CredentialManagementView: View {
             .accessibilityHint("展开或收起该供应商的凭证")
 
             if isExpanded {
-                Divider()
-                    .overlay(Color.primary.opacity(colorScheme == .dark ? 0.09 : 0.065))
-                    .padding(.horizontal, 14)
-
-                HStack(alignment: .top, spacing: 0) {
-                    credentialHierarchyRail
-
-                    VStack(spacing: 0) {
-                        ForEach(group.states, id: \.configuration.id) { state in
-                            credentialRow(state, provider: group.provider)
-
-                            if state.configuration.id != group.states.last?.configuration.id {
-                                Divider()
-                                    .overlay(
-                                        Color.primary.opacity(
-                                            colorScheme == .dark ? 0.075 : 0.05
-                                        )
-                                    )
-                                    .padding(.leading, 14)
-                            }
-                        }
+                VStack(spacing: 2) {
+                    ForEach(group.states, id: \.configuration.id) { state in
+                        credentialRow(state, provider: group.provider)
                     }
                 }
-                .padding(.leading, 20)
-                .padding(.trailing, 6)
-                .padding(.bottom, 4)
+                .padding(.leading, 18)
+                .padding(.trailing, 8)
+                .padding(.top, 2)
+                .padding(.bottom, 8)
                 .transition(.opacity)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .background {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.primary.opacity(colorScheme == .dark ? 0.030 : 0.018))
+                .fill(CompactPopoverPalette.surface(.card, colorScheme))
         }
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(
-                    Color.primary.opacity(colorScheme == .dark ? 0.075 : 0.052),
+                    SettingsDesign.fieldBorder(colorScheme),
                     lineWidth: 0.8
                 )
         }
-    }
-
-    private var credentialHierarchyRail: some View {
-        Rectangle()
-            .fill(Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.065))
-            .frame(width: 1)
-            .padding(.vertical, 8)
-            .padding(.trailing, 6)
-            .accessibilityHidden(true)
     }
 
     private func credentialRow(
@@ -731,5 +686,96 @@ private extension CredentialManagementView {
         ) { preferences in
             environment.settings.setUsagePreferences(preferences, for: state.configuration.id)
         }
+    }
+}
+
+private struct CredentialFilterMenuControl<MenuContent: View>: View {
+    let title: String
+    let value: String
+    let systemImage: String
+    let isActive: Bool
+    let help: String
+    private let menuContent: MenuContent
+
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var isHovered = false
+
+    init(
+        title: String,
+        value: String,
+        systemImage: String,
+        isActive: Bool,
+        help: String,
+        @ViewBuilder menuContent: () -> MenuContent
+    ) {
+        self.title = title
+        self.value = value
+        self.systemImage = systemImage
+        self.isActive = isActive
+        self.help = help
+        self.menuContent = menuContent()
+    }
+
+    var body: some View {
+        Menu {
+            menuContent
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(
+                        isActive
+                            ? Color.accentColor
+                            : (isHovered ? Color.primary : Color.secondary)
+                    )
+
+                Text("\(title) \(value)")
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(
+                        isActive ? Color.accentColor : Color.primary
+                    )
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: 124, alignment: .leading)
+
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(
+                        isActive
+                            ? Color.accentColor
+                            : Color.secondary
+                    )
+            }
+            .padding(.horizontal, 9)
+            .frame(minHeight: 32)
+            .background {
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(
+                        isActive
+                            ? Color.accentColor.opacity(0.09)
+                            : (isHovered
+                                ? SettingsDesign.hoverFill(colorScheme)
+                                : SettingsDesign.fieldFill(colorScheme))
+                    )
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .strokeBorder(
+                        isActive
+                            ? Color.accentColor.opacity(0.30)
+                            : SettingsDesign.fieldBorder(colorScheme),
+                        lineWidth: 0.8
+                    )
+            }
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize(horizontal: true, vertical: false)
+        .onHover { isHovered = $0 }
+        .animation(.easeOut(duration: 0.12), value: isHovered)
+        .help(help)
+        .accessibilityLabel("\(title)筛选")
+        .accessibilityValue(value)
     }
 }

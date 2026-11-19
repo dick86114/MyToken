@@ -103,6 +103,46 @@ final class CompactUsageCardPresentationTests: XCTestCase {
         XCTAssertEqual(CompactUsageCardPresentation.compactPercentNumberText(nil), "—")
     }
 
+    func test简洁卡片周期统一为五小时周月() {
+        func metric(id: String, label: String) -> NormalizedUsageMetric {
+            NormalizedUsageMetric(
+                id: id,
+                label: label,
+                used: 20,
+                limit: 100,
+                remaining: 80,
+                unit: .request,
+                presentation: .progress,
+                semantic: .usedQuota
+            )
+        }
+
+        XCTAssertEqual(
+            CompactUsageCardPresentation.compactPeriodLabel(
+                for: metric(id: "five-hour", label: "5 小时用量")
+            ),
+            "5小时"
+        )
+        XCTAssertEqual(
+            CompactUsageCardPresentation.compactPeriodLabel(
+                for: metric(id: "weekly", label: "周用量")
+            ),
+            "周"
+        )
+        XCTAssertEqual(
+            CompactUsageCardPresentation.compactPeriodLabel(
+                for: metric(id: "monthly", label: "月用量")
+            ),
+            "月"
+        )
+        XCTAssertEqual(
+            CompactUsageCardPresentation.compactPeriodLabel(
+                for: metric(id: "plan-total", label: "套餐总量")
+            ),
+            "套餐总量"
+        )
+    }
+
     func test重置文案当天带前缀跨天只保留日期() {
         let now = date("2026-09-22 17:00:00")
         let sameDay = progressMetric(
