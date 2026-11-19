@@ -849,6 +849,59 @@ class HomeScreenTest {
     }
 
     @Test
+    fun 有可用更新时首页顶部显示更新提醒条() {
+        var openedSettings = 0
+        composeRule.setContent {
+            MaterialTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = listOf(card(credential("更新横幅"))),
+                        groups = emptyList(),
+                        credentialCount = 1,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    onOpenSettings = { openedSettings++ },
+                    hasUpdateAvailable = true,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("home_update_banner").assertIsDisplayed()
+        composeRule.onNodeWithText("发现新版本").assertIsDisplayed()
+        composeRule.onNodeWithTag("home_update_banner").performClick()
+        assertEquals(1, openedSettings)
+    }
+
+    @Test
+    fun 无可用更新时不显示更新提醒条() {
+        composeRule.setContent {
+            MaterialTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = listOf(card(credential("无更新"))),
+                        groups = emptyList(),
+                        credentialCount = 1,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    hasUpdateAvailable = false,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("home_update_banner").assertDoesNotExist()
+    }
+
+    @Test
     fun 账户健康说明使用分组排版() {
         composeRule.setContent {
             MaterialTheme {

@@ -60,6 +60,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -223,6 +224,14 @@ fun HomeScreen(
                                     onOpenSettings = onOpenSettings,
                                     hasUpdateAvailable = hasUpdateAvailable,
                                 )
+                            }
+                            if (hasUpdateAvailable) {
+                                item(
+                                    key = "home_update_banner",
+                                    span = StaggeredGridItemSpan.FullLine,
+                                ) {
+                                    HomeUpdateBanner(onOpenSettings = onOpenSettings)
+                                }
                             }
                             item(
                                 key = "home_health",
@@ -535,6 +544,55 @@ private fun DensityGlyph(compact: Boolean, color: Color) {
                     .background(color, RoundedCornerShape(1.dp)),
             )
         }
+    }
+}
+
+/**
+ * 首页更新提醒条：应用启动时会检查 GitHub Release，发现新版本后在首页顶部提示。
+ * 点击进入设置页，由设置页的更新卡片负责下载与安装。
+ */
+@Composable
+private fun HomeUpdateBanner(onOpenSettings: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .clickable(role = Role.Button, onClick = onOpenSettings)
+            .padding(horizontal = 14.dp, vertical = 12.dp)
+            .semantics { contentDescription = "有新版本可用，前往设置查看并更新" }
+            .testTag("home_update_banner"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.SystemUpdate,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.size(20.dp),
+        )
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 10.dp),
+        ) {
+            Text(
+                text = "发现新版本",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Text(
+                text = "前往设置查看更新内容并安装",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f),
+            )
+        }
+        Text(
+            text = "去更新",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
     }
 }
 
