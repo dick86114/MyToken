@@ -844,19 +844,12 @@ private extension UsageRowView {
     }
 
     func normalizedMetricsContent(snapshot: UsageSnapshot, now: Date) -> some View {
-        if state.configuration.providerID == .deepseek,
-           let balance = snapshot.normalizedMetrics.first(where: {
-               $0.id == "balance" && $0.presentation == .balance
-           }) {
-            let compositionMetrics = Self.balanceCompositionMetrics(
-                in: snapshot.normalizedMetrics
-            )
+        if state.configuration.providerID == .deepseek {
             return AnyView(
-                CompactBalanceStrip(
-                    metric: balance,
-                    compositionMetrics: compositionMetrics,
-                    style: .full,
-                    metaText: "账户可用 · 余额不足时自动提醒"
+                DeepSeekMetricsView(
+                    metrics: snapshot.normalizedMetrics,
+                    allowedModels: snapshot.allowedModels,
+                    visualStyle: .popover
                 )
             )
         }

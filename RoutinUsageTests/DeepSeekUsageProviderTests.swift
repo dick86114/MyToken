@@ -112,4 +112,65 @@ final class DeepSeekUsageProviderTests: XCTestCase {
             .warning
         )
     }
+
+    func test多币种余额为每个币种各生成一组指标() async throws {
+        let stub = URLProtocolStub.makeSession { request in
+            let response = try XCTUnwrap(HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let body = #"""
+            {"is_available":true,"balance_infos":[
+              {"currency":"CNY","total_balance":"110.00","granted_balance":"10.00","topped_up_balance":"100.00"},
+              {"currency":"USD","total_balance":"23.86","granted_balance":"5.00","topped_up_balance":"18.86"}
+            ]}
+            """#
+            return (response, Data(body.utf8))
+        }
+        let provider = DeepSeekUsageProvider(session: stub.session)
+        let credential = ProviderCredential(providerID: .deepseek, kind: .apiKey, secret: "sk-test")
+
+        let fetched = try await provider.fetchUsage(credential, now: .now)
+        let snapshot = try XCTUnwrap(fetched)
+
+        let balances = snapshot.metrics.filter { $0.presentation == .balance }
+        XCTAssertEqual(balances.count, 2, "双币种账户应输出两条余额指标")
+        XCTAssertEqual(balances.map(\.currencyCode), ["CNY", "USD"])
+        XCTAssertEqual(balances.first?.value, Decimal(string: "110.00"))
+        XCTAssertEqual(balances.last?.value, Decimal(string: "23.86"))
+
+        // 每个币种都带自己的充值/赠金明细。
+        XCTAssertNotNil(snapshot.metrics.first { $0.id == "toppedUpBalance-CNY" })
+        XCTAssertNotNil(snapshot.metrics.first { $0.id == "grantedBalance-USD" })
+    }
+
+    func test账户可用状态只输出一次且反映is_available() async throws {
+        let stub = URLProtocolStub.makeSession { request in
+            let response = try XCTUnwrap(HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let body = #"""
+            {"is_available":false,"balance_infos":[
+              {"currency":"CNY","total_balance":"0","granted_balance":"0","topped_up_balance":"0"},
+              {"currency":"USD","total_balance":"0","granted_balance":"0","topped_up_balance":"0"}
+            ]}
+            """#
+            return (response, Data(body.utf8))
+        }
+        let provider = DeepSeekUsageProvider(session: stub.session)
+        let credential = ProviderCredential(providerID: .deepseek, kind: .apiKey, secret: "sk-test")
+
+        let fetched = try await provider.fetchUsage(credential, now: .now)
+        let snapshot = try XCTUnwrap(fetched)
+
+        let availability = snapshot.metrics.filter { $0.id == "availability" }
+        XCTAssertEqual(availability.count, 1, "账户状态属于整个账户，不应按币种重复")
+        XCTAssertEqual(availability.first?.value, 0)
+        XCTAssertEqual(availability.first?.healthState, .unavailable)
+    }
 }

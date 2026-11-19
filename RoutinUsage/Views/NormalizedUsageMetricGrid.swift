@@ -392,7 +392,10 @@ private struct NormalizedUsageMetricCell: View {
     }
 
     private var isDeepSeekSummary: Bool {
-        ["balance", "grantedBalance", "toppedUpBalance", "availability"].contains(metric.id)
+        // 多币种账户的指标 id 带币种后缀（如 balance-CNY），用前缀匹配保持同一套样式。
+        ["balance", "grantedBalance", "toppedUpBalance", "availability"].contains { baseID in
+            metric.id == baseID || metric.id.hasPrefix(baseID + "-")
+        }
     }
 
     private var healthColor: Color {

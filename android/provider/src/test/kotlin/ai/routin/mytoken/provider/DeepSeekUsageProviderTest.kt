@@ -153,6 +153,31 @@ class DeepSeekUsageProviderTest {
     }
 
     @Test
+    fun fetchUsage_mapsEveryCurrencyIntoItsOwnMetricGroup() = runTest {
+        transport.responses += ok(
+            """
+            {"is_available":true,"balance_infos":[
+              {"currency":"CNY","total_balance":"110.00","granted_balance":"10.00","topped_up_balance":"100.00"},
+              {"currency":"USD","total_balance":"23.86","granted_balance":"5.00","topped_up_balance":"18.86"}
+            ]}
+            """.trimIndent()
+        )
+
+        val snapshot = provider.fetchUsage(credential(), secret).getOrThrow()
+
+        val balances = snapshot.metrics.filter { it.presentation == UsageMetricPresentation.Balance }
+        assertEquals(2, balances.size)
+        assertEquals(listOf("CNY", "USD"), balances.map { it.currencyCode })
+        assertEquals(0, balances[0].value!!.compareTo(BigDecimal("110.00")))
+        assertEquals(0, balances[1].value!!.compareTo(BigDecimal("23.86")))
+        assertTrue(snapshot.metrics.any { it.id == "toppedUpBalance-CNY" })
+        assertTrue(snapshot.metrics.any { it.id == "grantedBalance-USD" })
+
+        // 账户状态属于整个账户，只应出现一次。
+        assertEquals(1, snapshot.metrics.count { it.id == "availability" })
+    }
+
+    @Test
     fun fetchUsage_malformedJsonFailsWithInvalidResponse() = runTest {
         transport.responses += ok("{ nope")
 

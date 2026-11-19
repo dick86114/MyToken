@@ -82,10 +82,17 @@ enum WidgetMetricRanker {
         _ metrics: [WidgetSnapshotMetric],
         priority: [String]
     ) -> [WidgetSnapshotMetric] {
-        let byID = Dictionary(uniqueKeysWithValues: metrics.map { ($0.id, $0) })
-        var result = priority.compactMap { byID[$0] }
-        let selectedIDs = Set(result.map(\.id))
-        result.append(contentsOf: metrics.filter { !selectedIDs.contains($0.id) })
+        var remaining = metrics
+        var result: [WidgetSnapshotMetric] = []
+        for priorityID in priority {
+            // 精确匹配优先；多币种等场景会产出带后缀的 id（如 balance-CNY），
+            // 这里一并用前缀匹配收进来，避免主指标退化成账户状态。
+            while let index = remaining.firstIndex(where: { $0.id == priorityID })
+                ?? remaining.firstIndex(where: { $0.id.hasPrefix(priorityID + "-") }) {
+                result.append(remaining.remove(at: index))
+            }
+        }
+        result.append(contentsOf: remaining)
         return result
     }
 

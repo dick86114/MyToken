@@ -92,24 +92,81 @@ struct DeepSeekUsageProvider: UsageProvider {
 
         do {
             let payload = try JSONDecoder().decode(DeepSeekBalanceResponse.self, from: data)
-            guard let balance = payload.balanceInfos.first else {
+            guard !payload.balanceInfos.isEmpty else {
                 throw UsageProviderError.invalidResponse
             }
-            let currency = balance.currency.isEmpty ? "CNY" : balance.currency
-            let total = Decimal(string: balance.totalBalance) ?? 0
-            let granted = Decimal(string: balance.grantedBalance) ?? 0
-            let toppedUp = Decimal(string: balance.toppedUpBalance) ?? 0
             let warningThreshold: Decimal?
             if let rawThreshold = credential.metadata["balanceWarningThreshold"] {
                 warningThreshold = Decimal(string: rawThreshold)
             } else {
                 warningThreshold = nil
             }
-            let health = UsageMetricHealthEvaluator.balanceState(
-                balance: total,
-                warningThreshold: warningThreshold,
-                isAvailable: payload.isAvailable
-            )
+
+            // 接口可能同时返回多种币种余额（例如 CNY 与 USD），逐币种生成一组指标，
+            // 避免只展示第一个币种而丢失其余账户余额。
+            let hasMultipleCurrencies = payload.balanceInfos.count > 1
+            var metrics: [NormalizedUsageMetric] = []
+            for (index, balance) in payload.balanceInfos.enumerated() {
+                let currency = balance.currency.isEmpty ? "CNY" : balance.currency
+                let total = Decimal(string: balance.totalBalance) ?? 0
+                let granted = Decimal(string: balance.grantedBalance) ?? 0
+                let toppedUp = Decimal(string: balance.toppedUpBalance) ?? 0
+                let health = UsageMetricHealthEvaluator.balanceState(
+                    balance: total,
+                    warningThreshold: warningThreshold,
+                    isAvailable: payload.isAvailable
+                )
+                let suffix = hasMultipleCurrencies ? "-\(currency.uppercased())" : ""
+                let currencyLabel = hasMultipleCurrencies ? "（\(currency.uppercased())）" : ""
+
+                metrics.append(contentsOf: [
+                    NormalizedUsageMetric(
+                        id: "balance\(suffix)",
+                        label: "余额\(currencyLabel)",
+                        value: total,
+                        unit: .currency,
+                        presentation: .balance,
+                        semantic: .balance,
+                        currencyCode: currency,
+                        healthState: health
+                    ),
+                    NormalizedUsageMetric(
+                        id: "grantedBalance\(suffix)",
+                        label: "赠金余额\(currencyLabel)",
+                        value: granted,
+                        unit: .currency,
+                        presentation: .value,
+                        semantic: .value,
+                        currencyCode: currency,
+                        healthState: health
+                    ),
+                    NormalizedUsageMetric(
+                        id: "toppedUpBalance\(suffix)",
+                        label: "充值余额\(currencyLabel)",
+                        value: toppedUp,
+                        unit: .currency,
+                        presentation: .value,
+                        semantic: .value,
+                        currencyCode: currency,
+                        healthState: health
+                    )
+                ])
+
+                // 账户可用状态属于整个账户，仅在首组指标中输出一次。
+                if index == 0 {
+                    metrics.append(
+                        NormalizedUsageMetric(
+                            id: "availability",
+                            label: "账户状态",
+                            value: payload.isAvailable ? 1 : 0,
+                            unit: .boolean,
+                            presentation: .status,
+                            semantic: .status,
+                            healthState: payload.isAvailable ? health : .unavailable
+                        )
+                    )
+                }
+            }
 
             return UsageSnapshot(
                 planName: "API 余额",
@@ -121,47 +178,7 @@ struct DeepSeekUsageProvider: UsageProvider {
                 fetchedAt: now,
                 providerID: .deepseek,
                 credentialID: credential.credentialID,
-                metrics: [
-                    NormalizedUsageMetric(
-                        id: "balance",
-                        label: "余额",
-                        value: total,
-                        unit: .currency,
-                        presentation: .balance,
-                        semantic: .balance,
-                        currencyCode: currency,
-                        healthState: health
-                    ),
-                    NormalizedUsageMetric(
-                        id: "grantedBalance",
-                        label: "赠金余额",
-                        value: granted,
-                        unit: .currency,
-                        presentation: .value,
-                        semantic: .value,
-                        currencyCode: currency,
-                        healthState: health
-                    ),
-                    NormalizedUsageMetric(
-                        id: "toppedUpBalance",
-                        label: "充值余额",
-                        value: toppedUp,
-                        unit: .currency,
-                        presentation: .value,
-                        semantic: .value,
-                        currencyCode: currency,
-                        healthState: health
-                    ),
-                    NormalizedUsageMetric(
-                        id: "availability",
-                        label: "账户状态",
-                        value: payload.isAvailable ? 1 : 0,
-                        unit: .boolean,
-                        presentation: .status,
-                        semantic: .status,
-                        healthState: payload.isAvailable ? health : .unavailable
-                    )
-                ]
+                metrics: metrics
             )
         } catch let error as UsageProviderError {
             throw error

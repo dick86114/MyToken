@@ -74,10 +74,23 @@ object WidgetMetricRanker {
         metrics: List<UsageMetric>,
         priority: List<String>,
     ): List<UsageMetric> {
-        val byId = metrics.associateBy(UsageMetric::id)
-        val result = priority.mapNotNull(byId::get).toMutableList()
-        val selected = result.mapTo(mutableSetOf()) { it.id }
-        result += metrics.filterNot { it.id in selected }
+        val remaining = metrics.toMutableList()
+        val result = mutableListOf<UsageMetric>()
+        for (priorityId in priority) {
+            // 精确匹配优先；多币种等场景会产生带后缀的 id（如 balance-CNY），
+            // 这里一并用前缀匹配收进来，避免主指标退化成账户状态。
+            while (true) {
+                val exact = remaining.indexOfFirst { it.id == priorityId }
+                val index = if (exact >= 0) {
+                    exact
+                } else {
+                    remaining.indexOfFirst { it.id.startsWith("$priorityId-") }
+                }
+                if (index < 0) break
+                result += remaining.removeAt(index)
+            }
+        }
+        result += remaining
         return result
     }
 

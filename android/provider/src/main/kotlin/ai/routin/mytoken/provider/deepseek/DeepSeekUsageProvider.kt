@@ -97,56 +97,61 @@ class DeepSeekUsageProvider(
         val root = ProviderJson.parse(body).asObjectOrNull()
             ?: throw UsageProviderException.InvalidResponse()
         val isAvailable = root.boolOrNull("is_available") ?: false
-        val balanceInfo = root.arrayOrNull("balance_infos")?.firstOrNull()?.asObjectOrNull()
+        val balanceInfos = root.arrayOrNull("balance_infos")
+            ?.mapNotNull { it.asObjectOrNull() }
+            ?.takeIf { it.isNotEmpty() }
             ?: throw UsageProviderException.InvalidResponse()
 
-        val currency = balanceInfo.stringOrNull("currency")?.takeIf { it.isNotEmpty() } ?: "CNY"
-        val total = balanceInfo.decimalOrNull("total_balance") ?: BigDecimal.ZERO
-        val granted = balanceInfo.decimalOrNull("granted_balance") ?: BigDecimal.ZERO
-        val toppedUp = balanceInfo.decimalOrNull("topped_up_balance") ?: BigDecimal.ZERO
-        val health = UsageMetricHealthEvaluator.balanceState(
-            balance = total,
-            warningThreshold = null,
-            isAvailable = isAvailable
-        )
+        // 接口可能同时返回多种币种余额（例如 CNY 与 USD），逐币种生成一组指标，
+        // 避免只展示第一个币种而丢失其余账户余额。
+        val hasMultipleCurrencies = balanceInfos.size > 1
+        val metrics = mutableListOf<UsageMetric>()
+        balanceInfos.forEachIndexed { index, balanceInfo ->
+            val currency = balanceInfo.stringOrNull("currency")?.takeIf { it.isNotEmpty() } ?: "CNY"
+            val total = balanceInfo.decimalOrNull("total_balance") ?: BigDecimal.ZERO
+            val granted = balanceInfo.decimalOrNull("granted_balance") ?: BigDecimal.ZERO
+            val toppedUp = balanceInfo.decimalOrNull("topped_up_balance") ?: BigDecimal.ZERO
+            val health = UsageMetricHealthEvaluator.balanceState(
+                balance = total,
+                warningThreshold = null,
+                isAvailable = isAvailable
+            )
+            val suffix = if (hasMultipleCurrencies) "-${currency.uppercase()}" else ""
+            val currencyLabel = if (hasMultipleCurrencies) "（${currency.uppercase()}）" else ""
 
-        return UsageSnapshot(
-            credentialId = credential.id,
-            fetchedAt = clock.instant(),
-            planName = "API 余额",
-            allowedModels = allowedModels,
-            metrics = listOf(
-                UsageMetric(
-                    id = "balance",
-                    label = "余额",
-                    value = total,
-                    unit = UsageMetricUnit.Currency,
-                    presentation = UsageMetricPresentation.Balance,
-                    semantic = UsageMetricSemantic.Balance,
-                    currencyCode = currency,
-                    healthState = health
-                ),
-                UsageMetric(
-                    id = "grantedBalance",
-                    label = "赠金余额",
-                    value = granted,
-                    unit = UsageMetricUnit.Currency,
-                    presentation = UsageMetricPresentation.Value,
-                    semantic = UsageMetricSemantic.Value,
-                    currencyCode = currency,
-                    healthState = health
-                ),
-                UsageMetric(
-                    id = "toppedUpBalance",
-                    label = "充值余额",
-                    value = toppedUp,
-                    unit = UsageMetricUnit.Currency,
-                    presentation = UsageMetricPresentation.Value,
-                    semantic = UsageMetricSemantic.Value,
-                    currencyCode = currency,
-                    healthState = health
-                ),
-                UsageMetric(
+            metrics += UsageMetric(
+                id = "balance$suffix",
+                label = "余额$currencyLabel",
+                value = total,
+                unit = UsageMetricUnit.Currency,
+                presentation = UsageMetricPresentation.Balance,
+                semantic = UsageMetricSemantic.Balance,
+                currencyCode = currency,
+                healthState = health
+            )
+            metrics += UsageMetric(
+                id = "grantedBalance$suffix",
+                label = "赠金余额$currencyLabel",
+                value = granted,
+                unit = UsageMetricUnit.Currency,
+                presentation = UsageMetricPresentation.Value,
+                semantic = UsageMetricSemantic.Value,
+                currencyCode = currency,
+                healthState = health
+            )
+            metrics += UsageMetric(
+                id = "toppedUpBalance$suffix",
+                label = "充值余额$currencyLabel",
+                value = toppedUp,
+                unit = UsageMetricUnit.Currency,
+                presentation = UsageMetricPresentation.Value,
+                semantic = UsageMetricSemantic.Value,
+                currencyCode = currency,
+                healthState = health
+            )
+            // 账户可用状态属于整个账户，仅在首组指标中输出一次。
+            if (index == 0) {
+                metrics += UsageMetric(
                     id = "availability",
                     label = "账户状态",
                     value = if (isAvailable) BigDecimal.ONE else BigDecimal.ZERO,
@@ -155,7 +160,15 @@ class DeepSeekUsageProvider(
                     semantic = UsageMetricSemantic.Status,
                     healthState = if (isAvailable) health else UsageMetricHealthState.Unavailable
                 )
-            )
+            }
+        }
+
+        return UsageSnapshot(
+            credentialId = credential.id,
+            fetchedAt = clock.instant(),
+            planName = "API 余额",
+            allowedModels = allowedModels,
+            metrics = metrics
         )
     }
 

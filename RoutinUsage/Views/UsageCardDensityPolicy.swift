@@ -57,8 +57,18 @@ enum UsageCardDensityPolicy {
         let byID = Dictionary(
             uniqueKeysWithValues: metrics.map { ($0.id, $0) }
         )
-        return compactSpec(providerID: providerID, metadata: metadata)
+        let ordered = compactSpec(providerID: providerID, metadata: metadata)
             .metricIDs
             .compactMap { byID[$0] }
+        if !ordered.isEmpty {
+            return ordered
+        }
+
+        // 多币种账户的指标 id 带币种后缀（如 balance-CNY），
+        // 简洁模式取首个余额型指标，避免整卡空白。
+        if providerID == .deepseek {
+            return metrics.filter { $0.presentation == .balance }.prefix(1).map { $0 }
+        }
+        return ordered
     }
 }

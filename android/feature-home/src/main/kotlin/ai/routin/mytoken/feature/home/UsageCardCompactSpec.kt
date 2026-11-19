@@ -4,6 +4,7 @@ import ai.routin.mytoken.domain.model.CredentialMetadataKey
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageCardDensity
 import ai.routin.mytoken.domain.model.UsageMetric
+import ai.routin.mytoken.domain.model.UsageMetricPresentation
 
 /**
  * 简洁卡片字段策略：与 macOS UsageCardDensityPolicy 保持同一套指标 ID 和
@@ -41,7 +42,15 @@ internal object UsageCardCompactSpec {
             ProviderId.OpenCode -> listOf("fiveHour", "weekly", "monthly")
         }
         val byId = metrics.associateBy { it.id }
-        return ids.mapNotNull { byId[it] }
+        val ordered = ids.mapNotNull { byId[it] }
+        if (ordered.isNotEmpty()) return ordered
+
+        // 多币种账户的指标 id 带币种后缀（如 balance-CNY），
+        // 简洁模式取首个余额型指标，避免整卡空白。
+        if (providerId == ProviderId.DeepSeek) {
+            return listOfNotNull(metrics.firstOrNull { it.presentation == UsageMetricPresentation.Balance })
+        }
+        return ordered
     }
 }
 

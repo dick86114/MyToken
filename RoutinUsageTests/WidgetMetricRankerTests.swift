@@ -49,6 +49,52 @@ final class WidgetMetricRankerTests: XCTestCase {
             ["five-hour", "weekly", "request-count", "purchased-remaining"]
         )
     }
+
+    func test_ranker_keeps_balance_primary_for_multi_currency_deepseek() {
+        let balanceCNY = WidgetSnapshotMetric(
+            id: "balance-CNY",
+            label: "余额（CNY）",
+            value: Decimal(10),
+            unit: .currency,
+            presentation: .balance,
+            semantic: .balance,
+            currencyCode: "CNY",
+            healthState: .normal
+        )
+        let balanceUSD = WidgetSnapshotMetric(
+            id: "balance-USD",
+            label: "余额（USD）",
+            value: Decimal(10),
+            unit: .currency,
+            presentation: .balance,
+            semantic: .balance,
+            currencyCode: "USD",
+            healthState: .normal
+        )
+        let availability = WidgetSnapshotMetric(
+            id: "availability",
+            label: "账户状态",
+            value: Decimal(1),
+            unit: .boolean,
+            presentation: .status,
+            semantic: .status,
+            healthState: .normal
+        )
+
+        let selection = WidgetMetricRanker.rank(
+            providerID: "deepseek",
+            metrics: [balanceCNY, balanceUSD, availability],
+            fixedMetricID: nil,
+            capacity: 3
+        )
+
+        // 多币种时余额仍应排在账户状态之前，避免主指标退化成状态。
+        XCTAssertEqual(selection.primary?.id, "balance-CNY")
+        XCTAssertEqual(
+            selection.orderedMetrics.map(\.id),
+            ["balance-CNY", "balance-USD", "availability"]
+        )
+    }
 }
 
 struct WidgetContractFixture: Decodable {

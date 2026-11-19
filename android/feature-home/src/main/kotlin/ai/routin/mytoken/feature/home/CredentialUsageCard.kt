@@ -42,6 +42,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import java.math.BigDecimal
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.Share
@@ -608,7 +609,7 @@ private fun FullUsageCardBody(
         return
     }
 
-    val balance = metrics.firstOrNull { it.presentation == UsageMetricPresentation.Balance }
+    val balanceMetrics = metrics.filter { it.presentation == UsageMetricPresentation.Balance }
     val progress = metrics.filter { it.presentation == UsageMetricPresentation.Progress }
     val values = metrics.filter {
         it.presentation == UsageMetricPresentation.Value ||
@@ -617,46 +618,173 @@ private fun FullUsageCardBody(
     val isDeepSeek = card.credential.providerId ==
         ai.routin.mytoken.domain.model.ProviderId.DeepSeek
     val rawMetrics = card.snapshot?.metrics.orEmpty()
-    val deepSeekGiftSegment = if (isDeepSeek) {
-        CompactBalanceCompositionPolicy.segments(rawMetrics)
-            .firstOrNull { it.kind == CompactBalanceSegmentKind.Granted }
-    } else {
-        null
-    }
-    val deepSeekGift = if (isDeepSeek) {
-        deepSeekGiftSegment?.let { segment ->
-            rawMetrics.firstOrNull { it.id == segment.id }
-                ?.copy(label = "赠送金额")
-        }
-    } else {
-        null
-    }
 
     Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-        if (balance != null) {
+        if (isDeepSeek) {
+            // 与 macOS DeepSeekMetricsView 对齐：按固定字段列出接口返回的全部内容，
+            // 零值也展示，缺失显示占位符而不是直接隐藏。
+            DeepSeekMetricsGrid(
+                metrics = rawMetrics,
+                allowedModels = card.snapshot?.allowedModels.orEmpty(),
+                isDark = isDark,
+            )
+        } else if (balanceMetrics.isNotEmpty()) {
+            val balance = balanceMetrics.first()
             BalanceStrip(
                 metric = balance,
-                composition = if (isDeepSeek) {
-                    emptyList()
-                } else {
-                    CompactBalanceCompositionPolicy.segments(rawMetrics)
-                },
+                composition = CompactBalanceCompositionPolicy.segments(rawMetrics),
                 isDark = isDark,
             )
         }
         if (progress.isNotEmpty()) {
             FullProgressMetrics(progress)
         }
-        if (isDeepSeek) {
-            if (deepSeekGift != null) {
-                FullValueMetrics(listOf(deepSeekGift))
-            }
-        } else if (values.isNotEmpty()) {
+        if (!isDeepSeek && values.isNotEmpty()) {
             FullValueMetrics(values)
         }
         FullCardFooter(card)
     }
 }
+
+/** 账户可用状态行，展示接口返回的 is_available。 */
+@Composable
+private fun FullAccountStatusRow(metric: UsageMetric) {
+    val isAvailable = (metric.value?.signum() ?: 0) > 0
+    val tint = if (isAvailable) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.error
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(5.dp)
+                .clip(CircleShape)
+                .background(tint),
+        )
+        Text(
+            text = if (isAvailable) "账户可用" else "账户不可用",
+            style = MaterialTheme.typography.labelSmall,
+            color = tint,
+        )
+        Text(
+            text = "· 余额不足时自动提醒",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
+ * DeepSeek 完整模式：参照 MiMo 的字段网格样式（两列卡片格子），
+ * 把接口返回的全部字段固定列出，零值也展示，缺失显示占位符。
+ */
+@Composable
+private fun DeepSeekMetricsGrid(
+    metrics: List<UsageMetric>,
+    allowedModels: List<String>,
+    isDark: Boolean,
+) {
+    val balances = metrics.filter { it.presentation == UsageMetricPresentation.Balance }
+    if (balances.isEmpty()) {
+        Text(
+            text = "暂无用量数据",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(vertical = 4.dp),
+        )
+        return
+    }
+
+    val isMultiCurrency = balances.size > 1
+    val availability = metrics.firstOrNull { it.id == "availability" }
+
+    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        balances.forEach { balance ->
+            val currency = balance.currencyCode?.uppercase().orEmpty()
+            val suffix = if (isMultiCurrency && currency.isNotEmpty()) "-$currency" else ""
+            if (isMultiCurrency && currency.isNotEmpty()) {
+                Text(
+                    text = currency,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            val cells = listOfNotNull(
+                "余额" to fullValueText(balance),
+                "充值" to fullValueTextOf(
+                    metrics.firstOrNull { it.id == "toppedUpBalance$suffix" }
+                        ?: metrics.firstOrNull { it.id == "toppedUpBalance" }
+                ),
+                "赠金" to fullValueTextOf(
+                    metrics.firstOrNull { it.id == "grantedBalance$suffix" }
+                        ?: metrics.firstOrNull { it.id == "grantedBalance" }
+                ),
+                "账户状态" to if (availability == null) {
+                    "—"
+                } else if ((availability.value?.signum() ?: 0) > 0) {
+                    "可用"
+                } else {
+                    "不可用"
+                },
+                "可用模型" to if (allowedModels.isEmpty()) {
+                    "—"
+                } else {
+                    "${allowedModels.size} 个"
+                }
+            )
+            DeepSeekMetricCells(cells)
+        }
+    }
+}
+
+/** 与 MiMo 的 FullValueMetrics 一致的卡片格子布局。 */
+@Composable
+private fun DeepSeekMetricCells(cells: List<Pair<String, String>>) {
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        cells.chunked(2).forEach { rowCells ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                rowCells.forEach { (label, value) ->
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f))
+                            .padding(horizontal = 9.dp, vertical = 7.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(
+                            text = label,
+                            fontSize = 9.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = value,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                repeat(2 - rowCells.size) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+/** 与 fullValueText 一致的取值，但允许 null 显示占位符。 */
+private fun fullValueTextOf(metric: UsageMetric?): String =
+    metric?.let(::fullValueText) ?: "—"
+
 
 private fun fullCardMetrics(card: CredentialCardUi): List<UsageMetric> {
     val all = card.snapshot?.metrics.orEmpty()
@@ -686,19 +814,20 @@ private fun fullCardMetrics(card: CredentialCardUi): List<UsageMetric> {
         else -> emptyList()
     }
     val baseIds = base.mapTo(mutableSetOf()) { it.id }
-    val missingBalance = all
-        .firstOrNull { it.presentation == UsageMetricPresentation.Balance && it.id !in baseIds }
-        ?.let(::listOf)
-        .orEmpty()
+    // 多币种账户可能有多条 balance 指标，需要全部保留，不能只取第一条。
+    val missingBalances = all.filter {
+        it.presentation == UsageMetricPresentation.Balance && it.id !in baseIds
+    }
+    val extrasIds = extras.mapTo(mutableSetOf()) { it.id }
     val missingValues = all
         .filter {
             it.id !in baseIds &&
-                it.id !in extras.map { extra -> extra.id } &&
+                it.id !in extrasIds &&
                 (it.presentation == UsageMetricPresentation.Value || it.presentation == UsageMetricPresentation.Status) &&
                 it.value?.signum() == 1
         }
         .take(3)
-    return (base + extras + missingBalance + missingValues).distinctBy { it.id }
+    return (base + extras + missingBalances + missingValues).distinctBy { it.id }
 }
 
 @Composable
@@ -922,7 +1051,7 @@ private fun BalanceStrip(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (metric.id == "balance" && metric.label == "余额") {
+                        text = if (metric.id == "balance" || metric.id.startsWith("balance-")) {
                             "账户余额"
                         } else {
                             metric.label
@@ -965,7 +1094,7 @@ private fun BalanceStrip(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (metric.id == "balance" && metric.label == "余额") {
+                        text = if (metric.id == "balance" || metric.id.startsWith("balance-")) {
                             "账户余额"
                         } else {
                             metric.label

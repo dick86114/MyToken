@@ -484,10 +484,11 @@ private fun ProgressCell(metric: UsageMetric, colors: StatusColors, modifier: Mo
 
 @Composable
 private fun BalanceCell(metric: UsageMetric, colors: StatusColors, modifier: Modifier = Modifier) {
-    val caption = when (metric.id) {
-        "balance" -> "账户余额"
-        "grantedBalance" -> "赠金余额"
-        "toppedUpBalance" -> "充值余额"
+    val caption = when {
+        // 多币种账户的指标 id 带币种后缀（如 balance-CNY），用前缀匹配保持同一套标题。
+        metric.id == "balance" || metric.id.startsWith("balance-") -> "账户余额"
+        metric.id == "grantedBalance" || metric.id.startsWith("grantedBalance-") -> "赠金余额"
+        metric.id == "toppedUpBalance" || metric.id.startsWith("toppedUpBalance-") -> "充值余额"
         else -> metric.label
     }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
