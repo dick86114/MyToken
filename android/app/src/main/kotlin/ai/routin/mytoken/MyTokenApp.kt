@@ -18,27 +18,26 @@ import ai.routin.mytoken.feature.transfer.TransferPreviewScreen
 import ai.routin.mytoken.feature.transfer.TransferScannerScreen
 import ai.routin.mytoken.feature.transfer.TransferUiState
 import ai.routin.mytoken.feature.transfer.TransferViewModel
+import ai.routin.mytoken.core.ui.GlassButton
+import ai.routin.mytoken.core.ui.GlassButtonTone
+import ai.routin.mytoken.core.ui.MyTokenEdgeDrawerHost
+import ai.routin.mytoken.core.ui.MyTokenEdgeDrawerSide
+import ai.routin.mytoken.core.ui.MyTokenLayoutMode
+import ai.routin.mytoken.core.ui.MyTokenDialog
+import ai.routin.mytoken.core.ui.MyTokenDialogRow
+import ai.routin.mytoken.core.ui.MyTokenDialogSection
+import ai.routin.mytoken.core.ui.MyTokenDialogStatus
+import ai.routin.mytoken.core.ui.MyTokenDialogTone
+import ai.routin.mytoken.core.ui.rememberMyTokenLayoutMode
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import ai.routin.mytoken.core.ui.GlassNavItem
-import ai.routin.mytoken.core.ui.MyTokenNavigationScaffold
-import ai.routin.mytoken.core.ui.rememberMyTokenLayoutMode
-import ai.routin.mytoken.core.ui.WalletCardsIcon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -50,13 +49,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.calculateStartPadding
-import androidx.compose.foundation.layout.calculateEndPadding
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -64,19 +58,17 @@ import java.util.UUID
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.map
 
-/** Lightweight screen stack; Task 11 owns the full navigation layer. */
+/** 首页 + 详情/编辑/迁移的轻量返回栈。 */
 sealed interface AppScreen {
     data object Home : AppScreen
-    data object Credentials : AppScreen
-    data object Settings : AppScreen
     data class Detail(val credentialId: UUID) : AppScreen
     data class Editor(val credentialId: UUID?) : AppScreen
     data object Transfer : AppScreen
 }
 
 /**
- * Composes the bottom navigation (首页 / 凭证 / 设置) and wires the home detail
- * edit/delete placeholders to the credential editor and delete-confirmation flows.
+ * 首页是唯一主轴；凭证与设置分别从左右两侧以工具抽屉浮出。
+ * 详情、编辑和迁移仍使用轻量返回栈，保证系统返回键语义清晰。
  */
 @Composable
 fun MyTokenApp(
@@ -87,8 +79,8 @@ fun MyTokenApp(
     openCredentialId: UUID? = null,
     onOpenCredentialConsumed: () -> Unit = {},
 ) {
-    var selectedTab by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     var screen by remember { mutableStateOf<AppScreen>(AppScreen.Home) }
+    var drawerSide by remember { mutableStateOf<MyTokenEdgeDrawerSide?>(null) }
     val backStack = remember { mutableStateListOf<AppScreen>() }
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -110,7 +102,14 @@ fun MyTokenApp(
         screen = backStack.removeLastOrNull() ?: AppScreen.Home
     }
 
-    BackHandler(enabled = backStack.isNotEmpty()) { goBack() }
+    val drawerIsVisible = screen == AppScreen.Home && drawerSide != null
+    BackHandler(enabled = drawerIsVisible || backStack.isNotEmpty()) {
+        if (drawerIsVisible) {
+            drawerSide = null
+        } else {
+            goBack()
+        }
+    }
 
     val homeViewModel = remember {
             HomeViewModel(
@@ -170,287 +169,256 @@ fun MyTokenApp(
         }
     }
 
-    val pagerState = rememberPagerState(initialPage = selectedTab, pageCount = { 3 })
-    LaunchedEffect(pagerState) {
-        androidx.compose.runtime.snapshotFlow { pagerState.currentPage }.collect { page ->
-            selectedTab = page
-            if (screen == AppScreen.Home || screen == AppScreen.Credentials || screen == AppScreen.Settings) {
-                screen = when (page) {
-                    0 -> AppScreen.Home
-                    1 -> AppScreen.Credentials
-                    else -> AppScreen.Settings
-                }
-            }
-        }
-    }
-
-    fun selectTab(index: Int) {
-        selectedTab = index
-        screen = when (index) {
-            0 -> AppScreen.Home
-            1 -> AppScreen.Credentials
-            else -> AppScreen.Settings
-        }
-        scope.launch { pagerState.animateScrollToPage(index) }
-    }
-
     val layoutMode = rememberMyTokenLayoutMode()
-    val isRootScreen = screen == AppScreen.Home ||
-        screen == AppScreen.Credentials ||
-        screen == AppScreen.Settings
-    val navigationItems = listOf(
-        GlassNavItem("首页", Icons.Filled.Home, "首页", selectedTab == 0) {
-            selectTab(0)
-        },
-        GlassNavItem("凭证", WalletCardsIcon, "凭证", selectedTab == 1) {
-            selectTab(1)
-        },
-        GlassNavItem("设置", Icons.Filled.Settings, "设置", selectedTab == 2) {
-            selectTab(2)
-        },
-    )
 
     LaunchedEffect(openCredentialId) {
         openCredentialId?.let { credentialId ->
-            selectedTab = 0
-            pagerState.scrollToPage(0)
+            drawerSide = null
             screen = AppScreen.Detail(credentialId)
             backStack.clear()
             onOpenCredentialConsumed()
         }
     }
 
-    MyTokenNavigationScaffold(
-        layoutMode = layoutMode,
-        showNavigation = isRootScreen,
-        items = navigationItems,
-    ) { padding ->
-        Box(modifier = Modifier
-            .padding(PaddingValues(start = padding.calculateStartPadding(LayoutDirection.Ltr), top = padding.calculateTopPadding(), end = padding.calculateEndPadding(LayoutDirection.Ltr)))
-            .fillMaxSize()) {
-            if (screen == AppScreen.Home || screen == AppScreen.Credentials || screen == AppScreen.Settings) {
-                HorizontalPager(
-                    state = pagerState,
+    when (val current = screen) {
+        AppScreen.Home -> {
+            MyTokenEdgeDrawerHost(
+                drawerSide = drawerSide,
+                onDrawerOpenRequested = { drawerSide = it },
+                onDismissRequest = { drawerSide = null },
+                startDrawer = {
+                    CredentialListScreen(
+                        state = listState,
+                        layoutMode = MyTokenLayoutMode.Compact,
+                        drawerMode = true,
+                        onToggleEnabled = credentialListViewModel::toggleEnabled,
+                        onMove = credentialListViewModel::move,
+                        onEditCredential = { id -> navigate(AppScreen.Editor(id)) },
+                        onRequestDelete = credentialListViewModel::requestDelete,
+                        onDismissDelete = credentialListViewModel::dismissDelete,
+                        onConfirmDelete = credentialListViewModel::confirmDelete,
+                        onImportFromMac = { navigate(AppScreen.Transfer) },
+                        onAddManually = { navigate(AppScreen.Editor(null)) },
+                    )
+                },
+                endDrawer = {
+                    SettingsScreen(
+                        state = settingsState,
+                        layoutMode = MyTokenLayoutMode.Compact,
+                        drawerMode = true,
+                        appVersion = appVersion,
+                        updateState = updateState,
+                        releaseHistoryState = releaseHistoryState,
+                        onOpenAppRefreshChange = settingsViewModel::setOpenAppRefresh,
+                        onRetryOnFailureChange = settingsViewModel::setRetryOnFailure,
+                        onThemeModeChange = settingsViewModel::setThemeMode,
+                        onOpenTransfer = { navigate(AppScreen.Transfer) },
+                        onCredentialFailureAlertsChange = settingsViewModel::setCredentialFailureAlertsEnabled,
+                        notificationPermissionGranted = notificationPermissionGranted,
+                        onRequestNotificationPermission = onRequestNotificationPermission,
+                        onCheckForUpdates = settingsViewModel::checkForUpdates,
+                        onLoadReleaseHistory = settingsViewModel::loadReleaseHistory,
+                        onLoadCachedReleaseHistory = settingsViewModel::loadCachedReleaseHistory,
+                        onDownloadAndInstall = settingsViewModel::downloadAndInstall,
+                        onOpenInstallPermissionSettings = settingsViewModel::openInstallPermissionSettings,
+                        onInstallDownloadedUpdate = settingsViewModel::installDownloadedUpdate,
+                        onMirrorBaseChange = settingsViewModel::setUpdateMirrorBase,
+                        onGitHubTokenSave = settingsViewModel::setGitHubToken,
+                        onGitHubTokenRemove = settingsViewModel::removeGitHubToken,
+                        logExportState = logExportState,
+                        onExportLogs = logExportController::export,
+                        onShareLogs = logExportController::share,
+                        onDismissLogExport = logExportController::dismiss,
+                    )
+                },
+            ) {
+                HomeScreen(
+                    state = homeState,
+                    layoutMode = layoutMode,
+                    usageCardDensity = usageCardDensity,
+                    onToggleUsageCardDensity = {
+                        homeViewModel.setUsageCardDensity(
+                            if (usageCardDensity == UsageCardDensity.COMPACT) {
+                                UsageCardDensity.FULL
+                            } else {
+                                UsageCardDensity.COMPACT
+                            }
+                        )
+                    },
+                    onRefreshAll = {
+                        homeViewModel.refreshAll(settingsState.refresh.retryOnFailure)
+                    },
+                    onRefreshCredential = { id ->
+                        homeState.groups.flatMap { it.cards }
+                            .firstOrNull { it.credential.id == id }
+                            ?.let { homeViewModel.refreshCredential(it.credential) }
+                    },
+                    onRetryCredential = { id ->
+                        val credential = homeState.groups.flatMap { it.cards }
+                            .firstOrNull { it.credential.id == id }
+                            ?.credential
+                        credential?.let {
+                            homeViewModel.refreshCredential(it)
+                        }
+                    },
+                    onOpenCredential = { id -> navigate(AppScreen.Detail(id)) },
+                    onImportFromMac = { navigate(AppScreen.Transfer) },
+                    onAddManually = { navigate(AppScreen.Editor(null)) },
+                    onOpenCredentials = { drawerSide = MyTokenEdgeDrawerSide.Start },
+                    onOpenSettings = { drawerSide = MyTokenEdgeDrawerSide.End },
+                    hasUpdateAvailable = updateState is ai.routin.mytoken.feature.settings.AppUpdateUiState.Available ||
+                        updateState is ai.routin.mytoken.feature.settings.AppUpdateUiState.NeedsInstallPermission ||
+                        updateState is ai.routin.mytoken.feature.settings.AppUpdateUiState.ReadyToInstall,
+                )
+            }
+        }
+
+        is AppScreen.Detail -> {
+            val card = homeState.groups
+                .flatMap { it.cards }
+                .firstOrNull { it.credential.id == current.credentialId }
+            var deletionTarget by remember(current.credentialId) {
+                mutableStateOf<Credential?>(null)
+            }
+            CredentialDetailScreen(
+                card = card,
+                lowThresholdPercent = settingsState.notifications.lowThresholdPercent,
+                onBack = { goBack() },
+                onRefresh = { card?.let { homeViewModel.refreshCredential(it.credential) } },
+                onEdit = { navigate(AppScreen.Editor(current.credentialId)) },
+                onDelete = { deletionTarget = card?.credential },
+            )
+            deletionTarget?.let { target ->
+                MyTokenDialog(
+                    title = "删除凭证",
+                    subtitle = "只影响本机数据",
+                    icon = Icons.Outlined.Delete,
+                    tone = MyTokenDialogTone.Danger,
+                    onDismissRequest = { deletionTarget = null },
+                    content = {
+                        MyTokenDialogSection {
+                            MyTokenDialogRow(
+                                label = "「${target.name}」",
+                                detail = "将从首页和凭证列表移除",
+                            )
+                        }
+                        MyTokenDialogStatus(
+                            message = "不会删除或修改供应商账户中的任何内容。",
+                            tone = MyTokenDialogTone.Info,
+                        )
+                    },
+                    actions = {
+                        GlassButton(
+                            text = "取消",
+                            onClick = { deletionTarget = null },
+                            modifier = Modifier.weight(1f),
+                            tone = GlassButtonTone.Neutral,
+                        )
+                        GlassButton(
+                            text = "删除",
+                            onClick = {
+                                deletionTarget = null
+                                scope.launch {
+                                    runCatching { graph.credentialRepository.delete(target.id) }
+                                    // Keep the Android-local order/pinned sets clean
+                                    // (same contract as the credential list delete path).
+                                    runCatching {
+                                        graph.credentialOrderStore.pruneCredential(target.id)
+                                    }
+                                    homeViewModel.refreshAll()
+                                    drawerSide = null
+                                    screen = AppScreen.Home
+                                    backStack.clear()
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            tone = GlassButtonTone.Destructive,
+                        )
+                    },
+                )
+            }
+        }
+
+        is AppScreen.Editor -> {
+            val editorViewModel = remember(current.credentialId) {
+                CredentialEditorViewModel(
+                    repository = graph.credentialRepository,
+                    providers = graph.providers,
+                    credentialId = current.credentialId,
+                )
+            }
+            val editorState by editorViewModel.state.collectAsStateWithLifecycle()
+            CredentialEditorScreen(
+                state = editorState,
+                layoutMode = layoutMode,
+                onBack = { goBack() },
+                onProviderChange = editorViewModel::setProviderId,
+                onNameChange = editorViewModel::setName,
+                onApiKeyChange = editorViewModel::setApiKey,
+                onAccessKeyIDChange = editorViewModel::setAccessKeyID,
+                onSecretAccessKeyChange = editorViewModel::setSecretAccessKey,
+                onRegionChange = editorViewModel::setRegion,
+                onBaseURLChange = editorViewModel::setBaseURL,
+                onUserIDChange = editorViewModel::setUserID,
+                onXiaomiUsageKindChange = editorViewModel::setXiaomiUsageKind,
+                onWebsiteURLChange = editorViewModel::setWebsiteURL,
+                onToggleSecretVisible = editorViewModel::toggleSecretVisible,
+                onTestConnection = editorViewModel::testConnection,
+                onSave = editorViewModel::save,
+            )
+            if (editorState.saveCompleted) {
+                LaunchedEffect(editorState.saveCompleted) {
+                    homeViewModel.refreshAfterExternalChange()
+                    goBack()
+                }
+            }
+        }
+
+        AppScreen.Transfer -> {
+            val transferViewModel = remember {
+                TransferViewModel(graph.transferRepository)
+            }
+            val transferState by transferViewModel.state.collectAsStateWithLifecycle()
+            when (val state = transferState) {
+                is TransferUiState.Idle -> TransferScannerScreen(
+                    isActive = true,
+                    layoutMode = layoutMode,
+                    onQrCodeScanned = transferViewModel::onQrCodeScanned,
+                    onCancel = { goBack() },
+                )
+                is TransferUiState.Connecting, is TransferUiState.Importing -> Column(
                     modifier = Modifier.fillMaxSize(),
-                    // 三个根页面都常驻组合会让首页滚动时维护过多无关节点；
-                    // Pager 自身会保留滚动状态，切回时再组合即可。
-                    beyondViewportPageCount = 0,
-                    key = { it },
-                ) { page ->
-                    when (page) {
-                        0 -> {
-                            HomeScreen(
-                                state = homeState,
-                                layoutMode = layoutMode,
-                                usageCardDensity = usageCardDensity,
-                                onToggleUsageCardDensity = {
-                                    homeViewModel.setUsageCardDensity(
-                                        if (usageCardDensity == UsageCardDensity.COMPACT) {
-                                            UsageCardDensity.FULL
-                                        } else {
-                                            UsageCardDensity.COMPACT
-                                        }
-                                    )
-                                },
-                                onRefreshAll = {
-                                    homeViewModel.refreshAll(settingsState.refresh.retryOnFailure)
-                                },
-                                onRefreshCredential = { id ->
-                                    homeState.groups.flatMap { it.cards }
-                                        .firstOrNull { it.credential.id == id }
-                                        ?.let { homeViewModel.refreshCredential(it.credential) }
-                                },
-                                onRetryCredential = { id ->
-                                    val credential = homeState.groups.flatMap { it.cards }
-                                        .firstOrNull { it.credential.id == id }
-                                        ?.credential
-                                    credential?.let {
-                                        homeViewModel.refreshCredential(it)
-                                    }
-                                },
-                                onOpenCredential = { id -> navigate(AppScreen.Detail(id)) },
-                                onImportFromMac = { navigate(AppScreen.Transfer) },
-                                onAddManually = { navigate(AppScreen.Editor(null)) },
-                            )
-                        }
-                        1 -> {
-                            CredentialListScreen(
-                                state = listState,
-                                layoutMode = layoutMode,
-                                onToggleEnabled = credentialListViewModel::toggleEnabled,
-                                onMove = credentialListViewModel::move,
-                                onEditCredential = { id -> navigate(AppScreen.Editor(id)) },
-                                onRequestDelete = credentialListViewModel::requestDelete,
-                                onDismissDelete = credentialListViewModel::dismissDelete,
-                                onConfirmDelete = credentialListViewModel::confirmDelete,
-                                onImportFromMac = { navigate(AppScreen.Transfer) },
-                                onAddManually = { navigate(AppScreen.Editor(null)) },
-                            )
-                        }
-                        else -> {
-                            SettingsScreen(
-                                state = settingsState,
-                                layoutMode = layoutMode,
-                                appVersion = appVersion,
-                                updateState = updateState,
-                                releaseHistoryState = releaseHistoryState,
-                                onOpenAppRefreshChange = settingsViewModel::setOpenAppRefresh,
-                                onRetryOnFailureChange = settingsViewModel::setRetryOnFailure,
-                                onThemeModeChange = settingsViewModel::setThemeMode,
-                                onOpenTransfer = { navigate(AppScreen.Transfer) },
-                                onCredentialFailureAlertsChange = settingsViewModel::setCredentialFailureAlertsEnabled,
-                                notificationPermissionGranted = notificationPermissionGranted,
-                                onRequestNotificationPermission = onRequestNotificationPermission,
-                                onCheckForUpdates = settingsViewModel::checkForUpdates,
-                                onLoadReleaseHistory = settingsViewModel::loadReleaseHistory,
-                                onLoadCachedReleaseHistory = settingsViewModel::loadCachedReleaseHistory,
-                                onDownloadAndInstall = settingsViewModel::downloadAndInstall,
-                                onOpenInstallPermissionSettings = settingsViewModel::openInstallPermissionSettings,
-                                onInstallDownloadedUpdate = settingsViewModel::installDownloadedUpdate,
-                                onMirrorBaseChange = settingsViewModel::setUpdateMirrorBase,
-                                onGitHubTokenSave = settingsViewModel::setGitHubToken,
-                                onGitHubTokenRemove = settingsViewModel::removeGitHubToken,
-                                logExportState = logExportState,
-                                onExportLogs = logExportController::export,
-                                onShareLogs = logExportController::share,
-                                onDismissLogExport = logExportController::dismiss,
-                            )
-                        }
-                    }
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    CircularProgressIndicator()
+                    Text(text = if (state is TransferUiState.Connecting) "连接中…" else "导入中…")
                 }
-            } else {
-                val current = screen
-                when (current) {
-                    is AppScreen.Detail -> {
-                    val card = homeState.groups
-                        .flatMap { it.cards }
-                        .firstOrNull { it.credential.id == current.credentialId }
-                    var deletionTarget by remember(current.credentialId) {
-                        mutableStateOf<Credential?>(null)
+                is TransferUiState.PreviewReady -> TransferPreviewScreen(
+                    state = state,
+                    layoutMode = layoutMode,
+                    onConfirm = { mode: ImportConflictMode -> transferViewModel.confirmImport(mode) },
+                    onCancel = transferViewModel::cancel,
+                )
+                is TransferUiState.Completed -> {
+                    LaunchedEffect(state) {
+                        homeViewModel.refreshAfterExternalChange()
                     }
-                    CredentialDetailScreen(
-                        card = card,
-                        lowThresholdPercent = settingsState.notifications.lowThresholdPercent,
-                        onBack = { goBack() },
-                        onRefresh = { card?.let { homeViewModel.refreshCredential(it.credential) } },
-                        onEdit = { navigate(AppScreen.Editor(current.credentialId)) },
-                        onDelete = { deletionTarget = card?.credential },
-                    )
-                    deletionTarget?.let { target ->
-                        AlertDialog(
-                            onDismissRequest = { deletionTarget = null },
-                            title = { Text(text = "删除凭证") },
-                            text = {
-                                Text(text = "确定删除「${target.name}」吗？只删除本机数据，不影响供应商账户。")
-                            },
-                            confirmButton = {
-                                TextButton(onClick = {
-                                    deletionTarget = null
-                                    scope.launch {
-                                        runCatching { graph.credentialRepository.delete(target.id) }
-                                        // Keep the Android-local order/pinned sets clean
-                                        // (same contract as the credential list delete path).
-                                        runCatching { graph.credentialOrderStore.pruneCredential(target.id) }
-                                        homeViewModel.refreshAll()
-                                        screen = AppScreen.Home
-                                        backStack.clear()
-                                    }
-                                }) {
-                                    Text(text = "删除", color = MaterialTheme.colorScheme.error)
-                                }
-                            },
-                            dismissButton = {
-                                TextButton(onClick = { deletionTarget = null }) {
-                                    Text(text = "取消")
-                                }
-                            },
-                        )
-                    }
-                }
-                is AppScreen.Editor -> {
-                    val editorViewModel = remember(current.credentialId) {
-                        CredentialEditorViewModel(
-                            repository = graph.credentialRepository,
-                            providers = graph.providers,
-                            credentialId = current.credentialId,
-                        )
-                    }
-                    val editorState by editorViewModel.state.collectAsStateWithLifecycle()
-                    CredentialEditorScreen(
-                        state = editorState,
+                    TransferCompletedScreen(
+                        summary = state.summary,
                         layoutMode = layoutMode,
-                        onBack = { goBack() },
-                        onProviderChange = editorViewModel::setProviderId,
-                        onNameChange = editorViewModel::setName,
-                        onApiKeyChange = editorViewModel::setApiKey,
-                        onAccessKeyIDChange = editorViewModel::setAccessKeyID,
-                        onSecretAccessKeyChange = editorViewModel::setSecretAccessKey,
-                        onRegionChange = editorViewModel::setRegion,
-                        onBaseURLChange = editorViewModel::setBaseURL,
-                        onUserIDChange = editorViewModel::setUserID,
-                        onXiaomiUsageKindChange = editorViewModel::setXiaomiUsageKind,
-                        onWebsiteURLChange = editorViewModel::setWebsiteURL,
-                        onToggleSecretVisible = editorViewModel::toggleSecretVisible,
-                        onTestConnection = editorViewModel::testConnection,
-                        onSave = editorViewModel::save,
+                        onDone = { goBack() },
                     )
-                    if (editorState.saveCompleted) {
-                        LaunchedEffect(editorState.saveCompleted) {
-                            homeViewModel.refreshAfterExternalChange()
-                            goBack()
-                        }
+                }
+                is TransferUiState.Failed -> Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(text = state.message, color = MaterialTheme.colorScheme.error)
+                    TextButton(onClick = transferViewModel::cancel) {
+                        Text(text = "返回")
                     }
                 }
-                AppScreen.Transfer -> {
-                    val transferViewModel = remember {
-                        TransferViewModel(graph.transferRepository)
-                    }
-                    val transferState by transferViewModel.state.collectAsStateWithLifecycle()
-                    when (val state = transferState) {
-                        is TransferUiState.Idle -> TransferScannerScreen(
-                            isActive = true,
-                            layoutMode = layoutMode,
-                            onQrCodeScanned = transferViewModel::onQrCodeScanned,
-                            onCancel = { goBack() },
-                        )
-                        is TransferUiState.Connecting, is TransferUiState.Importing -> Column(
-                            modifier = Modifier.fillMaxSize(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            CircularProgressIndicator()
-                            Text(text = if (state is TransferUiState.Connecting) "连接中…" else "导入中…")
-                        }
-                        is TransferUiState.PreviewReady -> TransferPreviewScreen(
-                            state = state,
-                            layoutMode = layoutMode,
-                            onConfirm = { mode: ImportConflictMode -> transferViewModel.confirmImport(mode) },
-                            onCancel = transferViewModel::cancel,
-                        )
-                        is TransferUiState.Completed -> {
-                            LaunchedEffect(state) {
-                                homeViewModel.refreshAfterExternalChange()
-                            }
-                            TransferCompletedScreen(
-                                summary = state.summary,
-                                layoutMode = layoutMode,
-                                onDone = { goBack() },
-                            )
-                        }
-                        is TransferUiState.Failed -> Column(
-                            modifier = Modifier.fillMaxSize(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Text(text = state.message, color = MaterialTheme.colorScheme.error)
-                            TextButton(onClick = transferViewModel::cancel) {
-                                Text(text = "返回")
-                            }
-                        }
-                    }
-                }
-                else -> Unit
             }
         }
     }
-
-}
 }

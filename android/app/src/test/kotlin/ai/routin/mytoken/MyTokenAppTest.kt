@@ -3,24 +3,21 @@ package ai.routin.mytoken
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/**
- * Smoke test for the Task 9 wiring: the real MainActivity renders the bottom
- * navigation and switches to the credential list and settings screens wired to
- * the real AppGraph dependencies.
- */
+/** 冒烟测试：真实 Activity 通过首页两角入口打开左右工具抽屉。 */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "w400dp-h1100dp")
 class MyTokenAppTest {
@@ -29,25 +26,51 @@ class MyTokenAppTest {
     val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun bottomNavigationSwitchesToCredentialsAndSettings() {
+    fun cornerEntriesOpenCredentialAndSettingsDrawers() {
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithContentDescription("首页").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("凭证").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("设置").assertIsDisplayed()
+        composeRule.onNodeWithTag("bottom_navigation").assertDoesNotExist()
+        composeRule.onNodeWithTag("navigation_rail").assertDoesNotExist()
 
-        composeRule.onNodeWithContentDescription("凭证").performClick()
+        composeRule.onNodeWithTag("home_open_credentials").performClick()
         composeRule.waitForIdle()
-        composeRule.onAllNodesWithText("凭证")[0].assertIsDisplayed()
+        composeRule.onNodeWithTag("edge_drawer_start").assertIsDisplayed()
+        composeRule.onNodeWithTag("credential_drawer_content").assertIsDisplayed()
+        composeRule.onNodeWithTag("edge_drawer_scrim_start")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitUntil(3_000) {
+            composeRule.onAllNodesWithTag("edge_drawer_start").fetchSemanticsNodes().isEmpty()
+        }
+        composeRule.onNodeWithTag("edge_drawer_start").assertDoesNotExist()
 
-        composeRule.onNodeWithContentDescription("设置").performClick()
+        composeRule.onNodeWithTag("home_open_settings").performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("刷新").assertIsDisplayed()
+        composeRule.onNodeWithTag("edge_drawer_end").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_drawer_content").assertIsDisplayed()
 
         // 低频设置以摘要形式保留，展开后才出现具体操作。
-        composeRule.onNodeWithTag("settings_list").performScrollToNode(
+        composeRule.onNodeWithTag("settings_drawer_content").performScrollToNode(
             hasText("数据迁移"),
         )
-        composeRule.onNodeWithText("从 Mac 扫码迁移凭证").assertIsDisplayed()
+        composeRule.onNodeWithText("扫码导入").assertIsDisplayed()
+    }
+
+    @Test
+    fun 从凭证抽屉进入编辑器后返回会恢复抽屉() {
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("home_open_credentials").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("credential_add_button")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithTag("edge_drawer_start").fetchSemanticsNodes().isEmpty()
+        }
+
+        composeRule.onNodeWithContentDescription("返回").performClick()
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithTag("edge_drawer_start").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeRule.onNodeWithTag("edge_drawer_start").assertIsDisplayed()
     }
 }

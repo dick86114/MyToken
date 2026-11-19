@@ -29,10 +29,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import java.util.UUID
 
-/**
- * Single-activity Compose host. Renders the bottom navigation app (home dashboard,
- * credential management, settings) wired to the real repositories and providers.
- */
+/** 单 Activity Compose 宿主：首页承载双侧工具抽屉，并连接真实仓库与供应商。 */
 class MainActivity : ComponentActivity() {
 
     private val pendingCredentialId = mutableStateOf<UUID?>(null)
@@ -61,6 +58,7 @@ class MainActivity : ComponentActivity() {
         notificationPermissionGranted.value =
             NotificationManagerCompat.from(this).areNotificationsEnabled()
         val graph = (application as MyTokenApplication).graph
+        graph.appUpdateController.checkForUpdatesOnLaunch()
         pendingCredentialId.value = intent?.getStringExtra(EXTRA_CREDENTIAL_ID)?.let(UUID::fromString)
         val appVersion = try {
             packageManager.getPackageInfo(packageName, 0).versionName ?: "0.1.0"

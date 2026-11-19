@@ -15,6 +15,7 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -55,6 +56,7 @@ class GitHubAppUpdateController(
     private val _releaseHistoryState =
         MutableStateFlow<AppReleaseHistoryUiState>(AppReleaseHistoryUiState.Idle)
     private var downloadedUpdate: DownloadedUpdate? = null
+    private val launchCheckRequested = AtomicBoolean(false)
 
     override val state: StateFlow<AppUpdateUiState> = _state.asStateFlow()
     override val releaseHistoryState: StateFlow<AppReleaseHistoryUiState> =
@@ -87,6 +89,13 @@ class GitHubAppUpdateController(
                 )
                 _state.update { AppUpdateUiState.Error(error.userMessage()) }
             }
+        }
+    }
+
+    /** 启动自动检查每个进程只触发一次，避免 Activity 重建或页面重组重复请求。 */
+    fun checkForUpdatesOnLaunch() {
+        if (launchCheckRequested.compareAndSet(false, true)) {
+            checkForUpdates()
         }
     }
 

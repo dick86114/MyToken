@@ -19,7 +19,7 @@ class CredentialUsageGlassStyleTest {
         val glass = source.substring(glassStart, glassEnd)
 
         assertFalse(source.contains("private fun Modifier.ringTileBackground"))
-        assertTrue(source.count("usageTileGlass(isDark)") >= 4)
+        assertTrue(source.count("usageTileGlass(isDark)") >= 3)
         assertTrue(glass.contains("Color.White.copy"))
         assertFalse(glass.contains("colors.warning"))
         assertFalse(glass.contains("colors.critical"))
@@ -36,11 +36,16 @@ class CredentialUsageGlassStyleTest {
         val compactBody = source.substring(bodyStart, glassStart)
         assertFalse(compactBody.contains("toneColor"))
 
+        val ringStart = requireNotNull(source.indexOf("private fun CompactRingTile"))
+        val fullBodyStart = requireNotNull(source.indexOf("private fun FullUsageCardBody"))
+        val compactRing = source.substring(ringStart, fullBodyStart)
+        assertFalse(compactRing.contains("UsageProgressBar"))
+
         val rowStart = requireNotNull(source.indexOf("private fun CompactMetricRow"))
         val rowEnd = requireNotNull(source.indexOf("private fun compactValueText"))
-        val percentTextEnd = requireNotNull(source.indexOf("UsageProgressBar", rowStart))
-        val percentText = source.substring(rowStart, percentTextEnd)
-        assertFalse(percentText.contains("progressColor(percent, colors)"))
+        val compactRow = source.substring(rowStart, rowEnd)
+        assertFalse(compactRow.contains("UsageProgressBar"))
+        assertFalse(compactRow.contains("progressColor(percent, colors)"))
     }
 
     private fun sourceText(name: String): String {

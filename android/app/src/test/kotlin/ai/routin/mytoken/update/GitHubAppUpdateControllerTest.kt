@@ -5,6 +5,7 @@ import ai.routin.mytoken.feature.settings.AppReleaseHistoryUiState
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -31,6 +32,38 @@ class GitHubAppUpdateControllerTest {
           </entry>
         </feed>
     """.trimIndent()
+
+    @Test
+    fun 启动检查同一进程只触发一次() = runBlocking {
+        val requests = AtomicInteger()
+        val body = """
+        [
+          {"tag_name":"v5.5.0","assets":[
+            {"name":"MyToken-5.5.0-android.apk","browser_download_url":"https://example.com/MyToken-5.5.0-android.apk"}
+          ],"html_url":"https://github.com/dick86114/MyToken/releases/tag/v5.5.0"}
+        ]
+        """.trimIndent()
+        val controller = GitHubAppUpdateController(
+            context = ApplicationProvider.getApplicationContext<Context>(),
+            currentVersionName = "5.5.0",
+            network = { _, _ ->
+                requests.incrementAndGet()
+                UpdateResponse(body)
+            },
+        )
+
+        controller.checkForUpdatesOnLaunch()
+        controller.checkForUpdatesOnLaunch()
+
+        withTimeout(5_000) {
+            controller.state.first {
+                it is AppUpdateUiState.UpToDate ||
+                    it is AppUpdateUiState.Available ||
+                    it is AppUpdateUiState.Error
+            }
+        }
+        assertEquals(1, requests.get())
+    }
 
     @Test
     fun cdn模式下API失败走镜像Atom并改写下载地址() = runBlocking {

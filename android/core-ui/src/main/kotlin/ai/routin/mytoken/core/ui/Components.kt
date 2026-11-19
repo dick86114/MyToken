@@ -1,30 +1,22 @@
 package ai.routin.mytoken.core.ui
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Card
@@ -37,24 +29,19 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -62,6 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /**
  * 玻璃控件统一设计规则：
@@ -95,7 +83,7 @@ private data class GlassToneColors(
 private fun isDarkTheme(): Boolean = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
 /**
- * 方案 A 按钮：实色底、10dp 圆角、细描边。
+ * 方案 A 按钮：实色底、12dp 圆角。
  * [GlassButtonTone.Primary] 只给当前区块的主操作，避免一屏多个强强调。
  */
 @Composable
@@ -115,7 +103,6 @@ fun GlassButton(
         modifier = modifier
             .clip(shape)
             .background(toneColors.container)
-            .border(1.dp, toneColors.base.copy(alpha = 0.36f), shape)
             .clickable(
                 interactionSource = interactionSource,
                 indication = ripple(color = toneColors.base),
@@ -161,28 +148,32 @@ fun GlassSwitch(
     val dark = isDarkTheme()
     val primary = MaterialTheme.colorScheme.primary
     val onSurface = MaterialTheme.colorScheme.onSurface
-    val trackBase = if (checked) primary else onSurface
-    val trackAlpha = when {
-        checked -> if (dark) 0.30f else 0.16f
-        else -> if (dark) 0.10f else 0.07f
-    }
+    val trackColor by animateColorAsState(
+        targetValue = if (checked) {
+            primary
+        } else {
+            onSurface.copy(alpha = if (dark) 0.22f else 0.13f)
+        },
+        animationSpec = spring(dampingRatio = 1f, stiffness = 700f),
+        label = "glassSwitchTrack",
+    )
     val thumbColor by animateColorAsState(
-        targetValue = if (checked) primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        targetValue = if (checked) Color.White else Color.White.copy(alpha = if (dark) 0.88f else 0.98f),
         label = "glassSwitchThumb",
     )
     val thumbOffset by animateDpAsState(
-        targetValue = if (checked) 25.dp else 3.dp,
+        targetValue = if (checked) 20.dp else 3.dp,
+        animationSpec = spring(dampingRatio = 1f, stiffness = 700f),
         label = "glassSwitchThumbOffset",
     )
-    val trackWidth = 52.dp
-    val trackHeight = 31.dp
+    val trackWidth = 46.dp
+    val trackHeight = 28.dp
     Box(
         modifier = modifier
             .width(trackWidth)
             .height(trackHeight)
             .clip(RoundedCornerShape(100))
-            .background(trackBase.copy(alpha = trackAlpha))
-            .border(1.dp, trackBase.copy(alpha = if (checked) 0.45f else 0.18f), RoundedCornerShape(100))
+            .background(trackColor)
             .toggleable(
                 value = checked,
                 role = Role.Switch,
@@ -194,7 +185,7 @@ fun GlassSwitch(
             modifier = Modifier
                 .padding(top = 2.5.dp)
                 .padding(start = thumbOffset)
-                .requiredSize(26.dp)
+                .requiredSize(23.dp)
                 .clip(RoundedCornerShape(100))
                 .background(thumbColor),
         )
@@ -214,10 +205,10 @@ fun glassFilterChipColors(selected: Boolean) = FilterChipDefaults.filterChipColo
 fun glassFilterChipBorder(selected: Boolean) = FilterChipDefaults.filterChipBorder(
     enabled = true,
     selected = selected,
-    borderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDarkTheme()) 0.22f else 0.28f),
-    selectedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = if (isDarkTheme()) 0.60f else 0.50f),
-    borderWidth = 1.dp,
-    selectedBorderWidth = 1.dp,
+    borderColor = Color.Transparent,
+    selectedBorderColor = Color.Transparent,
+    borderWidth = 0.dp,
+    selectedBorderWidth = 0.dp,
 )
 
 /**
@@ -274,10 +265,7 @@ fun GlassTextField(
     }
 }
 
-/**
- * Compose 的玻璃拟态实现：半透明多层底色 + 高光描边 + 顶部反光。
- * Android 10+ 可稳定渲染，且不会牺牲文字对比度。
- */
+/** Compose 材质实现：使用色调、圆角和层级表达表面，不依赖装饰性描边。 */
 @Composable
 fun LiquidGlassSurface(
     modifier: Modifier = Modifier,
@@ -290,206 +278,39 @@ fun LiquidGlassSurface(
     val material = MyTokenVisualPolicy.materialFor(surfaceRole)
     val solidBase = when (surfaceRole) {
         MyTokenVisualPolicy.SurfaceRole.Metric -> MaterialTheme.colorScheme.surfaceVariant
+        MyTokenVisualPolicy.SurfaceRole.Card -> MaterialTheme.colorScheme.surfaceVariant
         else -> MaterialTheme.colorScheme.surface
     }
-    val borderColor = if (isDark) Color.White.copy(alpha = 0.14f) else Color.Black.copy(alpha = 0.08f)
     val backgroundBrush = remember(isDark, material, solidBase) {
-        when (material) {
-            MyTokenVisualPolicy.Material.WindowGlass -> Brush.verticalGradient(
+        if (material == MyTokenVisualPolicy.Material.WindowGlass) {
+            Brush.verticalGradient(
                 listOf(
-                    (if (isDark) MyTokenPalette.darkCanvas else MyTokenPalette.lightCanvas).copy(alpha = if (isDark) 0.88f else 0.78f),
-                    (if (isDark) MyTokenPalette.darkSurface else MyTokenPalette.lightSurface).copy(alpha = if (isDark) 0.72f else 0.64f),
-                )
+                    (if (isDark) MyTokenPalette.darkCanvas else MyTokenPalette.lightCanvas)
+                        .copy(alpha = if (isDark) 0.88f else 0.78f),
+                    (if (isDark) MyTokenPalette.darkSurface else MyTokenPalette.lightSurface)
+                        .copy(alpha = if (isDark) 0.72f else 0.64f),
+                ),
             )
-            MyTokenVisualPolicy.Material.ModalGlass -> Brush.verticalGradient(
-                listOf(solidBase.copy(alpha = 0.97f), solidBase.copy(alpha = 0.94f))
-            )
-            MyTokenVisualPolicy.Material.Solid -> Brush.verticalGradient(listOf(solidBase, solidBase))
+        } else {
+            null
         }
-    }
-    val borderBrush = remember(isDark, borderColor) {
-        Brush.linearGradient(
-            colors = listOf(
-                borderColor,
-                borderColor.copy(alpha = 0.55f),
-                borderColor.copy(alpha = 0.85f),
-            )
-        )
     }
     Box(
         modifier = modifier
-            .then(if (MyTokenVisualPolicy.allowsShadow(surfaceRole)) Modifier.shadow(12.dp, shape) else Modifier)
             .clip(shape)
-            .background(brush = backgroundBrush)
-            .border(width = 1.dp, brush = borderBrush, shape = shape),
+            .then(
+                if (backgroundBrush != null) {
+                    Modifier.background(brush = backgroundBrush)
+                } else {
+                    Modifier.background(solidBase)
+                },
+            ),
         contentAlignment = contentAlignment,
     ) {
         content()
     }
 }
 
-data class GlassNavItem(
-    val label: String,
-    val icon: ImageVector,
-    val contentDescription: String,
-    val selected: Boolean,
-    val onClick: () -> Unit,
-)
-
-@Composable
-fun LiquidGlassBottomBar(
-    items: List<GlassNavItem>,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(bottom = 8.dp),
-        contentAlignment = Alignment.BottomCenter,
-    ) {
-        val selectedIndex = items.indexOfFirst { it.selected }.coerceAtLeast(0)
-        LiquidGlassSurface(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(horizontal = 18.dp)
-                .widthIn(min = 244.dp, max = 320.dp)
-                .height(68.dp)
-                .shadow(
-                    elevation = 16.dp,
-                    shape = RoundedCornerShape(30.dp),
-                    ambientColor = Color.Black.copy(alpha = 0.18f),
-                    spotColor = Color.Black.copy(alpha = 0.18f),
-                )
-                .testTag("bottom_navigation"),
-            surfaceRole = MyTokenVisualPolicy.SurfaceRole.Window,
-            shape = RoundedCornerShape(30.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                val itemWidth = maxWidth / items.size.coerceAtLeast(1)
-                val indicatorOffset by animateDpAsState(
-                    targetValue = itemWidth * selectedIndex,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioLowBouncy,
-                        stiffness = Spring.StiffnessMediumLow,
-                    ),
-                    label = "bottomNavigationIndicator",
-                )
-                val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-
-                Box(
-                    modifier = Modifier
-                        .offset(x = indicatorOffset)
-                        .width(itemWidth)
-                        .fillMaxHeight()
-                        .padding(5.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(
-                            brush = Brush.linearGradient(
-                                colors = if (isDark) {
-                                    listOf(
-                                        Color.White.copy(alpha = 0.20f),
-                                        Color.White.copy(alpha = 0.08f),
-                                    )
-                                } else {
-                                    listOf(
-                                        Color.White.copy(alpha = 0.92f),
-                                        Color.White.copy(alpha = 0.64f),
-                                    )
-                                },
-                            ),
-                        )
-                        .border(
-                            width = 1.dp,
-                            brush = Brush.linearGradient(
-                                colors = if (isDark) {
-                                    listOf(Color.White.copy(alpha = 0.32f), Color.White.copy(alpha = 0.08f))
-                                } else {
-                                    listOf(Color.White.copy(alpha = 0.90f), Color.White.copy(alpha = 0.58f))
-                                },
-                            ),
-                            shape = RoundedCornerShape(24.dp),
-                        )
-                        .drawBehind {
-                            drawCircle(
-                                brush = Brush.radialGradient(
-                                    colors = listOf(
-                                        Color.White.copy(alpha = if (isDark) 0.16f else 0.54f),
-                                        Color.Transparent,
-                                    ),
-                                    center = Offset(size.width * 0.28f, size.height * 0.18f),
-                                    radius = size.minDimension * 0.78f,
-                                ),
-                                radius = size.minDimension * 0.78f,
-                                center = Offset(size.width * 0.28f, size.height * 0.18f),
-                            )
-                        }
-                        .testTag("bottom_navigation_highlight"),
-                )
-
-                Box(
-                    modifier = Modifier.matchParentSize().background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = if (isDark) 0.10f else 0.42f),
-                                Color.Transparent,
-                                Color.White.copy(alpha = if (isDark) 0.05f else 0.14f),
-                            ),
-                        ),
-                    ),
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxSize().padding(5.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    items.forEachIndexed { index, item ->
-                        val interactionSource = remember { MutableInteractionSource() }
-                        val contentColor by animateColorAsState(
-                            targetValue = if (item.selected) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            label = "tabContentColor",
-                        )
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxSize()
-                                .testTag("bottom_navigation_item_$index")
-                                .clickable(
-                                    interactionSource = interactionSource,
-                                    indication = ripple(color = contentColor),
-                                    onClick = item.onClick,
-                                ),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                            ) {
-                                Icon(
-                                    imageVector = item.icon,
-                                    contentDescription = item.contentDescription,
-                                    tint = contentColor,
-                                )
-                                Text(
-                                    text = item.label,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = contentColor,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 @Composable
 fun SectionCard(
     title: String,
@@ -500,9 +321,10 @@ fun SectionCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(
             modifier = Modifier

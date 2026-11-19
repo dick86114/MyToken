@@ -84,6 +84,9 @@ class SettingsViewModel(
 
     fun setThemeMode(mode: AppThemeMode) = launch { displayStore.setThemeMode(mode) }
 
+    fun setUsageCardDensity(density: ai.routin.mytoken.domain.model.UsageCardDensity) =
+        launch { displayStore.setUsageCardDensity(density) }
+
     fun setShowDisabledCredentials(enabled: Boolean) =
         launch { displayStore.setShowDisabledCredentials(enabled) }
 

@@ -110,8 +110,8 @@ class SettingsScreenTest {
         setContent(onOpenTransfer = { opened++ })
 
         expandDataMigration()
-        composeRule.onNodeWithText("从 Mac 导入").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("从 Mac 导入").performClick()
+        composeRule.onNodeWithText("开始扫描").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("开始扫描").performClick()
 
         assertEquals(1, opened)
     }
@@ -199,7 +199,9 @@ class SettingsScreenTest {
         composeRule.onNodeWithText("授权并安装").assertExists()
         composeRule.onNodeWithText("打开安装权限设置").assertDoesNotExist()
         composeRule.onNodeWithText("授权后继续安装").assertDoesNotExist()
-        composeRule.onNodeWithTag("install_permission_button").performClick()
+        composeRule.onNodeWithTag("install_permission_button")
+            .performScrollTo()
+            .performClick()
 
         assertEquals(1, openedPermissionSettings)
     }

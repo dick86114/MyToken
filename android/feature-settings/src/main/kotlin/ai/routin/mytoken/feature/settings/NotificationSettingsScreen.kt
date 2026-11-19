@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,6 +36,9 @@ fun NotificationSettingsSection(
         ) {
             Text(
                 text = if (permissionGranted) "系统通知权限：已允许" else "系统通知权限：未授予，提醒将静默",
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 8.dp),
                 style = MaterialTheme.typography.bodySmall,
                 color = if (permissionGranted) {
                     MaterialTheme.colorScheme.onSurfaceVariant
@@ -43,8 +47,15 @@ fun NotificationSettingsSection(
                 },
             )
             if (!permissionGranted) {
-                TextButton(onClick = onRequestPermission) {
-                    Text(text = "去授权")
+                TextButton(
+                    onClick = onRequestPermission,
+                    modifier = Modifier.widthIn(min = 72.dp),
+                ) {
+                    Text(
+                        text = "去授权",
+                        maxLines = 1,
+                        softWrap = false,
+                    )
                 }
             }
         }

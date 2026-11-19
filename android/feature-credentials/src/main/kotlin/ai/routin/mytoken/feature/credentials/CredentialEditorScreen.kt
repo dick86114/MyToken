@@ -4,13 +4,17 @@ import ai.routin.mytoken.domain.model.CredentialKind
 import ai.routin.mytoken.domain.model.ProviderId
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -25,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import ai.routin.mytoken.core.ui.GlassButton
 import ai.routin.mytoken.core.ui.GlassButtonTone
@@ -36,11 +41,14 @@ import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 private fun kindLabel(kind: CredentialKind): String = when (kind) {
     CredentialKind.BearerApiKey -> "Bearer Token"
@@ -77,16 +85,57 @@ fun CredentialEditorScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(text = if (state.isNew) "新增凭证" else "编辑凭证") },
+                title = {},
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回",
-                        )
+                    Box(
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.78f)),
+                    ) {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "返回",
+                                modifier = Modifier.size(19.dp),
+                            )
+                        }
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent,
+                ),
             )
+        },
+        bottomBar = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.background)
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    GlassButton(
+                        onClick = onTestConnection,
+                        modifier = Modifier.weight(1f),
+                        enabled = !state.isTestingConnection,
+                        text = if (state.isTestingConnection) "测试中…" else "测试连接",
+                    )
+                    GlassButton(
+                        onClick = onSave,
+                        modifier = Modifier.weight(1f),
+                        enabled = !state.isSaving,
+                        tone = GlassButtonTone.Primary,
+                        text = if (state.isSaving) "保存中…" else "保存",
+                    )
+                }
+            }
         },
     ) { padding ->
         if (state.isLoading) {
@@ -106,6 +155,23 @@ fun CredentialEditorScreen(
                 .testTag("editor_form"),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            Column(modifier = Modifier.padding(bottom = 2.dp)) {
+                Text(
+                    text = if (state.isNew) "新增凭证" else "编辑凭证",
+                    fontSize = 26.sp,
+                    lineHeight = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.8).sp,
+                )
+                if (state.isNew) {
+                    Text(
+                        text = "选择供应商并填写密钥",
+                        modifier = Modifier.padding(top = 5.dp),
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             if (state.isNew) {
                 LiquidGlassSurface(
                     surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
@@ -274,13 +340,6 @@ fun CredentialEditorScreen(
                 )
             }
 
-            GlassButton(
-                onClick = onTestConnection,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !state.isTestingConnection,
-                text = if (state.isTestingConnection) "测试中…" else "测试连接",
-            )
-
             state.testResultMessage?.let { message ->
                 Text(
                     text = if (state.testSucceeded == true) "✓ $message" else "✗ $message",
@@ -300,13 +359,6 @@ fun CredentialEditorScreen(
                 )
             }
 
-            GlassButton(
-                onClick = onSave,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !state.isSaving,
-                tone = GlassButtonTone.Primary,
-                text = if (state.isSaving) "保存中…" else "保存",
-            )
         }
         }
     }

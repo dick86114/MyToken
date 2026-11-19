@@ -68,6 +68,17 @@ internal fun UsageRing(
             )
             if (clamped > 0f) {
                 drawArc(
+                    color = accent.copy(alpha = if (isDark) 0.20f else 0.13f),
+                    startAngle = -90f,
+                    sweepAngle = 360f * clamped / 100f,
+                    useCenter = true,
+                    topLeft = androidx.compose.ui.geometry.Offset(inset + stroke * 1.5f, inset + stroke * 1.5f),
+                    size = androidx.compose.ui.geometry.Size(
+                        width = (arcSize.width - stroke * 3f).coerceAtLeast(0f),
+                        height = (arcSize.height - stroke * 3f).coerceAtLeast(0f),
+                    ),
+                )
+                drawArc(
                     color = accent,
                     startAngle = -90f,
                     sweepAngle = 360f * clamped / 100f,

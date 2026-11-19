@@ -50,9 +50,7 @@ class CredentialListAdaptiveTest {
         }
 
         composeRule.onNodeWithTag("credential_grid").assertExists()
-        composeRule.onNodeWithText("1").assertExists()
-        composeRule.onNodeWithText("2").assertExists()
-        composeRule.onAllNodesWithContentDescription("长按拖动排序").onFirst().assertExists()
+        composeRule.onAllNodesWithContentDescription("Routin").onFirst().assertExists()
     }
 
     private fun credential(name: String) = Credential(

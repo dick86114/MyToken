@@ -142,10 +142,11 @@ class CredentialListScreenTest {
         advanceVm()
         setContent()
 
-        composeRule.onNodeWithContentDescription("删除 主力 Key").performClick()
+        composeRule.onNodeWithContentDescription("更多操作 主力 Key").performClick()
+        composeRule.onNodeWithText("删除 主力 Key").performClick()
         waitUntilVm { viewModel.state.value.pendingDeletion != null }
         composeRule.onNodeWithText("删除凭证").assertIsDisplayed()
-        composeRule.onNodeWithText("只删除本机数据，不影响供应商账户", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("不会删除或修改供应商账户", substring = true).assertIsDisplayed()
 
         composeRule.onNodeWithText("删除").performClick()
         waitUntilVm { repository.deletedIds.value.isNotEmpty() }
@@ -159,7 +160,8 @@ class CredentialListScreenTest {
         advanceVm()
         setContent()
 
-        composeRule.onNodeWithContentDescription("删除 主力 Key").performClick()
+        composeRule.onNodeWithContentDescription("更多操作 主力 Key").performClick()
+        composeRule.onNodeWithText("删除 主力 Key").performClick()
         waitUntilVm { viewModel.state.value.pendingDeletion != null }
         composeRule.onNodeWithText("取消").performClick()
         waitUntilVm { viewModel.state.value.pendingDeletion == null }
@@ -172,9 +174,9 @@ class CredentialListScreenTest {
     fun emptyStateShowsImportAndManualAddEntries() {
         setContent()
 
-        composeRule.onNodeWithText("尚未添加凭证").assertIsDisplayed()
+        composeRule.onNodeWithText("暂无凭证").assertIsDisplayed()
         composeRule.onNodeWithText("从 Mac 导入").assertIsDisplayed()
-        composeRule.onNodeWithText("手动添加").assertIsDisplayed()
+        composeRule.onNodeWithText("添加凭证").assertIsDisplayed()
     }
 
     @Test
@@ -202,8 +204,38 @@ class CredentialListScreenTest {
         advanceVm()
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithContentDescription("编辑 主力 Key").performClick()
+        composeRule.onNodeWithContentDescription("更多操作 主力 Key").performClick()
+        composeRule.onNodeWithText("编辑 主力 Key").performClick()
         assertEquals(key.id, edited)
         composeRule.onAllNodesWithText("Bearer Token", substring = true).assertCountEquals(0)
+    }
+
+    @Test
+    fun tappingCredentialRowOpensEditor() {
+        val key = credential("00000001", "主力 Key")
+        repository.credentials.value = listOf(key)
+        advanceVm()
+        var edited: UUID? = null
+        composeRule.setContent {
+            MaterialTheme {
+                val state by viewModel.state.collectAsState()
+                CredentialListScreen(
+                    state = state,
+                    onToggleEnabled = viewModel::toggleEnabled,
+                    onMove = viewModel::move,
+                    onEditCredential = { edited = it },
+                    onRequestDelete = viewModel::requestDelete,
+                    onDismissDelete = viewModel::dismissDelete,
+                    onConfirmDelete = viewModel::confirmDelete,
+                    onImportFromMac = {},
+                    onAddManually = {},
+                )
+            }
+        }
+        advanceVm()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("主力 Key").performClick()
+        assertEquals(key.id, edited)
     }
 }

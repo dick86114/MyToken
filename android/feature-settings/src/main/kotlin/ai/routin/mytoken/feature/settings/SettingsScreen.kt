@@ -5,7 +5,6 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +15,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,7 +28,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -64,7 +63,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -79,10 +77,21 @@ import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.GlassButton
 import ai.routin.mytoken.core.ui.GlassButtonTone
+import ai.routin.mytoken.core.ui.GlassHelpButton
+import ai.routin.mytoken.core.ui.HelpRow
+import ai.routin.mytoken.core.ui.HelpSection
+import ai.routin.mytoken.core.ui.MyTokenBrandMark
+import ai.routin.mytoken.core.ui.MyTokenDialog
+import ai.routin.mytoken.core.ui.MyTokenDialogRow
+import ai.routin.mytoken.core.ui.MyTokenDialogSection
+import ai.routin.mytoken.core.ui.MyTokenDialogStatus
+import ai.routin.mytoken.core.ui.MyTokenDialogTone
+import ai.routin.mytoken.core.ui.MyTokenPalette
 import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
 import ai.routin.mytoken.core.ui.glassFilterChipBorder
 import ai.routin.mytoken.core.ui.glassFilterChipColors
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -99,6 +108,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -128,6 +138,7 @@ fun SettingsScreen(
     onShareLogs: () -> Unit = {},
     onDismissLogExport: () -> Unit = {},
     layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
+    drawerMode: Boolean = false,
 ) {
     var showReleaseHistory by remember { mutableStateOf(false) }
     var migrationExpanded by rememberSaveable { mutableStateOf(false) }
@@ -152,19 +163,13 @@ fun SettingsScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "设置",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                },
-            )
+        containerColor = if (drawerMode) {
+            androidx.compose.ui.graphics.Color.Transparent
+        } else {
+            MaterialTheme.colorScheme.background
         },
     ) { padding ->
-        val columns = if (layoutMode == MyTokenLayoutMode.Compact) 1 else 2
+        val columns = if (drawerMode || layoutMode == MyTokenLayoutMode.Compact) 1 else 2
         MyTokenAdaptiveContent(
             maxWidth = 1200.dp,
             horizontalPadding = 16.dp,
@@ -172,13 +177,30 @@ fun SettingsScreen(
         ) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(columns),
-            modifier = Modifier.fillMaxSize().testTag("settings_list"),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 96.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .testTag(if (drawerMode) "settings_drawer_content" else "settings_list"),
+            contentPadding = PaddingValues(
+                top = 12.dp,
+                bottom = if (drawerMode) 24.dp else 96.dp,
+            ),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            item(
+                key = "settings_header",
+                span = { GridItemSpan(maxLineSpan) },
+            ) {
+                SettingsHeader()
+            }
+            item(
+                key = "settings_profile",
+                span = { GridItemSpan(maxLineSpan) },
+            ) {
+                SettingsProfileCard(appVersion = appVersion)
+            }
             item(key = "theme") {
-                SectionCard(title = "主题", modifier = Modifier.testTag("settings_theme_cell")) {
+                SectionCard(title = "外观", modifier = Modifier.testTag("settings_theme_cell")) {
                     ThemeSelector(
                         selected = state.display.themeMode,
                         onSelect = onThemeModeChange,
@@ -205,21 +227,16 @@ fun SettingsScreen(
             item(key = "migration") {
                 ExpandableSettingsSection(
                     title = "数据迁移",
-                    summary = "从 Mac 扫码迁移凭证",
+                    summary = "扫码导入",
                     expanded = migrationExpanded,
                     onExpandedChange = { migrationExpanded = it },
                     toggleTag = "settings_migration_toggle",
                     modifier = Modifier.testTag("settings_migration_cell"),
                 ) {
-                    Text(
-                        text = "从 Mac 扫码迁移凭证，密钥端到端加密传输。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                     GlassButton(
                         onClick = onOpenTransfer,
                         tone = GlassButtonTone.Primary,
-                        text = "从 Mac 导入",
+                        text = "开始扫描",
                     )
                 }
             }
@@ -422,19 +439,58 @@ private fun LogExportDialog(
     onDismiss: () -> Unit,
 ) {
     if (state is LogExportUiState.Idle) return
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                when (state) {
-                    is LogExportUiState.Working -> "正在导出日志"
-                    is LogExportUiState.Done -> "日志已导出"
-                    is LogExportUiState.Failed -> "导出失败"
-                    LogExportUiState.Idle -> ""
-                },
-            )
+    val title = when (state) {
+        is LogExportUiState.Working -> "正在导出日志"
+        is LogExportUiState.Done -> "日志已导出"
+        is LogExportUiState.Failed -> "导出失败"
+        LogExportUiState.Idle -> ""
+    }
+    val tone = when (state) {
+        is LogExportUiState.Working -> MyTokenDialogTone.Info
+        is LogExportUiState.Done -> MyTokenDialogTone.Success
+        is LogExportUiState.Failed -> MyTokenDialogTone.Danger
+        LogExportUiState.Idle -> MyTokenDialogTone.Info
+    }
+    val actions: (@Composable RowScope.() -> Unit)? = when (state) {
+        is LogExportUiState.Done -> {
+            {
+                GlassButton(
+                    text = "关闭",
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                    tone = GlassButtonTone.Neutral,
+                )
+                GlassButton(
+                    text = "分享",
+                    onClick = onShare,
+                    modifier = Modifier.weight(1f),
+                    tone = GlassButtonTone.Primary,
+                )
+            }
+        }
+        is LogExportUiState.Failed -> {
+            {
+                GlassButton(
+                    text = "关闭",
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    tone = GlassButtonTone.Neutral,
+                )
+            }
+        }
+        else -> null
+    }
+    MyTokenDialog(
+        title = title,
+        subtitle = when (state) {
+            is LogExportUiState.Done -> "文件已保存在本机，可直接分享"
+            is LogExportUiState.Failed -> "日志没有生成"
+            else -> "正在收集必要信息"
         },
-        text = {
+        icon = Icons.Filled.Code,
+        tone = tone,
+        onDismissRequest = onDismiss,
+        content = {
             when (state) {
                 LogExportUiState.Idle -> Unit
                 LogExportUiState.Working -> Row(
@@ -442,36 +498,42 @@ private fun LogExportDialog(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                    Text("正在收集应用日志、设备信息与最近记录…")
+                    Column {
+                        Text(
+                            text = "正在收集",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = "应用日志、设备信息与最近记录",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
-                is LogExportUiState.Done -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("把日志用任意方式发给开发者即可。")
-                    Text(
-                        text = "位置：${state.savedLocation}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = "大小：${(state.sizeBytes / 1024.0).let { String.format("%.1f", it) }} KB",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                is LogExportUiState.Done -> {
+                    MyTokenDialogSection(title = "导出结果") {
+                        MyTokenDialogRow(
+                            label = "文件位置",
+                            detail = state.savedLocation,
+                        )
+                        MyTokenDialogRow(
+                            label = "文件大小",
+                            detail = String.format("%.1f KB", state.sizeBytes / 1024.0),
+                        )
+                    }
+                    MyTokenDialogStatus(
+                        message = "把日志用任意方式发给开发者即可。",
+                        tone = MyTokenDialogTone.Success,
                     )
                 }
-                is LogExportUiState.Failed -> Text(state.message)
+                is LogExportUiState.Failed -> MyTokenDialogStatus(
+                    message = state.message,
+                    tone = MyTokenDialogTone.Danger,
+                )
             }
         },
-        confirmButton = {
-            when (state) {
-                is LogExportUiState.Done -> TextButton(onClick = onShare) { Text("分享") }
-                is LogExportUiState.Failed -> TextButton(onClick = onDismiss) { Text("关闭") }
-                else -> Unit
-            }
-        },
-        dismissButton = {
-            if (state is LogExportUiState.Done) {
-                TextButton(onClick = onDismiss) { Text("关闭") }
-            }
-        },
+        actions = actions,
     )
 }
 
@@ -481,44 +543,55 @@ private fun ReleaseHistoryDialog(
     onDismiss: () -> Unit,
     onRetry: () -> Unit,
 ) {
-    AlertDialog(
+    val isError = state is AppReleaseHistoryUiState.Error
+    val actions: @Composable RowScope.() -> Unit = {
+        GlassButton(
+            text = "关闭",
+            onClick = onDismiss,
+            modifier = Modifier.weight(1f),
+            tone = GlassButtonTone.Neutral,
+        )
+        GlassButton(
+            text = if (isError) "重试" else "完成",
+            onClick = if (isError) onRetry else onDismiss,
+            modifier = Modifier.weight(1f),
+            tone = if (isError) GlassButtonTone.Primary else GlassButtonTone.Neutral,
+        )
+    }
+    MyTokenDialog(
+        title = "历史版本",
+        subtitle = "Android 发布记录",
+        icon = Icons.Filled.History,
+        tone = if (isError) MyTokenDialogTone.Danger else MyTokenDialogTone.Info,
         onDismissRequest = onDismiss,
-        title = { Text("历史版本") },
-        text = {
+        content = {
             when (state) {
                 AppReleaseHistoryUiState.Idle,
                 AppReleaseHistoryUiState.Loading -> Row(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    Text("正在加载...")
-                }
-                is AppReleaseHistoryUiState.Error -> Column(
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                        Text("日志获取失败", color = MaterialTheme.colorScheme.error)
-                    GlassButton(
-                        onClick = onRetry,
-                        modifier = Modifier.fillMaxWidth(),
-                        tone = GlassButtonTone.Primary,
-                        text = "重试",
-                        icon = Icons.Filled.Refresh,
+                    Text(
+                        text = "正在加载发布记录",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                is AppReleaseHistoryUiState.Error -> MyTokenDialogStatus(
+                    message = "日志获取失败，请检查网络后重试。",
+                    tone = MyTokenDialogTone.Danger,
+                )
                 is AppReleaseHistoryUiState.Loaded -> {
                     if (state.releases.isEmpty()) {
-                        Text("暂无更新日志")
+                        MyTokenDialogStatus("暂无更新日志")
                     } else {
                         ReleaseHistoryList(releases = state.releases)
                     }
                 }
             }
         },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("完成")
-            }
-        },
+        actions = actions,
     )
 }
 
@@ -530,54 +603,55 @@ private fun ReleaseHistoryList(releases: List<AppReleaseHistoryItem>) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         items(releases, key = { it.version }) { release ->
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(
-                        text = "v${release.version}",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    release.publishedAt?.take(10)?.let { date ->
-                        Text(
-                            text = date,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (release.releaseNotes.isBlank()) {
-                        Text(
-                            text = "暂无更新日志",
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    } else {
-                        MarkdownText(
-                            markdown = release.releaseNotes,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    IconButton(
-                        onClick = { uriHandler.openUri(release.releaseUrl) },
-                        modifier = Modifier.size(40.dp),
+            MyTokenDialogSection {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                            contentDescription = "在 GitHub 查看",
-                            modifier = Modifier.size(19.dp),
+                        Text(
+                            text = "v${release.version}",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
                         )
+                        release.publishedAt?.take(10)?.let { date ->
+                            Text(
+                                text = date,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (release.releaseNotes.isBlank()) {
+                            Text(
+                                text = "暂无更新日志",
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else {
+                            MarkdownText(
+                                markdown = release.releaseNotes,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        IconButton(
+                            onClick = { uriHandler.openUri(release.releaseUrl) },
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                                contentDescription = "在 GitHub 查看",
+                                modifier = Modifier.size(19.dp),
+                            )
+                        }
                     }
                 }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
         }
     }
 }
@@ -771,6 +845,56 @@ private fun UpdateSection(
             tone = GlassButtonTone.Primary,
             text = "检测更新",
             icon = Icons.Filled.Refresh,
+        )
+    }
+}
+
+@Composable
+private fun SettingsHeader() {
+    Text(
+        text = "设置",
+        fontSize = 30.sp,
+        lineHeight = 31.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = (-1).sp,
+    )
+}
+
+@Composable
+private fun SettingsProfileCard(appVersion: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        MyTokenBrandMark(size = 36.dp)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 10.dp),
+        ) {
+            Text(
+                text = "MyToken $appVersion",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        GlassHelpButton(
+            title = "隐私与刷新",
+            subtitle = "凭证只在本机处理",
+            sections = listOf(
+                HelpSection(
+                    title = "本机数据",
+                    rows = listOf(
+                        HelpRow("凭证存储", "加密保存在本机 Keystore"),
+                        HelpRow("后台刷新", "频率由“刷新”设置控制"),
+                    ),
+                ),
+            ),
+            modifier = Modifier.testTag("settings_privacy_help"),
         )
     }
 }
@@ -1027,9 +1151,10 @@ private fun ExpandableSettingsSection(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column {
             DisclosureHeader(
@@ -1070,8 +1195,7 @@ private fun SettingsDisclosure(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.46f),
     ) {
         Column {
             DisclosureHeader(

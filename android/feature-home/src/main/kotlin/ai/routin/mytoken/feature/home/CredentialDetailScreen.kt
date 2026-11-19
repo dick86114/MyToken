@@ -4,9 +4,16 @@ import ai.routin.mytoken.core.ui.SectionCard
 import ai.routin.mytoken.core.ui.GlassButton
 import ai.routin.mytoken.core.ui.GlassButtonTone
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
+import ai.routin.mytoken.core.ui.MyTokenPalette
+import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
+import ai.routin.mytoken.core.ui.ProviderLogoPlate
 import ai.routin.mytoken.domain.model.CredentialKind
 import ai.routin.mytoken.domain.model.CredentialMetadataKey
 import ai.routin.mytoken.domain.model.UsageMetric
+import ai.routin.mytoken.domain.model.UsageMetricHealthState
+import ai.routin.mytoken.domain.model.UsageMetricPresentation
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,14 +21,22 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PauseCircle
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -29,15 +44,24 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.ZoneId
@@ -64,26 +88,80 @@ internal fun credentialKindLabel(
 fun CredentialDetailScreen(
     card: CredentialCardUi?,
     lowThresholdPercent: Int? = null,
+    layoutMode: ai.routin.mytoken.core.ui.MyTokenLayoutMode = ai.routin.mytoken.core.ui.MyTokenLayoutMode.Compact,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    var showShare by remember { mutableStateOf(false) }
+    var showMore by remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        text = card?.credential?.name ?: "凭证详情",
+                        text = "凭证详情",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                    Box(
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.78f)),
+                    ) {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "返回",
+                                modifier = Modifier.size(19.dp),
+                            )
+                        }
                     }
                 },
+                actions = {
+                    if (card != null) {
+                        IconButton(onClick = { showShare = true }) {
+                            Icon(
+                                imageVector = Icons.Outlined.Share,
+                                contentDescription = "分享用量",
+                            )
+                        }
+                        Box {
+                            IconButton(onClick = { showMore = true }) {
+                                Icon(
+                                    imageVector = Icons.Filled.MoreVert,
+                                    contentDescription = "更多操作",
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showMore,
+                                onDismissRequest = { showMore = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            "删除凭证",
+                                            color = MaterialTheme.colorScheme.error,
+                                        )
+                                    },
+                                    onClick = {
+                                        showMore = false
+                                        onDelete()
+                                    },
+                                )
+                            }
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent,
+                ),
             )
         },
         bottomBar = {
@@ -101,20 +179,14 @@ fun CredentialDetailScreen(
                     ) {
                     GlassButton(
                         onClick = onRefresh,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1.5f),
                         tone = GlassButtonTone.Primary,
-                        text = "刷新",
+                        text = "立即刷新",
                     )
                     GlassButton(
                         onClick = onEdit,
                         modifier = Modifier.weight(1f),
                         text = "编辑",
-                    )
-                    GlassButton(
-                        onClick = onDelete,
-                        modifier = Modifier.weight(1f),
-                        tone = GlassButtonTone.Destructive,
-                        text = "删除",
                     )
                 }
                 }
@@ -144,36 +216,8 @@ fun CredentialDetailScreen(
                 .testTag("detail_content"),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column {
-                    Text(
-                        text = card.credential.name,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = "${ProviderCatalog.displayName(card.credential.providerId)} · " +
-                            credentialKindLabel(
-                                kind = card.credential.credentialKind,
-                                provider = card.credential.providerId,
-                            ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = if (card.credential.isEnabled) Icons.Filled.CheckCircle else Icons.Filled.PauseCircle,
-                        contentDescription = null,
-                        tint = if (card.credential.isEnabled) statusColors().positive else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = if (card.credential.isEnabled) "已启用" else "已停用",
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(start = 4.dp),
-                    )
-                }
-            }
+            DetailHero(card = card)
+            DetailSummaryRow(card = card)
 
             SectionCard(title = "状态") {
                 DetailRow(
@@ -214,6 +258,141 @@ fun CredentialDetailScreen(
         }
         }
     }
+    if (showShare && card != null) {
+        UsageShareDialog(
+            card = card,
+            onDismiss = { showShare = false },
+            layoutMode = layoutMode,
+        )
+    }
+}
+
+@Composable
+private fun DetailHero(card: CredentialCardUi) {
+    val focusMetric = card.snapshot?.metrics.orEmpty().firstOrNull {
+        it.presentation == UsageMetricPresentation.Progress
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp))
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(14.dp)
+            .testTag("detail_hero"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        ProviderLogoPlate(
+            painter = painterResource(ProviderCatalog.logoRes(card.credential.providerId)),
+            contentDescription = null,
+            size = 44.dp,
+            shape = RoundedCornerShape(13.dp),
+            contentPadding = 5.dp,
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "${ProviderCatalog.displayName(card.credential.providerId)} · " +
+                    planName(card),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+            Text(
+                text = card.credential.name,
+                modifier = Modifier.padding(top = 3.dp),
+                fontSize = 17.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.3).sp,
+                maxLines = 1,
+            )
+            Text(
+                text = if (card.credential.isEnabled) "已启用" else "已停用",
+                modifier = Modifier.padding(top = 4.dp),
+                fontSize = 10.sp,
+                color = if (card.credential.isEnabled) {
+                    MyTokenPalette.positiveLight
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+        }
+        if (focusMetric != null) {
+            UsageRing(
+                percent = progressPercent(focusMetric),
+                tone = CompactUsageCardPresentation.tone(focusMetric),
+                isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f,
+                diameter = 62.dp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DetailSummaryRow(card: CredentialCardUi) {
+    val metrics = card.snapshot?.metrics.orEmpty()
+    val weekly = metrics.firstOrNull { it.id == "weekly" || it.label == "周" || it.label == "本周" }
+    val requests = metrics.firstOrNull { it.id == "request-count" }
+        ?.takeIf { card.credential.providerId != ai.routin.mytoken.domain.model.ProviderId.CommandCode }
+    if (weekly == null && requests == null) return
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (weekly != null) {
+            DetailSummaryTile(
+                label = "本周用量",
+                value = formatPercent(progressPercent(weekly)),
+                supporting = weekly.windowEnd?.let { "重置 ${formatResetTime(it)}" } ?: "当前周期",
+                modifier = Modifier.weight(1f),
+            )
+        }
+        if (requests != null) {
+            DetailSummaryTile(
+                label = "请求次数",
+                value = "${formatCompact(requests.value)} 次",
+                supporting = requests.label,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DetailSummaryTile(
+    label: String,
+    value: String,
+    supporting: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Text(
+            text = label,
+            fontSize = 9.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = value,
+            modifier = Modifier.padding(top = 3.dp),
+            fontSize = 20.sp,
+            lineHeight = 21.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = (-0.4).sp,
+        )
+        Text(
+            text = supporting,
+            modifier = Modifier.padding(top = 4.dp),
+            fontSize = 8.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
+    }
 }
 
 @Composable
@@ -225,7 +404,7 @@ private fun UsageMetricsSection(card: CredentialCardUi) {
         } else {
             if (card.credential.providerId == ai.routin.mytoken.domain.model.ProviderId.CommandCode) {
                 CommandCodeMetrics(
-                    metrics = metrics,
+                    metrics = metrics.filterNot { it.id == "request-count" },
                     showsBalanceBreakdown = true,
                 )
             } else {

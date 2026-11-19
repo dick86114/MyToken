@@ -4,23 +4,34 @@ import ai.routin.mytoken.domain.usage.RefreshStatus
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.MyTokenPalette
 import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
+import ai.routin.mytoken.core.ui.ProviderLogoPlate
+import ai.routin.mytoken.core.ui.GlassButton
+import ai.routin.mytoken.core.ui.GlassButtonTone
+import ai.routin.mytoken.core.ui.MyTokenDialog
+import ai.routin.mytoken.core.ui.MyTokenDialogRow
+import ai.routin.mytoken.core.ui.MyTokenDialogSection
+import ai.routin.mytoken.core.ui.MyTokenDialogStatus
+import ai.routin.mytoken.core.ui.MyTokenDialogTone
 import ai.routin.mytoken.domain.model.UsageCardDensity
 import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import ai.routin.mytoken.domain.model.UsageMetricUnit
-import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -34,7 +45,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -43,6 +54,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,21 +67,19 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathMeasure
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 
 /** 方案 A：石墨蓝承载卡片，品牌蓝表达正常用量，彩色只表达状态。 */
@@ -101,7 +111,22 @@ internal fun statusLabel(card: CredentialCardUi): String? = when (card.status) {
     RefreshStatus.Loading -> "正在加载"
     RefreshStatus.Disabled -> "已停用"
     RefreshStatus.Failed -> "更新失败"
-    RefreshStatus.Ready -> if (card.isStale) "显示上次成功数据" else null
+    RefreshStatus.Ready -> if (card.isStale) "待刷新" else null
+}
+
+private enum class CardHealth { Normal, Warning, Critical, Refreshing, Stale, Failed, Disabled }
+
+private fun cardHealth(card: CredentialCardUi): CardHealth {
+    if (card.status == RefreshStatus.Disabled) return CardHealth.Disabled
+    if (card.status == RefreshStatus.Failed || card.error != null) return CardHealth.Failed
+    if (card.status == RefreshStatus.Loading) return CardHealth.Refreshing
+    if (card.isStale) return CardHealth.Stale
+    val states = card.snapshot?.metrics.orEmpty().map { it.healthState }
+    return when {
+        states.any { it == UsageMetricHealthState.Critical || it == UsageMetricHealthState.Unavailable } -> CardHealth.Critical
+        states.any { it == UsageMetricHealthState.Warning } -> CardHealth.Warning
+        else -> CardHealth.Normal
+    }
 }
 
 @Composable
@@ -114,89 +139,71 @@ fun CredentialUsageCard(
     modifier: Modifier = Modifier,
     layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
     usageCardDensity: UsageCardDensity = UsageCardDensity.FULL,
+    highlightSignal: Int = 0,
 ) {
-    val providerName = ProviderCatalog.displayName(card.credential.providerId)
-    val plan = card.snapshot?.planName.orEmpty()
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     var showsFailureDetails by remember(card.credential.id) { mutableStateOf(false) }
-    var showsShareDialog by remember(card.credential.id) { mutableStateOf(false) }
 
-    val cometModifier = Modifier.refreshCometBorder(
+    val refreshModifier = Modifier.refreshPulseBorder(
         isLoading = card.status == RefreshStatus.Loading,
         color = MaterialTheme.colorScheme.primary,
     )
+    val locateLift = remember { Animatable(0f) }
+    LaunchedEffect(highlightSignal) {
+        if (highlightSignal <= 0) {
+            locateLift.snapTo(0f)
+            return@LaunchedEffect
+        }
+        locateLift.snapTo(0f)
+        locateLift.animateTo(
+            targetValue = 0f,
+            animationSpec = keyframes {
+                durationMillis = 860
+                0f at 0 using FastOutSlowInEasing
+                1f at 130 using FastOutSlowInEasing
+                0.18f at 270 using FastOutSlowInEasing
+                0.7f at 390 using FastOutSlowInEasing
+                0.08f at 530 using FastOutSlowInEasing
+                0.32f at 640 using FastOutSlowInEasing
+                0f at 820 using FastOutSlowInEasing
+            },
+        )
+    }
+    val locateBounceModifier = Modifier.graphicsLayer {
+        val lift = locateLift.value
+        scaleX = 1f + 0.025f * lift
+        scaleY = 1f + 0.025f * lift
+        translationY = -7.dp.toPx() * lift
+    }
 
     Card(
         onClick = onOpen,
-        modifier = modifier.fillMaxWidth().then(cometModifier),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(refreshModifier)
+            .then(locateBounceModifier)
+            .testTag("credential_card_${card.credential.id}"),
         shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isDark) CardPalette.darkSurface else MaterialTheme.colorScheme.surface,
+            containerColor = MaterialTheme.colorScheme.surface,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant,
-        ),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             CredentialCardHeader(
                 card = card,
-                providerName = providerName,
-                plan = plan,
                 isDark = isDark,
                 onShowFailure = { showsFailureDetails = true },
-                onShare = { showsShareDialog = true },
                 onRefresh = onRefresh,
             )
 
-            val metrics = card.snapshot?.metrics.orEmpty()
             if (usageCardDensity == UsageCardDensity.FULL) {
-                val start = card.snapshot?.subscriptionStartAt
-                val end = card.snapshot?.subscriptionEndAt
-                if (start != null || end != null) {
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = "开始 ${formatSubscriptionTime(start)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Text(
-                            text = "结束 ${formatSubscriptionTime(end)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.End,
-                        )
-                    }
-                }
-            }
-
-            if (usageCardDensity == UsageCardDensity.FULL) {
-                when (card.credential.providerId) {
-                    ai.routin.mytoken.domain.model.ProviderId.Glm -> GLMMetrics(metrics, columns = metricColumns)
-                    ai.routin.mytoken.domain.model.ProviderId.NewAPI -> NewAPIMetrics(metrics, columns = metricColumns)
-                    ai.routin.mytoken.domain.model.ProviderId.Volcengine -> VolcengineMetrics(metrics, columns = metricColumns)
-                    ai.routin.mytoken.domain.model.ProviderId.OpenCode -> UsageMetricGrid(
-                        metrics = OpenCodeCardPolicy.orderedMetrics(metrics),
-                        columns = metricColumns,
-                    )
-                    ai.routin.mytoken.domain.model.ProviderId.CommandCode -> CommandCodeMetrics(
-                        metrics = metrics,
-                        columns = metricColumns,
-                        showsBalanceBreakdown = false,
-                    )
-                    ai.routin.mytoken.domain.model.ProviderId.Xiaomi ->
-                        if (card.credential.metadata[ai.routin.mytoken.domain.model.CredentialMetadataKey.UsageKind] == "plan") {
-                            UsageMetricGrid(metrics = metrics, columns = metricColumns)
-                        } else {
-                            XiaomiAPIMetrics(metrics = metrics)
-                        }
-                    else -> UsageMetricGrid(metrics = metrics, columns = metricColumns)
-                }
+                FullUsageCardBody(card = card, isDark = isDark)
             } else {
                 CompactUsageCardBody(card = card, isDark = isDark)
             }
@@ -213,159 +220,138 @@ fun CredentialUsageCard(
             },
         )
     }
-    if (showsShareDialog) {
-        UsageShareDialog(
-            card = card,
-            onDismiss = { showsShareDialog = false },
-            layoutMode = layoutMode,
-        )
-    }
 }
 
-/** 仅在刷新中创建无限动画，非 Loading 卡片不再常驻空转动画。 */
+/** 仅在刷新中绘制一次与卡片同圆角的呼吸描边，避免沿线动画的错位和高开销。 */
 @Composable
-private fun Modifier.refreshCometBorder(isLoading: Boolean, color: Color): Modifier {
+private fun Modifier.refreshPulseBorder(isLoading: Boolean, color: Color): Modifier {
     if (!isLoading) return this
-    val phase by rememberInfiniteTransition(label = "comet").animateFloat(
+    val pulse = rememberInfiniteTransition(label = "refreshPulse").animateFloat(
         initialValue = 0f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(2400, easing = LinearEasing)),
-        label = "cometPhase",
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "refreshPulsePhase",
     )
     return drawWithContent {
         drawContent()
-        drawCometBorder(cornerRadiusPx = 14.dp.toPx(), phase = phase, color = color)
-    }
-}
-
-/** 刷新中：发光亮点沿卡片边框匀速环绕，身后拖出渐隐尾巴（流星）。 */
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCometBorder(
-    cornerRadiusPx: Float,
-    phase: Float,
-    color: Color,
-) {
-    val path = Path().apply {
-        addRoundRect(
-            RoundRect(
-                rect = Rect(Offset.Zero, size),
-                cornerRadius = CornerRadius(cornerRadiusPx, cornerRadiusPx),
-            )
+        val stroke = 1.5.dp.toPx()
+        val inset = stroke / 2f
+        drawRoundRect(
+            color = color.copy(alpha = 0.16f + 0.46f * pulse.value),
+            topLeft = Offset(inset, inset),
+            size = Size(size.width - stroke, size.height - stroke),
+            cornerRadius = CornerRadius(
+                (MyTokenVisualPolicy.outerRadiusDp.toPx() - inset).coerceAtLeast(0f),
+                (MyTokenVisualPolicy.outerRadiusDp.toPx() - inset).coerceAtLeast(0f),
+            ),
+            style = Stroke(width = stroke),
         )
     }
-    val measure = PathMeasure().apply { setPath(path, false) }
-    val length = measure.length
-    if (length <= 0f) return
-
-    val head = length * phase
-    val tail = length * 0.22f
-    val segments = 4
-    val segmentLength = tail / segments
-    for (i in segments downTo 1) {
-        val end = head - segmentLength * (i - 1)
-        val start = end - segmentLength
-        if (end <= 0f) continue
-        val fade = 1f - (i - 1) / segments.toFloat()
-        val stroke = Path()
-        if (start < 0f) {
-            measure.getSegment(length + start, length, stroke, true)
-            val wrapped = Path()
-            measure.getSegment(0f, end, wrapped, true)
-            stroke.addPath(wrapped)
-        } else {
-            measure.getSegment(start, end, stroke, true)
-        }
-        drawPath(
-            stroke,
-            color = color.copy(alpha = 0.9f * fade),
-            style = Stroke(width = (2.4f * fade + 0.4f).dp.toPx(), cap = StrokeCap.Round),
-        )
-    }
-    val position = measure.getPosition(head)
-    drawCircle(color = color.copy(alpha = 0.35f), radius = 6.dp.toPx(), center = position)
-    drawCircle(color = color, radius = 2.5.dp.toPx(), center = position)
 }
 
 @Composable
 private fun CredentialCardHeader(
     card: CredentialCardUi,
-    providerName: String,
-    plan: String,
     isDark: Boolean,
     onShowFailure: () -> Unit,
-    onShare: () -> Unit,
     onRefresh: () -> Unit,
 ) {
     val subscriptionExpiry = card.snapshot?.subscriptionEndAt
+    val health = cardHealth(card)
+    val statusColor = when (health) {
+        CardHealth.Critical -> MyTokenPalette.critical
+        CardHealth.Warning -> MyTokenPalette.warning
+        CardHealth.Refreshing -> MaterialTheme.colorScheme.primary
+        CardHealth.Stale -> MaterialTheme.colorScheme.onSurfaceVariant
+        CardHealth.Failed -> MyTokenPalette.critical
+        CardHealth.Disabled -> MaterialTheme.colorScheme.onSurfaceVariant
+        CardHealth.Normal -> MyTokenPalette.positiveLight
+    }
+    val statusText = when (health) {
+        CardHealth.Critical -> "已达上限"
+        CardHealth.Warning -> "接近上限"
+        CardHealth.Refreshing -> "刷新中"
+        CardHealth.Stale -> "待刷新"
+        CardHealth.Failed -> "更新失败"
+        CardHealth.Disabled -> "已停用"
+        CardHealth.Normal -> "正常"
+    }
 
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    val aliasSize = when {
+        card.credential.name.length > 24 -> 12.sp
+        card.credential.name.length > 16 -> 14.sp
+        else -> 15.sp
+    }
+    val aliasLineHeight = when {
+        card.credential.name.length > 24 -> 15.sp
+        card.credential.name.length > 16 -> 17.sp
+        else -> 18.sp
+    }
+
+    Row(verticalAlignment = Alignment.Top) {
         AvatarWithFailureBadge(card = card, onClick = onShowFailure)
 
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(start = 10.dp),
+                .padding(start = 8.dp, top = 0.dp, end = 4.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = card.credential.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                if (subscriptionExpiry != null) {
-                    val lifecyclePrefix =
-                        if (card.credential.providerId == ai.routin.mytoken.domain.model.ProviderId.OpenCode) {
-                            OpenCodeCardPolicy.lifecyclePrefix(card.snapshot?.billingMode)
-                        } else {
-                            "到期"
-                        }
-                    StatusPill(
-                        text = "$lifecyclePrefix ${formatSubscriptionTime(subscriptionExpiry)}",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        isDark = isDark,
-                    )
-                }
-            }
             Text(
-                text = if (plan.isEmpty()) providerName else "$providerName · $plan",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 1.dp),
+                text = card.credential.name,
+                fontSize = aliasSize,
+                lineHeight = aliasLineHeight,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = (-0.2).sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
+            if (subscriptionExpiry != null) {
+                val lifecyclePrefix =
+                    if (card.credential.providerId == ai.routin.mytoken.domain.model.ProviderId.OpenCode) {
+                        OpenCodeCardPolicy.lifecyclePrefix(card.snapshot?.billingMode)
+                    } else {
+                        "到期"
+                    }
+                Text(
+                    text = "$lifecyclePrefix ${formatSubscriptionTime(subscriptionExpiry)}",
+                    modifier = Modifier.padding(top = 2.dp),
+                    fontSize = 9.sp,
+                    lineHeight = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
 
-        Row(
-            modifier = Modifier.padding(start = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier.padding(start = 6.dp),
+            horizontalAlignment = Alignment.End,
         ) {
-            CircleIconButton(
-                tag = "credential_share_${card.credential.id}",
-                description = "分享 ${card.credential.name}",
-                enabled = card.snapshot != null && card.credential.isEnabled,
-                isDark = isDark,
-                onClick = onShare,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Share,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp),
-                )
-            }
-            CircleIconButton(
-                tag = "credential_refresh_${card.credential.id}",
-                description = "刷新 ${card.credential.name}",
-                enabled = card.status != RefreshStatus.Loading && card.credential.isEnabled,
-                isDark = isDark,
-                onClick = onRefresh,
-            ) {
-                if (card.status == RefreshStatus.Loading) {
-                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
-                } else {
-                    Icon(
-                        imageVector = Icons.Filled.Refresh,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
-                    )
+                StatusPill(text = statusText, color = statusColor, isDark = isDark)
+                CircleIconButton(
+                    tag = "credential_refresh_${card.credential.id}",
+                    description = "刷新 ${card.credential.name}",
+                    enabled = card.status != RefreshStatus.Loading && card.credential.isEnabled,
+                    isDark = isDark,
+                    onClick = onRefresh,
+                ) {
+                    if (card.status == RefreshStatus.Loading) {
+                        CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 1.8.dp)
+                    } else {
+                        Icon(
+                            imageVector = Icons.Filled.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(12.dp),
+                        )
+                    }
                 }
             }
         }
@@ -400,15 +386,14 @@ private fun AvatarWithFailureBadge(
             modifier = Modifier.size(30.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Image(
+            ProviderLogoPlate(
                 painter = painterResource(ProviderCatalog.logoRes(card.credential.providerId)),
                 contentDescription = null,
-                contentScale = ContentScale.Crop,
+                size = 30.dp,
+                shape = avatarShape,
+                contentPadding = 3.dp,
+                contentScale = ContentScale.Fit,
                 modifier = Modifier
-                    .size(30.dp)
-                    .clip(avatarShape)
-                    .background(Color.White)
-                    .border(1.dp, Color.Black.copy(alpha = 0.12f), avatarShape)
                     .testTag("credential_avatar_${card.credential.id}"),
             )
             if (failed) {
@@ -442,7 +427,6 @@ private fun CircleIconButton(
     onClick: () -> Unit,
     content: @Composable () -> Unit,
 ) {
-    val borderColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.55f)
     Box(
         modifier = Modifier
             .size(30.dp)
@@ -450,7 +434,6 @@ private fun CircleIconButton(
                 MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.06f else 0.04f),
                 CircleShape,
             )
-            .border(1.dp, borderColor, CircleShape)
             .testTag(tag)
             .semantics { contentDescription = description }
             .clickable(enabled = enabled, onClick = onClick),
@@ -502,90 +485,18 @@ private fun CompactUsageCardBody(card: CredentialCardUi, isDark: Boolean) {
                 card.snapshot?.metrics.orEmpty()
             ),
             isDark = isDark,
+            compact = true,
         )
-        CompactUsageArrangement.HorizontalRings -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        CompactUsageArrangement.HorizontalRings,
+        CompactUsageArrangement.VerticalRings -> Row(
+            horizontalArrangement = Arrangement.spacedBy(if (metrics.size >= 3) 5.dp else 8.dp),
+        ) {
             metrics.forEach { metric ->
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .usageTileGlass(isDark)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(10.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        UsageRing(
-                            percent = progressPercent(metric),
-                            tone = CompactUsageCardPresentation.tone(metric),
-                            isDark = isDark,
-                            diameter = 44.dp,
-                        )
-                        Text(
-                            text = metric.label,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Medium,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Text(
-                            text = ringSubtitle(metric, vertical = false),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                    if (metric.resetCards.isNotEmpty()) {
-                        ResetCardsBadge(
-                            metric = metric,
-                            style = ResetCardsBadgeStyle.Compact,
-                            modifier = Modifier
-                                .align(Alignment.CenterEnd)
-                                .padding(end = 8.dp),
-                        )
-                    }
-                }
-            }
-        }
-        CompactUsageArrangement.VerticalRings -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            metrics.forEach { metric ->
-                val tone = CompactUsageCardPresentation.tone(metric)
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .usageTileGlass(isDark),
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .padding(8.dp)
-                            .fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        UsageRing(
-                            percent = progressPercent(metric),
-                            tone = tone,
-                            isDark = isDark,
-                            diameter = 40.dp,
-                        )
-                        Text(
-                            text = metric.label,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Text(
-                            text = ringSubtitle(metric, vertical = true),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
+                CompactRingTile(
+                    metric = metric,
+                    isDark = isDark,
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
         CompactUsageArrangement.ValueTiles -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -611,28 +522,379 @@ private fun CompactUsageCardBody(card: CredentialCardUi, isDark: Boolean) {
     }
 }
 
+@Composable
+private fun CompactRingTile(
+    metric: UsageMetric,
+    isDark: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    BoxWithConstraints(
+        modifier = modifier
+            .usageTileGlass(isDark)
+            .testTag("compact_ring_tile_${metric.id}"),
+    ) {
+        val dense = maxWidth < 140.dp || LocalDensity.current.fontScale > 1.2f
+        val ringDiameter = if (dense) 30.dp else 36.dp
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    horizontal = if (dense) 6.dp else 10.dp,
+                    vertical = 9.dp,
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(if (dense) 6.dp else 9.dp),
+        ) {
+            UsageRing(
+                percent = progressPercent(metric),
+                tone = CompactUsageCardPresentation.tone(metric),
+                isDark = isDark,
+                diameter = ringDiameter,
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                CompactPeriodRow(metric = metric, dense = dense)
+                Text(
+                    text = ringSubtitle(metric),
+                    modifier = Modifier.fillMaxWidth(),
+                    fontSize = if (dense) 8.sp else 9.sp,
+                    lineHeight = if (dense) 10.sp else 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompactPeriodRow(metric: UsageMetric, dense: Boolean) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(if (dense) 3.dp else 5.dp),
+    ) {
+        Text(
+            text = compactPeriodLabel(metric),
+            fontSize = if (dense) 11.sp else 13.sp,
+            lineHeight = if (dense) 14.sp else 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (metric.resetCards.isNotEmpty()) {
+            ResetCardsBadge(metric = metric, style = ResetCardsBadgeStyle.Compact)
+        }
+    }
+}
+
+@Composable
+private fun FullUsageCardBody(
+    card: CredentialCardUi,
+    isDark: Boolean,
+) {
+    val metrics = fullCardMetrics(card)
+    if (metrics.isEmpty()) {
+        Text(
+            text = "暂无用量数据",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(vertical = 4.dp),
+        )
+        FullCardFooter(card)
+        return
+    }
+
+    val balance = metrics.firstOrNull { it.presentation == UsageMetricPresentation.Balance }
+    val progress = metrics.filter { it.presentation == UsageMetricPresentation.Progress }
+    val values = metrics.filter {
+        it.presentation == UsageMetricPresentation.Value ||
+            it.presentation == UsageMetricPresentation.Status
+    }
+    val isDeepSeek = card.credential.providerId ==
+        ai.routin.mytoken.domain.model.ProviderId.DeepSeek
+    val rawMetrics = card.snapshot?.metrics.orEmpty()
+    val deepSeekGiftSegment = if (isDeepSeek) {
+        CompactBalanceCompositionPolicy.segments(rawMetrics)
+            .firstOrNull { it.kind == CompactBalanceSegmentKind.Granted }
+    } else {
+        null
+    }
+    val deepSeekGift = if (isDeepSeek) {
+        deepSeekGiftSegment?.let { segment ->
+            rawMetrics.firstOrNull { it.id == segment.id }
+                ?.copy(label = "赠送金额")
+        }
+    } else {
+        null
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        if (balance != null) {
+            BalanceStrip(
+                metric = balance,
+                composition = if (isDeepSeek) {
+                    emptyList()
+                } else {
+                    CompactBalanceCompositionPolicy.segments(rawMetrics)
+                },
+                isDark = isDark,
+            )
+        }
+        if (progress.isNotEmpty()) {
+            FullProgressMetrics(progress)
+        }
+        if (isDeepSeek) {
+            if (deepSeekGift != null) {
+                FullValueMetrics(listOf(deepSeekGift))
+            }
+        } else if (values.isNotEmpty()) {
+            FullValueMetrics(values)
+        }
+        FullCardFooter(card)
+    }
+}
+
+private fun fullCardMetrics(card: CredentialCardUi): List<UsageMetric> {
+    val all = card.snapshot?.metrics.orEmpty()
+    val base = UsageCardCompactSpec.orderedMetrics(
+        providerId = card.credential.providerId,
+        metadata = card.credential.metadata,
+        metrics = all,
+    )
+    val extras = when (card.credential.providerId) {
+        ai.routin.mytoken.domain.model.ProviderId.CommandCode ->
+            listOfNotNull(all.firstOrNull { it.id == "request-count" })
+        ai.routin.mytoken.domain.model.ProviderId.NewAPI ->
+            listOfNotNull(all.firstOrNull { it.id == "quota-progress" })
+        ai.routin.mytoken.domain.model.ProviderId.Xiaomi ->
+            if (card.credential.metadata[ai.routin.mytoken.domain.model.CredentialMetadataKey.UsageKind] == "plan") {
+                emptyList()
+            } else {
+                all.filter {
+                    it.id in setOf(
+                        "total-consumption",
+                        "cash-balance",
+                        "gift-balance",
+                        "total-tokens",
+                    )
+                }.take(4)
+            }
+        else -> emptyList()
+    }
+    val baseIds = base.mapTo(mutableSetOf()) { it.id }
+    val missingBalance = all
+        .firstOrNull { it.presentation == UsageMetricPresentation.Balance && it.id !in baseIds }
+        ?.let(::listOf)
+        .orEmpty()
+    val missingValues = all
+        .filter {
+            it.id !in baseIds &&
+                it.id !in extras.map { extra -> extra.id } &&
+                (it.presentation == UsageMetricPresentation.Value || it.presentation == UsageMetricPresentation.Status) &&
+                it.value?.signum() == 1
+        }
+        .take(3)
+    return (base + extras + missingBalance + missingValues).distinctBy { it.id }
+}
+
+@Composable
+private fun FullProgressMetrics(metrics: List<UsageMetric>) {
+    if (metrics.size == 1) {
+        FullProgressMetricCell(metric = metrics.first(), modifier = Modifier.fillMaxWidth())
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            metrics.forEach { metric ->
+                FullProgressMetricCell(
+                    metric = metric,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FullProgressMetricCell(
+    metric: UsageMetric,
+    modifier: Modifier = Modifier,
+) {
+    val percent = progressPercent(metric)
+    val colors = statusColors()
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(
+            text = metricLabel(metric),
+            fontSize = 10.sp,
+            lineHeight = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = formatPercent(percent),
+            fontSize = 21.sp,
+            lineHeight = 22.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        UsageProgressBar(
+            percent = percent,
+            color = progressColor(percent, colors),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            text = "已用 ${formatMetricAmount(metric.used, metric)}",
+            fontSize = 9.sp,
+            lineHeight = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = "剩余 ${formatMetricAmount(metric.remaining, metric)}",
+            fontSize = 9.sp,
+            lineHeight = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        metric.windowEnd?.let { end ->
+            Text(
+                text = "重置 ${formatResetTime(end)} · ${formatRemainingDuration(end, java.time.Instant.now())}",
+                fontSize = 8.sp,
+                lineHeight = 10.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (metric.resetCards.isNotEmpty()) {
+            ResetCardsBadge(metric = metric, style = ResetCardsBadgeStyle.Detail)
+        }
+    }
+}
+
+@Composable
+private fun FullValueMetrics(metrics: List<UsageMetric>) {
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        metrics.chunked(2).forEach { rowMetrics ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                rowMetrics.forEach { metric ->
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f))
+                            .padding(horizontal = 9.dp, vertical = 7.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(
+                            text = metric.label,
+                            fontSize = 9.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = fullValueText(metric),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                repeat(2 - rowMetrics.size) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FullCardFooter(card: CredentialCardUi) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = card.freshness.text,
+            fontSize = 9.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.86f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = "详情",
+            fontSize = 9.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
+}
+
+private fun metricLabel(metric: UsageMetric): String = when (metric.label) {
+    "5 小时" -> "5 小时窗口"
+    "本周", "周" -> "本周用量"
+    "月" -> "本月用量"
+    else -> metric.label
+}
+
+private fun compactPeriodLabel(metric: UsageMetric): String {
+    val label = metric.label.trim()
+    return when {
+        label.contains("5") && label.contains("小时") -> "5 小时"
+        label.contains("周") -> "周"
+        label.contains("月") -> "月"
+        else -> label.removeSuffix("用量").trim()
+    }
+}
+
+private fun formatMetricAmount(value: java.math.BigDecimal?, metric: UsageMetric): String = when {
+    value == null -> "-"
+    metric.unit == UsageMetricUnit.Currency -> formatCurrency(value, metric.currencyCode)
+    metric.unit == UsageMetricUnit.Request -> "${formatGrouped(value)} 次"
+    else -> formatGrouped(value)
+}
+
+private fun fullValueText(metric: UsageMetric): String = when (metric.presentation) {
+    UsageMetricPresentation.Status ->
+        if (metric.healthState == UsageMetricHealthState.Unavailable) "不可用" else "可用"
+    UsageMetricPresentation.Balance ->
+        formatCurrency(metric.value, metric.currencyCode)
+    UsageMetricPresentation.Value ->
+        if (metric.unit == UsageMetricUnit.Request) {
+            "${formatCompact(metric.value)} 次"
+        } else if (metric.unit == UsageMetricUnit.Currency) {
+            formatCurrency(metric.value, metric.currencyCode)
+        } else {
+            formatGrouped(metric.value)
+        }
+    UsageMetricPresentation.Progress -> formatPercent(progressPercent(metric))
+}
+
 /** 简洁用量小卡片只保留一层无色透明玻璃，状态色仍只出现在圆环或进度条。 */
 private fun Modifier.usageTileGlass(isDark: Boolean): Modifier {
     val shape = RoundedCornerShape(MyTokenVisualPolicy.innerRadiusDp)
     val fillTopAlpha = if (isDark) 0.11f else 0.56f
     val fillBottomAlpha = if (isDark) 0.05f else 0.28f
-    val edgeAlpha = if (isDark) 0.22f else 0.80f
     val fill = Brush.verticalGradient(
         listOf(
             Color.White.copy(alpha = fillTopAlpha),
             Color.White.copy(alpha = fillBottomAlpha),
         )
     )
-    val edge = Brush.linearGradient(
-        listOf(
-            Color.White.copy(alpha = edgeAlpha),
-            Color.White.copy(alpha = edgeAlpha * 0.45f),
-        )
-    )
     return this
         .clip(shape)
         .background(fill, shape)
-        .border(1.dp, edge, shape)
 }
 
 @Composable
@@ -640,6 +902,7 @@ private fun BalanceStrip(
     metric: UsageMetric,
     composition: List<CompactBalanceSegment>,
     isDark: Boolean,
+    compact: Boolean = false,
 ) {
     val colors = statusColors()
     val statusColor = statusColor(metric, null, colors)
@@ -650,51 +913,101 @@ private fun BalanceStrip(
             .fillMaxWidth()
             .usageTileGlass(isDark),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = metric.label,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = formatCurrency(metric.value, metric.currencyCode),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = statusColor(metric, null, colors),
-                )
-                if (composition.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier.padding(top = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+        if (compact) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (metric.id == "balance" && metric.label == "余额") {
+                            "账户余额"
+                        } else {
+                            metric.label
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = formatCurrency(metric.value, metric.currencyCode),
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = statusColor(metric, null, colors),
+                    )
+                }
+                if (composition.isNotEmpty() || resetText != null) {
+                    Column(
+                        modifier = Modifier.padding(start = 12.dp),
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        composition.forEachIndexed { index, segment ->
-                            if (index > 0) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(2.dp)
-                                        .background(
-                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
-                                            CircleShape,
-                                        )
-                                )
-                            }
+                        composition.forEach { segment ->
                             BalanceCompositionItem(
                                 segment = segment,
                                 currencyCode = metric.currencyCode,
+                                compact = true,
                             )
+                        }
+                        if (resetText != null) {
+                            StatusPill(text = resetText, color = statusColor, isDark = isDark)
                         }
                     }
                 }
             }
-            if (resetText != null) {
-                StatusPill(text = resetText, color = statusColor, isDark = isDark)
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (metric.id == "balance" && metric.label == "余额") {
+                            "账户余额"
+                        } else {
+                            metric.label
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = formatCurrency(metric.value, metric.currencyCode),
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = statusColor(metric, null, colors),
+                    )
+                    if (composition.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier.padding(top = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            composition.forEachIndexed { index, segment ->
+                                if (index > 0) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(2.dp)
+                                            .background(
+                                                MaterialTheme.colorScheme.onSurfaceVariant
+                                                    .copy(alpha = 0.35f),
+                                                CircleShape,
+                                            )
+                                    )
+                                }
+                                BalanceCompositionItem(
+                                    segment = segment,
+                                    currencyCode = metric.currencyCode,
+                                )
+                            }
+                        }
+                    }
+                }
+                if (resetText != null) {
+                    StatusPill(text = resetText, color = statusColor, isDark = isDark)
+                }
             }
         }
     }
@@ -704,6 +1017,7 @@ private fun BalanceStrip(
 private fun BalanceCompositionItem(
     segment: CompactBalanceSegment,
     currencyCode: String?,
+    compact: Boolean = false,
 ) {
     val colors = statusColors()
     val tint = when (segment.kind) {
@@ -720,7 +1034,14 @@ private fun BalanceCompositionItem(
                 .background(tint, CircleShape)
         )
         Text(
-            text = segment.label,
+            text = if (compact) {
+                when (segment.kind) {
+                    CompactBalanceSegmentKind.ToppedUp -> "充值余额"
+                    CompactBalanceSegmentKind.Granted -> "赠送余额"
+                }
+            } else {
+                segment.label
+            },
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Medium,
             color = tint,
@@ -736,7 +1057,7 @@ private fun BalanceCompositionItem(
     }
 }
 
-private fun ringSubtitle(metric: UsageMetric, vertical: Boolean): String {
+private fun ringSubtitle(metric: UsageMetric): String {
     val end = metric.windowEnd ?: return if ((progressPercent(metric) ?: 0.0) <= 0.0) "待命中" else "--"
     return formatResetTime(end)
 }
@@ -750,7 +1071,7 @@ private fun CompactMetricRow(metric: UsageMetric) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(modifier = Modifier.fillMaxWidth()) {
             Text(
-                text = metric.label,
+                text = compactPeriodLabel(metric),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
@@ -770,10 +1091,6 @@ private fun CompactMetricRow(metric: UsageMetric) {
         }
 
         if (isProgress) {
-            UsageProgressBar(
-                percent = percent,
-                color = progressColor(percent, colors),
-            )
             metric.windowEnd?.let { end ->
                 Text(
                     text = "重置 ${formatResetTime(end)}",
@@ -807,32 +1124,38 @@ private fun RefreshFailureDialog(
     onDismiss: () -> Unit,
     onRetry: () -> Unit,
 ) {
-    AlertDialog(
+    MyTokenDialog(
+        title = "刷新失败",
+        subtitle = "请检查网络或凭证状态",
+        icon = Icons.Outlined.Warning,
+        tone = MyTokenDialogTone.Warning,
         onDismissRequest = onDismiss,
-        title = { Text(text = "刷新失败") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(text = card.error?.message ?: "更新失败")
-                Text(
-                    text = if (card.snapshot == null) {
-                        "暂无可用缓存，重试将重新请求用量数据。"
-                    } else {
-                        "当前显示上次成功数据。"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+        content = {
+            MyTokenDialogSection(title = "失败原因") {
+                MyTokenDialogRow(label = card.error?.message ?: "更新失败")
             }
+            MyTokenDialogStatus(
+                message = if (card.snapshot == null) {
+                    "暂无可用缓存，重试将重新请求用量数据。"
+                } else {
+                    "当前仍显示上次成功同步的数据。"
+                },
+                tone = MyTokenDialogTone.Info,
+            )
         },
-        confirmButton = {
-            TextButton(onClick = onRetry) {
-                Text(text = "重试")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(text = "关闭")
-            }
+        actions = {
+            GlassButton(
+                text = "关闭",
+                onClick = onDismiss,
+                modifier = Modifier.weight(1f),
+                tone = GlassButtonTone.Neutral,
+            )
+            GlassButton(
+                text = "重试",
+                onClick = onRetry,
+                modifier = Modifier.weight(1f),
+                tone = GlassButtonTone.Primary,
+            )
         },
     )
 }

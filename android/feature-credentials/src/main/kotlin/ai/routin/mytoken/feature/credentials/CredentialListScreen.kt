@@ -5,9 +5,12 @@ import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.core.ui.LiquidGlassSurface
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
+import ai.routin.mytoken.core.ui.MyTokenPalette
+import ai.routin.mytoken.core.ui.ProviderLogoPlate
 import androidx.compose.foundation.ExperimentalFoundationApi
 import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,9 +20,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -29,26 +32,36 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DragHandle
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.QrCodeScanner
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import ai.routin.mytoken.core.ui.GlassButton
 import ai.routin.mytoken.core.ui.GlassButtonTone
+import ai.routin.mytoken.core.ui.GlassHelpButton
+import ai.routin.mytoken.core.ui.HelpRow
+import ai.routin.mytoken.core.ui.HelpSection
 import ai.routin.mytoken.core.ui.GlassSwitch
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import ai.routin.mytoken.core.ui.MyTokenDialog
+import ai.routin.mytoken.core.ui.MyTokenDialogRow
+import ai.routin.mytoken.core.ui.MyTokenDialogSection
+import ai.routin.mytoken.core.ui.MyTokenDialogStatus
+import ai.routin.mytoken.core.ui.MyTokenDialogTone
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,10 +69,16 @@ import android.view.HapticFeedbackConstants
 import android.view.View
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import java.util.UUID
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -78,97 +97,235 @@ fun CredentialListScreen(
     onImportFromMac: () -> Unit,
     onAddManually: () -> Unit,
     layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
+    drawerMode: Boolean = false,
 ) {
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "凭证",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                },
-                actions = {
-                    IconButton(onClick = onImportFromMac) {
-                        Icon(imageVector = Icons.Filled.QrCodeScanner, contentDescription = "从 Mac 导入")
-                    }
-                    IconButton(onClick = onAddManually) {
-                        Icon(imageVector = Icons.Filled.Add, contentDescription = "手动添加")
-                    }
-                },
-            )
+        containerColor = if (drawerMode) {
+            Color.Transparent
+        } else {
+            MaterialTheme.colorScheme.background
         },
     ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .padding(bottom = if (drawerMode) 0.dp else 62.dp)
+                .fillMaxSize()
+                .testTag(if (drawerMode) "credential_drawer_content" else "credential_list_content"),
+        ) {
+            CredentialPageHeader(
+                enabledCount = state.items.count { it.isEnabled },
+                onImportFromMac = onImportFromMac,
+                onAddManually = onAddManually,
+                drawerMode = drawerMode,
+            )
         if (state.items.isEmpty()) {
             EmptyState(
-                modifier = Modifier.padding(padding),
+                modifier = Modifier.weight(1f),
                 onImportFromMac = onImportFromMac,
                 onAddManually = onAddManually,
             )
-        } else if (layoutMode == MyTokenLayoutMode.Expanded) {
-            ExpandedCredentialGrid(
-                state = state,
-                padding = padding,
-                onToggleEnabled = onToggleEnabled,
-                onMove = onMove,
-                onEditCredential = onEditCredential,
-                onRequestDelete = onRequestDelete,
-            )
         } else {
-            val listState = rememberLazyListState()
-            val hapticView = LocalView.current
-            val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
-                onMove(from.index, to.index)
-                hapticView.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-            }
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.padding(padding).fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                itemsIndexed(
-                    state.items,
-                    key = { _, item -> item.id },
-                    contentType = { _, _ -> "credential-row" },
-                ) { index, credential ->
-                    ReorderableItem(reorderableState, key = credential.id) { isDragging ->
-                        CredentialRow(
-                            credential = credential,
-                            order = index + 1,
-                            providerName = ProviderNames.displayName(credential.providerId),
-                            isDragging = isDragging,
-                            dragHandleModifier = Modifier.longPressDraggableHandle(
-                                onDragStarted = {
-                                    hapticView.performHapticFeedback(
-                                        HapticFeedbackConstants.KEYBOARD_TAP,
-                                    )
-                                },
-                                onDragStopped = {
-                                    hapticView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                                },
-                            ),
-                            onToggleEnabled = { onToggleEnabled(credential) },
-                            onEdit = { onEditCredential(credential.id) },
-                            onRequestDelete = { onRequestDelete(credential) },
-                        )
+            if (layoutMode == MyTokenLayoutMode.Expanded) {
+                ExpandedCredentialGrid(
+                    state = state,
+                    padding = PaddingValues(),
+                    onToggleEnabled = onToggleEnabled,
+                    onMove = onMove,
+                    onEditCredential = onEditCredential,
+                    onRequestDelete = onRequestDelete,
+                    modifier = Modifier.weight(1f),
+                )
+            } else {
+                val listState = rememberLazyListState()
+                val hapticView = LocalView.current
+                val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
+                    onMove(from.index, to.index)
+                    hapticView.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                }
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        bottom = if (drawerMode) 24.dp else 92.dp,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    itemsIndexed(
+                        state.items,
+                        key = { _, item -> item.id },
+                        contentType = { _, _ -> "credential-row" },
+                    ) { _, credential ->
+                        ReorderableItem(reorderableState, key = credential.id) { isDragging ->
+                            CredentialRow(
+                                credential = credential,
+                                providerName = ProviderNames.displayName(credential.providerId),
+                                isDragging = isDragging,
+                                dragHandleModifier = Modifier.longPressDraggableHandle(
+                                    onDragStarted = {
+                                        hapticView.performHapticFeedback(
+                                            HapticFeedbackConstants.KEYBOARD_TAP,
+                                        )
+                                    },
+                                    onDragStopped = {
+                                        hapticView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                                    },
+                                ),
+                                onToggleEnabled = { onToggleEnabled(credential) },
+                                onEdit = { onEditCredential(credential.id) },
+                                onRequestDelete = { onRequestDelete(credential) },
+                            )
+                        }
                     }
                 }
             }
         }
+        }
     }
 
     state.pendingDeletion?.let { target ->
-        AlertDialog(
+        MyTokenDialog(
+            title = "删除凭证",
+            subtitle = "只影响本机数据",
+            icon = Icons.Outlined.Delete,
+            tone = MyTokenDialogTone.Danger,
             onDismissRequest = onDismissDelete,
-            title = { Text(text = "删除凭证") },
-            text = { Text(text = "确定删除「${target.name}」吗？只删除本机数据，不影响供应商账户。") },
-            confirmButton = {
-                TextButton(onClick = onConfirmDelete) { Text(text = "删除", color = MaterialTheme.colorScheme.error) }
+            content = {
+                MyTokenDialogSection {
+                    MyTokenDialogRow(
+                        label = "「${target.name}」",
+                        detail = "将从首页和凭证列表移除",
+                    )
+                }
+                MyTokenDialogStatus(
+                    message = "不会删除或修改供应商账户中的任何内容。",
+                    tone = MyTokenDialogTone.Info,
+                )
             },
-            dismissButton = { TextButton(onClick = onDismissDelete) { Text(text = "取消") } },
+            actions = {
+                GlassButton(
+                    text = "取消",
+                    onClick = onDismissDelete,
+                    modifier = Modifier.weight(1f),
+                    tone = GlassButtonTone.Neutral,
+                )
+                GlassButton(
+                    text = "删除",
+                    onClick = onConfirmDelete,
+                    modifier = Modifier.weight(1f),
+                    tone = GlassButtonTone.Destructive,
+                )
+            },
         )
+    }
+}
+
+@Composable
+private fun CredentialPageHeader(
+    enabledCount: Int,
+    onImportFromMac: () -> Unit,
+    onAddManually: () -> Unit,
+    drawerMode: Boolean = false,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "凭证",
+                    fontSize = 30.sp,
+                    lineHeight = 31.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-1).sp,
+                )
+                if (drawerMode) {
+                    GlassHelpButton(
+                        title = "凭证列表",
+                        subtitle = "列表与首页共用同一组凭证",
+                        sections = listOf(
+                            HelpSection(
+                                title = "操作",
+                                rows = listOf(
+                                    HelpRow("轻点凭证", "进入编辑"),
+                                    HelpRow("长按拖动", "调整显示顺序"),
+                                    HelpRow("右侧开关", "控制首页是否展示"),
+                                ),
+                            ),
+                        ),
+                        modifier = Modifier
+                            .padding(start = 6.dp)
+                            .testTag("credential_help"),
+                    )
+                }
+            }
+            if (enabledCount > 0) {
+                Text(
+                    text = "$enabledCount 个已启用",
+                    modifier = Modifier.padding(top = 5.dp),
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (!drawerMode) {
+                HeaderCircleButton(
+                    contentDescription = "从 Mac 导入",
+                    onClick = onImportFromMac,
+                ) {
+                    Icon(Icons.Filled.QrCodeScanner, contentDescription = null, modifier = Modifier.size(16.dp))
+                }
+            }
+            HeaderCircleButton(
+                contentDescription = "新增凭证",
+                onClick = onAddManually,
+                primary = true,
+            ) {
+                Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(22.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeaderCircleButton(
+    contentDescription: String,
+    onClick: () -> Unit,
+    primary: Boolean = false,
+    content: @Composable () -> Unit,
+) {
+    val shape = if (primary) CircleShape else RoundedCornerShape(10.dp)
+    Box(
+        modifier = Modifier
+            .size(if (primary) 40.dp else 34.dp)
+            .clip(shape)
+            .background(
+                if (primary) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                } else {
+                    MaterialTheme.colorScheme.surface.copy(alpha = 0.78f)
+                },
+            )
+            .clickable(onClick = onClick)
+            .semantics { this.contentDescription = contentDescription }
+            .testTag(if (primary) "credential_add_button" else "credential_import_button"),
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.material3.LocalContentColor provides if (primary) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+        ) {
+            content()
+        }
     }
 }
 
@@ -181,6 +338,7 @@ private fun ExpandedCredentialGrid(
     onMove: (Int, Int) -> Unit,
     onEditCredential: (UUID) -> Unit,
     onRequestDelete: (Credential) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyGridState()
     val hapticView = LocalView.current
@@ -191,7 +349,7 @@ private fun ExpandedCredentialGrid(
     MyTokenAdaptiveContent(
         maxWidth = 960.dp,
         horizontalPadding = 0.dp,
-        modifier = Modifier.padding(padding).fillMaxSize(),
+        modifier = modifier.padding(padding).fillMaxSize(),
     ) {
         LazyVerticalGrid(
             state = listState,
@@ -201,11 +359,10 @@ private fun ExpandedCredentialGrid(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            gridItemsIndexed(state.items, key = { _, item -> item.id }) { index, credential ->
+            gridItemsIndexed(state.items, key = { _, item -> item.id }) { _, credential ->
                 ReorderableItem(reorderableState, key = credential.id) { isDragging ->
                     CredentialRow(
                         credential = credential,
-                        order = index + 1,
                         providerName = ProviderNames.displayName(credential.providerId),
                         isDragging = isDragging,
                         dragHandleModifier = Modifier.longPressDraggableHandle(
@@ -229,7 +386,6 @@ private fun ExpandedCredentialGrid(
 @Composable
 private fun CredentialRow(
     credential: Credential,
-    order: Int,
     providerName: String,
     isDragging: Boolean,
     dragHandleModifier: Modifier,
@@ -237,9 +393,11 @@ private fun CredentialRow(
     onEdit: () -> Unit,
     onRequestDelete: () -> Unit,
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
     LiquidGlassSurface(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(role = Role.Button, onClick = onEdit)
             .then(dragHandleModifier)
             .zIndex(if (isDragging) 1f else 0f)
             .then(
@@ -257,48 +415,27 @@ private fun CredentialRow(
         shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 10.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 58.dp)
+                .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = order.toString(),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-            Spacer(modifier = Modifier.width(6.dp))
-            Icon(
-                imageVector = Icons.Filled.DragHandle,
-                contentDescription = "长按拖动排序",
+            ProviderLogoAvatar(
+                providerId = credential.providerId,
+                providerName = providerName,
             )
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 10.dp),
+                    .padding(start = 10.dp, end = 8.dp),
             ) {
                 Text(
                     text = credential.name,
-                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 13.sp,
+                    lineHeight = 16.sp,
                     fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = providerName,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            IconButton(onClick = onEdit) {
-                Icon(
-                    imageVector = Icons.Filled.Edit,
-                    contentDescription = "编辑 ${credential.name}",
+                    maxLines = 1,
                 )
             }
             GlassSwitch(
@@ -306,15 +443,72 @@ private fun CredentialRow(
                 onCheckedChange = { onToggleEnabled() },
                 contentDescription = "启用 ${credential.name}",
             )
-            IconButton(onClick = onRequestDelete) {
-                Icon(
-                    imageVector = Icons.Filled.Delete,
-                    contentDescription = "删除 ${credential.name}",
-                    tint = MaterialTheme.colorScheme.error,
-                )
+            Box {
+                IconButton(
+                    onClick = { menuExpanded = true },
+                    modifier = Modifier
+                        .size(28.dp)
+                        .testTag("credential_more_${credential.id}"),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.MoreVert,
+                        contentDescription = "更多操作 ${credential.name}",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(17.dp),
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("编辑 ${credential.name}") },
+                        onClick = {
+                            menuExpanded = false
+                            onEdit()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                "删除 ${credential.name}",
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onRequestDelete()
+                        },
+                    )
+                }
             }
         }
     }
+}
+
+@Composable
+private fun ProviderLogoAvatar(
+    providerId: ProviderId,
+    providerName: String,
+) {
+    ProviderLogoPlate(
+        painter = painterResource(providerLogoRes(providerId)),
+        contentDescription = providerName,
+        size = 30.dp,
+        shape = RoundedCornerShape(9.dp),
+        contentPadding = 3.dp,
+    )
+}
+
+private fun providerLogoRes(providerId: ProviderId): Int = when (providerId) {
+    ProviderId.Routin -> R.drawable.share_provider_routin_logo
+    ProviderId.DeepSeek -> R.drawable.share_provider_deepseek_logo
+    ProviderId.Glm -> R.drawable.share_provider_glm_logo
+    ProviderId.Volcengine -> R.drawable.share_provider_volcengine_logo
+    ProviderId.NewAPI -> R.drawable.share_provider_newapi_logo
+    ProviderId.CommandCode -> R.drawable.share_provider_commandcode_logo
+    ProviderId.Xiaomi -> R.drawable.share_provider_xiaomi_logo
+    ProviderId.OpenCode -> R.drawable.share_provider_opencode_logo
 }
 
 @Composable
@@ -325,13 +519,7 @@ private fun EmptyState(
 ) {
     Box(modifier = modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = "尚未添加凭证", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "从 Mac 迁移，或手动添加供应商凭证",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Text(text = "暂无凭证", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
             Spacer(modifier = Modifier.height(24.dp))
         GlassButton(
             onClick = onImportFromMac,
@@ -341,7 +529,7 @@ private fun EmptyState(
         Spacer(modifier = Modifier.height(8.dp))
         GlassButton(
             onClick = onAddManually,
-            text = "手动添加",
+            text = "添加凭证",
         )
         }
     }

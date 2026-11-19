@@ -51,7 +51,7 @@ class AndroidVisualRegressionTest {
         assertEquals(MyTokenVisualPolicy.Material.ModalGlass, MyTokenVisualPolicy.materialFor(MyTokenVisualPolicy.SurfaceRole.Modal))
         assertFalse(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.Card))
         assertFalse(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.Window))
-        assertTrue(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.Modal))
+        assertFalse(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.Modal))
     }
 
     @Test
@@ -72,10 +72,10 @@ class AndroidVisualRegressionTest {
             }
         }
 
-        assertEquals(0xFF2F80ED.toInt(), lightPrimary.toArgb())
-        assertEquals(0xFF4D94F5.toInt(), darkPrimary.toArgb())
-        assertEquals(0xFF2F9E78.toInt(), lightPositive.toArgb())
-        assertEquals(0xFFD15B5B.toInt(), darkDanger.toArgb())
+        assertEquals(0xFF2F6BFF.toInt(), lightPrimary.toArgb())
+        assertEquals(0xFF6E9DFF.toInt(), darkPrimary.toArgb())
+        assertEquals(0xFF2E9B77.toInt(), lightPositive.toArgb())
+        assertEquals(0xFFD25A60.toInt(), darkDanger.toArgb())
     }
 
     @Test
@@ -136,7 +136,10 @@ class AndroidVisualRegressionTest {
                 val getLayoutAction = config[SemanticsActions.GetTextLayoutResult]
                 getLayoutAction?.action?.invoke(layouts)
                 if (layouts.isNotEmpty()) {
-                    assertFalse(layouts.single().hasVisualOverflow)
+                    assertFalse(
+                        "重置时间不应被截断",
+                        layouts.single().hasVisualOverflow,
+                    )
                 }
             }
     }
