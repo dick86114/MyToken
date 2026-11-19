@@ -746,7 +746,8 @@ final class ProjectBootstrapTests: XCTestCase {
         XCTAssertTrue(usageRowView.contains("title: \"周\""))
         XCTAssertTrue(usageRowView.contains("UsageFormatter.remainingDurationText"))
         XCTAssertFalse(usageRowView.contains("groupMultipliers"))
-        XCTAssertFalse(usageRowView.contains("allowedModels"))
+        // DeepSeek 完整模式需要展示可用模型数量，其余供应商的弹窗仍不展示模型清单；
+        // 旧版的「允许模型」文案已废弃，改为「可用模型」。
         XCTAssertFalse(usageRowView.contains("允许模型"))
     }
 

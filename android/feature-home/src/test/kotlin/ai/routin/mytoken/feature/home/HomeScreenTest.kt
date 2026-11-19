@@ -432,7 +432,7 @@ class HomeScreenTest {
 
     @Test
     @Config(qualifiers = "w400dp-h1100dp")
-    fun fullDeepSeekCardShowsGiftAmountTileWithoutAccountStatus() {
+    fun fullDeepSeekCardShowsAllAccountFieldsIncludingStatusAndTopUp() {
         val credential = credential("DeepSeek 余额", ProviderId.DeepSeek)
         val total = UsageMetric(
             id = "balance",
@@ -480,10 +480,13 @@ class HomeScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("赠送金额").assertIsDisplayed()
+        // 完整模式需要把接口返回的字段全部展示：赠金、充值余额、账户状态缺一不可。
+        composeRule.onNodeWithText("赠金").assertIsDisplayed()
         composeRule.onNodeWithText("¥5.00").assertIsDisplayed()
-        composeRule.onNodeWithText("账户状态").assertDoesNotExist()
-        composeRule.onNodeWithText("充值余额").assertDoesNotExist()
+        composeRule.onNodeWithText("充值").assertIsDisplayed()
+        composeRule.onNodeWithText("¥33.40").assertIsDisplayed()
+        composeRule.onNodeWithText("账户状态").assertIsDisplayed()
+        composeRule.onNodeWithText("可用").assertIsDisplayed()
     }
 
     @Test
