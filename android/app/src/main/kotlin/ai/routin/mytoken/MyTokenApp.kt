@@ -269,6 +269,12 @@ fun MyTokenApp(
                     hasUpdateAvailable = updateState is ai.routin.mytoken.feature.settings.AppUpdateUiState.Available ||
                         updateState is ai.routin.mytoken.feature.settings.AppUpdateUiState.NeedsInstallPermission ||
                         updateState is ai.routin.mytoken.feature.settings.AppUpdateUiState.ReadyToInstall,
+                    updateVersion = when (val state = updateState) {
+                        is ai.routin.mytoken.feature.settings.AppUpdateUiState.Available -> state.version
+                        is ai.routin.mytoken.feature.settings.AppUpdateUiState.NeedsInstallPermission -> state.version
+                        is ai.routin.mytoken.feature.settings.AppUpdateUiState.ReadyToInstall -> state.version
+                        else -> null
+                    },
                 )
             }
         }

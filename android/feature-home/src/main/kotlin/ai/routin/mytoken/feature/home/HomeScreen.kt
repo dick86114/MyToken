@@ -113,6 +113,7 @@ fun HomeScreen(
     onOpenCredentials: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     hasUpdateAvailable: Boolean = false,
+    updateVersion: String? = null,
     layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
     usageCardDensity: UsageCardDensity = UsageCardDensity.FULL,
     onToggleUsageCardDensity: () -> Unit = {},
@@ -230,7 +231,10 @@ fun HomeScreen(
                                     key = "home_update_banner",
                                     span = StaggeredGridItemSpan.FullLine,
                                 ) {
-                                    HomeUpdateBanner(onOpenSettings = onOpenSettings)
+                                    HomeUpdateBanner(
+                                        version = updateVersion,
+                                        onOpenSettings = onOpenSettings,
+                                    )
                                 }
                             }
                             item(
@@ -552,7 +556,10 @@ private fun DensityGlyph(compact: Boolean, color: Color) {
  * 点击进入设置页，由设置页的更新卡片负责下载与安装。
  */
 @Composable
-private fun HomeUpdateBanner(onOpenSettings: () -> Unit) {
+private fun HomeUpdateBanner(
+    version: String?,
+    onOpenSettings: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -576,7 +583,7 @@ private fun HomeUpdateBanner(onOpenSettings: () -> Unit) {
                 .padding(horizontal = 10.dp),
         ) {
             Text(
-                text = "发现新版本",
+                text = version?.takeIf { it.isNotBlank() }?.let { "发现新版本 $it" } ?: "发现新版本",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,

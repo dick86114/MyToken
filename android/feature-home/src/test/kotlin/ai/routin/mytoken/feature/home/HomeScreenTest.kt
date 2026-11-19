@@ -867,12 +867,13 @@ class HomeScreenTest {
                     onAddManually = {},
                     onOpenSettings = { openedSettings++ },
                     hasUpdateAvailable = true,
+                    updateVersion = "6.1.0",
                 )
             }
         }
 
         composeRule.onNodeWithTag("home_update_banner").assertIsDisplayed()
-        composeRule.onNodeWithText("发现新版本").assertIsDisplayed()
+        composeRule.onNodeWithText("发现新版本 6.1.0").assertIsDisplayed()
         composeRule.onNodeWithTag("home_update_banner").performClick()
         assertEquals(1, openedSettings)
     }
