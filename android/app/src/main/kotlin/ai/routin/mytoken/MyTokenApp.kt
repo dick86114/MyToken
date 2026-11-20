@@ -30,6 +30,15 @@ import ai.routin.mytoken.core.ui.MyTokenDialogStatus
 import ai.routin.mytoken.core.ui.MyTokenDialogTone
 import ai.routin.mytoken.core.ui.rememberMyTokenLayoutMode
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
@@ -43,6 +52,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -81,6 +91,7 @@ fun MyTokenApp(
 ) {
     var screen by remember { mutableStateOf<AppScreen>(AppScreen.Home) }
     var drawerSide by remember { mutableStateOf<MyTokenEdgeDrawerSide?>(null) }
+    var pageDirection by remember { mutableIntStateOf(1) }
     val backStack = remember { mutableStateListOf<AppScreen>() }
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -94,11 +105,15 @@ fun MyTokenApp(
     val logExportState by logExportController.state.collectAsState()
 
     fun navigate(target: AppScreen) {
+        pageDirection = 1
+        drawerSide = null
         backStack.add(screen)
         screen = target
     }
 
     fun goBack() {
+        pageDirection = -1
+        drawerSide = null
         screen = backStack.removeLastOrNull() ?: AppScreen.Home
     }
 
@@ -173,6 +188,7 @@ fun MyTokenApp(
 
     LaunchedEffect(openCredentialId) {
         openCredentialId?.let { credentialId ->
+            pageDirection = 1
             drawerSide = null
             screen = AppScreen.Detail(credentialId)
             backStack.clear()
@@ -180,7 +196,30 @@ fun MyTokenApp(
         }
     }
 
-    when (val current = screen) {
+    AnimatedContent(
+        targetState = screen,
+        modifier = Modifier.fillMaxSize(),
+        transitionSpec = {
+            val forward = pageDirection >= 0
+            val enter = slideInHorizontally(
+                animationSpec = spring(
+                    dampingRatio = 1f,
+                    stiffness = Spring.StiffnessMedium,
+                ),
+                initialOffsetX = { width -> if (forward) width else -width / 6 },
+            ) + fadeIn(animationSpec = tween(durationMillis = 180))
+            val exit = slideOutHorizontally(
+                animationSpec = spring(
+                    dampingRatio = 1f,
+                    stiffness = Spring.StiffnessMedium,
+                ),
+                targetOffsetX = { width -> if (forward) -width / 6 else width },
+            ) + fadeOut(animationSpec = tween(durationMillis = 140))
+            enter togetherWith exit
+        },
+        label = "appScreenTransition",
+    ) { current ->
+        when (current) {
         AppScreen.Home -> {
             MyTokenEdgeDrawerHost(
                 drawerSide = drawerSide,
@@ -332,6 +371,7 @@ fun MyTokenApp(
                                         graph.credentialOrderStore.pruneCredential(target.id)
                                     }
                                     homeViewModel.refreshAll()
+                                    pageDirection = -1
                                     drawerSide = null
                                     screen = AppScreen.Home
                                     backStack.clear()
@@ -425,6 +465,7 @@ fun MyTokenApp(
                     }
                 }
             }
+        }
         }
     }
 }

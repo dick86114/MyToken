@@ -3,6 +3,7 @@ package ai.routin.mytoken.feature.home
 import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.core.ui.MyTokenPalette
+import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -291,7 +292,10 @@ internal fun ResetCardsBadge(
                 MaterialTheme.colorScheme.onSurface.copy(alpha = if (expanded) 0.12f else 0.06f),
                 CircleShape,
             )
-            .padding(horizontal = if (style == ResetCardsBadgeStyle.Detail) 7.dp else 5.dp, vertical = 2.dp),
+            .padding(
+                horizontal = if (style == ResetCardsBadgeStyle.Detail) 7.dp else 5.dp,
+                vertical = if (style == ResetCardsBadgeStyle.Detail) 2.dp else 1.dp,
+            ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
@@ -309,7 +313,11 @@ internal fun ResetCardsBadge(
         }
         Text(
             text = if (style == ResetCardsBadgeStyle.Detail) text else cards.size.toString(),
-            style = MaterialTheme.typography.labelSmall,
+            style = if (style == ResetCardsBadgeStyle.Detail) {
+                MaterialTheme.typography.labelSmall
+            } else {
+                MyTokenType.badge.copy(fontSize = 9.5.sp, lineHeight = 12.sp)
+            },
             fontWeight = FontWeight.SemiBold,
             color = if (style == ResetCardsBadgeStyle.Detail) {
                 MaterialTheme.colorScheme.onSurfaceVariant
@@ -330,10 +338,7 @@ internal fun ResetCardsBadge(
             Column(modifier = Modifier.fillMaxWidth().padding(all = 12.dp)) {
                 Text(
                     text = "重置卡到期时间",
-                    style = TextStyle(
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    ),
+                    style = MyTokenType.metricValue,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 HorizontalDivider(
@@ -348,7 +353,7 @@ internal fun ResetCardsBadge(
                         Text(
                             text = (index + 1).toString(),
                             style = TextStyle(
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 fontFamily = FontFamily.Monospace,
                             ),
@@ -360,7 +365,7 @@ internal fun ResetCardsBadge(
                         Text(
                             text = formatResetCardExpiry(card.expiresAt),
                             style = TextStyle(
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 fontFamily = FontFamily.Monospace,
                             ),
                             color = MaterialTheme.colorScheme.onSurface,

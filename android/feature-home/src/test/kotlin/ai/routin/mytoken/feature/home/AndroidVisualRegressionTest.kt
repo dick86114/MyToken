@@ -21,8 +21,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.Density
 import java.math.BigDecimal
@@ -127,7 +130,8 @@ class AndroidVisualRegressionTest {
         }
 
         val resetText = formatResetTime(end)
-        composeRule.onNodeWithText("到期 ${formatSubscriptionTime(expiry)}").assertExists()
+        composeRule.onNodeWithText("长周期套餐 · 到期 ${formatSubscriptionTime(expiry)}")
+            .assertExists()
         composeRule.onAllNodesWithText(resetText, useUnmergedTree = true)
             .fetchSemanticsNodes()
             .forEach { node ->
@@ -142,6 +146,75 @@ class AndroidVisualRegressionTest {
                     )
                 }
             }
+    }
+
+    @Test
+    @Config(qualifiers = "w280dp-h1200dp")
+    fun 窄屏完整配额卡片保留窗口与辅助字段() {
+        val end = Instant.now().plus(Duration.ofHours(2))
+        val credential = Credential(
+            id = UUID.randomUUID(),
+            providerId = ProviderId.Glm,
+            credentialKind = CredentialKind.ApiKey,
+            name = "GLM 窄屏",
+        )
+        val card = CredentialCardUi(
+            credential = credential,
+            status = RefreshStatus.Ready,
+            snapshot = UsageSnapshot(
+                credentialId = credential.id,
+                fetchedAt = Instant.now(),
+                metrics = listOf(
+                    progressMetric("five-hour", "5 小时用量", end).copy(
+                        resetCards = listOf(
+                            ai.routin.mytoken.domain.model.UsageResetCard(
+                                expiresAt = Instant.now().plus(Duration.ofDays(3)),
+                            ),
+                        ),
+                    ),
+                    progressMetric("weekly", "每周用量", end.plus(Duration.ofDays(4))),
+                    UsageMetric(
+                        id = "model-calls",
+                        label = "模型调用量",
+                        value = BigDecimal("1888"),
+                        unit = UsageMetricUnit.Request,
+                        presentation = UsageMetricPresentation.Value,
+                        semantic = UsageMetricSemantic.Value,
+                        healthState = UsageMetricHealthState.Normal,
+                    ),
+                ),
+                planName = "Coding Plan",
+            ),
+            isStale = false,
+            error = null,
+            freshness = Freshness(FreshnessLevel.JUST_NOW, "刚刚更新"),
+        )
+
+        composeRule.setContent {
+            MyTokenTheme {
+                CompositionLocalProvider(
+                    LocalDensity provides Density(
+                        density = LocalDensity.current.density,
+                        fontScale = 1.25f,
+                    ),
+                ) {
+                    CredentialUsageCard(
+                        card = card,
+                        onOpen = {},
+                        onRetry = {},
+                        usageCardDensity = UsageCardDensity.FULL,
+                    )
+                }
+            }
+        }
+
+        val root = composeRule.onRoot().getUnclippedBoundsInRoot()
+        listOf("5 小时用量", "本周用量", "模型调用").forEach { label ->
+            val bounds = composeRule.onNodeWithText(label).getUnclippedBoundsInRoot()
+            assertTrue("$label should stay inside the card", bounds.left >= root.left)
+            assertTrue("$label should stay inside the card", bounds.right <= root.right)
+        }
+        composeRule.onNodeWithContentDescription("1 张重置卡").assertExists()
     }
 
     private fun progressMetric(

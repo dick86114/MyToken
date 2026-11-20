@@ -67,6 +67,7 @@ fun MyTokenTheme(
 ) {
     MaterialTheme(
         colorScheme = if (darkTheme) DarkColors else LightColors,
+        typography = MyTokenTypography,
     ) {
         // OriginOS 等机型上系统拉伸 overscroll 会额外走一层 RenderEffect，滑动容易掉帧。
         CompositionLocalProvider(LocalOverscrollConfiguration provides null) {

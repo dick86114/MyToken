@@ -56,7 +56,7 @@ class MyTokenAppTest {
     }
 
     @Test
-    fun 从凭证抽屉进入编辑器后返回会恢复抽屉() {
+    fun 从凭证抽屉进入编辑器后返回不会残留旧抽屉() {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("home_open_credentials").performClick()
         composeRule.waitForIdle()
@@ -68,9 +68,14 @@ class MyTokenAppTest {
 
         composeRule.onNodeWithContentDescription("返回").performClick()
         composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithTag("edge_drawer_start").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithTag("home_open_settings").fetchSemanticsNodes().isNotEmpty()
         }
 
-        composeRule.onNodeWithTag("edge_drawer_start").assertIsDisplayed()
+        composeRule.onNodeWithTag("edge_drawer_start").assertDoesNotExist()
+        composeRule.onNodeWithTag("home_open_settings").performClick()
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithTag("edge_drawer_end").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("edge_drawer_end").assertIsDisplayed()
     }
 }

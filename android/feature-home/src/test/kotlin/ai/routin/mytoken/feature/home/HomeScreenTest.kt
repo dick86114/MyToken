@@ -2,6 +2,7 @@ package ai.routin.mytoken.feature.home
 
 import ai.routin.mytoken.domain.model.AppError
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
+import ai.routin.mytoken.core.ui.MyTokenTheme
 import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.model.CredentialKind
 import ai.routin.mytoken.domain.model.ProviderId
@@ -99,10 +100,27 @@ class HomeScreenTest {
         metrics: List<UsageMetric> = emptyList(),
         isStale: Boolean = false,
         error: AppError? = null,
+        allowedModels: List<String> = emptyList(),
+        statusText: String? = null,
+        usageKind: String? = null,
+        billingMode: String? = null,
+        planName: String = "成长版",
+        subscriptionEndAt: Instant? = now.plusSeconds(86400),
     ) = CredentialCardUi(
         credential = credential,
         status = status,
-        snapshot = UsageSnapshot(credential.id, now, metrics, "成长版", now.minusSeconds(86400), now.plusSeconds(86400)),
+        snapshot = UsageSnapshot(
+            credentialId = credential.id,
+            fetchedAt = now,
+            metrics = metrics,
+            planName = planName,
+            subscriptionStartAt = now.minusSeconds(86400),
+            subscriptionEndAt = subscriptionEndAt,
+            statusText = statusText,
+            usageKind = usageKind,
+            billingMode = billingMode,
+            allowedModels = allowedModels,
+        ),
         isStale = isStale,
         error = error,
         freshness = if (isStale) Freshness(FreshnessLevel.EXPIRED, "数据已过期") else Freshness(FreshnessLevel.JUST_NOW, "刚刚更新"),
@@ -224,8 +242,8 @@ class HomeScreenTest {
             }
         }
 
-        composeRule.onAllNodesWithText("2 张重置卡").onFirst().assertIsDisplayed()
-        composeRule.onAllNodesWithText("1 张重置卡").onFirst().assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("2 张重置卡").assertExists()
+        composeRule.onNodeWithContentDescription("1 张重置卡").assertExists()
     }
 
     @Test
@@ -253,17 +271,15 @@ class HomeScreenTest {
         }
 
         composeRule.onNodeWithText("¥12.50").assertIsDisplayed()
-        composeRule.onNodeWithText("充值余额").assertIsDisplayed()
-        composeRule.onNodeWithText("¥10.00").assertIsDisplayed()
-        composeRule.onNodeWithText("赠送余额").assertIsDisplayed()
-        composeRule.onNodeWithText("¥2.50").assertIsDisplayed()
-        val totalBounds = composeRule.onNodeWithText("¥12.50", useUnmergedTree = true)
+        composeRule.onNodeWithText("现金 ¥10.00").assertIsDisplayed()
+        composeRule.onNodeWithText("赠送 ¥2.50").assertIsDisplayed()
+        val cashBounds = composeRule.onNodeWithText("现金 ¥10.00", useUnmergedTree = true)
             .getUnclippedBoundsInRoot()
-        val giftBounds = composeRule.onNodeWithText("赠送余额", useUnmergedTree = true)
+        val giftBounds = composeRule.onNodeWithText("赠送 ¥2.50", useUnmergedTree = true)
             .getUnclippedBoundsInRoot()
         assertTrue(
-            "total=$totalBounds gift=$giftBounds",
-            giftBounds.left.value > totalBounds.right.value,
+            "cash=$cashBounds gift=$giftBounds",
+            giftBounds.left.value > cashBounds.right.value,
         )
     }
 
@@ -331,6 +347,45 @@ class HomeScreenTest {
     }
 
     @Test
+    @Config(qualifiers = "w400dp-h900dp")
+    fun compactValueCardUsesHairlineTwoByTwoGrid() {
+        val credential = credential("New API 统计", ProviderId.NewAPI)
+        val metrics = listOf(
+            token("today-token", "今日 Token", 14_873_680.0),
+            token("one-day-token", "近 24 小时 Token", 15_123_456.0),
+            token("seven-day-token", "近 7 天 Token", 139_735_349.0),
+            token("thirty-day-token", "近 30 天 Token", 1_100_848_403.0),
+        )
+        composeRule.setContent {
+            MaterialTheme {
+                CredentialUsageCard(
+                    card(credential, metrics = metrics),
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.COMPACT,
+                )
+            }
+        }
+
+        listOf("今日 Token", "近 24 小时 Token", "近 7 天 Token", "近 30 天 Token")
+            .forEach { composeRule.onNodeWithText(it).assertIsDisplayed() }
+        composeRule.onNodeWithText("14.87").assertIsDisplayed()
+        composeRule.onNodeWithText("15.12").assertIsDisplayed()
+        composeRule.onNodeWithText("139.74").assertIsDisplayed()
+        composeRule.onNodeWithText("1.1").assertIsDisplayed()
+
+        val first = composeRule.onNodeWithText("今日 Token", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val second = composeRule.onNodeWithText("近 24 小时 Token", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val third = composeRule.onNodeWithText("近 7 天 Token", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        assertEquals(first.top.value, second.top.value, 0.5f)
+        assertTrue(second.left.value > first.left.value)
+        assertTrue(third.top.value > first.top.value)
+    }
+
+    @Test
     fun showsStandardCardWithMacStyleFields() {
         val credential = credential("熠")
         composeRule.setContent {
@@ -351,8 +406,58 @@ class HomeScreenTest {
             }
         }
         composeRule.onNodeWithText("熠").assertIsDisplayed()
-        composeRule.onAllNodesWithText("已用", substring = true, useUnmergedTree = true).onFirst().assertIsDisplayed()
+        composeRule.onNodeWithText("5 小时额度").assertIsDisplayed()
         composeRule.onAllNodesWithText("剩余", substring = true, useUnmergedTree = true).onFirst().assertIsDisplayed()
+    }
+
+    @Test
+    fun 首页顶部使用单行工具条且账户健康保持紧凑() {
+        val cards = (1..7).map { index ->
+            card(credential("健康 $index"), metrics = listOf(progress(20.0 + index, 100.0)))
+        }
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = cards,
+                        groups = listOf(group(ProviderId.Routin, cards)),
+                        credentialCount = cards.size,
+                        lastUpdatedText = "刚刚同步",
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("账户用量").assertDoesNotExist()
+        composeRule.onNodeWithTag("home_wordmark").assertDoesNotExist()
+        composeRule.onNodeWithTag("usage_density_toggle").assertIsDisplayed()
+        val rootBounds = composeRule.onRoot().getUnclippedBoundsInRoot()
+        val toggleBounds = composeRule.onNodeWithTag("usage_density_toggle")
+            .getUnclippedBoundsInRoot()
+        assertEquals(
+            ((rootBounds.left + rootBounds.right) / 2f).value,
+            ((toggleBounds.left + toggleBounds.right) / 2f).value,
+            1f,
+        )
+        val toolbarBounds = composeRule.onNodeWithTag("home_toolbar")
+            .getUnclippedBoundsInRoot()
+        assertTrue(
+            "首页工具条应保持单行高度，实际高度 ${toolbarBounds.bottom - toolbarBounds.top}",
+            (toolbarBounds.bottom - toolbarBounds.top).value < 50f,
+        )
+        val healthBounds = composeRule.onNodeWithTag("health_summary")
+            .getUnclippedBoundsInRoot()
+        val healthHeight = healthBounds.bottom - healthBounds.top
+        assertTrue(
+            "账户健康应压缩为单行摘要 + 状态条，实际高度 $healthHeight",
+            healthHeight.value < 100f,
+        )
     }
 
     @Test
@@ -419,12 +524,13 @@ class HomeScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("到期 ${formatSubscriptionTime(now.plusSeconds(86_400))}")
+        val metaText = "成长版 · 到期 ${formatSubscriptionTime(now.plusSeconds(86_400))}"
+        composeRule.onNodeWithText(metaText)
             .assertIsDisplayed()
         val alias = composeRule.onNodeWithText("高用量", useUnmergedTree = true)
             .getUnclippedBoundsInRoot()
         val expiry = composeRule.onNodeWithText(
-            "到期 ${formatSubscriptionTime(now.plusSeconds(86_400))}",
+            metaText,
             useUnmergedTree = true,
         ).getUnclippedBoundsInRoot()
         assertTrue(expiry.top.value >= alias.bottom.value - 1f)
@@ -432,7 +538,7 @@ class HomeScreenTest {
 
     @Test
     @Config(qualifiers = "w400dp-h1100dp")
-    fun fullDeepSeekCardShowsAllAccountFieldsIncludingStatusAndTopUp() {
+    fun fullDeepSeekCardUsesBalanceHeroAndShowsAllAccountFields() {
         val credential = credential("DeepSeek 余额", ProviderId.DeepSeek)
         val total = UsageMetric(
             id = "balance",
@@ -472,6 +578,9 @@ class HomeScreenTest {
                     card(
                         credential,
                         metrics = listOf(total, gift, toppedUp, availability),
+                        allowedModels = listOf("deepseek-v4-flash", "deepseek-v4-pro"),
+                        planName = "API 余额",
+                        subscriptionEndAt = null,
                     ),
                     onOpen = {},
                     onRetry = {},
@@ -480,18 +589,234 @@ class HomeScreenTest {
             }
         }
 
-        // 完整模式需要把接口返回的字段全部展示：赠金、充值余额、账户状态缺一不可。
-        composeRule.onNodeWithText("赠金").assertIsDisplayed()
-        composeRule.onNodeWithText("¥5.00").assertIsDisplayed()
-        composeRule.onNodeWithText("充值").assertIsDisplayed()
-        composeRule.onNodeWithText("¥33.40").assertIsDisplayed()
-        composeRule.onNodeWithText("账户状态").assertIsDisplayed()
-        composeRule.onNodeWithText("可用").assertIsDisplayed()
+        composeRule.onNodeWithText("账户余额 · CNY").assertIsDisplayed()
+        val balanceTitleResults = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        composeRule.onNodeWithText("账户余额 · CNY", useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
+                action(balanceTitleResults)
+            }
+        assertTrue(
+            "余额标题不应在完整模式中被截断",
+            !balanceTitleResults.single().hasVisualOverflow,
+        )
+        composeRule.onNodeWithText("¥38.40").assertIsDisplayed()
+        composeRule.onNodeWithText("账户可用").assertDoesNotExist()
+        composeRule.onNodeWithText("充值 ¥33.40").assertIsDisplayed()
+        composeRule.onNodeWithText("赠金 ¥5.00").assertIsDisplayed()
+        composeRule.onNodeWithText("可用模型").assertIsDisplayed()
+        composeRule.onNodeWithText("2 个").assertIsDisplayed()
+        composeRule.onNodeWithText("deepseek-v4-flash").assertDoesNotExist()
     }
 
     @Test
     @Config(qualifiers = "w400dp-h1100dp")
-    fun balanceStripShowsResetTimeInsteadOfHealthCopy() {
+    fun fullDeepSeekCardGroupsCurrenciesAndShowsAccountStatusOnce() {
+        val credential = credential("DeepSeek 双币种", ProviderId.DeepSeek)
+        val cny = balance(110.0).copy(id = "balance-CNY", label = "余额（CNY）")
+        val usd = cny.copy(
+            id = "balance-USD",
+            label = "余额（USD）",
+            value = BigDecimal("23.86"),
+            currencyCode = "USD",
+        )
+        val availability = cny.copy(
+            id = "availability",
+            label = "账户状态",
+            value = BigDecimal.ONE,
+            unit = UsageMetricUnit.Boolean_,
+            presentation = UsageMetricPresentation.Status,
+            semantic = UsageMetricSemantic.Status,
+        )
+        composeRule.setContent {
+            MaterialTheme {
+                CredentialUsageCard(
+                    card(
+                        credential,
+                        metrics = listOf(
+                            cny,
+                            cny.copy(
+                                id = "toppedUpBalance-CNY",
+                                label = "充值余额（CNY）",
+                                value = BigDecimal("100.00"),
+                                presentation = UsageMetricPresentation.Value,
+                                semantic = UsageMetricSemantic.Value,
+                            ),
+                            cny.copy(
+                                id = "grantedBalance-CNY",
+                                label = "赠金余额（CNY）",
+                                value = BigDecimal("10.00"),
+                                presentation = UsageMetricPresentation.Value,
+                                semantic = UsageMetricSemantic.Value,
+                            ),
+                            usd,
+                            usd.copy(
+                                id = "toppedUpBalance-USD",
+                                label = "充值余额（USD）",
+                                value = BigDecimal("18.86"),
+                                presentation = UsageMetricPresentation.Value,
+                                semantic = UsageMetricSemantic.Value,
+                            ),
+                            usd.copy(
+                                id = "grantedBalance-USD",
+                                label = "赠金余额（USD）",
+                                value = BigDecimal("5.00"),
+                                presentation = UsageMetricPresentation.Value,
+                                semantic = UsageMetricSemantic.Value,
+                            ),
+                            availability,
+                        ),
+                        allowedModels = listOf("deepseek-v4-flash", "deepseek-v4-pro"),
+                        planName = "API 余额",
+                        subscriptionEndAt = null,
+                    ),
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("¥110.00").assertIsDisplayed()
+        composeRule.onNodeWithText("$23.86").assertIsDisplayed()
+        composeRule.onNodeWithText("USD 账户").assertIsDisplayed()
+        composeRule.onNodeWithText("充值 $18.86 · 赠金 $5.00").assertIsDisplayed()
+        composeRule.onNodeWithText("可用模型").assertIsDisplayed()
+        composeRule.onNodeWithText("2 个").assertIsDisplayed()
+        composeRule.onNodeWithText("账户可用").assertDoesNotExist()
+        assertEquals(
+            1,
+            composeRule.onAllNodesWithText("可用模型").fetchSemanticsNodes().size,
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h1100dp")
+    fun fullDeepSeekUnavailableAccountStillSurfacesStatus() {
+        val credential = credential("DeepSeek 不可用", ProviderId.DeepSeek)
+        val total = balance(38.40).copy(id = "balance", label = "余额")
+        val availability = total.copy(
+            id = "availability",
+            label = "账户状态",
+            value = BigDecimal.ZERO,
+            unit = UsageMetricUnit.Boolean_,
+            presentation = UsageMetricPresentation.Status,
+            semantic = UsageMetricSemantic.Status,
+            healthState = UsageMetricHealthState.Unavailable,
+        )
+        composeRule.setContent {
+            MaterialTheme {
+                CredentialUsageCard(
+                    card(
+                        credential,
+                        metrics = listOf(total, availability),
+                        allowedModels = listOf("deepseek-v4-flash"),
+                        planName = "API 余额",
+                        subscriptionEndAt = null,
+                    ),
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("账户不可用").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h1100dp")
+    fun fullXiaomiApiCardShowsUsageBreakdownWithoutDuplicateBalances() {
+        val credential = credential("小米 MiMo API", ProviderId.Xiaomi)
+        val accountBalance = balance(12.50).copy(
+            id = "account-balance",
+            label = "账户余额",
+        )
+        val cash = accountBalance.copy(
+            id = "cash-balance",
+            label = "现金余额",
+            value = BigDecimal("10.00"),
+            presentation = UsageMetricPresentation.Value,
+            semantic = UsageMetricSemantic.Value,
+        )
+        val gift = accountBalance.copy(
+            id = "gift-balance",
+            label = "赠送余额",
+            value = BigDecimal("2.50"),
+            presentation = UsageMetricPresentation.Value,
+            semantic = UsageMetricSemantic.Value,
+        )
+        val consumption = accountBalance.copy(
+            id = "total-consumption",
+            label = "近 31 天消费",
+            value = BigDecimal("2.00"),
+            presentation = UsageMetricPresentation.Value,
+            semantic = UsageMetricSemantic.Value,
+        )
+        val models = listOf(
+            "mimo-v2.5-pro",
+            "mimo-v2.5",
+            "mimo-v2.5-asr",
+            "mimo-v2.5-tts",
+            "mimo-v2.5-tts-voicedesign",
+            "mimo-v2.5-tts-voiceclone",
+        )
+
+        composeRule.setContent {
+            MaterialTheme {
+                CredentialUsageCard(
+                    card(
+                        credential,
+                        metrics = listOf(
+                            accountBalance,
+                            cash,
+                            gift,
+                            consumption,
+                            token("total-tokens", "近 31 天消耗", 1500.0),
+                            token("input-tokens", "未命中缓存", 900.0),
+                            token("output-tokens", "输出", 300.0),
+                            token("cache-tokens", "命中缓存", 300.0),
+                        ),
+                        allowedModels = models,
+                        statusText = "可用",
+                        usageKind = "api",
+                        billingMode = "按量计费",
+                        planName = "API 按量",
+                        subscriptionEndAt = null,
+                    ),
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("¥12.50").assertIsDisplayed()
+        composeRule.onNodeWithText("账户可用").assertDoesNotExist()
+        composeRule.onNodeWithText("现金 ¥10.00").assertIsDisplayed()
+        composeRule.onNodeWithText("赠送 ¥2.50").assertIsDisplayed()
+        composeRule.onNodeWithText("近 31 天").assertIsDisplayed()
+        composeRule.onNodeWithText("按量计费").assertDoesNotExist()
+        composeRule.onNodeWithText("¥2.00").assertIsDisplayed()
+        composeRule.onNodeWithText("1,500").assertIsDisplayed()
+        composeRule.onNodeWithText("未命中 900").assertIsDisplayed()
+        composeRule.onNodeWithText("输出 300").assertIsDisplayed()
+        composeRule.onNodeWithText("缓存 300").assertIsDisplayed()
+        composeRule.onNodeWithText("可用模型").assertIsDisplayed()
+        composeRule.onNodeWithText("6 个").assertIsDisplayed()
+        composeRule.onNodeWithText("mimo-v2.5-pro").assertDoesNotExist()
+        assertEquals(
+            1,
+            composeRule.onAllNodesWithText("现金 ¥10.00").fetchSemanticsNodes().size,
+        )
+        assertEquals(
+            1,
+            composeRule.onAllNodesWithText("赠送 ¥2.50").fetchSemanticsNodes().size,
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h1100dp")
+    fun compactBalanceShowsAmountWithoutHealthCopyOrResetPill() {
         val resetAt = now.plusSeconds(86_400)
         val credential = credential("余额账户", ProviderId.DeepSeek)
         val balanceMetric = UsageMetric(
@@ -518,16 +843,17 @@ class HomeScreenTest {
         }
 
         composeRule.onNodeWithText("余额账户").assertExists()
+        composeRule.onNodeWithText("账户余额 · CNY").assertIsDisplayed()
+        composeRule.onNodeWithText("¥38.42").assertIsDisplayed()
         composeRule.onNodeWithText("充足", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithText("偏低", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithText("不足", useUnmergedTree = true).assertDoesNotExist()
-        composeRule.onAllNodesWithText("重置", substring = true, useUnmergedTree = true)
-            .onFirst()
-            .assertExists()
+        composeRule.onNodeWithText("重置", substring = true, useUnmergedTree = true)
+            .assertDoesNotExist()
     }
 
     @Test
-    @Config(qualifiers = "w360dp-h800dp")
+    @Config(qualifiers = "w360dp-h1200dp")
     fun commandCodeCardUsesRequestedMetricLayout() {
         val command = credential("Command Code", ProviderId.CommandCode)
         fun metric(
@@ -555,8 +881,10 @@ class HomeScreenTest {
             metric("five-hour", "5 小时", used = 2.45, limit = 14.0, remaining = 11.55),
             metric("weekly", "周", used = 2.45, limit = 35.0, remaining = 32.55),
             metric("credit-progress", "月", used = 24.11, limit = 70.0, remaining = 45.89),
+            metric("monthly-remaining", "月度剩余", value = 34.42),
             metric("purchased-remaining", "购买剩余", value = 0.0),
             metric("free-remaining", "赠送剩余", value = 0.0),
+            metric("period-spent", "周期消费", value = 35.54),
             metric("request-count", "累计请求", value = 9700.0, unit = UsageMetricUnit.Request),
         )
         val commandCodeCard = CredentialCardUi(
@@ -581,14 +909,23 @@ class HomeScreenTest {
             }
         }
 
-        listOf("5 小时窗口", "本周用量", "本月用量", "累计请求").forEach {
+        listOf("5 小时额度", "本周额度", "本月额度", "累计请求").forEach {
             composeRule.onNodeWithText(it).assertIsDisplayed()
         }
         composeRule.onNodeWithText("额度单位：美元（USD）").assertDoesNotExist()
-        composeRule.onNodeWithText("已用 \$24.11").assertIsDisplayed()
+        composeRule.onNodeWithText("18%").assertIsDisplayed()
+        composeRule.onNodeWithText("剩余 \$11.55").assertIsDisplayed()
+        composeRule.onNodeWithText("34%").assertIsDisplayed()
         composeRule.onNodeWithText("剩余 \$45.89").assertIsDisplayed()
-        composeRule.onNodeWithText("购买剩余").assertDoesNotExist()
-        composeRule.onNodeWithText("赠送剩余").assertDoesNotExist()
+        composeRule.onNodeWithText("额度构成").assertIsDisplayed()
+        val compositionResults = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        composeRule.onNodeWithText(
+            "月度 \$34.42 · 购买 \$0.00 · 赠送 \$0.00",
+            useUnmergedTree = true,
+        ).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
+            action(compositionResults)
+        }
+        assertEquals(1, compositionResults.single().lineCount)
         val requestTextResults = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
         composeRule.onNodeWithText("9.7K 次", useUnmergedTree = true)
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
@@ -600,12 +937,343 @@ class HomeScreenTest {
     }
 
     @Test
+    @Config(qualifiers = "w400dp-h1100dp")
+    fun fullGlmCardGroupsActivityBelowTheQuotaWindows() {
+        val credential = credential("GLM 完整模式", ProviderId.Glm)
+        fun valueMetric(id: String, label: String, value: Double, unit: UsageMetricUnit) =
+            UsageMetric(
+                id = id,
+                label = label,
+                value = BigDecimal.valueOf(value),
+                unit = unit,
+                presentation = UsageMetricPresentation.Value,
+                semantic = UsageMetricSemantic.Value,
+                healthState = UsageMetricHealthState.Normal,
+            )
+        val testCard = card(
+            credential,
+            metrics = listOf(
+                glmProgressMetric("five-hour", "5 小时用量", resetCards = 2),
+                glmProgressMetric("weekly", "每周用量", resetCards = 1),
+                valueMetric("model-calls", "模型调用量", 22.0, UsageMetricUnit.Request),
+                UsageMetric(
+                    id = "zcode-mcp",
+                    label = "MCP 调用量",
+                    used = BigDecimal("461"),
+                    limit = BigDecimal("1000"),
+                    remaining = BigDecimal("539"),
+                    value = BigDecimal("461"),
+                    unit = UsageMetricUnit.Request,
+                    presentation = UsageMetricPresentation.Value,
+                    semantic = UsageMetricSemantic.UsedQuota,
+                    healthState = UsageMetricHealthState.Normal,
+                ),
+                valueMetric(
+                    "activity-total-tokens",
+                    "累计 Token 数",
+                    1_890_000_000.0,
+                    UsageMetricUnit.Token,
+                ),
+            ),
+        )
+        composeRule.setContent {
+            MaterialTheme {
+                CredentialUsageCard(
+                    testCard,
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("5 小时用量").assertIsDisplayed()
+        composeRule.onNodeWithText("本周用量").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("2 张重置卡").assertExists()
+        composeRule.onNodeWithContentDescription("1 张重置卡").assertExists()
+        composeRule.onNodeWithText("模型调用").assertIsDisplayed()
+        composeRule.onNodeWithText("22 次").assertIsDisplayed()
+        composeRule.onNodeWithText("MCP 调用").assertIsDisplayed()
+        composeRule.onNodeWithText("461 / 1,000").assertIsDisplayed()
+        composeRule.onNodeWithText("累计 Tokens").assertIsDisplayed()
+        composeRule.onNodeWithText("1.89B").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h1100dp")
+    fun fullNewApiCardPairsTokenAndCostAcrossWindows() {
+        val credential = credential("New API 统计", ProviderId.NewAPI)
+        val quota = progress(3.5, 14.0).copy(
+            id = "quota-progress",
+            label = "账户额度",
+            remaining = BigDecimal("10.50"),
+            currencyCode = "CNY",
+        )
+        val today = token("today-token", "今日 Token", 14_873_680.0)
+        val todayCost = token("today-token-cost", "今日消费", 1.4)
+            .copy(unit = UsageMetricUnit.Currency, currencyCode = "CNY")
+        val oneDay = token("one-day-token", "近 24 小时 Token", 15_123_456.0)
+        val oneDayCost = token("one-day-token-cost", "近 24 小时消费", 1.42)
+            .copy(unit = UsageMetricUnit.Currency, currencyCode = "CNY")
+        val sevenDay = token("seven-day-token", "近 7 天 Token", 139_735_349.0)
+        val sevenDayCost = token("seven-day-token-cost", "近 7 天消费", 13.1)
+            .copy(unit = UsageMetricUnit.Currency, currencyCode = "CNY")
+        val thirtyDay = token("thirty-day-token", "近 30 天 Token", 1_100_848_403.0)
+        val thirtyDayCost = token("thirty-day-token-cost", "近 30 天消费", 103.2)
+            .copy(unit = UsageMetricUnit.Currency, currencyCode = "CNY")
+
+        composeRule.setContent {
+            MaterialTheme {
+                CredentialUsageCard(
+                    card(
+                        credential,
+                        metrics = listOf(
+                            quota,
+                            today,
+                            todayCost,
+                            oneDay,
+                            oneDayCost,
+                            sevenDay,
+                            sevenDayCost,
+                            thirtyDay,
+                            thirtyDayCost,
+                            token("rpm", "近 60 秒 RPM", 3.0)
+                                .copy(unit = UsageMetricUnit.Request),
+                            token("tpm", "近 60 秒 TPM", 456.0),
+                            token("request-count", "账户累计请求", 42.0)
+                                .copy(unit = UsageMetricUnit.Request),
+                        ),
+                        planName = "New API · vip",
+                        subscriptionEndAt = null,
+                    ),
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("账户额度").assertIsDisplayed()
+        composeRule.onNodeWithText("25%").assertIsDisplayed()
+        composeRule.onNodeWithText("剩余 ¥10.50").assertIsDisplayed()
+        composeRule.onNodeWithText("今日").assertIsDisplayed()
+        composeRule.onNodeWithText("14.87M tokens").assertIsDisplayed()
+        composeRule.onNodeWithText("¥1.40").assertIsDisplayed()
+        composeRule.onNodeWithText("15.12M tokens").assertIsDisplayed()
+        composeRule.onNodeWithText("1.1B tokens").assertIsDisplayed()
+        composeRule.onNodeWithText("RPM").assertIsDisplayed()
+        composeRule.onNodeWithText("TPM").assertIsDisplayed()
+        composeRule.onNodeWithText("42 次").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h1100dp")
+    fun fullMimoTokenPlanShowsCreditsAndSubscriptionStatus() {
+        val credential = credential("MiMo Plan", ProviderId.Xiaomi)
+        val models = listOf("m1", "m2", "m3", "m4", "m5", "m6")
+        val plan = UsageMetric(
+            id = "plan-total",
+            label = "套餐总量",
+            used = BigDecimal("5000"),
+            limit = BigDecimal("20000"),
+            remaining = BigDecimal("15000"),
+            unit = UsageMetricUnit.Token,
+            windowEnd = now.plusSeconds(86_400 * 30),
+            presentation = UsageMetricPresentation.Progress,
+            semantic = UsageMetricSemantic.UsedQuota,
+            healthState = UsageMetricHealthState.Normal,
+        )
+        val status = UsageMetric(
+            id = "plan-status",
+            label = "订阅状态",
+            value = BigDecimal.ONE,
+            unit = UsageMetricUnit.Boolean_,
+            presentation = UsageMetricPresentation.Status,
+            semantic = UsageMetricSemantic.Status,
+            healthState = UsageMetricHealthState.Normal,
+        )
+        composeRule.setContent {
+            MaterialTheme {
+                CredentialUsageCard(
+                    card(
+                        credential,
+                        metrics = listOf(plan, status),
+                        allowedModels = models,
+                        statusText = "有效",
+                        usageKind = "plan",
+                        billingMode = "自动续费",
+                        planName = "Pro 月度套餐",
+                        subscriptionEndAt = now.plusSeconds(86_400 * 30),
+                    ),
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("套餐额度").assertIsDisplayed()
+        composeRule.onNodeWithText("25%").assertIsDisplayed()
+        composeRule.onNodeWithText("剩余 15,000 credits").assertIsDisplayed()
+        composeRule.onNodeWithText("套餐总量").assertIsDisplayed()
+        composeRule.onNodeWithText("20,000 credits").assertIsDisplayed()
+        composeRule.onNodeWithText("已使用").assertIsDisplayed()
+        composeRule.onNodeWithText("订阅状态").assertIsDisplayed()
+        composeRule.onNodeWithText("有效").assertIsDisplayed()
+        composeRule.onNodeWithText("可用模型").assertIsDisplayed()
+        composeRule.onNodeWithText("6 个").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h1100dp")
+    fun fullRoutinTokenPackShowsTotalsAndModelCount() {
+        val credential = credential("Routin Token Pack", ProviderId.Routin)
+        val tokenPack = UsageMetric(
+            id = "token",
+            label = "Token",
+            used = BigDecimal("320000000"),
+            limit = BigDecimal("1000000000"),
+            remaining = BigDecimal("680000000"),
+            unit = UsageMetricUnit.Token,
+            presentation = UsageMetricPresentation.Progress,
+            semantic = UsageMetricSemantic.UsedQuota,
+            healthState = UsageMetricHealthState.Normal,
+        )
+        composeRule.setContent {
+            MaterialTheme {
+                CredentialUsageCard(
+                    card(
+                        credential,
+                        metrics = listOf(tokenPack),
+                        allowedModels = listOf("a", "b", "c"),
+                        usageKind = "tokenPack",
+                        planName = "Pro",
+                    ),
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Token 套餐").assertIsDisplayed()
+        composeRule.onNodeWithText("32%").assertIsDisplayed()
+        composeRule.onNodeWithText("剩余 680M tokens").assertIsDisplayed()
+        composeRule.onNodeWithText("总额度").assertIsDisplayed()
+        composeRule.onNodeWithText("1B tokens").assertIsDisplayed()
+        composeRule.onNodeWithText("已使用").assertIsDisplayed()
+        composeRule.onNodeWithText("320M tokens").assertIsDisplayed()
+        composeRule.onNodeWithText("可用模型").assertIsDisplayed()
+        composeRule.onNodeWithText("3 个").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h1100dp")
+    fun fullOpenCodeCardKeepsThreeWindowHierarchy() {
+        val credential = credential("OpenCode Go", ProviderId.OpenCode)
+        val metrics = listOf(
+            progress(6.0, 30.0).copy(id = "fiveHour", label = "5 小时"),
+            progress(15.0, 75.0).copy(id = "weekly", label = "周"),
+            progress(45.0, 150.0).copy(id = "monthly", label = "月"),
+        )
+        composeRule.setContent {
+            MaterialTheme {
+                CredentialUsageCard(
+                    card(
+                        credential,
+                        metrics = metrics,
+                        planName = "OpenCode Go",
+                        statusText = "正常续费",
+                        usageKind = "periodic",
+                        billingMode = "自动续费",
+                    ),
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("5 小时额度").assertIsDisplayed()
+        composeRule.onNodeWithText("本周用量").assertIsDisplayed()
+        composeRule.onNodeWithText("本月用量").assertIsDisplayed()
+        composeRule.onAllNodesWithText("20%").onFirst().assertIsDisplayed()
+        composeRule.onNodeWithText("30%").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h1100dp")
+    fun fullQuotaSplitPlacesSecondaryWindowToTheRight() {
+        val credential = credential("双栏配额", ProviderId.Routin)
+        val metrics = listOf(
+            progress(20.0, 100.0).copy(id = "fiveHour", label = "5 小时"),
+            progress(10.0, 100.0).copy(id = "weekly", label = "周"),
+        )
+        composeRule.setContent {
+            MaterialTheme {
+                CredentialUsageCard(
+                    card(credential, metrics = metrics),
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        val primary = composeRule.onNodeWithText("5 小时额度", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val secondary = composeRule.onNodeWithText("本周用量", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        assertTrue(secondary.left.value > primary.right.value)
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h1100dp")
+    fun fullVolcengineCardFallsBackToTheOnlyAvailableWindow() {
+        val credential = credential("火山方舟", ProviderId.Volcengine)
+        val weekly = UsageMetric(
+            id = "weekly",
+            label = "近一周用量",
+            used = BigDecimal("3252.2867"),
+            limit = BigDecimal("35000"),
+            remaining = BigDecimal("31747.7133"),
+            unit = UsageMetricUnit.Request,
+            windowEnd = now.plusSeconds(86_400),
+            presentation = UsageMetricPresentation.Progress,
+            semantic = UsageMetricSemantic.UsedQuota,
+            healthState = UsageMetricHealthState.Normal,
+        )
+        composeRule.setContent {
+            MaterialTheme {
+                CredentialUsageCard(
+                    card(
+                        credential,
+                        metrics = listOf(weekly),
+                        planName = "Max Plan",
+                        subscriptionEndAt = null,
+                    ),
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("本周用量").assertIsDisplayed()
+        composeRule.onNodeWithText("9%").assertIsDisplayed()
+        composeRule.onNodeWithText("暂无用量数据").assertDoesNotExist()
+    }
+
+    @Test
     @Config(qualifiers = "w1200dp-h800dp")
     fun credentialCardKeepsNarrowMetricLayoutOnWideScreens() {
         val credential = credential("宽屏主账号", ProviderId.Routin)
         val card = card(
             credential,
-            metrics = listOf(progress(12.0, 60.0), balance(38.42)),
+            metrics = listOf(
+                progress(12.0, 60.0).copy(id = "fiveHour", label = "5 小时"),
+                progress(20.0, 100.0).copy(id = "weekly", label = "周"),
+            ),
         )
 
         composeRule.setContent {
@@ -628,12 +1296,18 @@ class HomeScreenTest {
         }
 
         composeRule.onNodeWithTag("home_grid_3_columns").assertExists()
-        val progressLabel = composeRule.onNodeWithText("5 小时窗口", useUnmergedTree = true)
-            .getUnclippedBoundsInRoot()
-        val balanceLabel = composeRule.onNodeWithText("账户余额", useUnmergedTree = true)
-            .getUnclippedBoundsInRoot()
-
-        assertTrue(balanceLabel.left.value > progressLabel.left.value)
+        composeRule.onNodeWithText("5 小时额度", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithText("本周用量", useUnmergedTree = true).assertIsDisplayed()
+        val cardBounds = composeRule.onNodeWithTag(
+            "credential_card_${credential.id}",
+            useUnmergedTree = true,
+        ).getUnclippedBoundsInRoot()
+        val rootBounds = composeRule.onRoot().getUnclippedBoundsInRoot()
+        val availableWidth = rootBounds.right.value - rootBounds.left.value
+        assertTrue(
+            "wide screen should still use a narrow card",
+            cardBounds.right.value - cardBounds.left.value < availableWidth * 0.6f,
+        )
     }
 
     @Test
@@ -745,7 +1419,7 @@ class HomeScreenTest {
 
     @Test
     fun 点击账户健康短条会把中间凭证卡片定位到屏幕中心() {
-        val cards = (1..5).map { index ->
+        val cards = (1..7).map { index ->
             val item = credential("健康居中 $index")
             card(item, metrics = listOf(progress(index * 10.0, 100.0)))
         }
@@ -763,26 +1437,32 @@ class HomeScreenTest {
                     onOpenCredential = {},
                     onImportFromMac = {},
                     onAddManually = {},
-                    usageCardDensity = UsageCardDensity.COMPACT,
+                    usageCardDensity = UsageCardDensity.FULL,
+                    hasUpdateAvailable = true,
+                    updateVersion = "6.1.0",
                 )
             }
         }
 
-        composeRule.onNodeWithTag("health_segment_2").performClick()
+        composeRule.onNodeWithTag("health_segment_3").performClick()
         composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithTag("credential_card_${cards[2].credential.id}")
+            composeRule.onAllNodesWithTag("credential_card_${cards[3].credential.id}")
                 .fetchSemanticsNodes()
                 .isNotEmpty()
         }
         composeRule.waitForIdle()
 
-        val root = composeRule.onRoot().getUnclippedBoundsInRoot()
-        val card = composeRule
-            .onNodeWithTag("credential_card_${cards[2].credential.id}")
+        val grid = composeRule.onNodeWithTag("home_grid_1_columns")
             .getUnclippedBoundsInRoot()
-        val rootCenter = (root.top.value + root.bottom.value) / 2f
+        val card = composeRule
+            .onNodeWithTag("credential_card_${cards[3].credential.id}")
+            .getUnclippedBoundsInRoot()
+        val gridCenter = (grid.top.value + grid.bottom.value) / 2f
         val cardCenter = (card.top.value + card.bottom.value) / 2f
-        assertTrue("卡片中心应贴近屏幕中心，实际偏差 ${abs(cardCenter - rootCenter)}dp", abs(cardCenter - rootCenter) < 40f)
+        assertTrue(
+            "卡片中心应贴近可见网格中心，实际偏差 ${abs(cardCenter - gridCenter)}dp",
+            abs(cardCenter - gridCenter) < 16f,
+        )
     }
 
     @Test
@@ -873,6 +1553,8 @@ class HomeScreenTest {
         }
 
         composeRule.onNodeWithTag("home_update_banner").assertIsDisplayed()
+        composeRule.onNodeWithTag("home_update_banner_icon", useUnmergedTree = true)
+            .assertExists()
         composeRule.onNodeWithText("发现新版本 6.1.0").assertIsDisplayed()
         composeRule.onNodeWithTag("home_update_banner").performClick()
         assertEquals(1, openedSettings)

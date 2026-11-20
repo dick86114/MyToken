@@ -39,6 +39,7 @@ import ai.routin.mytoken.core.ui.glassFilterChipColors
 import ai.routin.mytoken.core.ui.LiquidGlassSurface
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
+import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -158,16 +159,13 @@ fun CredentialEditorScreen(
             Column(modifier = Modifier.padding(bottom = 2.dp)) {
                 Text(
                     text = if (state.isNew) "新增凭证" else "编辑凭证",
-                    fontSize = 26.sp,
-                    lineHeight = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = (-0.8).sp,
+                    style = MyTokenType.pageTitle,
                 )
                 if (state.isNew) {
                     Text(
                         text = "选择供应商并填写密钥",
                         modifier = Modifier.padding(top = 5.dp),
-                        fontSize = 10.sp,
+                        style = MyTokenType.metricLabel,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }

@@ -335,8 +335,7 @@ fun SectionCard(
             Column {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MyTokenType.sectionTitle,
                 )
                 if (supportingText != null) {
                     Text(

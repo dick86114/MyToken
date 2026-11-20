@@ -6,6 +6,7 @@ import ai.routin.mytoken.core.ui.LiquidGlassSurface
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.MyTokenPalette
+import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.ProviderLogoPlate
 import androidx.compose.foundation.ExperimentalFoundationApi
 import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
@@ -115,6 +116,7 @@ fun CredentialListScreen(
         ) {
             CredentialPageHeader(
                 enabledCount = state.items.count { it.isEnabled },
+                totalCount = state.items.size,
                 onImportFromMac = onImportFromMac,
                 onAddManually = onAddManually,
                 drawerMode = drawerMode,
@@ -225,6 +227,7 @@ fun CredentialListScreen(
 @Composable
 private fun CredentialPageHeader(
     enabledCount: Int,
+    totalCount: Int,
     onImportFromMac: () -> Unit,
     onAddManually: () -> Unit,
     drawerMode: Boolean = false,
@@ -239,10 +242,7 @@ private fun CredentialPageHeader(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "凭证",
-                    fontSize = 30.sp,
-                    lineHeight = 31.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = (-1).sp,
+                    style = MyTokenType.pageTitle,
                 )
                 if (drawerMode) {
                     GlassHelpButton(
@@ -264,12 +264,14 @@ private fun CredentialPageHeader(
                     )
                 }
             }
-            if (enabledCount > 0) {
+            if (totalCount > 0) {
                 Text(
-                    text = "$enabledCount 个已启用",
-                    modifier = Modifier.padding(top = 5.dp),
-                    fontSize = 11.sp,
+                    text = "已启用 $enabledCount / $totalCount",
+                    style = MyTokenType.metricLabel,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .padding(top = 5.dp)
+                        .testTag("credential_enabled_summary"),
                 )
             }
         }
@@ -432,8 +434,8 @@ private fun CredentialRow(
             ) {
                 Text(
                     text = credential.name,
-                    fontSize = 13.sp,
-                    lineHeight = 16.sp,
+                    fontSize = 15.sp,
+                    lineHeight = 19.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                 )
