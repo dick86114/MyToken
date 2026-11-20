@@ -2,11 +2,10 @@ package ai.routin.mytoken.feature.home
 
 import ai.routin.mytoken.domain.model.ProviderId
 import androidx.annotation.DrawableRes
-import androidx.compose.ui.graphics.Color
 
 /**
- * Provider display names and accent colors, mirroring the macOS popover
- * (ProviderRegistry display names + ProviderTheme accent colors).
+ * Provider display names and logo resources. 颜色只来自 MyTokenColors token，
+ * 不再提供供应商主题色。
  */
 object ProviderCatalog {
     fun displayName(providerId: ProviderId): String = when (providerId) {
@@ -30,16 +29,5 @@ object ProviderCatalog {
         ProviderId.CommandCode -> R.drawable.share_provider_commandcode_logo
         ProviderId.Xiaomi -> R.drawable.share_provider_xiaomi_logo
         ProviderId.OpenCode -> R.drawable.share_provider_opencode_logo
-    }
-
-    fun accentColor(providerId: ProviderId): Color = when (providerId) {
-        ProviderId.Routin -> Color(0xFF1565C0)
-        ProviderId.DeepSeek -> Color(0xFF3949AB)
-        ProviderId.Glm -> Color(0xFF2E7D32)
-        ProviderId.Volcengine -> Color(0xFFEF6C00)
-        ProviderId.NewAPI -> Color(0xFF6A1B9A)
-        ProviderId.CommandCode -> Color(0xFF00897B)
-        ProviderId.Xiaomi -> Color(0xFFAD1457)
-        ProviderId.OpenCode -> Color(0xFFCCE833)
     }
 }

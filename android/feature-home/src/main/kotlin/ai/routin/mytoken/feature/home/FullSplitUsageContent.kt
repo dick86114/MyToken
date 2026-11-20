@@ -1,5 +1,8 @@
 package ai.routin.mytoken.feature.home
 
+import ai.routin.mytoken.core.ui.MyTokenStatus
+import ai.routin.mytoken.core.ui.MyTokenStatusTone
+import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.domain.model.CredentialMetadataKey
 import ai.routin.mytoken.domain.model.ProviderId
@@ -8,7 +11,6 @@ import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import ai.routin.mytoken.domain.model.UsageMetricUnit
 import androidx.compose.foundation.background
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -23,23 +25,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.sp
 import java.math.BigDecimal
 import java.time.Instant
@@ -190,46 +187,33 @@ internal fun FullSplitUsageContent(
 }
 
 @Composable
+private fun EmptyUsageText() {
+    Text(
+        text = "暂无用量数据",
+        style = MyTokenType.caption,
+        color = MyTokenThemeTokens.colors.muted,
+    )
+}
+
+@Composable
 private fun FullSplitLayout(
     left: @Composable () -> Unit,
     right: @Composable () -> Unit,
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        if (maxWidth < 280.dp) {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // 窄卡或大字体会让 40/60 分栏挤成一列字，改为上下堆叠且不加分割线。
+        if (maxWidth < 280.dp || LocalDensity.current.fontScale >= 1.3f) {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 left()
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 right()
             }
         } else {
-            val dividerColor = MaterialTheme.colorScheme.outlineVariant
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .drawBehind {
-                        val x = size.width * 0.4f
-                        drawLine(
-                            color = dividerColor,
-                            start = Offset(x, 0f),
-                            end = Offset(x, size.height),
-                            strokeWidth = 1.dp.toPx(),
-                        )
-                    },
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
             ) {
-                Box(
-                    modifier = Modifier
-                        .weight(0.4f)
-                        .padding(end = 12.dp),
-                ) {
-                    left()
-                }
-                Box(
-                    modifier = Modifier
-                        .weight(0.6f)
-                        .padding(start = 13.dp),
-                ) {
-                    right()
-                }
+                Box(modifier = Modifier.weight(0.4f)) { left() }
+                Box(modifier = Modifier.weight(0.6f)) { right() }
             }
         }
     }
@@ -246,11 +230,7 @@ private fun FullQuotaSplit(
     bottom: (@Composable () -> Unit)? = null,
 ) {
     if (primary == null) {
-        Text(
-            text = "暂无用量数据",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        EmptyUsageText()
         return
     }
 
@@ -292,11 +272,7 @@ private fun FullPackSplit(
     endOverride: Instant? = null,
 ) {
     if (primary == null) {
-        Text(
-            text = "暂无用量数据",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        EmptyUsageText()
         return
     }
 
@@ -325,7 +301,7 @@ private fun FullQuotaFocus(
     remainingFormatter: (UsageMetric) -> String = ::formatRemaining,
     note: String? = null,
 ) {
-    val colors = statusColors()
+    val colors = MyTokenThemeTokens.colors
     val percent = progressPercent(metric)
     val tone = splitTone(metric, percent)
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -336,8 +312,8 @@ private fun FullQuotaFocus(
         ) {
             Text(
                 text = label,
-                style = MyTokenType.metricLabel,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MyTokenType.label,
+                color = colors.muted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -349,28 +325,29 @@ private fun FullQuotaFocus(
         Text(
             text = formatPercent(percent),
             modifier = Modifier.padding(top = 4.dp),
-            style = MyTokenType.heroNumber,
-            color = MaterialTheme.colorScheme.onSurface,
+            style = MyTokenType.displayCompact,
+            color = colors.ink,
             maxLines = 1,
         )
-        FullSplitProgress(
+        UsageProgressBar(
             percent = percent,
-            color = splitToneColor(tone, colors),
+            color = splitToneColor(tone),
             modifier = Modifier.padding(top = 8.dp),
+            height = 4.dp,
         )
         Text(
             text = "剩余 ${remainingFormatter(metric)}",
             modifier = Modifier.padding(top = 5.dp),
-            style = MyTokenType.metricCaption,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MyTokenType.caption,
+            color = colors.muted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         Text(
             text = note ?: quotaEndText(metric.windowEnd ?: endOverride, endLabel) ?: "—",
             modifier = Modifier.padding(top = 2.dp),
-            style = MyTokenType.metricCaption,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MyTokenType.caption,
+            color = colors.muted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -383,7 +360,7 @@ private fun FullWindowRow(
     endLabel: String,
     labelFormatter: (UsageMetric) -> String,
 ) {
-    val colors = statusColors()
+    val colors = MyTokenThemeTokens.colors
     val percent = progressPercent(metric)
     val tone = splitTone(metric, percent)
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -394,8 +371,8 @@ private fun FullWindowRow(
         ) {
             Text(
                 text = labelFormatter(metric),
-                style = MyTokenType.metricLabelTight,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MyTokenType.label,
+                color = colors.muted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -405,18 +382,18 @@ private fun FullWindowRow(
             }
             Text(
                 text = formatPercent(percent),
-                style = MyTokenType.metricValue,
+                style = MyTokenType.label,
                 color = when (tone) {
-                    SplitTone.Normal -> MaterialTheme.colorScheme.onSurface
-                    SplitTone.Warning -> colors.warning
-                    SplitTone.Critical -> colors.critical
+                    SplitTone.Normal -> colors.ink
+                    SplitTone.Warning -> colors.warningText
+                    SplitTone.Critical -> colors.criticalText
                 },
                 maxLines = 1,
             )
         }
-        FullSplitProgress(
+        UsageProgressBar(
             percent = percent,
-            color = splitToneColor(tone, colors),
+            color = splitToneColor(tone),
             modifier = Modifier.padding(top = 4.dp),
             height = 3.dp,
         )
@@ -429,15 +406,15 @@ private fun FullWindowRow(
             Text(
                 text = "剩余 ${formatRemaining(metric)}",
                 modifier = Modifier.weight(1f),
-                style = MyTokenType.metricCaption,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MyTokenType.caption,
+                color = colors.muted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = quotaEndText(metric.windowEnd, endLabel) ?: "—",
-                style = MyTokenType.metricCaption,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MyTokenType.caption,
+                color = colors.muted,
                 maxLines = 1,
             )
         }
@@ -449,36 +426,30 @@ private fun FullFacts(
     facts: List<SplitFact>,
     topPadding: androidx.compose.ui.unit.Dp,
 ) {
-    val colors = statusColors()
+    val colors = MyTokenThemeTokens.colors
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = topPadding),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         facts.forEach { fact ->
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp, bottom = 1.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top,
             ) {
                 Text(
                     text = fact.label,
-                    style = MyTokenType.factLabel,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MyTokenType.caption,
+                    color = colors.muted,
                     maxLines = 1,
                 )
                 Spacer(modifier = Modifier.width(7.dp))
                 Text(
                     text = fact.value,
                     modifier = Modifier.weight(1f),
-                    style = MyTokenType.factValue,
-                    color = if (fact.positive) {
-                        colors.positive
-                    } else {
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
-                    },
+                    style = MyTokenType.caption,
+                    color = if (fact.positive) colors.positiveText else colors.ink,
                     textAlign = TextAlign.End,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -505,26 +476,27 @@ private fun FullCommandCodeSummary(byId: Map<String, UsageMetric>) {
     val requests = byId["request-count"]
     if (composition.isEmpty() && periodSpent == null && requests == null) return
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    val colors = MyTokenThemeTokens.colors
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         if (composition.isNotEmpty()) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = "额度构成",
-                    style = MyTokenType.factLabel,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MyTokenType.caption,
+                    color = colors.muted,
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = composition,
                     modifier = Modifier.weight(1f),
-                    style = MyTokenType.factValue,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f),
+                    style = MyTokenType.caption,
+                    color = colors.ink,
                     textAlign = TextAlign.End,
                     maxLines = 1,
                     softWrap = false,
@@ -534,9 +506,7 @@ private fun FullCommandCodeSummary(byId: Map<String, UsageMetric>) {
         }
         if (periodSpent != null || requests != null) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 CommandCodeSummaryValue(
@@ -562,52 +532,24 @@ private fun CommandCodeSummaryValue(
     modifier: Modifier = Modifier,
     alignEnd: Boolean = false,
 ) {
+    val colors = MyTokenThemeTokens.colors
     Column(
         modifier = modifier,
         horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start,
     ) {
         Text(
             text = label,
-            style = MyTokenType.metricCaption,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MyTokenType.caption,
+            color = colors.muted,
         )
         Text(
             text = value,
             modifier = Modifier.padding(top = 1.dp),
-            style = MyTokenType.factValue,
+            style = MyTokenType.caption,
             fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = colors.ink,
             maxLines = 1,
         )
-    }
-}
-
-@Composable
-private fun FullSplitProgress(
-    percent: Double?,
-    color: Color,
-    modifier: Modifier = Modifier,
-    height: androidx.compose.ui.unit.Dp = 4.dp,
-) {
-    val fraction = ((percent ?: 0.0).coerceIn(0.0, 100.0) / 100.0).toFloat()
-    val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)
-    Canvas(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(height)
-    ) {
-        val radius = CornerRadius(size.height / 2f, size.height / 2f)
-        drawRoundRect(
-            color = trackColor,
-            cornerRadius = radius,
-        )
-        if (fraction > 0f) {
-            drawRoundRect(
-                color = color,
-                size = Size(size.width * fraction, size.height),
-                cornerRadius = radius,
-            )
-        }
     }
 }
 
@@ -619,11 +561,7 @@ private fun FullDeepSeekBalance(
     val groups = remember(metrics) { deepSeekCurrencyGroups(metrics) }
     val primary = groups.firstOrNull()
     if (primary == null) {
-        Text(
-            text = "暂无用量数据",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        EmptyUsageText()
         return
     }
 
@@ -636,11 +574,7 @@ private fun FullDeepSeekBalance(
             modelsText = modelCountText(card),
         )
         groups.drop(1).forEach { group ->
-            HorizontalDivider(
-                modifier = Modifier.padding(top = 10.dp, bottom = 8.dp),
-                color = MaterialTheme.colorScheme.outlineVariant,
-            )
-            FullSecondaryBalance(group = group)
+            FullSecondaryBalance(group = group, modifier = Modifier.padding(top = 24.dp))
         }
     }
 }
@@ -654,11 +588,7 @@ private fun FullXiaomiApiBalance(
     val balance = byId["account-balance"]
         ?: metrics.firstOrNull { it.presentation == UsageMetricPresentation.Balance }
     if (balance == null) {
-        Text(
-            text = "暂无用量数据",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        EmptyUsageText()
         return
     }
 
@@ -686,7 +616,7 @@ private fun FullBalanceHero(
     status: SplitAccountStatus,
     modelsText: String,
 ) {
-    val colors = statusColors()
+    val colors = MyTokenThemeTokens.colors
     val currency = group.balance.currencyCode?.trim()?.uppercase().orEmpty()
     val title = if (currency.isEmpty()) "账户余额" else "账户余额 · $currency"
     val primaryValue = group.toppedUp?.value ?: BigDecimal.ZERO
@@ -706,8 +636,8 @@ private fun FullBalanceHero(
             Text(
                 text = title,
                 modifier = Modifier.weight(1f),
-                style = MyTokenType.metricLabel,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MyTokenType.label,
+                color = colors.muted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -724,8 +654,8 @@ private fun FullBalanceHero(
             Text(
                 text = formatCurrency(group.balance.value, group.balance.currencyCode),
                 modifier = Modifier.weight(1f),
-                style = MyTokenType.balanceNumber,
-                color = MaterialTheme.colorScheme.onSurface,
+                style = MyTokenType.display,
+                color = colors.ink,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -735,15 +665,15 @@ private fun FullBalanceHero(
             ) {
                 Text(
                     text = "可用模型",
-                    style = MyTokenType.metricCaption,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MyTokenType.caption,
+                    color = colors.muted,
                 )
                 Text(
                     text = modelsText,
                     modifier = Modifier.padding(top = 1.dp),
-                    style = MyTokenType.metricValue,
+                    style = MyTokenType.label,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = colors.ink,
                     maxLines = 1,
                 )
             }
@@ -754,7 +684,7 @@ private fun FullBalanceHero(
                 .padding(top = 8.dp)
                 .height(5.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)),
+                .background(colors.track),
         ) {
             if (total.signum() > 0) {
                 if (primaryWeight > 0.0) {
@@ -762,7 +692,7 @@ private fun FullBalanceHero(
                         modifier = Modifier
                             .weight(primaryWeight.toFloat())
                             .height(5.dp)
-                            .background(colors.positive),
+                            .background(colors.cat1),
                     )
                 }
                 if (primaryWeight < 1.0) {
@@ -770,7 +700,7 @@ private fun FullBalanceHero(
                         modifier = Modifier
                             .weight((1.0 - primaryWeight).toFloat())
                             .height(5.dp)
-                            .background(colors.brand),
+                            .background(colors.cat2),
                     )
                 }
             }
@@ -786,21 +716,21 @@ private fun FullBalanceHero(
                 label = primaryLabel,
                 metric = group.toppedUp,
                 currencyCode = group.balance.currencyCode,
-                color = colors.positive,
+                color = colors.cat1,
             )
             FullBalanceLegend(
                 label = secondaryLabel,
                 metric = group.granted,
                 currencyCode = group.balance.currencyCode,
-                color = colors.brand,
+                color = colors.cat2,
             )
         }
     }
 }
 
 @Composable
-private fun FullSecondaryBalance(group: SplitCurrencyGroup) {
-    val colors = statusColors()
+private fun FullSecondaryBalance(group: SplitCurrencyGroup, modifier: Modifier = Modifier) {
+    val colors = MyTokenThemeTokens.colors
     val currency = group.balance.currencyCode?.trim()?.uppercase().orEmpty()
     val primaryValue = group.toppedUp?.value ?: BigDecimal.ZERO
     val secondaryValue = group.granted?.value ?: BigDecimal.ZERO
@@ -810,7 +740,7 @@ private fun FullSecondaryBalance(group: SplitCurrencyGroup) {
     } else {
         0.0
     }
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Bottom,
@@ -818,8 +748,8 @@ private fun FullSecondaryBalance(group: SplitCurrencyGroup) {
             Text(
                 text = if (currency.isEmpty()) "其他币种" else "$currency 账户",
                 modifier = Modifier.weight(1f),
-                style = MyTokenType.metricLabelTight,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MyTokenType.label,
+                color = colors.muted,
             )
             Text(
                 text = formatCurrency(group.balance.value, group.balance.currencyCode),
@@ -827,7 +757,7 @@ private fun FullSecondaryBalance(group: SplitCurrencyGroup) {
                 lineHeight = 20.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = (-0.35).sp,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = colors.ink,
                 maxLines = 1,
             )
         }
@@ -837,7 +767,7 @@ private fun FullSecondaryBalance(group: SplitCurrencyGroup) {
                 .padding(top = 5.dp)
                 .height(4.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)),
+                .background(colors.track),
         ) {
             if (total.signum() > 0) {
                 if (primaryWeight > 0.0) {
@@ -845,7 +775,7 @@ private fun FullSecondaryBalance(group: SplitCurrencyGroup) {
                         modifier = Modifier
                             .weight(primaryWeight.toFloat())
                             .height(4.dp)
-                            .background(colors.positive),
+                            .background(colors.cat1),
                     )
                 }
                 if (primaryWeight < 1.0) {
@@ -853,7 +783,7 @@ private fun FullSecondaryBalance(group: SplitCurrencyGroup) {
                         modifier = Modifier
                             .weight((1.0 - primaryWeight).toFloat())
                             .height(4.dp)
-                            .background(colors.brand),
+                            .background(colors.cat2),
                     )
                 }
             }
@@ -862,8 +792,8 @@ private fun FullSecondaryBalance(group: SplitCurrencyGroup) {
             text = "充值 ${formatSplitMetricAmount(group.toppedUp?.value, group.toppedUp ?: group.balance)} · " +
                 "赠金 ${formatSplitMetricAmount(group.granted?.value, group.granted ?: group.balance)}",
             modifier = Modifier.padding(top = 3.dp),
-            style = MyTokenType.metricCaption,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MyTokenType.caption,
+            color = colors.muted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -877,6 +807,7 @@ private fun FullBalanceLegend(
     currencyCode: String?,
     color: Color,
 ) {
+    val colors = MyTokenThemeTokens.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -888,8 +819,8 @@ private fun FullBalanceLegend(
         )
         Text(
             text = "$label ${formatCurrency(metric?.value, metric?.currencyCode ?: currencyCode)}",
-            style = MyTokenType.metricCaption,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MyTokenType.caption,
+            color = colors.muted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -901,7 +832,7 @@ private fun FullBalanceLegend(
 private fun FullXiaomiUsage(
     metrics: List<UsageMetric>,
 ) {
-    val colors = statusColors()
+    val colors = MyTokenThemeTokens.colors
     val byId = remember(metrics) { metrics.associateBy(UsageMetric::id) }
     val consumption = byId["total-consumption"]
     val totalTokens = byId["total-tokens"]
@@ -913,22 +844,18 @@ private fun FullXiaomiUsage(
     val cacheValue = cacheTokens?.value ?: BigDecimal.ZERO
     val tokenTotal = inputValue + outputValue + cacheValue
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        HorizontalDivider(
-            modifier = Modifier.padding(top = 10.dp),
-            color = MaterialTheme.colorScheme.outlineVariant,
-        )
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
+    ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = "近 31 天",
-                style = MyTokenType.metricLabel,
+                style = MyTokenType.label,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = colors.ink,
             )
         }
         Row(
@@ -941,22 +868,22 @@ private fun FullXiaomiUsage(
             Column {
                 Text(
                     text = "消费",
-                    style = MyTokenType.metricCaption,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MyTokenType.caption,
+                    color = colors.muted,
                 )
                 Text(
                     text = consumption?.let { formatCurrency(it.value, it.currencyCode) } ?: "-",
                     modifier = Modifier.padding(top = 1.dp),
-                    style = MyTokenType.metricValueStrong,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MyTokenType.numericValue,
+                    color = colors.ink,
                     maxLines = 1,
                 )
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text = "Tokens",
-                    style = MyTokenType.metricCaption,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MyTokenType.caption,
+                    color = colors.muted,
                 )
                 Row(
                     modifier = Modifier.padding(top = 1.dp),
@@ -964,8 +891,8 @@ private fun FullXiaomiUsage(
                 ) {
                     Text(
                         text = formatGrouped(totalTokens?.value),
-                        style = MyTokenType.metricValueStrong,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MyTokenType.numericValue,
+                        color = colors.ink,
                         maxLines = 1,
                     )
                     Text(
@@ -973,7 +900,7 @@ private fun FullXiaomiUsage(
                         modifier = Modifier.padding(start = 2.dp, bottom = 1.dp),
                         fontSize = 10.sp,
                         lineHeight = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = colors.muted,
                     )
                 }
             }
@@ -984,7 +911,7 @@ private fun FullXiaomiUsage(
                 .padding(top = 6.dp)
                 .height(4.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)),
+                .background(colors.track),
         ) {
             if (tokenTotal.signum() > 0) {
                 val total = tokenTotal.toDouble()
@@ -993,7 +920,7 @@ private fun FullXiaomiUsage(
                         modifier = Modifier
                             .weight((inputValue.toDouble() / total).toFloat())
                             .height(4.dp)
-                            .background(colors.brand),
+                            .background(colors.cat1),
                     )
                 }
                 if (outputValue.signum() > 0) {
@@ -1001,7 +928,7 @@ private fun FullXiaomiUsage(
                         modifier = Modifier
                             .weight((outputValue.toDouble() / total).toFloat())
                             .height(4.dp)
-                            .background(colors.warning),
+                            .background(colors.cat2),
                     )
                 }
                 if (cacheValue.signum() > 0) {
@@ -1009,7 +936,7 @@ private fun FullXiaomiUsage(
                         modifier = Modifier
                             .weight((cacheValue.toDouble() / total).toFloat())
                             .height(4.dp)
-                            .background(colors.neutral),
+                            .background(colors.cat3),
                     )
                 }
             }
@@ -1021,29 +948,29 @@ private fun FullXiaomiUsage(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            FullTokenLegend("未命中 ${formatGrouped(inputTokens?.value)}", colors.brand)
-            FullTokenLegend("输出 ${formatGrouped(outputTokens?.value)}", colors.warning)
-            FullTokenLegend("缓存 ${formatGrouped(cacheTokens?.value)}", colors.neutral)
+            FullTokenLegend("未命中 ${formatGrouped(inputTokens?.value)}", colors.cat1)
+            FullTokenLegend("输出 ${formatGrouped(outputTokens?.value)}", colors.cat2)
+            FullTokenLegend("缓存 ${formatGrouped(cacheTokens?.value)}", colors.cat3)
         }
     }
 }
 
 @Composable
 private fun FullTokenLegend(text: String, color: Color) {
+    val colors = MyTokenThemeTokens.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         Box(
             modifier = Modifier
-                .size(4.dp)
+                .size(5.dp)
                 .background(color, CircleShape),
         )
         Text(
             text = text,
-            fontSize = 10.sp,
-            lineHeight = 13.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MyTokenType.caption,
+            color = colors.muted,
             maxLines = 1,
         )
     }
@@ -1055,11 +982,7 @@ private fun FullNewApiSplit(metrics: List<UsageMetric>) {
     val primary = byId["quota-progress"]
         ?: metrics.firstOrNull { it.presentation == UsageMetricPresentation.Progress }
     if (primary == null) {
-        Text(
-            text = "暂无用量数据",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        EmptyUsageText()
         return
     }
 
@@ -1112,6 +1035,7 @@ private fun FullNewApiWindowRow(
     tokens: UsageMetric?,
     cost: UsageMetric?,
 ) {
+    val colors = MyTokenThemeTokens.colors
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -1119,21 +1043,21 @@ private fun FullNewApiWindowRow(
         Text(
             text = label,
             modifier = Modifier.width(64.dp),
-            style = MyTokenType.metricCaption,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MyTokenType.caption,
+            color = colors.muted,
             maxLines = 1,
         )
         Text(
             text = tokens?.value?.let { "${formatCompact(it)} tokens" } ?: "-",
             modifier = Modifier.weight(1f),
-            style = MyTokenType.metricValue,
-            color = MaterialTheme.colorScheme.onSurface,
+            style = MyTokenType.label,
+            color = colors.ink,
             maxLines = 1,
         )
         Text(
             text = cost?.let { formatCurrency(it.value, it.currencyCode) } ?: "-",
-            style = MyTokenType.metricCaption,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MyTokenType.caption,
+            color = colors.muted,
             maxLines = 1,
         )
     }
@@ -1142,6 +1066,7 @@ private fun FullNewApiWindowRow(
 @Composable
 private fun FullRealtimeLine(items: List<Pair<String, String>>) {
     if (items.isEmpty()) return
+    val colors = MyTokenThemeTokens.colors
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1154,7 +1079,7 @@ private fun FullRealtimeLine(items: List<Pair<String, String>>) {
                     modifier = Modifier
                         .width(1.dp)
                         .height(13.dp)
-                        .background(MaterialTheme.colorScheme.outlineVariant),
+                        .background(colors.line),
                 )
             }
             Row(
@@ -1166,13 +1091,13 @@ private fun FullRealtimeLine(items: List<Pair<String, String>>) {
                     text = item.first,
                     fontSize = 10.sp,
                     lineHeight = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = colors.muted,
                 )
                 Spacer(modifier = Modifier.width(3.dp))
                 Text(
                     text = item.second,
-                    style = MyTokenType.metricValue,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MyTokenType.label,
+                    color = colors.ink,
                     maxLines = 1,
                 )
             }
@@ -1182,28 +1107,14 @@ private fun FullRealtimeLine(items: List<Pair<String, String>>) {
 
 @Composable
 private fun FullAccountStatus(status: SplitAccountStatus) {
-    val colors = statusColors()
-    val color = when (status.healthy) {
-        true -> colors.positive
-        false -> colors.critical
-        null -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(4.dp)
-                .background(color, CircleShape),
-        )
-        Text(
-            text = status.text,
-            style = MyTokenType.badge.copy(fontSize = 9.5.sp, lineHeight = 12.sp),
-            color = color,
-            maxLines = 1,
-        )
-    }
+    MyTokenStatus(
+        text = status.text,
+        tone = when (status.healthy) {
+            true -> MyTokenStatusTone.Positive
+            false -> MyTokenStatusTone.Critical
+            null -> MyTokenStatusTone.Neutral
+        },
+    )
 }
 
 private fun glmFacts(byId: Map<String, UsageMetric>): List<SplitFact> = buildList {
@@ -1337,10 +1248,10 @@ private fun splitTone(metric: UsageMetric, percent: Double?): SplitTone {
 }
 
 @Composable
-private fun splitToneColor(tone: SplitTone, colors: StatusColors): Color = when (tone) {
-    SplitTone.Normal -> colors.brand
-    SplitTone.Warning -> colors.warning
-    SplitTone.Critical -> colors.critical
+private fun splitToneColor(tone: SplitTone): Color = when (tone) {
+    SplitTone.Normal -> MyTokenThemeTokens.colors.positiveFill
+    SplitTone.Warning -> MyTokenThemeTokens.colors.warningFill
+    SplitTone.Critical -> MyTokenThemeTokens.colors.criticalFill
 }
 
 internal fun formatRemaining(metric: UsageMetric): String {

@@ -14,15 +14,19 @@ class ResetCardsMenuStyleTest {
         val end = source.length
         val menu = source.substring(start, end)
 
-        assertTrue(menu.contains("shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp)"))
-        assertTrue(menu.contains("resetCardsMenuContainer()"))
+        assertTrue(menu.contains("shape = RoundedCornerShape(MyTokenRadius.inner)"))
+        assertTrue(menu.contains("containerColor = resetCardsMenuContainer()"))
         assertTrue(menu.contains("border = BorderStroke(1.dp, resetCardsMenuBorder())"))
         assertTrue(menu.contains("Modifier.width(210.dp)"))
         assertTrue(menu.contains("padding(all = 12.dp)"))
         assertTrue(menu.contains("Modifier.width(14.dp)"))
         assertTrue(menu.contains("textAlign = TextAlign.End"))
         assertTrue(menu.contains("fontFamily = FontFamily.Monospace"))
-        assertFalse(menu.contains("text = \"${'$'}{index + 1}  "))
+        // 菜单内部不再有分割线；行间距用 8dp
+        assertFalse(menu.contains("HorizontalDivider"))
+        assertTrue(menu.contains("Arrangement.spacedBy(8.dp)"))
+        // 到期时间值用 micro 字号
+        assertTrue(menu.contains("MyTokenType.micro"))
     }
 
     @Test

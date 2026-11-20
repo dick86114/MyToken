@@ -88,6 +88,29 @@ class HomeScreenTest {
         healthState = UsageMetricHealthState.Normal,
     )
 
+    private fun balanceMetric(
+        id: String,
+        value: Double,
+        currency: String,
+        topped: Double,
+        granted: Double,
+    ) = UsageMetric(
+        id = id,
+        label = "余额",
+        value = BigDecimal.valueOf(value),
+        unit = UsageMetricUnit.Currency,
+        presentation = UsageMetricPresentation.Balance,
+        semantic = UsageMetricSemantic.Balance,
+        currencyCode = currency,
+        healthState = UsageMetricHealthState.Normal,
+    ).let { balance ->
+        val extras = buildList {
+            if (topped > 0) add(balance.copy(id = "toppedUpBalance-${currency}", label = "充值余额", value = BigDecimal.valueOf(topped)))
+            if (granted > 0) add(balance.copy(id = "grantedBalance-${currency}", label = "赠金余额", value = BigDecimal.valueOf(granted)))
+        }
+        listOf(balance) + extras
+    }
+
     private fun token(id: String, label: String, value: Double) = UsageMetric(
         id = id,
         label = label,
@@ -499,6 +522,41 @@ class HomeScreenTest {
         composeRule.onAllNodesWithTag("card_skeleton", useUnmergedTree = true).assertCountEquals(0)
         composeRule.onNodeWithTag("compact_ring_primary", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithText("刷新中", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h1100dp")
+    fun multiCurrencyCompositionHandlesZeroSegments() {
+        val item = credential("多币种账户", provider = ProviderId.DeepSeek)
+        val balances = listOf(
+            balanceMetric(id = "balance-CNY", value = 120.0, currency = "CNY", topped = 80.0, granted = 40.0),
+            balanceMetric(id = "balance-USD", value = 50.0, currency = "USD", topped = 50.0, granted = 0.0),
+            balanceMetric(id = "balance-EUR", value = 30.0, currency = "EUR", topped = 0.0, granted = 30.0),
+        ).flatten()
+        composeRule.setContent {
+            MaterialTheme {
+                CredentialUsageCard(
+                    card(item, metrics = balances),
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        // 三个币种的总额度数字都要出现（¥120.00 / $50.00 / €30.00）
+        listOf("¥120.00", "$50.00", "€30.00").forEach { amount ->
+            assertTrue(
+                "缺少币种金额 $amount",
+                composeRule.onAllNodesWithText(amount, useUnmergedTree = true)
+                    .fetchSemanticsNodes()
+                    .isNotEmpty(),
+            )
+        }
+        // “可用模型”只在主余额区出现一次
+        composeRule.onAllNodesWithText("可用模型", useUnmergedTree = true)
+            .fetchSemanticsNodes()
+            .let { assertEquals(1, it.size) }
     }
 
     @Test
