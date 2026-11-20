@@ -184,6 +184,25 @@ internal fun RemainingDurationText(end: Instant, colors: StatusColors, modifier:
     )
 }
 
+private val shortExpiryFormatter = DateTimeFormatter.ofPattern("MM-dd")
+
+internal fun formatShortExpiry(instant: Instant): String =
+    shortExpiryFormatter.format(instant.atZone(ZoneId.systemDefault()))
+
+/** 简洁页脚的紧凑倒计时：2h40m / 3d2h / 45m。 */
+internal fun formatCompactCountdown(end: Instant, now: Instant = Instant.now()): String {
+    if (!end.isAfter(now)) return "已结束"
+    val totalMinutes = max(1L, Duration.between(now, end).toMinutes())
+    val days = totalMinutes / (24 * 60)
+    val hours = (totalMinutes % (24 * 60)) / 60
+    val minutes = totalMinutes % 60
+    return when {
+        days > 0 -> "${days}d${hours}h"
+        hours > 0 -> "${hours}h${minutes}m"
+        else -> "${minutes}m"
+    }
+}
+
 internal fun formatSubscriptionTime(instant: Instant?): String {
     if (instant == null) return "-"
     return subscriptionFormatter.format(instant.atZone(ZoneId.systemDefault()))
@@ -306,7 +325,7 @@ internal fun ResetCardsBadge(
             )
         }
         Text(
-            text = if (detail) text else cards.size.toString(),
+            text = if (detail) "重置卡 ${cards.size}" else cards.size.toString(),
             style = MyTokenType.micro,
             color = colors.muted,
         )

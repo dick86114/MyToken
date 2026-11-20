@@ -102,7 +102,7 @@ private fun ModelIDChip(
 
     Surface(
         onClick = { onCopy(modelID) },
-        shape = RoundedCornerShape(MyTokenRadius.pill),
+        shape = RoundedCornerShape(8.dp),
         color = colors.subtle,
         border = BorderStroke(1.dp, if (isCopied) colors.actionFill else colors.line),
         modifier = Modifier.semantics { contentDescription = description },
@@ -114,7 +114,7 @@ private fun ModelIDChip(
         ) {
             Text(
                 text = modelID,
-                style = MyTokenType.label,
+                style = MyTokenType.caption.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
                 color = contentColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

@@ -73,8 +73,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import java.util.UUID
 import sh.calvin.reorderable.ReorderableItem
@@ -268,22 +270,21 @@ private fun AddButton(onClick: () -> Unit) {
             modifier = Modifier
                 .height(34.dp)
                 .clip(RoundedCornerShape(MyTokenRadius.pill))
-                .background(colors.subtle)
-                .border(1.dp, colors.line, RoundedCornerShape(MyTokenRadius.pill))
+                .background(colors.actionFill)
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
             Icon(
                 imageVector = Icons.Filled.Add,
                 contentDescription = null,
-                tint = colors.actionText,
+                tint = colors.onAction,
                 modifier = Modifier.size(16.dp),
             )
             Text(
                 text = "添加",
-                style = MyTokenType.label,
-                color = colors.actionText,
+                style = MyTokenType.label.copy(fontWeight = FontWeight(650)),
+                color = colors.onAction,
             )
         }
     }
@@ -300,13 +301,13 @@ private fun SectionRow() {
     ) {
         Text(
             text = "全部凭证",
-            style = MyTokenType.section,
-            color = colors.ink,
+            style = MyTokenType.sectionLabel,
+            color = colors.muted,
         )
         Spacer(modifier = Modifier.weight(1f))
         Text(
             text = "长按拖动排序",
-            style = MyTokenType.caption,
+            style = MyTokenType.micro.copy(fontWeight = FontWeight.Normal),
             color = colors.muted,
         )
     }
@@ -319,11 +320,11 @@ private fun PrivacyFooter() {
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(top = 8.dp, bottom = 16.dp),
+            .padding(top = 22.dp, bottom = 16.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = "凭证只保存在本机",
+            text = "凭证只保存在本机，不上传",
             style = MyTokenType.caption,
             color = colors.muted,
             modifier = Modifier.testTag("credential_privacy_footer"),
@@ -566,14 +567,14 @@ private fun DisabledChip(id: UUID) {
     val colors = MyTokenThemeTokens.colors
     Text(
         text = "已停用",
-        style = MyTokenType.caption,
+        style = MyTokenType.micro.copy(fontWeight = FontWeight(650), lineHeight = 13.sp),
         color = colors.muted,
         modifier = Modifier
             .testTag("credential_disabled_$id")
-            .clip(RoundedCornerShape(MyTokenRadius.pill))
+            .clip(RoundedCornerShape(5.dp))
             .background(colors.subtle)
-            .border(1.dp, colors.line, RoundedCornerShape(MyTokenRadius.pill))
-            .padding(horizontal = 6.dp, vertical = 1.dp),
+            .border(1.dp, colors.line, RoundedCornerShape(5.dp))
+            .padding(horizontal = 5.dp, vertical = 1.dp),
     )
 }
 
@@ -592,7 +593,7 @@ private fun ProviderLogoAvatar(
         painter = painterResource(providerLogoRes(providerId)),
         contentDescription = providerName,
         size = 36.dp,
-        shape = RoundedCornerShape(9.dp),
+        shape = RoundedCornerShape(10.dp),
         contentPadding = 4.dp,
     )
 }

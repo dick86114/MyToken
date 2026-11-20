@@ -35,10 +35,10 @@ class MyTokenTypographyTest {
     fun `numeric variants match the approved scale`() {
         assertEquals(20.sp, MyTokenType.detailTitle.fontSize)
         assertEquals(15.sp, MyTokenType.listTitle.fontSize)
-        assertEquals(14.sp, MyTokenType.ringCompact.fontSize)
-        assertEquals(18.sp, MyTokenType.ringCompact.lineHeight)
-        assertEquals(16.sp, MyTokenType.ringFull.fontSize)
-        assertEquals(20.sp, MyTokenType.ringFull.lineHeight)
+        assertEquals(12.5.sp, MyTokenType.ringCompact.fontSize)
+        assertEquals(16.sp, MyTokenType.ringCompact.lineHeight)
+        assertEquals(15.sp, MyTokenType.ringFull.fontSize)
+        assertEquals(19.sp, MyTokenType.ringFull.lineHeight)
         assertEquals(9.sp, MyTokenType.percentMark.fontSize)
         assertEquals(18.sp, MyTokenType.detailRemaining.fontSize)
         assertEquals(24.sp, MyTokenType.detailRemaining.lineHeight)
@@ -58,6 +58,7 @@ class MyTokenTypographyTest {
         assertEquals((-0.8f).sp, MyTokenType.display.letterSpacing)
         assertEquals((-0.6f).sp, MyTokenType.displayCompact.letterSpacing)
         assertEquals((-0.3f).sp, MyTokenType.ringCompact.letterSpacing)
+        assertEquals((-0.5f).sp, MyTokenType.ringFull.letterSpacing)
     }
 
     @Test

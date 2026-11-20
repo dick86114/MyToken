@@ -97,8 +97,8 @@ object MyTokenType {
 
     /** 简洁弧线圆心数字。 */
     val ringCompact = TextStyle(
-        fontSize = 14.sp,
-        lineHeight = 18.sp,
+        fontSize = 12.5.sp,
+        lineHeight = 16.sp,
         fontWeight = FontWeight(700),
         letterSpacing = (-0.3).sp,
         fontFeatureSettings = "tnum",
@@ -106,11 +106,28 @@ object MyTokenType {
 
     /** 完整弧线圆心数字。 */
     val ringFull = TextStyle(
-        fontSize = 16.sp,
-        lineHeight = 20.sp,
+        fontSize = 15.sp,
+        lineHeight = 19.sp,
         fontWeight = FontWeight(700),
-        letterSpacing = (-0.3).sp,
+        letterSpacing = (-0.5).sp,
         fontFeatureSettings = "tnum",
+    )
+
+    /** 详情 Hero 的 88dp 弧线圆心数字。 */
+    val detailRing = TextStyle(
+        fontSize = 20.sp,
+        lineHeight = 24.sp,
+        fontWeight = FontWeight(750),
+        letterSpacing = (-0.6).sp,
+        fontFeatureSettings = "tnum",
+    )
+
+    /** 分节小标题（设计稿 section-label）：11sp 大写字距。 */
+    val sectionLabel = TextStyle(
+        fontSize = 11.sp,
+        lineHeight = 16.sp,
+        fontWeight = FontWeight(650),
+        letterSpacing = 0.9.sp,
     )
 
     /** 百分号符号，仅用于数字旁。 */

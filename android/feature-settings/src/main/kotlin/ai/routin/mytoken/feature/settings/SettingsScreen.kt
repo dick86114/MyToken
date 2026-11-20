@@ -77,9 +77,6 @@ import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.MyTokenButton
 import ai.routin.mytoken.core.ui.MyTokenButtonTone
-import ai.routin.mytoken.core.ui.MyTokenHelpButton
-import ai.routin.mytoken.core.ui.HelpRow
-import ai.routin.mytoken.core.ui.HelpSection
 import ai.routin.mytoken.core.ui.MyTokenBrandMark
 import ai.routin.mytoken.core.ui.MyTokenRadius
 import ai.routin.mytoken.core.ui.MyTokenRow
@@ -926,42 +923,36 @@ private fun SettingsProfileCard(appVersion: String) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            MyTokenBrandMark(size = 36.dp)
-            Column(
+            Box(
                 modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(colors.ink),
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "MyToken $appVersion",
-                    style = MyTokenType.body,
-                    fontWeight = FontWeight.SemiBold,
+                    text = "M",
+                    style = MyTokenType.title.copy(fontWeight = FontWeight(800)),
+                    color = colors.canvas,
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "MyToken",
+                    style = MyTokenType.title.copy(fontWeight = FontWeight(700)),
                     color = colors.ink,
                 )
                 Text(
-                    text = "凭证只在本机",
+                    text = "v$appVersion · 凭证只在本机",
+                    modifier = Modifier.padding(top = 2.dp),
                     style = MyTokenType.caption,
                     color = colors.muted,
                 )
             }
-            MyTokenHelpButton(
-                title = "隐私与刷新",
-                subtitle = "凭证只在本机处理",
-                sections = listOf(
-                    HelpSection(
-                        title = "本机数据",
-                        rows = listOf(
-                            HelpRow("凭证存储", "加密保存在本机 Keystore"),
-                            HelpRow("后台刷新", "频率由“刷新”设置控制"),
-                        ),
-                    ),
-                ),
-                modifier = Modifier.testTag("settings_privacy_help"),
-            )
         }
     }
 }

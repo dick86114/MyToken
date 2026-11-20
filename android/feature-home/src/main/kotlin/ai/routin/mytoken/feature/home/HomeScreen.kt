@@ -179,12 +179,21 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                     }
-                    Box(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(MyTokenSize.touch)
                             .testTag("health_summary"),
                     ) {
+                        HomeStatusRow(
+                            total = visibleCards.size,
+                            allTotal = allCards.size,
+                            attention = attentionCount,
+                            syncText = state.lastUpdatedText ?: "刚刚同步",
+                            selectedProvider = selectedProvider,
+                            providers = visibleProviders,
+                            counts = providerCounts,
+                            onSelect = { selectedProvider = it },
+                        )
                         HealthRuler(
                             entries = healthEntries,
                             onLocate = { id ->
@@ -207,19 +216,7 @@ fun HomeScreen(
                                     }
                                 }
                             },
-                            // 末尾留给筛选 pill，保证每一段都可点。
-                            modifier = Modifier.matchParentSize().padding(end = 132.dp),
-                        )
-                        HomeStatusRow(
-                            total = visibleCards.size,
-                            allTotal = allCards.size,
-                            attention = attentionCount,
-                            syncText = state.lastUpdatedText ?: "刚刚同步",
-                            selectedProvider = selectedProvider,
-                            providers = visibleProviders,
-                            counts = providerCounts,
-                            onSelect = { selectedProvider = it },
-                            modifier = Modifier.matchParentSize(),
+                            modifier = Modifier.padding(top = 1.dp, bottom = 14.dp),
                         )
                     }
                 }

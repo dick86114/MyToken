@@ -20,6 +20,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -39,7 +40,8 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.DropdownMenu
@@ -164,7 +166,7 @@ internal fun HomeToolbar(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector = Icons.AutoMirrored.Outlined.FormatListBulleted,
+                imageVector = Icons.Filled.Menu,
                 contentDescription = null,
                 tint = colors.muted,
                 modifier = Modifier.size(20.dp),
@@ -194,19 +196,19 @@ internal fun HomeToolbar(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector = Icons.Filled.Settings,
+                imageVector = Icons.Outlined.Settings,
                 contentDescription = null,
-                tint = colors.muted,
-                modifier = Modifier.size(20.dp),
+                tint = colors.ink,
+                modifier = Modifier.size(19.dp),
             )
             if (hasUpdateAvailable) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 6.dp, end = 6.dp)
-                        .size(7.dp)
+                        .padding(top = 9.dp, end = 9.dp)
+                        .size(6.dp)
                         .clip(CircleShape)
-                        .background(colors.warningFill)
+                        .background(colors.actionFill)
                         .testTag("home_update_badge"),
                 )
             }
@@ -223,9 +225,10 @@ private fun DensitySwitch(
 ) {
     val compact = density.isCompact()
     val colors = MyTokenThemeTokens.colors
-    val optionWidth = 56.dp
+    val optionWidth = 52.dp
+    val underlineWidth = 26.dp
     val underlineOffset by animateDpAsState(
-        targetValue = if (compact) 0.dp else optionWidth,
+        targetValue = if (compact) 0.dp else optionWidth + 6.dp,
         animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
         label = "densityUnderlineOffset",
     )
@@ -247,6 +250,7 @@ private fun DensitySwitch(
                 width = optionWidth,
                 onClick = { if (!compact) onToggle() },
             )
+            Spacer(modifier = Modifier.width(6.dp))
             DensityOption(
                 text = "完整",
                 compact = false,
@@ -259,8 +263,12 @@ private fun DensitySwitch(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .offset(x = underlineOffset + (optionWidth - 18.dp) / 2)
-                .width(18.dp)
+                .offset(
+                    x = underlineOffset + (optionWidth - underlineWidth) / 2 +
+                        if (compact) 0.dp else 6.dp,
+                    y = (-8).dp,
+                )
+                .width(underlineWidth)
                 .height(2.dp)
                 .clip(CircleShape)
                 .background(colors.actionFill),
@@ -297,8 +305,8 @@ private fun DensityOption(
         Text(
             text = text,
             style = MyTokenType.label,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-            color = if (selected) colors.actionText else colors.muted,
+            fontWeight = if (selected) FontWeight(650) else FontWeight(550),
+            color = if (selected) colors.ink else colors.muted,
             maxLines = 1,
         )
     }
@@ -325,7 +333,7 @@ internal fun HomeStatusRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(MyTokenSize.touch)
+            .height(34.dp)
             .testTag("home_status_row"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -333,7 +341,7 @@ internal fun HomeStatusRow(
             text = buildAnnotatedString {
                 append("$total 个账户 · ")
                 if (attention > 0) {
-                    withStyle(SpanStyle(color = colors.warningText)) {
+                    withStyle(SpanStyle(color = colors.warningText, fontWeight = FontWeight(650))) {
                         append("$attention 个需注意")
                     }
                 } else {
@@ -350,7 +358,7 @@ internal fun HomeStatusRow(
         Spacer(modifier = Modifier.width(MyTokenSpacing.sm))
         Box(
             modifier = Modifier
-                .height(MyTokenSize.touch)
+                .height(34.dp)
                 .widthIn(min = MyTokenSize.touch)
                 .clip(RoundedCornerShape(MyTokenSize.switchHeight))
                 .clickable(role = Role.Button) { expanded = true }
@@ -362,15 +370,15 @@ internal fun HomeStatusRow(
                 modifier = Modifier
                     .height(30.dp)
                     .clip(RoundedCornerShape(MyTokenSize.switchHeight))
-                    .background(colors.subtle)
+                    .background(colors.surface)
                     .border(
                         width = 1.dp,
                         color = colors.line,
                         shape = RoundedCornerShape(MyTokenSize.switchHeight),
                     )
-                    .padding(start = 10.dp, end = 6.dp),
+                    .padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
             ) {
                 Text(
                     text = filterLabel,
@@ -426,50 +434,46 @@ internal fun HealthRuler(
 ) {
     val colors = MyTokenThemeTokens.colors
     Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Bottom,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         entries.forEachIndexed { index, entry ->
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxHeight(),
-                contentAlignment = Alignment.BottomCenter,
+                    .fillMaxHeight()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { onLocate(entry.credentialId) }
+                    .semantics {
+                        contentDescription = "${entry.name}，${homeHealthLabel(entry.tone)}"
+                    }
+                    .testTag("health_segment_$index"),
+                contentAlignment = Alignment.Center,
             ) {
-                // 触控带占满 48dp 高度（视觉条仍在底部 4dp）；
-                // 右侧留给筛选 pill，避免 pill 覆盖最后一段的触控。
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .fillMaxHeight()
-                        .clickable { onLocate(entry.credentialId) }
-                        .semantics {
-                            contentDescription = "${entry.name}，${homeHealthLabel(entry.tone)}"
-                        }
-                        .testTag("health_segment_$index"),
-                    contentAlignment = Alignment.BottomCenter,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 2.dp)
-                            .height(MyTokenSize.healthBar)
-                            .clip(CircleShape)
-                            .background(
-                                when (entry.tone) {
-                                    HomeHealthTone.Normal -> colors.statusDotNormal
-                                    HomeHealthTone.Warning -> colors.warningFill
-                                    HomeHealthTone.Critical -> colors.criticalFill
-                                },
-                            ),
-                    )
-                }
+                        .height(MyTokenSize.healthBar)
+                        .clip(CircleShape)
+                        .background(
+                            when (entry.tone) {
+                                HomeHealthTone.Normal -> colors.statusDotNormal.copy(alpha = 0.5f)
+                                HomeHealthTone.Warning -> colors.warningFill
+                                HomeHealthTone.Critical -> colors.criticalFill
+                            },
+                        ),
+                )
             }
         }
     }
 }
 
-/** 更新提示：28dp 单行，唯一常驻呼吸动画（尊重减少动态）。 */
+/** 更新提示：28dp 单行，✦ + 新版本号 + ›；设计稿为静态样式。 */
 @Composable
 internal fun HomeUpdateBanner(
     version: String?,
@@ -480,33 +484,31 @@ internal fun HomeUpdateBanner(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 28.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(colors.subtle)
-            .border(1.dp, colors.line, RoundedCornerShape(14.dp))
+            .height(28.dp)
             .clickable(role = Role.Button, onClick = onOpenSettings)
-            .padding(horizontal = 10.dp, vertical = 5.dp)
             .semantics { contentDescription = "有新版本可用，前往设置查看并更新" }
             .testTag("home_update_banner"),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        UpdateStar(modifier = Modifier.testTag("home_update_banner_icon"))
         Text(
-            text = version?.takeIf { it.isNotBlank() }?.let { "发现新版本 $it" } ?: "发现新版本",
-            modifier = Modifier
-                .weight(1f)
-                .padding(start = 8.dp),
-            style = MyTokenType.label,
-            color = colors.ink,
+            text = "✦",
+            modifier = Modifier.testTag("home_update_banner_icon"),
+            style = MyTokenType.micro,
+            color = colors.actionText,
+        )
+        Text(
+            text = version?.takeIf { it.isNotBlank() }?.let { "新版本 $it 可用" } ?: "有新版本可用",
+            style = MyTokenType.micro.copy(fontWeight = FontWeight.Normal),
+            color = colors.muted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        Spacer(modifier = Modifier.weight(1f))
         Text(
-            text = "去更新",
+            text = "›",
             style = MyTokenType.label,
-            fontWeight = FontWeight.SemiBold,
-            color = colors.actionText,
-            maxLines = 1,
+            color = colors.muted,
         )
     }
 }

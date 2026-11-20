@@ -24,12 +24,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowRight
@@ -141,21 +143,11 @@ internal fun UsageCardFrame(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val compact = density.isCompact()
-    val fontScale = LocalDensity.current.fontScale
-    // 1.0× 用固定高度保证网格行等高；更大字号改为最小高度，让内容撑开而不是裁切页脚。
-    val fixedHeight = compact && fontScale <= 1.0f
-    val minHeight = compact && !fixedHeight
     val interactionSource = remember { MutableInteractionSource() }
     MyTokenSurface(
         modifier = modifier
             .fillMaxWidth()
-            .then(
-                when {
-                    fixedHeight -> Modifier.height(CompactCardHeight)
-                    minHeight -> Modifier.heightIn(min = CompactCardHeight)
-                    else -> Modifier
-                },
-            )
+            .then(if (compact) Modifier.heightIn(min = CompactCardHeight) else Modifier)
             .myTokenPressScale(interactionSource, pressedScale = 0.99f)
             .clickable(
                 interactionSource = interactionSource,
@@ -166,31 +158,19 @@ internal fun UsageCardFrame(
         surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
         shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
     ) {
-        val padding = if (compact) 14.dp else 16.dp
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(padding)
-                    // 给底部页脚留出空间：页脚固定在卡片底边，内容再高也不会被盖住。
-                    .padding(bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
-            ) {
-                content()
-            }
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .fillMaxWidth()
-                    .padding(start = padding, end = padding, bottom = padding),
-            ) {
-                footer()
-            }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(if (compact) 14.dp else 16.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
+        ) {
+            content()
+            footer()
         }
     }
 }
 
-/** 身份区：logo + 名称 + meta + 状态点文字 + 失败/完整模式下的刷新入口。 */
+/** 身份区：logo + 名称 + meta + 状态（简洁仅圆点 / 完整圆点+文字）+ 刷新。 */
 @Composable
 internal fun UsageCardIdentity(
     card: CredentialCardUi,
@@ -202,32 +182,22 @@ internal fun UsageCardIdentity(
 ) {
     val compact = density.isCompact()
     val colors = MyTokenThemeTokens.colors
-    val subscriptionExpiry = card.snapshot?.subscriptionEndAt
-    val lifecycleText = subscriptionExpiry?.let { expiry ->
-        val prefix = if (card.credential.providerId == ProviderId.OpenCode) {
-            OpenCodeCardPolicy.lifecyclePrefix(card.snapshot?.billingMode)
-        } else {
-            "到期"
-        }
-        "$prefix ${formatSubscriptionTime(expiry)}"
+    val planMetaText = card.snapshot?.planName?.trim()?.takeIf { it.isNotEmpty() }?.let { plan ->
+        if (compact) plan else "${ProviderCatalog.displayName(card.credential.providerId)} · $plan"
     }
-    val planMetaText = listOfNotNull(
-        card.snapshot?.planName?.trim()?.takeIf { it.isNotEmpty() },
-        lifecycleText,
-    ).joinToString(" · ").takeIf { it.isNotEmpty() }
     val statusText = usageCardStatusText(health)
 
     Row(verticalAlignment = Alignment.Top) {
         Box(
-            modifier = Modifier.size(if (compact) 36.dp else 44.dp),
+            modifier = Modifier.size(if (compact) 24.dp else 28.dp),
             contentAlignment = Alignment.TopStart,
         ) {
             ProviderLogoPlate(
                 painter = painterResource(ProviderCatalog.logoRes(card.credential.providerId)),
                 contentDescription = null,
                 size = if (compact) 24.dp else 28.dp,
-                shape = RoundedCornerShape(7.dp),
-                contentPadding = if (compact) 2.dp else 3.dp,
+                shape = RoundedCornerShape(if (compact) 7.dp else 8.dp),
+                contentPadding = 3.dp,
                 modifier = Modifier.testTag("credential_avatar_${card.credential.id}"),
             )
         }
@@ -235,13 +205,15 @@ internal fun UsageCardIdentity(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(start = 8.dp, end = 6.dp)
-                .testTag("credential_name_${card.credential.id}"),
+                .padding(start = 7.dp, end = 6.dp)
+                .testTag("credential_identity_${card.credential.id}"),
         ) {
             Text(
                 text = card.credential.name,
-                style = if (compact) MyTokenType.label else MyTokenType.section,
-                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.testTag("credential_name_${card.credential.id}"),
+                style = if (compact) MyTokenType.label else MyTokenType.listTitle,
+                fontWeight = FontWeight(650),
+                color = colors.ink,
                 maxLines = if (compact) 1 else 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -249,7 +221,11 @@ internal fun UsageCardIdentity(
                 Text(
                     text = planMetaText,
                     modifier = Modifier.padding(top = 2.dp),
-                    style = MyTokenType.caption,
+                    style = if (compact) {
+                        MyTokenType.micro.copy(fontWeight = FontWeight.Normal)
+                    } else {
+                        MyTokenType.caption
+                    },
                     color = colors.muted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -258,8 +234,9 @@ internal fun UsageCardIdentity(
         }
 
         Row(
+            modifier = Modifier.padding(top = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
             val statusModifier = if (health == UsageCardHealth.Failed) {
                 Modifier
@@ -270,11 +247,28 @@ internal fun UsageCardIdentity(
                 Modifier
             }
             if (showStatus) {
-                MyTokenStatus(
-                    text = statusText,
-                    tone = usageCardStatusTone(health),
-                    modifier = statusModifier,
-                )
+                if (compact) {
+                    // 设计稿简洁卡头部只保留状态圆点，文字留给完整卡。
+                    Box(
+                        modifier = statusModifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(
+                                when (usageCardStatusTone(health)) {
+                                    MyTokenStatusTone.Warning -> colors.warningFill
+                                    MyTokenStatusTone.Critical -> colors.criticalFill
+                                    MyTokenStatusTone.Positive -> colors.positiveFill
+                                    MyTokenStatusTone.Neutral -> colors.statusDotNormal
+                                },
+                            ),
+                    )
+                } else {
+                    MyTokenStatus(
+                        text = statusText,
+                        tone = usageCardStatusTone(health),
+                        modifier = statusModifier,
+                    )
+                }
             }
             if (!compact || health == UsageCardHealth.Failed) {
                 Box(
@@ -301,7 +295,8 @@ internal fun UsageCardIdentity(
                             modifier = Modifier.size(15.dp),
                         )
                     }
-                }            }
+                }
+            }
         }
     }
 }
@@ -455,6 +450,86 @@ internal fun usageCardFooterText(card: CredentialCardUi, health: UsageCardHealth
     UsageCardHealth.Warning -> "接近上限"
     UsageCardHealth.Critical -> "已达上限"
     UsageCardHealth.Normal -> card.freshness.text
+}
+
+/** 简洁卡页脚：左状态 / 右重置或到期，对应设计稿两段式页脚。 */
+internal fun usageCardFooterParts(card: CredentialCardUi, health: UsageCardHealth): Pair<String, String> {
+    val snapshot = card.snapshot
+    val metrics = snapshot?.metrics.orEmpty()
+    val primary = metrics.firstOrNull { it.presentation == UsageMetricPresentation.Progress }
+    val balance = metrics.firstOrNull { it.presentation == UsageMetricPresentation.Balance }
+    val usageKind = card.credential.metadata[ai.routin.mytoken.domain.model.CredentialMetadataKey.UsageKind]
+        ?: snapshot?.usageKind
+    val update = snapshot?.fetchedAt?.let { "${formatResetTime(it)} 更新" } ?: "尚未更新"
+    val expiry = snapshot?.subscriptionEndAt?.let(::formatShortExpiry)
+    val countdown = primary?.windowEnd?.let { "${formatCompactCountdown(it)} 后重置" }.orEmpty()
+
+    return when (health) {
+        UsageCardHealth.Failed -> (snapshot?.fetchedAt?.let {
+            "更新失败 · 上次成功 ${formatResetTime(it)}"
+        } ?: "更新失败") to ""
+
+        UsageCardHealth.Stale -> "待刷新" to (snapshot?.fetchedAt?.let { "${formatResetTime(it)} 的数据" } ?: "")
+        UsageCardHealth.Loading -> "刷新中" to ""
+        UsageCardHealth.Disabled -> "已停用" to ""
+        UsageCardHealth.Warning -> "接近上限" to countdown
+        UsageCardHealth.Critical -> "已达上限" to countdown
+        UsageCardHealth.Normal -> when {
+            balance != null -> compactAccountStatus(card) to update
+            usageKind == "plan" && expiry != null ->
+                (snapshot?.statusText?.takeIf { it.isNotBlank() } ?: "有效") to "$expiry 到期"
+            primary?.windowEnd != null -> update to countdown
+            expiry != null -> "有效" to "$expiry 到期"
+            else -> update to ""
+        }
+    }
+}
+
+internal fun compactAccountStatus(card: CredentialCardUi): String {
+    val raw = card.snapshot?.statusText?.trim()?.takeIf { it.isNotEmpty() } ?: return "账户可用"
+    return if (raw.startsWith("账户")) raw else "账户$raw"
+}
+
+@Composable
+internal fun UsageCardFooterColumns(
+    left: String,
+    right: String,
+    health: UsageCardHealth,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MyTokenThemeTokens.colors
+    val leftColor = when (health) {
+        UsageCardHealth.Warning -> colors.warningText
+        UsageCardHealth.Critical, UsageCardHealth.Failed -> colors.criticalText
+        else -> colors.muted
+    }
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = left,
+            modifier = Modifier
+                .weight(1f)
+                .testTag("card_footer_left"),
+            style = MyTokenType.caption,
+            fontWeight = if (leftColor != colors.muted) FontWeight(600) else FontWeight.Normal,
+            color = leftColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (right.isNotEmpty()) {
+            Text(
+                text = right,
+                modifier = Modifier.testTag("card_footer_right"),
+                style = MyTokenType.caption,
+                color = colors.muted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
 }
 
 /** 加载中没有缓存数据时的静态骨架：只用 track 色块，不做 shimmer。 */

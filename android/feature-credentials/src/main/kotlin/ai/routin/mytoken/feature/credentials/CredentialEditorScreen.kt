@@ -67,6 +67,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -126,7 +127,7 @@ fun CredentialEditorScreen(
                     )
                     MyTokenButton(
                         onClick = onSave,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1.25f),
                         enabled = !state.isSaving,
                         tone = MyTokenButtonTone.Primary,
                         text = if (state.isSaving) "保存中…" else "保存",
@@ -355,7 +356,7 @@ private fun EditorTopBar(title: String, onBack: () -> Unit) {
         }
         Text(
             text = title,
-            style = MyTokenType.section,
+            style = MyTokenType.listTitle.copy(fontWeight = FontWeight(650)),
             color = colors.ink,
         )
     }
@@ -405,7 +406,7 @@ private fun ProviderRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = kindLabel(kind),
+                    text = "${kindLabel(kind)} · 读取用量",
                     style = MyTokenType.caption,
                     color = colors.muted,
                     maxLines = 1,
@@ -453,7 +454,7 @@ private fun ProviderPickerSheet(
             Box(modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)) {
                 Box(
                     modifier = Modifier
-                        .size(width = 32.dp, height = 4.dp)
+                        .size(width = 36.dp, height = 4.dp)
                         .clip(RoundedCornerShape(MyTokenRadius.pill))
                         .background(colors.line),
                 )
@@ -469,21 +470,17 @@ private fun ProviderPickerSheet(
                 .testTag("editor_provider_sheet"),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Column {
                 Text(
                     text = "选择供应商",
-                    style = MyTokenType.section,
+                    style = MyTokenType.section.copy(fontWeight = FontWeight(700)),
                     color = colors.ink,
-                    modifier = Modifier.weight(1f),
                 )
                 Text(
-                    text = "取消",
-                    style = MyTokenType.label,
+                    text = "不同供应商需要不同的凭证字段",
+                    modifier = Modifier.padding(top = 3.dp),
+                    style = MyTokenType.caption,
                     color = colors.muted,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(MyTokenRadius.pill))
-                        .clickable { dismissThen(onDismiss) }
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
                 )
             }
             ProviderId.entries.chunked(2).forEach { rowProviders ->
@@ -505,6 +502,18 @@ private fun ProviderPickerSheet(
                     }
                 }
             }
+            Text(
+                text = "取消",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 44.dp)
+                    .clip(RoundedCornerShape(MyTokenRadius.pill))
+                    .clickable { dismissThen(onDismiss) }
+                    .padding(vertical = 12.dp),
+                style = MyTokenType.label.copy(fontWeight = FontWeight(600)),
+                color = colors.muted,
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }
@@ -517,40 +526,39 @@ private fun ProviderTile(
     modifier: Modifier = Modifier,
 ) {
     val colors = MyTokenThemeTokens.colors
-    val shape = RoundedCornerShape(MyTokenRadius.inner)
-    Row(
+    val shape = RoundedCornerShape(14.dp)
+    Box(
         modifier = modifier
-            .heightIn(min = 64.dp)
             .clip(shape)
             .background(colors.surface)
-            .border(if (isSelected) 1.dp else 1.dp, if (isSelected) colors.actionFill else colors.line, shape)
+            .border(
+                width = 1.dp,
+                color = if (isSelected) colors.actionFill else colors.line,
+                shape = shape,
+            )
             .clickable(onClick = onClick)
             .testTag("editor_provider_tile_${provider.rawValue}")
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(10.dp),
     ) {
-        ProviderLogoPlate(
-            painter = painterResource(providerLogoRes(provider)),
-            contentDescription = null,
-            size = 26.dp,
-            shape = RoundedCornerShape(7.dp),
-            contentPadding = 2.dp,
-        )
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(start = 8.dp),
-        ) {
+        Column {
+            ProviderLogoPlate(
+                painter = painterResource(providerLogoRes(provider)),
+                contentDescription = null,
+                size = 26.dp,
+                shape = RoundedCornerShape(7.dp),
+                contentPadding = 2.dp,
+            )
             Text(
                 text = ProviderNames.displayName(provider),
-                style = MyTokenType.label,
+                modifier = Modifier.padding(top = 4.dp),
+                style = MyTokenType.label.copy(fontWeight = FontWeight(650)),
                 color = colors.ink,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = kindLabel(defaultKind(provider)),
-                style = MyTokenType.caption,
+                style = MyTokenType.micro.copy(fontWeight = FontWeight.Normal),
                 color = colors.muted,
                 maxLines = 1,
             )
@@ -560,7 +568,9 @@ private fun ProviderTile(
                 imageVector = Icons.Filled.Check,
                 contentDescription = null,
                 tint = colors.actionText,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(12.dp),
             )
         }
     }

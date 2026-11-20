@@ -144,12 +144,15 @@ fun CredentialUsageCard(
             .semantics { contentDescription = cardDescription }
             .testTag("credential_card_${card.credential.id}"),
         footer = {
-            if (showsSkeleton) {
-                UsageCardSkeletonFooter()
-            } else {
-                UsageCardFooter(
-                    text = if (compact) usageCardFooterText(card, health) else card.freshness.text,
-                    showChevron = !compact,
+            when {
+                showsSkeleton -> UsageCardSkeletonFooter()
+                compact -> {
+                    val (left, right) = usageCardFooterParts(card, health)
+                    UsageCardFooterColumns(left = left, right = right, health = health)
+                }
+                else -> UsageCardFooter(
+                    text = usageCardFooterText(card, health),
+                    showChevron = true,
                 )
             }
         },
@@ -210,6 +213,7 @@ private fun CompactUsageCardBody(card: CredentialCardUi, health: UsageCardHealth
         )
 
         CompactUsageArrangement.RingWithWindows -> CompactRingWithWindows(
+            card = card,
             metrics = metrics,
             health = health,
         )
@@ -220,16 +224,17 @@ private fun CompactUsageCardBody(card: CredentialCardUi, health: UsageCardHealth
 
 @Composable
 private fun CompactRingWithWindows(
+    card: CredentialCardUi,
     metrics: List<UsageMetric>,
     health: UsageCardHealth,
 ) {
     val colors = MyTokenThemeTokens.colors
     val primary = metrics.first()
-    val secondary = metrics.drop(1)
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 9.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Column(
             modifier = Modifier.testTag("compact_ring_primary"),
@@ -248,8 +253,7 @@ private fun CompactRingWithWindows(
             ) {
                 Text(
                     text = compactPeriodLabel(primary),
-                    style = MyTokenType.label,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MyTokenType.caption.copy(fontWeight = FontWeight.SemiBold),
                     color = colors.ink,
                     maxLines = 1,
                 )
@@ -257,26 +261,127 @@ private fun CompactRingWithWindows(
                     ResetCardsBadge(metric = primary, style = ResetCardsBadgeStyle.Compact)
                 }
             }
-            if (secondary.isEmpty()) {
-                Text(
-                    text = ringSubtitle(primary),
-                    modifier = Modifier.padding(top = 2.dp),
-                    style = MyTokenType.caption,
-                    color = colors.muted,
-                    maxLines = 1,
-                )
-            }
         }
-        if (secondary.isNotEmpty()) {
+
+        val miniRows = compactMiniRows(card = card, metrics = metrics)
+        if (miniRows.isNotEmpty()) {
             Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
             ) {
-                secondary.forEach { metric ->
-                    UsageCardWindowRow(metric = metric, dense = true)
+                miniRows.forEach { row ->
+                    when (row) {
+                        is CompactMiniRow.Progress -> CompactMiniProgressRow(row.metric)
+                        is CompactMiniRow.Text -> CompactMiniTextRow(row.label, row.value)
+                    }
                 }
             }
         }
+    }
+}
+
+private sealed interface CompactMiniRow {
+    data class Progress(val metric: UsageMetric) : CompactMiniRow
+    data class Text(val label: String, val value: String) : CompactMiniRow
+}
+
+private fun compactMiniRows(
+    card: CredentialCardUi,
+    metrics: List<UsageMetric>,
+): List<CompactMiniRow> = buildList {
+    metrics.drop(1)
+        .filter { it.presentation == UsageMetricPresentation.Progress }
+        .forEach { add(CompactMiniRow.Progress(it)) }
+
+    val byId = card.snapshot?.metrics.orEmpty().associateBy(UsageMetric::id)
+    val usageKind = card.credential.metadata[ai.routin.mytoken.domain.model.CredentialMetadataKey.UsageKind]
+        ?: card.snapshot?.usageKind
+    when {
+        usageKind == "plan" || usageKind == "tokenPack" -> {
+            val plan = metrics.firstOrNull()
+            val remaining = plan?.remaining
+            val limit = plan?.limit
+            if (remaining != null && limit != null) {
+                add(CompactMiniRow.Text("剩余", "${formatCompact(remaining)} / ${formatCompact(limit)}"))
+            }
+        }
+        card.credential.providerId == ai.routin.mytoken.domain.model.ProviderId.CommandCode -> {
+            val amounts = listOf("monthly-remaining", "purchased-remaining", "free-remaining")
+                .mapNotNull { id -> byId[id]?.value }
+            if (amounts.isNotEmpty()) {
+                val total = amounts.fold(BigDecimal.ZERO, BigDecimal::add)
+                add(CompactMiniRow.Text("余额", formatCurrency(total, byId["monthly-remaining"]?.currencyCode ?: "$")))
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompactMiniProgressRow(metric: UsageMetric) {
+    val colors = MyTokenThemeTokens.colors
+    val percent = progressPercent(metric)
+    val tone = CompactUsageCardPresentation.tone(metric)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("compact_window_row_${metric.id}"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = compactPeriodLabel(metric),
+            style = MyTokenType.caption,
+            color = colors.muted,
+            maxLines = 1,
+        )
+        UsageProgressBar(
+            percent = percent,
+            color = when (tone) {
+                UsageMetricTone.Warning -> colors.warningFill
+                UsageMetricTone.Critical -> colors.criticalFill
+                UsageMetricTone.Normal -> colors.positiveFill
+            },
+            modifier = Modifier.weight(1f),
+            height = 3.dp,
+        )
+        Text(
+            text = formatPercent(percent),
+            style = MyTokenType.caption.copy(fontWeight = FontWeight.SemiBold),
+            color = when (tone) {
+                UsageMetricTone.Warning -> colors.warningText
+                UsageMetricTone.Critical -> colors.criticalText
+                UsageMetricTone.Normal -> colors.ink
+            },
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun CompactMiniTextRow(label: String, value: String) {
+    val colors = MyTokenThemeTokens.colors
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MyTokenType.caption,
+            color = colors.muted,
+            maxLines = 1,
+        )
+        Spacer(modifier = Modifier.weight(1f))
+        Text(
+            text = value,
+            style = MyTokenType.caption.copy(
+                fontWeight = FontWeight.SemiBold,
+                fontFeatureSettings = "tnum",
+            ),
+            color = colors.ink,
+            maxLines = 1,
+        )
     }
 }
 
@@ -292,25 +397,18 @@ private fun CompactBalanceLayout(
     val compositionTotal = composition.fold(BigDecimal.ZERO) { total, segment ->
         total + segment.value
     }
+    val amount = splitBalanceAmount(formatCurrency(metric.value, metric.currencyCode))
+    val markSpan = SpanStyle(
+        fontSize = 0.6.em,
+        fontWeight = FontWeight(650),
+        color = colors.muted,
+    )
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 2.dp),
+            .padding(top = 9.dp),
     ) {
-        Text(
-            text = title,
-            style = MyTokenType.caption,
-            color = colors.muted,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        val amount = splitBalanceAmount(formatCurrency(metric.value, metric.currencyCode))
-        val markSpan = SpanStyle(
-            fontSize = 0.6.em,
-            fontWeight = FontWeight(650),
-            color = colors.muted,
-        )
         Text(
             text = buildAnnotatedString {
                 if (amount.prefix.isNotEmpty()) {
@@ -322,17 +420,30 @@ private fun CompactBalanceLayout(
                     withStyle(markSpan) { append(amount.suffix) }
                 }
             },
-            modifier = Modifier.padding(top = 4.dp),
             style = MyTokenType.displayCompact,
             color = colors.ink,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        Text(
+            text = title,
+            modifier = Modifier.padding(top = 4.dp),
+            style = MyTokenType.caption,
+            color = colors.muted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
         if (composition.isNotEmpty()) {
+            Text(
+                text = "余额构成",
+                modifier = Modifier.padding(top = 10.dp),
+                style = MyTokenType.caption,
+                color = colors.muted,
+            )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 10.dp)
+                    .padding(top = 4.dp)
                     .height(5.dp)
                     .clip(CircleShape)
                     .background(colors.track),
@@ -356,12 +467,9 @@ private fun CompactBalanceLayout(
                     }
                 }
             }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+            Column(
+                modifier = Modifier.padding(top = 5.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
             ) {
                 composition.forEach { segment ->
                     CompactBalanceLegend(
@@ -372,13 +480,8 @@ private fun CompactBalanceLayout(
             }
         }
         if (modelCount > 0) {
-            Text(
-                text = "可用模型 $modelCount 个",
-                modifier = Modifier.padding(top = 6.dp),
-                style = MyTokenType.caption,
-                color = colors.muted,
-                maxLines = 1,
-            )
+            Spacer(modifier = Modifier.height(5.dp))
+            CompactMiniTextRow(label = "可用模型", value = "$modelCount 个")
         }
     }
 }

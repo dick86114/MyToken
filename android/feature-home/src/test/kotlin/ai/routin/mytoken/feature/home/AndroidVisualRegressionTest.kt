@@ -23,6 +23,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -133,7 +134,9 @@ class AndroidVisualRegressionTest {
         }
 
         val resetText = formatResetTime(end)
-        composeRule.onNodeWithText("长周期套餐 · 到期 ${formatSubscriptionTime(expiry)}")
+        composeRule.onNodeWithText("长周期套餐").assertExists()
+        composeRule.onAllNodesWithText("后重置", substring = true, useUnmergedTree = true)
+            .onFirst()
             .assertExists()
         composeRule.onAllNodesWithText(resetText, useUnmergedTree = true)
             .fetchSemanticsNodes()

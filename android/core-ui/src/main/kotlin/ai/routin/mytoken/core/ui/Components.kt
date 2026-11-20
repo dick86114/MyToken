@@ -312,28 +312,35 @@ fun MyTokenSection(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = MyTokenThemeTokens.colors
-    MyTokenSurface(
-        modifier = modifier.fillMaxWidth(),
-        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
-    ) {
-        Column(
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(MyTokenSpacing.cardFull),
-            verticalArrangement = Arrangement.spacedBy(MyTokenSpacing.md),
+                .padding(start = 2.dp, end = 2.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = title,
-                    modifier = Modifier.weight(1f),
-                    style = MyTokenType.section,
-                    color = colors.ink,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                action?.invoke()
+            Text(
+                text = title,
+                modifier = Modifier.weight(1f),
+                style = MyTokenType.sectionLabel,
+                color = colors.muted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            action?.invoke()
+        }
+        MyTokenSurface(
+            modifier = Modifier.fillMaxWidth(),
+            surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(MyTokenSpacing.cardFull),
+                verticalArrangement = Arrangement.spacedBy(MyTokenSpacing.md),
+            ) {
+                content()
             }
-            content()
         }
     }
 }

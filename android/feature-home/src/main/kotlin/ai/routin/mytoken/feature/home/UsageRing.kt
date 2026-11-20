@@ -6,15 +6,16 @@ import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.rememberMyTokenMotionEnabled
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -39,6 +40,7 @@ internal fun UsageArcGauge(
     tone: UsageMetricTone,
     diameter: Dp,
     inactive: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
     val colors = MyTokenThemeTokens.colors
     val accent = when {
@@ -61,12 +63,16 @@ internal fun UsageArcGauge(
     val trackStroke = ArcStrokeWidth
     // 动态字体放大时同步放大弧线，避免圆心数字被 52dp 直径裁切。
     val scaledDiameter = diameter * LocalDensity.current.fontScale.coerceIn(1f, 1.35f)
-    val numberStyle = if (scaledDiameter >= 64.dp) MyTokenType.ringFull else MyTokenType.ringCompact
+    val numberStyle = when {
+        scaledDiameter >= 80.dp -> MyTokenType.detailRing
+        scaledDiameter >= 64.dp -> MyTokenType.ringFull
+        else -> MyTokenType.ringCompact
+    }
     val numberText = CompactUsageCardPresentation.compactPercentNumberText(percent)
     val contentColor = if (inactive) colors.muted else colors.ink
 
     Box(
-        modifier = Modifier.size(scaledDiameter),
+        modifier = modifier.size(scaledDiameter),
         contentAlignment = Alignment.Center,
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -97,22 +103,16 @@ internal fun UsageArcGauge(
                 style = Stroke(width = trackStroke.toPx(), cap = StrokeCap.Round),
             )
         }
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                text = numberText,
-                style = numberStyle,
-                color = contentColor,
-                maxLines = 1,
-            )
-            Text(
-                text = "%",
-                style = MyTokenType.percentMark,
-                color = contentColor,
-                modifier = Modifier
-                    .padding(start = 1.dp)
-                    .offset(y = (-1).dp),
-                maxLines = 1,
-            )
-        }
+        Text(
+            text = buildAnnotatedString {
+                append(numberText)
+                withStyle(SpanStyle(fontSize = MyTokenType.percentMark.fontSize)) {
+                    append("%")
+                }
+            },
+            style = numberStyle,
+            color = contentColor,
+            maxLines = 1,
+        )
     }
 }

@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.sp
 import java.math.BigDecimal
 import java.time.Instant
@@ -308,36 +309,35 @@ private fun FullQuotaFocus(
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
             Text(
                 text = label,
-                style = MyTokenType.label,
+                style = MyTokenType.caption,
                 color = colors.muted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
             if (metric.resetCards.isNotEmpty()) {
-                ResetCardsBadge(metric = metric, style = ResetCardsBadgeStyle.Compact)
+                ResetCardsBadge(metric = metric, style = ResetCardsBadgeStyle.Detail)
             }
         }
-        Text(
-            text = formatPercent(percent),
-            modifier = Modifier.padding(top = 4.dp),
-            style = MyTokenType.displayCompact,
-            color = colors.ink,
-            maxLines = 1,
-        )
-        UsageProgressBar(
+        UsageArcGauge(
             percent = percent,
-            color = splitToneColor(tone),
-            modifier = Modifier.padding(top = 8.dp),
-            height = 4.dp,
+            tone = when (tone) {
+                SplitTone.Warning -> UsageMetricTone.Warning
+                SplitTone.Critical -> UsageMetricTone.Critical
+                SplitTone.Normal -> UsageMetricTone.Normal
+            },
+            diameter = 64.dp,
+            modifier = Modifier
+                .padding(top = 7.dp)
+                .testTag("full_ring_primary"),
         )
         Text(
             text = "剩余 ${remainingFormatter(metric)}",
-            modifier = Modifier.padding(top = 5.dp),
+            modifier = Modifier.padding(top = 6.dp),
             style = MyTokenType.caption,
             color = colors.muted,
             maxLines = 1,
@@ -345,7 +345,7 @@ private fun FullQuotaFocus(
         )
         Text(
             text = note ?: quotaEndText(metric.windowEnd ?: endOverride, endLabel) ?: "—",
-            modifier = Modifier.padding(top = 2.dp),
+            modifier = Modifier.padding(top = 1.dp),
             style = MyTokenType.caption,
             color = colors.muted,
             maxLines = 1,
@@ -363,26 +363,30 @@ private fun FullWindowRow(
     val colors = MyTokenThemeTokens.colors
     val percent = progressPercent(metric)
     val tone = splitTone(metric, percent)
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 14.dp),
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
             Text(
                 text = labelFormatter(metric),
-                style = MyTokenType.label,
+                style = MyTokenType.caption,
                 color = colors.muted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
             if (metric.resetCards.isNotEmpty()) {
-                ResetCardsBadge(metric = metric, style = ResetCardsBadgeStyle.Compact)
+                ResetCardsBadge(metric = metric, style = ResetCardsBadgeStyle.Detail)
             }
             Text(
                 text = formatPercent(percent),
-                style = MyTokenType.label,
+                style = MyTokenType.label.copy(fontWeight = FontWeight(650)),
                 color = when (tone) {
                     SplitTone.Normal -> colors.ink
                     SplitTone.Warning -> colors.warningText
@@ -394,30 +398,9 @@ private fun FullWindowRow(
         UsageProgressBar(
             percent = percent,
             color = splitToneColor(tone),
-            modifier = Modifier.padding(top = 4.dp),
+            modifier = Modifier.padding(top = 5.dp),
             height = 3.dp,
         )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 3.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "剩余 ${formatRemaining(metric)}",
-                modifier = Modifier.weight(1f),
-                style = MyTokenType.caption,
-                color = colors.muted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = quotaEndText(metric.windowEnd, endLabel) ?: "—",
-                style = MyTokenType.caption,
-                color = colors.muted,
-                maxLines = 1,
-            )
-        }
     }
 }
 
@@ -431,7 +414,7 @@ private fun FullFacts(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = topPadding),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         facts.forEach { fact ->
             Row(
@@ -572,6 +555,11 @@ private fun FullDeepSeekBalance(
             secondaryLabel = "赠金",
             status = balanceAccountStatus(card, metrics),
             modelsText = modelCountText(card),
+            facts = listOf(
+                "账户状态" to (card.snapshot?.statusText?.trim()?.removePrefix("账户")?.ifBlank { "可用" } ?: "可用"),
+                "可用模型" to modelCountText(card),
+                "计费方式" to "按量",
+            ),
         )
         groups.drop(1).forEach { group ->
             FullSecondaryBalance(group = group, modifier = Modifier.padding(top = 24.dp))
@@ -603,11 +591,17 @@ private fun FullXiaomiApiBalance(
             secondaryLabel = "赠送",
             status = balanceAccountStatus(card, metrics),
             modelsText = modelCountText(card),
+            facts = listOf(
+                "账户状态" to (card.snapshot?.statusText?.trim()?.removePrefix("账户")?.ifBlank { "可用" } ?: "可用"),
+                "可用模型" to modelCountText(card),
+                "计费方式" to "按量",
+            ),
         )
         FullXiaomiUsage(metrics = metrics)
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FullBalanceHero(
     group: SplitCurrencyGroup,
@@ -615,6 +609,7 @@ private fun FullBalanceHero(
     secondaryLabel: String,
     status: SplitAccountStatus,
     modelsText: String,
+    facts: List<Pair<String, String>> = emptyList(),
 ) {
     val colors = MyTokenThemeTokens.colors
     val currency = group.balance.currencyCode?.trim()?.uppercase().orEmpty()
@@ -636,7 +631,7 @@ private fun FullBalanceHero(
             Text(
                 text = title,
                 modifier = Modifier.weight(1f),
-                style = MyTokenType.label,
+                style = MyTokenType.caption,
                 color = colors.muted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -645,43 +640,24 @@ private fun FullBalanceHero(
                 FullAccountStatus(status = status)
             }
         }
+        Text(
+            text = formatCurrency(group.balance.value, group.balance.currencyCode),
+            modifier = Modifier.padding(top = 8.dp),
+            style = MyTokenType.display,
+            color = colors.ink,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = "余额构成",
+            modifier = Modifier.padding(top = 14.dp),
+            style = MyTokenType.caption,
+            color = colors.muted,
+        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 7.dp),
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            Text(
-                text = formatCurrency(group.balance.value, group.balance.currencyCode),
-                modifier = Modifier.weight(1f),
-                style = MyTokenType.display,
-                color = colors.ink,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Column(
-                modifier = Modifier.padding(start = 10.dp, bottom = 2.dp),
-                horizontalAlignment = Alignment.End,
-            ) {
-                Text(
-                    text = "可用模型",
-                    style = MyTokenType.caption,
-                    color = colors.muted,
-                )
-                Text(
-                    text = modelsText,
-                    modifier = Modifier.padding(top = 1.dp),
-                    style = MyTokenType.label,
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.ink,
-                    maxLines = 1,
-                )
-            }
-        }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp)
+                .padding(top = 4.dp)
                 .height(5.dp)
                 .clip(CircleShape)
                 .background(colors.track),
@@ -724,6 +700,24 @@ private fun FullBalanceHero(
                 currencyCode = group.balance.currencyCode,
                 color = colors.cat2,
             )
+        }
+        if (facts.isNotEmpty()) {
+            FlowRow(
+                modifier = Modifier.padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                facts.forEach { (label, value) ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(text = label, style = MyTokenType.caption, color = colors.muted)
+                        Text(
+                            text = value,
+                            style = MyTokenType.caption.copy(fontWeight = FontWeight.SemiBold),
+                            color = colors.ink,
+                        )
+                    }
+                }
+            }
         }
     }
 }

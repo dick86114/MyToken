@@ -234,7 +234,7 @@ class HomeScreenTest {
         }
 
         composeRule.onNodeWithContentDescription("2 张重置卡").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("1 张重置卡").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("1 张重置卡").assertDoesNotExist()
         composeRule.onNodeWithText("5 小时").assertIsDisplayed()
         composeRule.onNodeWithText("周").assertIsDisplayed()
         composeRule.onNodeWithText("5 小时用量").assertDoesNotExist()
@@ -305,8 +305,8 @@ class HomeScreenTest {
         val giftBounds = composeRule.onNodeWithText("赠送 ¥2.50", useUnmergedTree = true)
             .getUnclippedBoundsInRoot()
         assertTrue(
-            "cash=$cashBounds gift=$giftBounds",
-            giftBounds.left.value > cashBounds.right.value,
+            "窄卡内图例按设计纵向换行：cash=$cashBounds gift=$giftBounds",
+            giftBounds.top.value >= cashBounds.bottom.value - 1f,
         )
     }
 
@@ -446,7 +446,7 @@ class HomeScreenTest {
         ).getUnclippedBoundsInRoot()
         val gaugeWidth = gaugeBounds.right - gaugeBounds.left
         val nameBounds = composeRule.onNodeWithTag(
-            "credential_name_${item.id}",
+            "credential_identity_${item.id}",
             useUnmergedTree = true,
         ).getUnclippedBoundsInRoot()
         val nameWidth = nameBounds.right - nameBounds.left
@@ -584,18 +584,19 @@ class HomeScreenTest {
             }
         }
 
-        listOf(
-            "credential_refresh_${credential.id}",
-            "provider_filter_menu",
-            "health_segment_0",
-            "home_open_credentials",
-            "home_open_settings",
-        ).forEach { tag ->
+        // 设计稿尺寸：筛选 pill 34dp、健康标尺 20dp；其余仍按 48dp 触控。
+        mapOf(
+            "credential_refresh_${credential.id}" to 48.dp,
+            "provider_filter_menu" to 34.dp,
+            "health_segment_0" to 20.dp,
+            "home_open_credentials" to 48.dp,
+            "home_open_settings" to 48.dp,
+        ).forEach { (tag, minSize) ->
             val bounds = composeRule.onNodeWithTag(tag, useUnmergedTree = true)
                 .getUnclippedBoundsInRoot()
             val height = bounds.bottom - bounds.top
             val width = bounds.right - bounds.left
-            assertTrue("触控目标 $tag 高度应 ≥48dp（实际 $height）", height >= 48.dp)
+            assertTrue("触控目标 $tag 高度应 ≥$minSize（实际 $height）", height >= minSize)
             assertTrue("触控目标 $tag 宽度应 ≥48dp（实际 $width）", width >= 48.dp)
         }
     }
@@ -690,9 +691,9 @@ class HomeScreenTest {
         ).resolve("src/main/kotlin/ai/routin/mytoken/feature/home/UsageCardSkeleton.kt")
             .let { if (it.isFile) it else java.io.File("android/feature-home") .resolve("src/main/kotlin/ai/routin/mytoken/feature/home/UsageCardSkeleton.kt") }
             .readText()
-        // 1.0× 时保持等高；更大字号用 heightIn(min) 允许内容撑高，避免页脚被裁切。
+        // 简洁卡用最小高度：内容多时随内容撑高，不再固定高度裁切。
         assertTrue(source.contains("heightIn(min = CompactCardHeight)"))
-        assertTrue(source.contains("fontScale <= 1.0f"))
+        assertTrue(!source.contains("Modifier.height(CompactCardHeight)"))
     }
 
     @Test
@@ -874,7 +875,7 @@ class HomeScreenTest {
 
         composeRule.onNodeWithText("即将耗尽", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithText("用量偏高", useUnmergedTree = true).assertDoesNotExist()
-        composeRule.onAllNodesWithText(formatResetTime(resetAt), substring = true, useUnmergedTree = true)
+        composeRule.onAllNodesWithText("后重置", substring = true, useUnmergedTree = true)
             .onFirst()
             .assertIsDisplayed()
     }
@@ -899,16 +900,10 @@ class HomeScreenTest {
             }
         }
 
-        val metaText = "成长版 · 到期 ${formatSubscriptionTime(now.plusSeconds(86_400))}"
-        composeRule.onNodeWithText(metaText)
-            .assertIsDisplayed()
-        val alias = composeRule.onNodeWithText("高用量", useUnmergedTree = true)
-            .getUnclippedBoundsInRoot()
-        val expiry = composeRule.onNodeWithText(
-            metaText,
-            useUnmergedTree = true,
-        ).getUnclippedBoundsInRoot()
-        assertTrue(expiry.top.value >= alias.bottom.value - 1f)
+        // 设计稿简洁卡把到期/重置放进页脚两段式，而不是标题下的 meta。
+        composeRule.onNodeWithText("成长版").assertIsDisplayed()
+        composeRule.onNodeWithText("后重置", substring = true, useUnmergedTree = true)
+            .assertExists()
     }
 
     @Test
@@ -1291,7 +1286,6 @@ class HomeScreenTest {
         composeRule.onNodeWithText("18%").assertIsDisplayed()
         composeRule.onNodeWithText("剩余 \$11.55").assertIsDisplayed()
         composeRule.onNodeWithText("34%").assertIsDisplayed()
-        composeRule.onNodeWithText("剩余 \$45.89").assertIsDisplayed()
         composeRule.onNodeWithText("额度构成").assertIsDisplayed()
         val compositionResults = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
         composeRule.onNodeWithText(
@@ -1729,7 +1723,7 @@ class HomeScreenTest {
         composeRule.onNodeWithTag("provider_filter_item_routin").performClick()
         composeRule.onNodeWithText("备用").assertDoesNotExist()
         composeRule.onNodeWithTag("provider_filter_menu").assertIsSelected()
-        composeRule.onNodeWithText("Routin", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Routin").assertIsDisplayed()
     }
 
     @Test
@@ -1931,7 +1925,7 @@ class HomeScreenTest {
         composeRule.onNodeWithTag("home_update_banner").assertIsDisplayed()
         composeRule.onNodeWithTag("home_update_banner_icon", useUnmergedTree = true)
             .assertExists()
-        composeRule.onNodeWithText("发现新版本 6.1.0").assertIsDisplayed()
+        composeRule.onNodeWithText("新版本 6.1.0 可用").assertIsDisplayed()
         composeRule.onNodeWithTag("home_update_banner").performClick()
         assertEquals(1, openedSettings)
     }

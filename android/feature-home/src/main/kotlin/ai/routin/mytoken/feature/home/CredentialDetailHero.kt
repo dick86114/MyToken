@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -149,13 +150,16 @@ private fun QuotaHero(metric: UsageMetric, health: UsageCardHealth) {
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = quotaEndText(metric.windowEnd, "重置") ?: "—",
+                text = metric.windowEnd?.let { "${formatRemainingDuration(it, Instant.now())} 后重置" }
+                    ?: quotaEndText(null, "重置") ?: "—",
                 style = MyTokenType.caption,
                 color = colors.muted,
                 maxLines = 1,
             )
             if (metric.resetCards.isNotEmpty()) {
-                ResetCardsBadge(metric = metric, style = ResetCardsBadgeStyle.Detail)
+                Box(modifier = Modifier.padding(top = 7.dp)) {
+                    ResetCardsBadge(metric = metric, style = ResetCardsBadgeStyle.Detail)
+                }
             }
         }
     }
@@ -305,18 +309,29 @@ private fun DetailWindowRow(metric: UsageMetric) {
     val colors = MyTokenThemeTokens.colors
     val percent = progressPercent(metric)
     val tone = CompactUsageCardPresentation.tone(metric)
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    val end = metric.windowEnd
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 18.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
                 text = metric.label.ifBlank { windowLabel(metric) },
-                style = MyTokenType.label,
-                color = colors.muted,
+                style = MyTokenType.label.copy(fontWeight = FontWeight(600)),
+                color = colors.ink,
                 modifier = Modifier.weight(1f),
                 maxLines = 1,
             )
             Text(
                 text = formatPercent(percent),
-                style = MyTokenType.label,
+                style = MyTokenType.label.copy(
+                    fontWeight = FontWeight(700),
+                    fontFeatureSettings = "tnum",
+                ),
                 color = when (tone) {
                     UsageMetricTone.Warning -> colors.warningText
                     UsageMetricTone.Critical -> colors.criticalText
@@ -331,26 +346,39 @@ private fun DetailWindowRow(metric: UsageMetric) {
                 UsageMetricTone.Critical -> colors.criticalFill
                 UsageMetricTone.Normal -> colors.positiveFill
             },
-            height = 5.dp,
+            modifier = Modifier.padding(top = 7.dp),
+            height = 4.dp,
         )
-        Row {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
-                text = "已用 ${formatDetailAmount(metric.used, metric)} / ${formatDetailAmount(metric.limit, metric)} · 剩余 ${formatRemaining(metric)}",
+                text = "剩余 ${formatRemaining(metric)}",
                 style = MyTokenType.caption,
                 color = colors.muted,
                 modifier = Modifier.weight(1f),
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = quotaEndText(metric.windowEnd, "重置") ?: "—",
+                text = end?.let { "${formatRemainingDuration(it, Instant.now())} 后重置" } ?: "—",
                 style = MyTokenType.caption,
                 color = colors.muted,
                 maxLines = 1,
             )
         }
         if (metric.resetCards.isNotEmpty()) {
-            ResetCardsBadge(metric = metric, style = ResetCardsBadgeStyle.Detail)
+            Text(
+                text = "重置卡 ${metric.resetCards.size} 张 · " +
+                    metric.resetCards.joinToString(" · ") { formatResetCardExpiry(it.expiresAt) },
+                modifier = Modifier.padding(top = 4.dp),
+                style = MyTokenType.caption,
+                color = colors.muted,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
