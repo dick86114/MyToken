@@ -81,17 +81,16 @@ internal fun homeHealthLabel(tone: HomeHealthTone): String = when (tone) {
 }
 
 /** 卡片健康：失败/不可用为 critical，warning 次之；待刷新与加载保持中性。 */
-internal fun homeHealthTone(card: CredentialCardUi): HomeHealthTone {
-    if (card.status == ai.routin.mytoken.domain.usage.RefreshStatus.Failed || card.error != null) {
-        return HomeHealthTone.Critical
+internal fun homeHealthTone(card: CredentialCardUi): HomeHealthTone =
+    when (usageCardHealth(card)) {
+        UsageCardHealth.Critical, UsageCardHealth.Failed -> HomeHealthTone.Critical
+        UsageCardHealth.Warning -> HomeHealthTone.Warning
+        UsageCardHealth.Normal,
+        UsageCardHealth.Stale,
+        UsageCardHealth.Loading,
+        UsageCardHealth.Disabled,
+        -> HomeHealthTone.Normal
     }
-    val tones = card.snapshot?.metrics.orEmpty().mapNotNull(::metricHealthTone)
-    return when {
-        tones.any { it == HomeHealthTone.Critical } -> HomeHealthTone.Critical
-        tones.any { it == HomeHealthTone.Warning } -> HomeHealthTone.Warning
-        else -> HomeHealthTone.Normal
-    }
-}
 
 private fun metricHealthTone(metric: UsageMetric): HomeHealthTone? = when (metric.healthState) {
     UsageMetricHealthState.Critical,

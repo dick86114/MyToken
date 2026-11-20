@@ -17,7 +17,9 @@ import ai.routin.mytoken.domain.model.UsageSnapshot
 import ai.routin.mytoken.domain.usage.RefreshStatus
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -41,6 +43,7 @@ import java.time.Instant
 import java.util.UUID
 import kotlin.math.abs
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -308,7 +311,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun compactThreeRingsStayInOneRow() {
+    fun compactThreeWindowsUsesOneRingAndMiniRows() {
         val item = credential("三周期", ProviderId.OpenCode)
         val threeMetrics = listOf(
             progress(10.0, 100.0).copy(id = "fiveHour", label = "5 小时"),
@@ -326,30 +329,16 @@ class HomeScreenTest {
             }
         }
 
-        val first = composeRule.onNodeWithTag(
-            "compact_ring_tile_fiveHour",
-            useUnmergedTree = true,
-        )
-            .getUnclippedBoundsInRoot()
-        val second = composeRule.onNodeWithTag(
-            "compact_ring_tile_weekly",
-            useUnmergedTree = true,
-        )
-            .getUnclippedBoundsInRoot()
-        val third = composeRule.onNodeWithTag(
-            "compact_ring_tile_monthly",
-            useUnmergedTree = true,
-        )
-            .getUnclippedBoundsInRoot()
-        assertEquals(first.top.value, second.top.value, 0.5f)
-        assertEquals(second.top.value, third.top.value, 0.5f)
-        assertTrue(first.left.value < second.left.value)
-        assertTrue(second.left.value < third.left.value)
+        composeRule.onAllNodesWithTag("compact_ring_primary", useUnmergedTree = true)
+            .assertCountEquals(1)
+        composeRule.onNodeWithTag("compact_window_row_weekly", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag("compact_window_row_monthly", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag("compact_ring_tile_weekly", useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test
     @Config(qualifiers = "w400dp-h900dp")
-    fun compactValueCardUsesHairlineTwoByTwoGrid() {
+    fun compactValueGridUsesSpacingNotDividers() {
         val credential = credential("New API 统计", ProviderId.NewAPI)
         val metrics = listOf(
             token("today-token", "今日 Token", 14_873_680.0),
@@ -384,6 +373,132 @@ class HomeScreenTest {
         assertEquals(first.top.value, second.top.value, 0.5f)
         assertTrue(second.left.value > first.left.value)
         assertTrue(third.top.value > first.top.value)
+
+        val source = java.io.File(System.getProperty("user.dir"))
+            .walkTopDown()
+            .first { it.name == "CredentialUsageCard.kt" }
+            .readText()
+        assertFalse("卡片内部不应再有分割线", source.contains("HorizontalDivider"))
+    }
+
+    /**
+     * Robolectric 的文本度量不随 fontScale 变化（每个字形固定约 1px），因此不能用
+     * hasVisualOverflow / 文本节点宽度判断裁切。这里改为断言真正受 fontScale 影响的几何：
+     * 弧线直径随字号放大、身份行的名称列仍占据卡片大部分宽度、圆心数字落在弧线范围内。
+     */
+    @Test
+    @Config(qualifiers = "w390dp-h1100dp")
+    fun longNameAtLargeFontScaleKeepsGaugeAndNameColumn() {
+        val longName = "非常长的凭证名称用于验证大字体下不会被裁切或溢出"
+        val item = credential(longName)
+        val fontScale = 1.3f
+        composeRule.setContent {
+            MaterialTheme {
+                androidx.compose.runtime.CompositionLocalProvider(
+                    androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(
+                        androidx.compose.ui.platform.LocalDensity.current.density,
+                        fontScale,
+                    ),
+                ) {
+                    CredentialUsageCard(
+                        card(item, metrics = listOf(progress(42.0, 100.0))),
+                        onOpen = {},
+                        onRetry = {},
+                        usageCardDensity = UsageCardDensity.COMPACT,
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithText(longName, substring = true, useUnmergedTree = true).assertExists()
+
+        val cardBounds = composeRule.onNodeWithTag(
+            "credential_card_${item.id}",
+            useUnmergedTree = true,
+        ).getUnclippedBoundsInRoot()
+        val contentWidth = cardBounds.right - cardBounds.left - 28.dp
+        val gaugeBounds = composeRule.onNodeWithTag(
+            "compact_ring_primary",
+            useUnmergedTree = true,
+        ).getUnclippedBoundsInRoot()
+        val gaugeWidth = gaugeBounds.right - gaugeBounds.left
+        val nameBounds = composeRule.onNodeWithTag(
+            "credential_name_${item.id}",
+            useUnmergedTree = true,
+        ).getUnclippedBoundsInRoot()
+        val nameWidth = nameBounds.right - nameBounds.left
+
+        assertTrue(
+            "弧线直径应随字号放大（实际 $gaugeWidth），否则圆心数字会被 52dp 裁切",
+            gaugeWidth >= (52f * fontScale - 1f).dp,
+        )
+        assertTrue("弧线不应溢出卡片内容宽度", gaugeWidth <= contentWidth)
+        assertTrue(
+            "长名称下名称列仍应占卡片内容宽度过半（实际 $nameWidth / $contentWidth）",
+            nameWidth > contentWidth / 2,
+        )
+
+        listOf("42", "%").forEach { text ->
+            composeRule.onAllNodesWithText(text, substring = true, useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .forEach { node ->
+                    val nodeBounds = node.boundsInRoot
+                    assertTrue(
+                        "数字 $text 应落在弧线范围内",
+                        nodeBounds.left >= gaugeBounds.left.value && nodeBounds.right <= gaugeBounds.right.value,
+                    )
+                    val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+                    node.config[androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult]
+                        ?.action?.invoke(layouts)
+                    assertEquals(
+                        "数字 $text 应按放大后的字号排版",
+                        fontScale,
+                        layouts.single().layoutInput.density.fontScale,
+                        0.001f,
+                    )
+                }
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h1100dp")
+    fun loadingCardWithoutDataShowsStaticSkeleton() {
+        val item = credential("空数据凭证")
+        composeRule.setContent {
+            MaterialTheme {
+                CredentialUsageCard(
+                    card(item, status = RefreshStatus.Loading, metrics = emptyList()),
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.COMPACT,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("card_skeleton", useUnmergedTree = true).assertExists()
+        composeRule.onAllNodesWithTag("compact_ring_primary", useUnmergedTree = true).assertCountEquals(0)
+        composeRule.onAllNodesWithText("刷新中", useUnmergedTree = true).assertCountEquals(0)
+        composeRule.onAllNodesWithText("暂无用量数据", useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h1100dp")
+    fun refreshingCardWithDataKeepsContent() {
+        val item = credential("有数据凭证")
+        composeRule.setContent {
+            MaterialTheme {
+                CredentialUsageCard(
+                    card(item, status = RefreshStatus.Loading, metrics = listOf(progress(42.0, 100.0))),
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.COMPACT,
+                )
+            }
+        }
+
+        composeRule.onAllNodesWithTag("card_skeleton", useUnmergedTree = true).assertCountEquals(0)
+        composeRule.onNodeWithTag("compact_ring_primary", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("刷新中", useUnmergedTree = true).assertExists()
     }
 
     @Test

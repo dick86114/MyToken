@@ -2,7 +2,7 @@ package ai.routin.mytoken.feature.home
 
 import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
-import ai.routin.mytoken.core.ui.MyTokenPalette
+import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
 import androidx.compose.foundation.BorderStroke
@@ -44,6 +44,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.math.RoundingMode
@@ -225,10 +226,11 @@ internal fun UsageProgressBar(
     percent: Double?,
     color: Color,
     modifier: Modifier = Modifier,
+    height: Dp = 4.dp,
 ) {
     val fraction = ((percent ?: 0.0).coerceIn(0.0, 100.0) / 100.0).toFloat()
-    val track = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-    Canvas(modifier = modifier.fillMaxWidth().height(6.dp)) {
+    val track = MyTokenThemeTokens.colors.track
+    Canvas(modifier = modifier.fillMaxWidth().height(height)) {
         val radius = CornerRadius(size.height / 2f, size.height / 2f)
         drawRoundRect(color = track, cornerRadius = radius)
         if (fraction > 0f) {
@@ -330,10 +332,10 @@ internal fun ResetCardsBadge(
             onDismissRequest = { expanded = false },
             modifier = Modifier.width(210.dp),
             shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
-            containerColor = resetCardsMenuContainer(isDark),
+            containerColor = resetCardsMenuContainer(),
             tonalElevation = 0.dp,
             shadowElevation = 12.dp,
-            border = BorderStroke(1.dp, resetCardsMenuBorder(isDark)),
+            border = BorderStroke(1.dp, resetCardsMenuBorder()),
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(all = 12.dp)) {
                 Text(
@@ -377,18 +379,12 @@ internal fun ResetCardsBadge(
     }
 }
 
-/** macOS popover 使用中性弹层；Android 以高不透明中性色近似玻璃弹层。 */
-private fun resetCardsMenuContainer(isDark: Boolean): Color = if (isDark) {
-    MyTokenPalette.darkSurface.copy(alpha = 0.96f)
-} else {
-    Color.White.copy(alpha = 0.96f)
-}
+/** 浮层使用实色表面 + hairline，由 Surface 统一投影。 */
+@Composable
+private fun resetCardsMenuContainer(): Color = MyTokenThemeTokens.colors.surface
 
-private fun resetCardsMenuBorder(isDark: Boolean): Color = if (isDark) {
-    Color.White.copy(alpha = 0.14f)
-} else {
-    Color.Black.copy(alpha = 0.08f)
-}
+@Composable
+private fun resetCardsMenuBorder(): Color = MyTokenThemeTokens.colors.line
 
 
 @Composable

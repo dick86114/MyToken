@@ -5,7 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 锁定 Android 重置卡浮窗与 macOS popover 相同的卡片式排版。 */
+/** 锁定重置卡浮层的实色弹层样式与列表排版。 */
 class ResetCardsMenuStyleTest {
     @Test
     fun `重置卡浮窗使用mac端相同的列表样式`() {
@@ -15,11 +15,10 @@ class ResetCardsMenuStyleTest {
         val menu = source.substring(start, end)
 
         assertTrue(menu.contains("shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp)"))
-        assertTrue(menu.contains("resetCardsMenuContainer(isDark)"))
-        assertTrue(menu.contains("border = BorderStroke(1.dp, resetCardsMenuBorder(isDark))"))
+        assertTrue(menu.contains("resetCardsMenuContainer()"))
+        assertTrue(menu.contains("border = BorderStroke(1.dp, resetCardsMenuBorder())"))
         assertTrue(menu.contains("Modifier.width(210.dp)"))
         assertTrue(menu.contains("padding(all = 12.dp)"))
-        assertTrue(menu.contains("HorizontalDivider"))
         assertTrue(menu.contains("Modifier.width(14.dp)"))
         assertTrue(menu.contains("textAlign = TextAlign.End"))
         assertTrue(menu.contains("fontFamily = FontFamily.Monospace"))
@@ -27,15 +26,14 @@ class ResetCardsMenuStyleTest {
     }
 
     @Test
-    fun `重置卡浮窗使用中性弹层底色`() {
+    fun `重置卡浮窗使用实色表面token`() {
         val source = sourceText("UsageMetricGrid.kt")
 
-        assertTrue(source.contains("private fun resetCardsMenuContainer(isDark: Boolean): Color"))
-        assertTrue(source.contains("Color.White.copy(alpha = 0.96f)"))
-        assertTrue(source.contains("MyTokenPalette.darkSurface.copy(alpha = 0.96f)"))
-        assertTrue(source.contains("private fun resetCardsMenuBorder(isDark: Boolean): Color"))
-        assertTrue(source.contains("Color.Black.copy(alpha = 0.08f)"))
-        assertTrue(source.contains("Color.White.copy(alpha = 0.14f)"))
+        assertTrue(source.contains("private fun resetCardsMenuContainer(): Color = MyTokenThemeTokens.colors.surface"))
+        assertTrue(source.contains("private fun resetCardsMenuBorder(): Color = MyTokenThemeTokens.colors.line"))
+        assertFalse(source.contains("copy(alpha = 0.96f)"))
+        assertFalse(source.contains("Color.White.copy(alpha = 0.14f)"))
+        assertFalse(source.contains("Color.Black.copy(alpha = 0.08f)"))
     }
 
     private fun sourceText(name: String): String {

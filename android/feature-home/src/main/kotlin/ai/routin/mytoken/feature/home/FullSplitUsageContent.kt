@@ -1343,7 +1343,7 @@ private fun splitToneColor(tone: SplitTone, colors: StatusColors): Color = when 
     SplitTone.Critical -> colors.critical
 }
 
-private fun formatRemaining(metric: UsageMetric): String {
+internal fun formatRemaining(metric: UsageMetric): String {
     val value = metric.remaining ?: return "-"
     val percentQuota = metric.limit?.compareTo(BigDecimal("100")) == 0 &&
         metric.used?.let { it >= BigDecimal.ZERO && it <= BigDecimal("100") } == true
@@ -1365,7 +1365,7 @@ private fun formatSplitMetricAmount(
     else -> formatGrouped(value)
 }
 
-private fun quotaEndText(end: Instant?, label: String): String? {
+internal fun quotaEndText(end: Instant?, label: String): String? {
     if (end == null) return null
     return when (label) {
         "到期" -> "${formatResetTime(end)} 到期"
@@ -1374,7 +1374,7 @@ private fun quotaEndText(end: Instant?, label: String): String? {
     }
 }
 
-private fun windowLabel(metric: UsageMetric): String {
+internal fun windowLabel(metric: UsageMetric): String {
     val label = metric.label.trim()
     return when {
         metric.id == "credit-progress" -> "本月额度"
