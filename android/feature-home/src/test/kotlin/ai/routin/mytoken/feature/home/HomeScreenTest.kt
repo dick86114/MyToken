@@ -31,6 +31,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -458,6 +459,56 @@ class HomeScreenTest {
             "账户健康应压缩为单行摘要 + 状态条，实际高度 $healthHeight",
             healthHeight.value < 100f,
         )
+    }
+
+    @Test
+    fun 顶部导航固顶且离开首页后保留滚动位置() {
+        val cards = (1..18).map { index ->
+            card(
+                credential("滚动 $index"),
+                metrics = listOf(progress(index.toDouble(), 100.0)),
+            )
+        }
+        val gridState = androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState()
+        var showHome by mutableStateOf(true)
+        composeRule.setContent {
+            MyTokenTheme {
+                if (showHome) {
+                    HomeScreen(
+                        state = HomeUiState(
+                            isLoading = false,
+                            cards = cards,
+                            groups = emptyList(),
+                            credentialCount = cards.size,
+                        ),
+                        onRefreshAll = {},
+                        onRefreshCredential = {},
+                        onOpenCredential = {},
+                        onImportFromMac = {},
+                        onAddManually = {},
+                        gridState = gridState,
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag("home_toolbar").assertIsDisplayed()
+        val toolbarBefore = composeRule.onNodeWithTag("home_toolbar")
+            .getUnclippedBoundsInRoot()
+        composeRule.onNodeWithTag("home_grid_1_columns").performScrollToIndex(8)
+        composeRule.waitForIdle()
+        val toolbarAfter = composeRule.onNodeWithTag("home_toolbar")
+            .getUnclippedBoundsInRoot()
+        assertEquals(toolbarBefore.top.value, toolbarAfter.top.value, 0.5f)
+
+        val scrollIndex = gridState.firstVisibleItemIndex
+        assertTrue("首页应已滚动", scrollIndex > 0)
+        composeRule.runOnIdle { showHome = false }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { showHome = true }
+        composeRule.waitForIdle()
+
+        assertEquals(scrollIndex, gridState.firstVisibleItemIndex)
     }
 
     @Test
@@ -1452,16 +1503,15 @@ class HomeScreenTest {
         }
         composeRule.waitForIdle()
 
-        val grid = composeRule.onNodeWithTag("home_grid_1_columns")
-            .getUnclippedBoundsInRoot()
+        val root = composeRule.onRoot().getUnclippedBoundsInRoot()
         val card = composeRule
             .onNodeWithTag("credential_card_${cards[3].credential.id}")
             .getUnclippedBoundsInRoot()
-        val gridCenter = (grid.top.value + grid.bottom.value) / 2f
+        val rootCenter = (root.top.value + root.bottom.value) / 2f
         val cardCenter = (card.top.value + card.bottom.value) / 2f
         assertTrue(
-            "卡片中心应贴近可见网格中心，实际偏差 ${abs(cardCenter - gridCenter)}dp",
-            abs(cardCenter - gridCenter) < 16f,
+            "卡片中心应贴近屏幕中心，实际偏差 ${abs(cardCenter - rootCenter)}dp",
+            abs(cardCenter - rootCenter) < 16f,
         )
     }
 
