@@ -653,3 +653,8 @@ provider 逻辑和视觉。
 8. **删除的旧实现**：`ProviderCatalog.accentColor`、`ModelIdChipPalette`、
    `MyTokenPalette` 与 `MyTokenType` 的旧过渡别名均已删除；新增
    `DesignTokenLintTest` 阻止内联颜色/字号/半透明卡片表面回流。
+9. **设计稿对齐（2026-11-21 复核）**：按 `docs/design/home-hifi.html` / `cards-spec.html` / `pages.html`
+   逐项校准——顶栏汉堡菜单与齿轮更新点、28dp 更新提示、「状态行 34dp + 全宽健康标尺」两行结构、
+   简洁卡居中弧线 + mini 行 + 两段式页脚、完整卡左 40% 弧线右 60% 指标、Command Code 构成条 + 图例、
+   OpenCode/Routin facts、列表实心蓝色「添加」pill 与小号分节标签、编辑页纵向供应商磁贴与全宽取消、
+   设置页 M 品牌块、详情页 88 环与窗口行排版。分节标题统一移到卡片外（11sp 大写字距、muted）。
