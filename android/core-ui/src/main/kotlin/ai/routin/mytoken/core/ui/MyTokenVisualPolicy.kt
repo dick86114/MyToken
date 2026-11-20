@@ -1,28 +1,32 @@
 package ai.routin.mytoken.core.ui
 
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 
-/** A 晨雾跨端视觉契约：浅表面承载结构，品牌蓝表达操作和正常用量。 */
+/**
+ * 旧调色板的过渡别名。页面迁移完成后（Task 11）删除；
+ * 新代码一律使用 [MyTokenThemeTokens.colors]。
+ */
+@Deprecated("改用 MyTokenThemeTokens.colors")
 object MyTokenPalette {
-    val brandLight = Color(0xFF2F6BFF)
-    val brandDark = Color(0xFF6E9DFF)
-    val positiveLight = Color(0xFF2E9B77)
-    val positiveDark = Color(0xFF55C49D)
-    val warning = Color(0xFFBF8126)
-    val critical = Color(0xFFD25A60)
+    val brandLight: Color = MyTokenLightColors.actionFill
+    val brandDark: Color = MyTokenDarkColors.actionFill
+    val positiveLight: Color = MyTokenLightColors.positiveFill
+    val positiveDark: Color = MyTokenDarkColors.positiveFill
+    val warning: Color = MyTokenLightColors.warningFill
+    val critical: Color = MyTokenLightColors.criticalFill
 
-    val lightCanvas = Color(0xFFF3F6F9)
-    val lightSurface = Color(0xFFFFFFFF)
-    val lightElevated = Color(0xFFF7F9FC)
-    val lightText = Color(0xFF17222C)
-    val lightMutedText = Color(0xFF71808E)
+    val lightCanvas: Color = MyTokenLightColors.canvas
+    val lightSurface: Color = MyTokenLightColors.surface
+    val lightElevated: Color = MyTokenLightColors.subtle
+    val lightText: Color = MyTokenLightColors.ink
+    val lightMutedText: Color = MyTokenLightColors.muted
 
-    val darkCanvas = Color(0xFF0B1015)
-    val darkSurface = Color(0xFF121920)
-    val darkElevated = Color(0xFF1A2430)
-    val darkText = Color(0xFFF7F8FA)
-    val darkMutedText = Color(0xFF93A1AE)
+    val darkCanvas: Color = MyTokenDarkColors.canvas
+    val darkSurface: Color = MyTokenDarkColors.surface
+    val darkElevated: Color = MyTokenDarkColors.subtle
+    val darkText: Color = MyTokenDarkColors.ink
+    val darkMutedText: Color = MyTokenDarkColors.muted
 }
 
 object MyTokenVisualPolicy {
@@ -34,21 +38,20 @@ object MyTokenVisualPolicy {
         Modal,
     }
 
+    /** 实色表面是默认；只有浮层允许阴影。 */
     enum class Material {
-        WindowGlass,
         Solid,
-        ModalGlass,
+        Overlay,
     }
 
-    val outerRadiusDp = 20.dp
-    val innerRadiusDp = 12.dp
-    val buttonRadiusDp = 12.dp
+    val outerRadiusDp: Dp = MyTokenRadius.card
+    val innerRadiusDp: Dp = MyTokenRadius.inner
+    val buttonRadiusDp: Dp = MyTokenRadius.inner
 
     fun materialFor(role: SurfaceRole): Material = when (role) {
-        SurfaceRole.Window -> Material.WindowGlass
-        SurfaceRole.Card, SurfaceRole.Metric, SurfaceRole.Control -> Material.Solid
-        SurfaceRole.Modal -> Material.ModalGlass
+        SurfaceRole.Modal -> Material.Overlay
+        SurfaceRole.Window, SurfaceRole.Card, SurfaceRole.Metric, SurfaceRole.Control -> Material.Solid
     }
 
-    fun allowsShadow(role: SurfaceRole): Boolean = false
+    fun allowsShadow(role: SurfaceRole): Boolean = role == SurfaceRole.Modal
 }

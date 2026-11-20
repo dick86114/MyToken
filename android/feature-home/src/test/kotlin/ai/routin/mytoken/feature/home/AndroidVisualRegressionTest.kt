@@ -49,12 +49,12 @@ class AndroidVisualRegressionTest {
 
     @Test
     fun 方案A材质契约只允许模态投影() {
-        assertEquals(MyTokenVisualPolicy.Material.WindowGlass, MyTokenVisualPolicy.materialFor(MyTokenVisualPolicy.SurfaceRole.Window))
+        assertEquals(MyTokenVisualPolicy.Material.Solid, MyTokenVisualPolicy.materialFor(MyTokenVisualPolicy.SurfaceRole.Window))
         assertEquals(MyTokenVisualPolicy.Material.Solid, MyTokenVisualPolicy.materialFor(MyTokenVisualPolicy.SurfaceRole.Card))
-        assertEquals(MyTokenVisualPolicy.Material.ModalGlass, MyTokenVisualPolicy.materialFor(MyTokenVisualPolicy.SurfaceRole.Modal))
+        assertEquals(MyTokenVisualPolicy.Material.Overlay, MyTokenVisualPolicy.materialFor(MyTokenVisualPolicy.SurfaceRole.Modal))
         assertFalse(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.Card))
         assertFalse(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.Window))
-        assertFalse(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.Modal))
+        assertTrue(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.Modal))
     }
 
     @Test
@@ -63,6 +63,7 @@ class AndroidVisualRegressionTest {
         var darkPrimary = Color.Unspecified
         var lightPositive = Color.Unspecified
         var darkDanger = Color.Unspecified
+        var darkOnPrimary = Color.Unspecified
 
         composeRule.setContent {
             MyTokenTheme(darkTheme = false) {
@@ -72,13 +73,15 @@ class AndroidVisualRegressionTest {
             MyTokenTheme(darkTheme = true) {
                 darkPrimary = MaterialTheme.colorScheme.primary
                 darkDanger = MaterialTheme.colorScheme.error
+                darkOnPrimary = MaterialTheme.colorScheme.onPrimary
             }
         }
 
         assertEquals(0xFF2F6BFF.toInt(), lightPrimary.toArgb())
-        assertEquals(0xFF6E9DFF.toInt(), darkPrimary.toArgb())
-        assertEquals(0xFF2E9B77.toInt(), lightPositive.toArgb())
-        assertEquals(0xFFD25A60.toInt(), darkDanger.toArgb())
+        assertEquals(0xFF7AA2FF.toInt(), darkPrimary.toArgb())
+        assertEquals(0xFF30C48D.toInt(), lightPositive.toArgb())
+        assertEquals(0xFFFF6369.toInt(), darkDanger.toArgb())
+        assertEquals(0xFF061326.toInt(), darkOnPrimary.toArgb())
     }
 
     @Test

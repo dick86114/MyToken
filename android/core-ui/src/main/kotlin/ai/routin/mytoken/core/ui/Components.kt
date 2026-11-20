@@ -282,7 +282,7 @@ fun LiquidGlassSurface(
         else -> MaterialTheme.colorScheme.surface
     }
     val backgroundBrush = remember(isDark, material, solidBase) {
-        if (material == MyTokenVisualPolicy.Material.WindowGlass) {
+        if (material == MyTokenVisualPolicy.Material.Overlay) {
             Brush.verticalGradient(
                 listOf(
                     (if (isDark) MyTokenPalette.darkCanvas else MyTokenPalette.lightCanvas)

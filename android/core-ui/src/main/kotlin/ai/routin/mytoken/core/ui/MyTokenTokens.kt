@@ -1,0 +1,96 @@
+package ai.routin.mytoken.core.ui
+
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.ProvidableCompositionLocal
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
+
+/**
+ * “安静的仪表”颜色单一来源（设计文档 §6.1）。
+ *
+ * 角色划分：`canvas/surface/subtle/line` 承载结构，`ink/muted` 承载文字，
+ * `action*` 只做交互，`positive/warning/critical` 只做数据与异常，
+ * `cat1/2/3` 是墨色深浅，用于构成条分类。
+ */
+@Immutable
+data class MyTokenColors(
+    val canvas: Color,
+    val surface: Color,
+    val subtle: Color,
+    val line: Color,
+    val ink: Color,
+    val muted: Color,
+    val actionFill: Color,
+    val actionText: Color,
+    val onAction: Color,
+    val positiveFill: Color,
+    val positiveText: Color,
+    val warningFill: Color,
+    val warningText: Color,
+    val criticalFill: Color,
+    val criticalText: Color,
+    val cat1: Color,
+    val cat2: Color,
+    val cat3: Color,
+    val track: Color,
+    val statusDotNormal: Color,
+)
+
+internal val MyTokenLightColors = MyTokenColors(
+    canvas = Color(0xFFEEF0F2),
+    surface = Color(0xFFFFFFFF),
+    subtle = Color(0xFFF6F7F9),
+    line = Color(0xFFE5E7EB),
+    ink = Color(0xFF17181A),
+    muted = Color(0xFF6B7076),
+    actionFill = Color(0xFF2F6BFF),
+    actionText = Color(0xFF1F5AE0),
+    onAction = Color(0xFFFFFFFF),
+    positiveFill = Color(0xFF30C48D),
+    positiveText = Color(0xFF14805A),
+    warningFill = Color(0xFFF5A524),
+    warningText = Color(0xFF9A5B00),
+    criticalFill = Color(0xFFE5484D),
+    criticalText = Color(0xFFC0272D),
+    cat1 = Color(0xFF2B2D31),
+    cat2 = Color(0xFF8A8F96),
+    cat3 = Color(0xFFC9CDD3),
+    track = Color(0xFFE9EBEE),
+    statusDotNormal = Color(0xFFA3A9B0),
+)
+
+internal val MyTokenDarkColors = MyTokenColors(
+    canvas = Color(0xFF0D0F12),
+    surface = Color(0xFF16181C),
+    subtle = Color(0xFF1D2025),
+    line = Color(0xFF292D33),
+    ink = Color(0xFFF5F6F7),
+    muted = Color(0xFF9BA1A8),
+    actionFill = Color(0xFF7AA2FF),
+    actionText = Color(0xFF9DBBFF),
+    onAction = Color(0xFF061326),
+    positiveFill = Color(0xFF35D399),
+    positiveText = Color(0xFF5BE0AC),
+    warningFill = Color(0xFFFFB340),
+    warningText = Color(0xFFFFC266),
+    criticalFill = Color(0xFFFF6369),
+    criticalText = Color(0xFFFF8A8E),
+    cat1 = Color(0xFFE8EAED),
+    cat2 = Color(0xFF9BA1A8),
+    cat3 = Color(0xFF4A4F56),
+    track = Color(0xFF2A2E34),
+    statusDotNormal = Color(0xFF6B7076),
+)
+
+internal val LocalMyTokenColors: ProvidableCompositionLocal<MyTokenColors> =
+    staticCompositionLocalOf { MyTokenLightColors }
+
+/** 业务代码读取颜色的唯一入口。 */
+object MyTokenThemeTokens {
+    val colors: MyTokenColors
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalMyTokenColors.current
+}
