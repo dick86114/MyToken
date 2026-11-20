@@ -81,6 +81,7 @@ import ai.routin.mytoken.core.ui.GlassHelpButton
 import ai.routin.mytoken.core.ui.HelpRow
 import ai.routin.mytoken.core.ui.HelpSection
 import ai.routin.mytoken.core.ui.MyTokenBrandMark
+import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.MyTokenDialog
 import ai.routin.mytoken.core.ui.MyTokenDialogRow
 import ai.routin.mytoken.core.ui.MyTokenDialogSection
@@ -853,10 +854,7 @@ private fun UpdateSection(
 private fun SettingsHeader() {
     Text(
         text = "设置",
-        fontSize = 30.sp,
-        lineHeight = 31.sp,
-        fontWeight = FontWeight.Bold,
-        letterSpacing = (-1).sp,
+        style = MyTokenType.pageTitle,
     )
 }
 
@@ -878,7 +876,8 @@ private fun SettingsProfileCard(appVersion: String) {
         ) {
             Text(
                 text = "MyToken $appVersion",
-                fontSize = 13.sp,
+                fontSize = 14.sp,
+                lineHeight = 19.sp,
                 fontWeight = FontWeight.SemiBold,
             )
         }

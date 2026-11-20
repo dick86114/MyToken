@@ -5,13 +5,13 @@ import ai.routin.mytoken.core.ui.GlassButton
 import ai.routin.mytoken.core.ui.GlassButtonTone
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenPalette
+import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
 import ai.routin.mytoken.core.ui.ProviderLogoPlate
 import ai.routin.mytoken.domain.model.CredentialKind
 import ai.routin.mytoken.domain.model.CredentialMetadataKey
 import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
-import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -54,7 +54,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -217,7 +216,6 @@ fun CredentialDetailScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             DetailHero(card = card)
-            DetailSummaryRow(card = card)
 
             SectionCard(title = "状态") {
                 DetailRow(
@@ -269,9 +267,6 @@ fun CredentialDetailScreen(
 
 @Composable
 private fun DetailHero(card: CredentialCardUi) {
-    val focusMetric = card.snapshot?.metrics.orEmpty().firstOrNull {
-        it.presentation == UsageMetricPresentation.Progress
-    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -293,16 +288,15 @@ private fun DetailHero(card: CredentialCardUi) {
             Text(
                 text = "${ProviderCatalog.displayName(card.credential.providerId)} · " +
                     planName(card),
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Medium,
+                style = MyTokenType.metricLabelTight,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
             )
             Text(
                 text = card.credential.name,
                 modifier = Modifier.padding(top = 3.dp),
-                fontSize = 17.sp,
-                lineHeight = 20.sp,
+                fontSize = 18.sp,
+                lineHeight = 22.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = (-0.3).sp,
                 maxLines = 1,
@@ -310,7 +304,8 @@ private fun DetailHero(card: CredentialCardUi) {
             Text(
                 text = if (card.credential.isEnabled) "已启用" else "已停用",
                 modifier = Modifier.padding(top = 4.dp),
-                fontSize = 10.sp,
+                fontSize = 11.5.sp,
+                lineHeight = 15.sp,
                 color = if (card.credential.isEnabled) {
                     MyTokenPalette.positiveLight
                 } else {
@@ -318,80 +313,6 @@ private fun DetailHero(card: CredentialCardUi) {
                 },
             )
         }
-        if (focusMetric != null) {
-            UsageRing(
-                percent = progressPercent(focusMetric),
-                tone = CompactUsageCardPresentation.tone(focusMetric),
-                isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f,
-                diameter = 62.dp,
-            )
-        }
-    }
-}
-
-@Composable
-private fun DetailSummaryRow(card: CredentialCardUi) {
-    val metrics = card.snapshot?.metrics.orEmpty()
-    val weekly = metrics.firstOrNull { it.id == "weekly" || it.label == "周" || it.label == "本周" }
-    val requests = metrics.firstOrNull { it.id == "request-count" }
-        ?.takeIf { card.credential.providerId != ai.routin.mytoken.domain.model.ProviderId.CommandCode }
-    if (weekly == null && requests == null) return
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        if (weekly != null) {
-            DetailSummaryTile(
-                label = "本周用量",
-                value = formatPercent(progressPercent(weekly)),
-                supporting = weekly.windowEnd?.let { "重置 ${formatResetTime(it)}" } ?: "当前周期",
-                modifier = Modifier.weight(1f),
-            )
-        }
-        if (requests != null) {
-            DetailSummaryTile(
-                label = "请求次数",
-                value = "${formatCompact(requests.value)} 次",
-                supporting = requests.label,
-                modifier = Modifier.weight(1f),
-            )
-        }
-    }
-}
-
-@Composable
-private fun DetailSummaryTile(
-    label: String,
-    value: String,
-    supporting: String,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-    ) {
-        Text(
-            text = label,
-            fontSize = 9.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = value,
-            modifier = Modifier.padding(top = 3.dp),
-            fontSize = 20.sp,
-            lineHeight = 21.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = (-0.4).sp,
-        )
-        Text(
-            text = supporting,
-            modifier = Modifier.padding(top = 4.dp),
-            fontSize = 8.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-        )
     }
 }
 

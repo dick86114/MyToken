@@ -5,47 +5,37 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 锁定 Android 简洁用量小卡片与 macOS 一致的无色玻璃契约。 */
+/** 锁定 Android 简洁模式方案 A 的无内层底板、细弧与发丝分隔契约。 */
 class CredentialUsageGlassStyleTest {
     private val source = sourceText("CredentialUsageCard.kt")
     private val ringSource = sourceText("UsageRing.kt")
 
     @Test
-    fun `简洁用量小卡片使用无色玻璃底`() {
-        val glassStart = requireNotNull(source.indexOf("private fun Modifier.usageTileGlass"))
-        val glassEnd = source.indexOf("private fun BalanceStrip")
-        assertTrue(glassStart >= 0)
-        assertTrue(glassEnd > glassStart)
-        val glass = source.substring(glassStart, glassEnd)
-
+    fun `简洁模式不再使用内层玻璃底板`() {
+        assertFalse(source.contains("usageTileGlass"))
         assertFalse(source.contains("private fun Modifier.ringTileBackground"))
-        assertTrue(source.count("usageTileGlass(isDark)") >= 3)
-        assertTrue(glass.contains("Color.White.copy"))
-        assertFalse(glass.contains("colors.warning"))
-        assertFalse(glass.contains("colors.critical"))
-        assertFalse(glass.contains("tone"))
+        assertTrue(source.contains("private fun CompactBalanceLayout"))
+        assertTrue(source.contains("private fun CompactValueGrid"))
     }
 
     @Test
     fun `简洁进度文字和数值不随状态变色`() {
         assertFalse(ringSource.contains("labelColor = when (tone)"))
         assertTrue(ringSource.contains("MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)"))
+        assertTrue(ringSource.contains("CompactGaugeStartAngle = 135f"))
+        assertTrue(ringSource.contains("CompactGaugeSweepAngle = 270f"))
 
         val bodyStart = requireNotNull(source.indexOf("private fun CompactUsageCardBody"))
-        val glassStart = requireNotNull(source.indexOf("private fun Modifier.usageTileGlass"))
-        val compactBody = source.substring(bodyStart, glassStart)
+        val ringStart = requireNotNull(source.indexOf("private fun CompactRingMetrics"))
+        val compactBody = source.substring(bodyStart, ringStart)
         assertFalse(compactBody.contains("toneColor"))
 
-        val ringStart = requireNotNull(source.indexOf("private fun CompactRingTile"))
+        val ringTileStart = requireNotNull(source.indexOf("private fun CompactRingTile"))
         val fullBodyStart = requireNotNull(source.indexOf("private fun FullUsageCardBody"))
-        val compactRing = source.substring(ringStart, fullBodyStart)
+        val compactRing = source.substring(ringTileStart, fullBodyStart)
         assertFalse(compactRing.contains("UsageProgressBar"))
-
-        val rowStart = requireNotNull(source.indexOf("private fun CompactMetricRow"))
-        val rowEnd = requireNotNull(source.indexOf("private fun compactValueText"))
-        val compactRow = source.substring(rowStart, rowEnd)
-        assertFalse(compactRow.contains("UsageProgressBar"))
-        assertFalse(compactRow.contains("progressColor(percent, colors)"))
+        assertTrue(compactRing.contains("CompactArcGauge"))
+        assertFalse(compactRing.contains("usageTileGlass"))
     }
 
     private fun sourceText(name: String): String {

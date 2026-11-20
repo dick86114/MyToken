@@ -107,8 +107,8 @@ fun MyTokenDialog(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = title,
-                                fontSize = 18.sp,
-                                lineHeight = 22.sp,
+                                fontSize = 20.sp,
+                                lineHeight = 25.sp,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = (-0.3).sp,
                             )
@@ -116,8 +116,8 @@ fun MyTokenDialog(
                                 Text(
                                     text = subtitle,
                                     modifier = Modifier.padding(top = 3.dp),
-                                    fontSize = 11.sp,
-                                    lineHeight = 16.sp,
+                                    fontSize = 12.5.sp,
+                                    lineHeight = 17.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
@@ -167,8 +167,8 @@ fun MyTokenDialogSection(
         if (title != null) {
             Text(
                 text = title,
-                fontSize = 10.sp,
-                lineHeight = 13.sp,
+                fontSize = 11.sp,
+                lineHeight = 15.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 0.4.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -202,16 +202,16 @@ fun MyTokenDialogRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = label,
-                fontSize = 12.sp,
-                lineHeight = 17.sp,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
                 fontWeight = FontWeight.SemiBold,
             )
             if (detail != null) {
                 Text(
                     text = detail,
                     modifier = Modifier.padding(top = 1.dp),
-                    fontSize = 11.sp,
-                    lineHeight = 16.sp,
+                    fontSize = 12.5.sp,
+                    lineHeight = 17.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -246,8 +246,8 @@ fun MyTokenDialogStatus(
         Text(
             text = message,
             modifier = Modifier.weight(1f),
-            fontSize = 11.sp,
-            lineHeight = 16.sp,
+            fontSize = 12.5.sp,
+            lineHeight = 17.sp,
             color = MaterialTheme.colorScheme.onSurface,
         )
     }

@@ -1,5 +1,6 @@
 package ai.routin.mytoken.feature.home
 
+import android.animation.ValueAnimator
 import ai.routin.mytoken.core.ui.GlassButton
 import ai.routin.mytoken.core.ui.GlassButtonTone
 import ai.routin.mytoken.core.ui.GlassHelpButton
@@ -10,6 +11,7 @@ import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenBrandMark
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.MyTokenPalette
+import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
 import ai.routin.mytoken.core.ui.ProviderLogoPlate
 import ai.routin.mytoken.core.ui.adaptiveGridColumns
@@ -21,11 +23,16 @@ import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import ai.routin.mytoken.domain.usage.RefreshStatus
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -45,6 +52,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
@@ -60,7 +68,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -69,15 +76,23 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -90,9 +105,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex
 import java.util.UUID
+import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -137,6 +154,7 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
     var highlightedCredentialId by remember { mutableStateOf<UUID?>(null) }
     var flashTick by remember { mutableIntStateOf(0) }
+    val firstCardItemIndex = if (hasUpdateAvailable) 4 else 3
 
     Scaffold { padding ->
         val contentModifier = Modifier
@@ -154,7 +172,6 @@ fun HomeScreen(
                     onOpenCredentials = onOpenCredentials,
                     onOpenSettings = onOpenSettings,
                     hasUpdateAvailable = hasUpdateAvailable,
-                    showDensitySwitch = false,
                 )
                 Box(
                     modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -174,7 +191,6 @@ fun HomeScreen(
                     onOpenCredentials = onOpenCredentials,
                     onOpenSettings = onOpenSettings,
                     hasUpdateAvailable = hasUpdateAvailable,
-                    showDensitySwitch = false,
                 )
                 EmptyState(
                     modifier = Modifier.weight(1f),
@@ -250,7 +266,9 @@ fun HomeScreen(
                                         }
                                         if (index >= 0) {
                                             scope.launch {
-                                                gridState.animateToItemCentered(3 + index)
+                                                gridState.animateToItemCentered(
+                                                    firstCardItemIndex + index,
+                                                )
                                                 highlightedCredentialId = id
                                                 flashTick += 1
                                                 delay(1_000)
@@ -308,112 +326,76 @@ private fun HomeHeader(
     onOpenCredentials: () -> Unit,
     onOpenSettings: () -> Unit,
     hasUpdateAvailable: Boolean,
-    showDensitySwitch: Boolean = true,
 ) {
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .testTag("home_toolbar"),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clickable(role = Role.Button, onClick = onOpenCredentials)
+                .semantics {
+                    contentDescription = "打开凭证列表，共 $credentialCount 个凭证"
+                }
+                .testTag("home_open_credentials"),
+        ) {
             Box(
                 modifier = Modifier
-                    .size(44.dp)
-                    .clickable(role = Role.Button, onClick = onOpenCredentials)
-                    .semantics {
-                        contentDescription = "打开凭证列表，共 $credentialCount 个凭证"
-                    }
-                    .testTag("home_open_credentials"),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.78f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.FormatListBulleted,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(21.dp),
-                    )
-                }
-                if (credentialCount > 0) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .size(18.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary)
-                            .zIndex(1f),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = credentialCount.coerceAtMost(99).toString(),
-                            fontSize = 8.sp,
-                            lineHeight = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                        )
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.weight(1f))
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
+                    .fillMaxSize()
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.78f))
-                    .clickable(role = Role.Button, onClick = onOpenSettings)
-                    .semantics {
-                        contentDescription = if (hasUpdateAvailable) {
-                            "打开设置，有可用更新"
-                        } else {
-                            "打开设置"
-                        }
-                    }
-                    .testTag("home_open_settings"),
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.78f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = Icons.Filled.Settings,
+                    imageVector = Icons.AutoMirrored.Outlined.FormatListBulleted,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(21.dp),
                 )
-                if (hasUpdateAvailable) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(MyTokenPalette.warning)
-                            .testTag("home_update_badge"),
-                    )
-                }
             }
         }
-
-        Row(
+        DensitySwitch(
+            density = usageCardDensity,
+            onToggle = onToggleUsageCardDensity,
+            modifier = Modifier.align(Alignment.Center),
+        )
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 13.dp),
-            verticalAlignment = Alignment.Bottom,
+                .align(Alignment.CenterEnd)
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.78f))
+                .clickable(role = Role.Button, onClick = onOpenSettings)
+                .semantics {
+                    contentDescription = if (hasUpdateAvailable) {
+                        "打开设置，有可用更新"
+                    } else {
+                        "打开设置"
+                    }
+                }
+                .testTag("home_open_settings"),
+            contentAlignment = Alignment.Center,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "账户用量",
-                    fontSize = 30.sp,
-                    lineHeight = 31.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = (-1.1).sp,
-                )
-            }
-            if (showDensitySwitch) {
-                DensitySwitch(
-                    density = usageCardDensity,
-                    onToggle = onToggleUsageCardDensity,
+            Icon(
+                imageVector = Icons.Filled.Settings,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(19.dp),
+            )
+            if (hasUpdateAvailable) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(MyTokenPalette.warning)
+                        .testTag("home_update_badge"),
                 )
             }
         }
-
     }
 }
 
@@ -421,6 +403,7 @@ private fun HomeHeader(
 private fun DensitySwitch(
     density: UsageCardDensity,
     onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val compact = density.isCompact()
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -429,17 +412,12 @@ private fun DensitySwitch(
     } else {
         Color(0xFF17222C).copy(alpha = 0.055f)
     }
-    val thumbColor = if (dark) {
-        Color.White.copy(alpha = 0.12f)
-    } else {
-        MaterialTheme.colorScheme.surface
-    }
 
     BoxWithConstraints(
-        modifier = Modifier
+        modifier = modifier
             .testTag("usage_density_toggle")
-            .width(152.dp)
-            .height(32.dp)
+            .width(156.dp)
+            .height(34.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(trackColor)
             .padding(2.dp),
@@ -452,14 +430,6 @@ private fun DensitySwitch(
                 stiffness = Spring.StiffnessMediumLow,
             ),
             label = "densityThumbOffset",
-        )
-        Box(
-            modifier = Modifier
-                .offset(x = thumbOffset)
-                .width(optionWidth)
-                .fillMaxHeight()
-                .clip(RoundedCornerShape(8.dp))
-                .background(thumbColor),
         )
         Row(
             modifier = Modifier
@@ -483,6 +453,18 @@ private fun DensitySwitch(
                 onClick = { if (compact) onToggle() },
             )
         }
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .offset(
+                    x = thumbOffset + (optionWidth - 18.dp) / 2,
+                    y = (-4).dp,
+                )
+                .width(18.dp)
+                .height(2.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary),
+        )
     }
 }
 
@@ -523,7 +505,8 @@ private fun DensityOption(
         Text(
             text = text,
             modifier = Modifier.padding(start = 4.dp),
-            fontSize = 10.sp,
+            fontSize = 11.sp,
+            lineHeight = 15.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
             color = contentColor,
         )
@@ -571,36 +554,121 @@ private fun HomeUpdateBanner(
             .testTag("home_update_banner"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            imageVector = Icons.Outlined.SystemUpdate,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-            modifier = Modifier.size(20.dp),
-        )
+        UpdateBannerGlyph()
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(horizontal = 10.dp),
+                .padding(horizontal = 11.dp),
         ) {
             Text(
                 text = version?.takeIf { it.isNotBlank() }?.let { "发现新版本 $it" } ?: "发现新版本",
-                fontSize = 13.sp,
+                fontSize = 14.sp,
+                lineHeight = 19.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
             Text(
                 text = "前往设置查看更新内容并安装",
-                fontSize = 11.sp,
+                fontSize = 12.5.sp,
+                lineHeight = 17.sp,
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f),
             )
         }
         Text(
             text = "去更新",
-            fontSize = 12.sp,
+            fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onPrimaryContainer,
         )
     }
+}
+
+@Composable
+private fun UpdateBannerGlyph(modifier: Modifier = Modifier) {
+    val accent = MaterialTheme.colorScheme.primary
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val animationsEnabled = remember { ValueAnimator.areAnimatorsEnabled() }
+    val twinkle = if (animationsEnabled) {
+        rememberInfiniteTransition(label = "updateTwinkle").animateFloat(
+            initialValue = 0.35f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1_250, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "updateTwinklePhase",
+        )
+    } else {
+        remember { mutableFloatStateOf(0.85f) }
+    }
+
+    Box(
+        modifier = modifier
+            .size(38.dp)
+            .testTag("home_update_banner_icon"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val phase = twinkle.value
+            drawRoundRect(
+                color = if (isDark) {
+                    accent.copy(alpha = 0.16f + 0.06f * phase)
+                } else {
+                    Color.White.copy(alpha = 0.66f + 0.05f * phase)
+                },
+                cornerRadius = CornerRadius(12.dp.toPx()),
+            )
+            val glowRadius = size.minDimension * (0.38f + 0.08f * phase)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        accent.copy(alpha = 0.20f + 0.18f * phase),
+                        Color.Transparent,
+                    ),
+                    center = center,
+                    radius = glowRadius,
+                ),
+                radius = glowRadius,
+                center = center,
+            )
+        }
+        Canvas(
+            modifier = Modifier
+                .size(22.dp)
+                .graphicsLayer {
+                    val phase = twinkle.value
+                    alpha = 0.84f + 0.16f * phase
+                    scaleX = 0.94f + 0.08f * phase
+                    scaleY = 0.94f + 0.08f * phase
+                },
+        ) {
+            drawStar(
+                center = center,
+                outerRadius = size.minDimension * 0.46f,
+                innerRadius = size.minDimension * 0.21f,
+                color = accent,
+            )
+        }
+    }
+}
+
+private fun DrawScope.drawStar(
+    center: Offset,
+    outerRadius: Float,
+    innerRadius: Float,
+    color: Color,
+) {
+    val star = Path().apply {
+        repeat(10) { index ->
+            val radius = if (index % 2 == 0) outerRadius else innerRadius
+            val angle = (-90f + index * 36f) * PI.toFloat() / 180f
+            val x = center.x + radius * cos(angle)
+            val y = center.y + radius * sin(angle)
+            if (index == 0) moveTo(x, y) else lineTo(x, y)
+        }
+        close()
+    }
+    drawPath(path = star, color = color)
 }
 
 @Composable
@@ -609,125 +677,120 @@ private fun HealthSummary(
     lastUpdatedText: String,
     onLocate: (UUID) -> Unit,
 ) {
-    val healthyCount = cards.count { healthTone(it) == HealthTone.Normal }
+    val healthEntries = remember(cards) { cards.map { it to healthTone(it) } }
+    val healthyCount = healthEntries.count { (_, tone) -> tone == HealthTone.Normal }
     val total = cards.size
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = 14.dp, vertical = 11.dp)
+            .testTag("health_summary"),
     ) {
-        Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "账户健康",
-                        fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Row(
-                        modifier = Modifier.padding(top = 2.dp),
-                        verticalAlignment = Alignment.Bottom,
-                    ) {
-                        Text(
-                            text = healthyCount.toString(),
-                            fontSize = 26.sp,
-                            lineHeight = 28.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            text = " / $total",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(bottom = 2.dp),
-                        )
-                    }
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    SyncPill(text = lastUpdatedText)
-                    GlassHelpButton(
-                        title = "账户健康",
-                        subtitle = "按首页顺序排列，点击短条定位卡片",
-                        sections = listOf(
-                            HelpSection(
-                                title = "颜色",
-                                rows = listOf(
-                                    HelpRow(
-                                        label = "正常",
-                                        detail = "余量充足",
-                                        marker = HelpMarker.Positive,
-                                    ),
-                                    HelpRow(
-                                        label = "接近上限",
-                                        detail = "建议留意",
-                                        marker = HelpMarker.Warning,
-                                    ),
-                                    HelpRow(
-                                        label = "已超限 / 不可用",
-                                        detail = "建议处理",
-                                        marker = HelpMarker.Critical,
-                                    ),
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "账户健康",
+                style = MyTokenType.metricLabel,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = healthyCount.toString(),
+                fontSize = 24.sp,
+                lineHeight = 26.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.6).sp,
+            )
+            Text(
+                text = "/ $total",
+                style = MyTokenType.metricLabel,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 2.dp, top = 2.dp),
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                SyncPill(text = lastUpdatedText)
+                GlassHelpButton(
+                    title = "账户健康",
+                    subtitle = "按首页顺序排列，点击短条定位卡片",
+                    sections = listOf(
+                        HelpSection(
+                            title = "颜色",
+                            rows = listOf(
+                                HelpRow(
+                                    label = "正常",
+                                    detail = "余量充足",
+                                    marker = HelpMarker.Positive,
                                 ),
-                            ),
-                            HelpSection(
-                                title = "判定阈值",
-                                rows = listOf(
-                                    HelpRow("通用进度", "80% 标红 · 50% 标橙"),
-                                    HelpRow("小米 MiMo", "90% 标红 · 70% 标橙"),
-                                    HelpRow("余额", "小于等于 0 标红"),
+                                HelpRow(
+                                    label = "接近上限",
+                                    detail = "建议留意",
+                                    marker = HelpMarker.Warning,
+                                ),
+                                HelpRow(
+                                    label = "已超限 / 不可用",
+                                    detail = "建议处理",
+                                    marker = HelpMarker.Critical,
                                 ),
                             ),
                         ),
-                        modifier = Modifier.testTag("health_help"),
-                    )
-                }
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 9.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                cards.forEachIndexed { index, card ->
-                    val tone = healthTone(card)
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(54.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { onLocate(card.credential.id) }
-                            .semantics {
-                                contentDescription =
-                                    "${card.credential.name}，${healthToneLabel(tone)}"
-                            }
-                            .testTag("health_segment_$index"),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                    ) {
-                        ProviderLogoPlate(
-                            painter = painterResource(
-                                ProviderCatalog.logoRes(card.credential.providerId),
+                        HelpSection(
+                            title = "判定阈值",
+                            rows = listOf(
+                                HelpRow("通用进度", "80% 标红 · 50% 标橙"),
+                                HelpRow("小米 MiMo", "90% 标红 · 70% 标橙"),
+                                HelpRow("余额", "小于等于 0 标红"),
                             ),
-                            contentDescription = null,
-                            size = 20.dp,
-                            shape = RoundedCornerShape(5.dp),
-                            contentPadding = 2.dp,
-                            modifier = Modifier
-                                .testTag("health_provider_logo_${card.credential.providerId.rawValue}"),
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(99.dp))
-                                .background(healthToneColor(tone)),
-                        )
-                    }
+                        ),
+                    ),
+                    modifier = Modifier.testTag("health_help"),
+                )
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 7.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            healthEntries.forEachIndexed { index, (card, tone) ->
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(7.dp))
+                        .clickable { onLocate(card.credential.id) }
+                        .semantics {
+                            contentDescription =
+                                "${card.credential.name}，${healthToneLabel(tone)}"
+                        }
+                        .testTag("health_segment_$index"),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    ProviderLogoPlate(
+                        painter = painterResource(
+                            ProviderCatalog.logoRes(card.credential.providerId),
+                        ),
+                        contentDescription = null,
+                        size = 19.dp,
+                        shape = RoundedCornerShape(5.dp),
+                        contentPadding = 2.dp,
+                        modifier = Modifier
+                            .testTag("health_provider_logo_${card.credential.providerId.rawValue}"),
+                    )
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(99.dp))
+                            .background(healthToneColor(tone)),
+                    )
                 }
             }
         }
@@ -739,19 +802,19 @@ private fun SyncPill(text: String) {
     Row(
         modifier = Modifier
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 8.dp, vertical = 5.dp),
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.045f))
+            .padding(horizontal = 9.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Box(
             modifier = Modifier
-                .size(5.dp)
+                .size(4.5.dp)
                 .background(MyTokenPalette.positiveLight, CircleShape),
         )
         Text(
             text = text,
-            fontSize = 8.sp,
+            style = MyTokenType.sync,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
         )
@@ -797,28 +860,35 @@ private fun ProviderChip(
     onClick: () -> Unit,
 ) {
     val container by animateColorAsState(
-        targetValue = if (selected) MyTokenPalette.lightText else MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)
+        },
         label = "providerChipContainer",
     )
     val content by animateColorAsState(
-        targetValue = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.surface
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
         label = "providerChipContent",
     )
     Box(
         modifier = Modifier
-            .height(28.dp)
+            .heightIn(min = 30.dp)
             .clip(CircleShape)
             .background(container)
             .clickable(onClick = onClick)
             .semantics { this.selected = selected }
             .testTag(testTag)
-            .padding(horizontal = 10.dp),
+            .padding(horizontal = 11.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = text,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Medium,
+            style = MyTokenType.chip,
             color = content,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -866,6 +936,7 @@ private suspend fun LazyStaggeredGridState.animateToItemCentered(index: Int) {
         index = index,
         scrollOffset = -(viewportHeight / 3),
     )
+    withFrameNanos { }
     var item = layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
     if (item == null) {
         delay(16)
@@ -880,7 +951,7 @@ private suspend fun LazyStaggeredGridState.animateToItemCentered(index: Int) {
         animateScrollBy(
             value = delta,
             animationSpec = tween(
-                durationMillis = 280,
+                durationMillis = 240,
                 easing = FastOutSlowInEasing,
             ),
         )

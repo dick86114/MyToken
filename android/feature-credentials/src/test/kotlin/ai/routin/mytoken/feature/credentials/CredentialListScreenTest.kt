@@ -114,6 +114,7 @@ class CredentialListScreenTest {
 
         composeRule.onNodeWithText("主力 Key").assertIsDisplayed()
         composeRule.onNodeWithText("备用 Key").performScrollTo()
+        composeRule.onNodeWithText("已启用 2 / 2").assertIsDisplayed()
     }
 
     @Test
