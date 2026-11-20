@@ -85,9 +85,9 @@ class CommandCodeDetailScreenTest {
         }
 
         listOf("5 小时", "周", "月", "购买剩余", "赠送剩余", "累计请求").forEach { label ->
-            composeRule.onNodeWithText(label).assertIsDisplayed()
+            composeRule.onNodeWithText(label).performScrollTo().assertIsDisplayed()
         }
-        listOf("套餐状态", "订阅与周期", "账户与模型").forEach { label ->
+        listOf("全部窗口", "套餐与订阅", "账户与模型", "配置").forEach { label ->
             composeRule.onNodeWithText(label).performScrollTo().assertIsDisplayed()
         }
         listOf("有效", "周期订阅", "claude-sonnet-5").forEach { value ->
