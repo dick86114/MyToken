@@ -1287,14 +1287,11 @@ class HomeScreenTest {
         composeRule.onNodeWithText("剩余 \$11.55").assertIsDisplayed()
         composeRule.onNodeWithText("34%").assertIsDisplayed()
         composeRule.onNodeWithText("额度构成").assertIsDisplayed()
-        val compositionResults = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
-        composeRule.onNodeWithText(
-            "月度 \$34.42 · 购买 \$0.00 · 赠送 \$0.00",
-            useUnmergedTree = true,
-        ).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
-            action(compositionResults)
+        // 设计稿用构成条 + 图例，而不是一行拼接文本。
+        listOf("月度 \$34.42", "购买 \$0.00", "赠送 \$0.00").forEach { legend ->
+            composeRule.onNodeWithText(legend, useUnmergedTree = true).assertExists()
         }
-        assertEquals(1, compositionResults.single().lineCount)
+        composeRule.onNodeWithText("余额 \$34.42", useUnmergedTree = true).assertExists()
         val requestTextResults = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
         composeRule.onNodeWithText("9.7K 次", useUnmergedTree = true)
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
@@ -1481,7 +1478,7 @@ class HomeScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("套餐额度").assertIsDisplayed()
+        composeRule.onNodeWithText("套餐").assertIsDisplayed()
         composeRule.onNodeWithText("25%").assertIsDisplayed()
         composeRule.onNodeWithText("剩余 15,000 credits").assertIsDisplayed()
         composeRule.onNodeWithText("套餐总量").assertIsDisplayed()

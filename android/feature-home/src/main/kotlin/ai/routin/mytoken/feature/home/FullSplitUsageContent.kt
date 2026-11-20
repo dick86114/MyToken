@@ -115,7 +115,7 @@ internal fun FullSplitUsageContent(
         card.credential.providerId == ProviderId.Xiaomi && usageKind == "plan" -> {
             FullPackSplit(
                 primary = byId["plan-total"],
-                leftLabel = "套餐额度",
+                leftLabel = "套餐",
                 endLabel = "到期",
                 remainingFormatter = { metric ->
                     "${formatGrouped(metric.remaining)} credits"
@@ -159,6 +159,7 @@ internal fun FullSplitUsageContent(
                 primary = ordered.firstOrNull(),
                 secondary = ordered.drop(1),
                 leftLabel = ordered.firstOrNull()?.let(::quotaWindowLabel) ?: "当前额度",
+                facts = openCodeFacts(card),
             )
         }
 
@@ -171,6 +172,7 @@ internal fun FullSplitUsageContent(
                 primary = ordered.firstOrNull(),
                 secondary = ordered.drop(1),
                 leftLabel = ordered.firstOrNull()?.let(::quotaWindowLabel) ?: "当前额度",
+                facts = routinFacts(card, byId),
             )
         }
 
@@ -442,67 +444,107 @@ private fun FullFacts(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FullCommandCodeSummary(byId: Map<String, UsageMetric>) {
+    val colors = MyTokenThemeTokens.colors
     val composition = listOfNotNull(
-        byId["monthly-remaining"]?.let {
-            "月度 ${formatCurrency(it.value, it.currencyCode)}"
-        },
-        byId["purchased-remaining"]?.let {
-            "购买 ${formatCurrency(it.value, it.currencyCode)}"
-        },
-        byId["free-remaining"]?.let {
-            "赠送 ${formatCurrency(it.value, it.currencyCode)}"
-        },
-    ).joinToString(" · ")
+        byId["monthly-remaining"]?.let { Triple("月度", it.value, it.currencyCode) },
+        byId["purchased-remaining"]?.let { Triple("购买", it.value, it.currencyCode) },
+        byId["free-remaining"]?.let { Triple("赠送", it.value, it.currencyCode) },
+    )
     val periodSpent = byId["period-spent"]
     val requests = byId["request-count"]
     if (composition.isEmpty() && periodSpent == null && requests == null) return
+    val total = composition.fold(BigDecimal.ZERO) { acc, item -> acc + (item.second ?: BigDecimal.ZERO) }
+    val tints = listOf(colors.cat1, colors.cat2, colors.cat3)
 
-    val colors = MyTokenThemeTokens.colors
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         if (composition.isNotEmpty()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                Text(text = "额度构成", style = MyTokenType.caption, color = colors.muted)
+                Spacer(modifier = Modifier.weight(1f))
                 Text(
-                    text = "额度构成",
-                    style = MyTokenType.caption,
-                    color = colors.muted,
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = composition,
-                    modifier = Modifier.weight(1f),
-                    style = MyTokenType.caption,
+                    text = "余额 ${formatCurrency(total, composition.first().third)}",
+                    style = MyTokenType.caption.copy(fontWeight = FontWeight(650)),
                     color = colors.ink,
-                    textAlign = TextAlign.End,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis,
                 )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(5.dp)
+                    .clip(CircleShape)
+                    .background(colors.track),
+            ) {
+                if (total.signum() > 0) {
+                    composition.forEachIndexed { index, item ->
+                        val weight = (item.second ?: BigDecimal.ZERO).toDouble() / total.toDouble()
+                        if (weight > 0.0) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(weight.toFloat())
+                                    .height(5.dp)
+                                    .background(tints[index]),
+                            )
+                        }
+                    }
+                }
+            }
+            FlowRow(
+                modifier = Modifier.padding(top = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                composition.forEachIndexed { index, item ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(5.dp)
+                                .background(tints[index], CircleShape),
+                        )
+                        Text(
+                            text = "${item.first} ${formatCurrency(item.second, item.third)}",
+                            style = MyTokenType.caption,
+                            color = colors.muted,
+                            maxLines = 1,
+                        )
+                    }
+                }
             }
         }
         if (periodSpent != null || requests != null) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                CommandCodeSummaryValue(
-                    label = "本周期消费",
-                    value = periodSpent?.let { formatCurrency(it.value, it.currencyCode) } ?: "-",
-                    modifier = Modifier.weight(1f),
-                )
-                CommandCodeSummaryValue(
-                    label = "累计请求",
-                    value = requests?.let { "${formatCompact(it.value)} 次" } ?: "-",
-                    modifier = Modifier.weight(1f),
-                    alignEnd = true,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(text = "累计请求", style = MyTokenType.caption, color = colors.muted)
+                    Text(
+                        text = requests?.let { "${formatCompact(it.value)} 次" } ?: "-",
+                        style = MyTokenType.caption.copy(fontWeight = FontWeight(650)),
+                        color = colors.ink,
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(text = "本周期消费", style = MyTokenType.caption, color = colors.muted)
+                    Text(
+                        text = periodSpent?.let { formatCurrency(it.value, it.currencyCode) } ?: "-",
+                        style = MyTokenType.caption.copy(fontWeight = FontWeight(650)),
+                        color = colors.ink,
+                    )
+                }
             }
         }
     }
@@ -1104,6 +1146,27 @@ private fun FullAccountStatus(status: SplitAccountStatus) {
             null -> MyTokenStatusTone.Neutral
         },
     )
+}
+
+private fun openCodeFacts(card: CredentialCardUi): List<SplitFact> = buildList {
+    card.snapshot?.billingMode?.let { add(SplitFact("续费", it)) }
+    card.snapshot?.subscriptionEndAt?.let {
+        add(SplitFact("到期", formatSubscriptionTime(it).substringBefore(' ')))
+    }
+}
+
+private fun routinFacts(card: CredentialCardUi, byId: Map<String, UsageMetric>): List<SplitFact> = buildList {
+    byId["token"]?.let { token ->
+        add(
+            SplitFact(
+                "Token 包",
+                "${formatCompact(token.remaining)} / ${formatCompact(token.limit)}",
+            ),
+        )
+    }
+    card.snapshot?.subscriptionEndAt?.let {
+        add(SplitFact("到期", formatSubscriptionTime(it).substringBefore(' ')))
+    }
 }
 
 private fun glmFacts(byId: Map<String, UsageMetric>): List<SplitFact> = buildList {
