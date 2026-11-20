@@ -134,6 +134,7 @@ fun HomeScreen(
     layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
     usageCardDensity: UsageCardDensity = UsageCardDensity.FULL,
     onToggleUsageCardDensity: () -> Unit = {},
+    gridState: LazyStaggeredGridState = rememberLazyStaggeredGridState(),
 ) {
     var selectedProvider by remember { mutableStateOf<ProviderId?>(null) }
     val allCards = remember(state.cards) {
@@ -150,11 +151,13 @@ fun HomeScreen(
             ?.let { provider -> allCards.filter { it.credential.providerId == provider } }
             ?: allCards
     }
-    val gridState = rememberLazyStaggeredGridState()
     val scope = rememberCoroutineScope()
     var highlightedCredentialId by remember { mutableStateOf<UUID?>(null) }
     var flashTick by remember { mutableIntStateOf(0) }
-    val firstCardItemIndex = if (hasUpdateAvailable) 4 else 3
+    val firstCardItemIndex = if (hasUpdateAvailable) 3 else 2
+    val fixedHeaderCenterBiasPx = with(androidx.compose.ui.platform.LocalDensity.current) {
+        28.dp.toPx()
+    }
 
     Scaffold { padding ->
         val contentModifier = Modifier
@@ -199,17 +202,30 @@ fun HomeScreen(
                 )
             }
 
-            else -> PullToRefreshBox(
-                isRefreshing = state.isRefreshingAll,
-                onRefresh = onRefreshAll,
-                modifier = contentModifier.testTag("home_pull_refresh"),
+            else -> MyTokenAdaptiveContent(
+                maxWidth = 1440.dp,
+                horizontalPadding = 16.dp,
+                modifier = contentModifier,
             ) {
-                MyTokenAdaptiveContent(
-                    maxWidth = 1440.dp,
-                    horizontalPadding = 16.dp,
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    HomeHeader(
+                        credentialCount = state.cards.size,
+                        usageCardDensity = usageCardDensity,
+                        onToggleUsageCardDensity = onToggleUsageCardDensity,
+                        onOpenCredentials = onOpenCredentials,
+                        onOpenSettings = onOpenSettings,
+                        hasUpdateAvailable = hasUpdateAvailable,
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
+                    PullToRefreshBox(
+                        isRefreshing = state.isRefreshingAll,
+                        onRefresh = onRefreshAll,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .testTag("home_pull_refresh"),
+                    ) {
+                        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                         val columns = adaptiveGridColumns(
                             availableWidth = maxWidth,
                             maxColumns = layoutMode.maxColumns(1, 2, 3),
@@ -229,19 +245,6 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalItemSpacing = if (usageCardDensity.isCompact()) 8.dp else 12.dp,
                         ) {
-                            item(
-                                key = "home_header",
-                                span = StaggeredGridItemSpan.FullLine,
-                            ) {
-                                HomeHeader(
-                                    credentialCount = state.cards.size,
-                                    usageCardDensity = usageCardDensity,
-                                    onToggleUsageCardDensity = onToggleUsageCardDensity,
-                                    onOpenCredentials = onOpenCredentials,
-                                    onOpenSettings = onOpenSettings,
-                                    hasUpdateAvailable = hasUpdateAvailable,
-                                )
-                            }
                             if (hasUpdateAvailable) {
                                 item(
                                     key = "home_update_banner",
@@ -268,6 +271,7 @@ fun HomeScreen(
                                             scope.launch {
                                                 gridState.animateToItemCentered(
                                                     firstCardItemIndex + index,
+                                                    fixedHeaderCenterBiasPx,
                                                 )
                                                 highlightedCredentialId = id
                                                 flashTick += 1
@@ -312,6 +316,7 @@ fun HomeScreen(
                             }
                         }
                     }
+                    }
                 }
             }
         }
@@ -326,9 +331,10 @@ private fun HomeHeader(
     onOpenCredentials: () -> Unit,
     onOpenSettings: () -> Unit,
     hasUpdateAvailable: Boolean,
+    modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(44.dp)
             .testTag("home_toolbar"),
@@ -930,7 +936,10 @@ private fun EmptyState(
     }
 }
 
-private suspend fun LazyStaggeredGridState.animateToItemCentered(index: Int) {
+private suspend fun LazyStaggeredGridState.animateToItemCentered(
+    index: Int,
+    centerBiasPx: Float,
+) {
     val viewportHeight = layoutInfo.viewportSize.height
     animateScrollToItem(
         index = index,
@@ -946,7 +955,7 @@ private suspend fun LazyStaggeredGridState.animateToItemCentered(index: Int) {
 
     val viewportCenter = layoutInfo.viewportSize.height / 2f
     val itemCenter = item.offset.y + item.size.height / 2f
-    val delta = itemCenter - viewportCenter
+    val delta = itemCenter - (viewportCenter - centerBiasPx)
     if (abs(delta) > 1f) {
         animateScrollBy(
             value = delta,
