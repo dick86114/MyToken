@@ -1,6 +1,6 @@
 package ai.routin.mytoken.feature.settings
 
-import ai.routin.mytoken.core.ui.GlassSwitch
+import ai.routin.mytoken.core.ui.MyTokenSwitch
 import androidx.compose.runtime.Composable
 import ai.routin.mytoken.core.ui.SettingRow
 
@@ -32,7 +32,7 @@ internal fun SettingSwitchRow(
     onChange: (Boolean) -> Unit,
 ) {
     SettingRow(title = label) {
-        GlassSwitch(
+        MyTokenSwitch(
             checked = checked,
             onCheckedChange = onChange,
             contentDescription = label,

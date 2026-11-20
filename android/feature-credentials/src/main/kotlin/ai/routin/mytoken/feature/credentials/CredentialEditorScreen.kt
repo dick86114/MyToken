@@ -31,12 +31,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import ai.routin.mytoken.core.ui.GlassButton
-import ai.routin.mytoken.core.ui.GlassButtonTone
-import ai.routin.mytoken.core.ui.GlassTextField
-import ai.routin.mytoken.core.ui.glassFilterChipBorder
-import ai.routin.mytoken.core.ui.glassFilterChipColors
-import ai.routin.mytoken.core.ui.LiquidGlassSurface
+import ai.routin.mytoken.core.ui.MyTokenButton
+import ai.routin.mytoken.core.ui.MyTokenButtonTone
+import ai.routin.mytoken.core.ui.MyTokenTextField
+import ai.routin.mytoken.core.ui.myTokenFilterChipBorder
+import ai.routin.mytoken.core.ui.myTokenFilterChipColors
+import ai.routin.mytoken.core.ui.MyTokenSurface
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.MyTokenType
@@ -122,17 +122,17 @@ fun CredentialEditorScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    GlassButton(
+                    MyTokenButton(
                         onClick = onTestConnection,
                         modifier = Modifier.weight(1f),
                         enabled = !state.isTestingConnection,
                         text = if (state.isTestingConnection) "测试中…" else "测试连接",
                     )
-                    GlassButton(
+                    MyTokenButton(
                         onClick = onSave,
                         modifier = Modifier.weight(1f),
                         enabled = !state.isSaving,
-                        tone = GlassButtonTone.Primary,
+                        tone = MyTokenButtonTone.Primary,
                         text = if (state.isSaving) "保存中…" else "保存",
                     )
                 }
@@ -171,7 +171,7 @@ fun CredentialEditorScreen(
                 }
             }
             if (state.isNew) {
-                LiquidGlassSurface(
+                MyTokenSurface(
                     surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
                 ) {
@@ -193,8 +193,8 @@ fun CredentialEditorScreen(
                                     selected = state.providerId == provider,
                                     onClick = { onProviderChange(provider) },
                                     label = { Text(text = ProviderNames.displayName(provider)) },
-                                    colors = glassFilterChipColors(selected = state.providerId == provider),
-                                    border = glassFilterChipBorder(selected = state.providerId == provider),
+                                    colors = myTokenFilterChipColors(selected = state.providerId == provider),
+                                    border = myTokenFilterChipBorder(selected = state.providerId == provider),
                                 )
                             }
                         }
@@ -208,7 +208,7 @@ fun CredentialEditorScreen(
                 )
             }
 
-            GlassTextField(
+            MyTokenTextField(
                 value = state.name,
                 onValueChange = onNameChange,
                 label = "名称",
@@ -232,8 +232,8 @@ fun CredentialEditorScreen(
                             selected = state.xiaomiUsageKind == value,
                             onClick = { onXiaomiUsageKindChange(value) },
                             label = { Text(label) },
-                            colors = glassFilterChipColors(selected = state.xiaomiUsageKind == value),
-                            border = glassFilterChipBorder(selected = state.xiaomiUsageKind == value),
+                            colors = myTokenFilterChipColors(selected = state.xiaomiUsageKind == value),
+                            border = myTokenFilterChipBorder(selected = state.xiaomiUsageKind == value),
                         )
                     }
                 }
@@ -275,7 +275,7 @@ fun CredentialEditorScreen(
                     testTag = "editor_api_key",
                 )
                 CredentialKind.AccessKeyPair -> {
-            GlassTextField(
+            MyTokenTextField(
                 value = state.accessKeyID,
                 onValueChange = onAccessKeyIDChange,
                 label = "Access Key ID",
@@ -291,7 +291,7 @@ fun CredentialEditorScreen(
                         onToggleVisible = onToggleSecretVisible,
                         testTag = "editor_secret_access_key",
                     )
-            GlassTextField(
+            MyTokenTextField(
                 value = state.region,
                 onValueChange = onRegionChange,
                 label = "区域（默认 cn-beijing）",
@@ -303,7 +303,7 @@ fun CredentialEditorScreen(
             }
 
             if (state.providerId == ProviderId.NewAPI) {
-                GlassTextField(
+                MyTokenTextField(
                     value = state.baseURL,
                     onValueChange = onBaseURLChange,
                     label = "接口地址",
@@ -311,7 +311,7 @@ fun CredentialEditorScreen(
                         .fillMaxWidth()
                         .testTag("editor_base_url"),
                 )
-                GlassTextField(
+                MyTokenTextField(
                     value = state.userID,
                     onValueChange = onUserIDChange,
                     label = "用户 ID",
@@ -321,7 +321,7 @@ fun CredentialEditorScreen(
                 )
             }
 
-            GlassTextField(
+            MyTokenTextField(
                 value = state.websiteURL,
                 onValueChange = onWebsiteURLChange,
                 label = "官网地址（可选）",
@@ -372,7 +372,7 @@ private fun SecretField(
     onToggleVisible: () -> Unit,
     testTag: String,
 ) {
-    GlassTextField(
+    MyTokenTextField(
         value = value,
         onValueChange = onValueChange,
         label = label,

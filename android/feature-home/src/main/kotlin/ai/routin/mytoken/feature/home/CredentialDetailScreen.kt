@@ -1,8 +1,8 @@
 package ai.routin.mytoken.feature.home
 
 import ai.routin.mytoken.core.ui.SectionCard
-import ai.routin.mytoken.core.ui.GlassButton
-import ai.routin.mytoken.core.ui.GlassButtonTone
+import ai.routin.mytoken.core.ui.MyTokenButton
+import ai.routin.mytoken.core.ui.MyTokenButtonTone
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenPalette
 import ai.routin.mytoken.core.ui.MyTokenType
@@ -176,13 +176,13 @@ fun CredentialDetailScreen(
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                    GlassButton(
+                    MyTokenButton(
                         onClick = onRefresh,
                         modifier = Modifier.weight(1.5f),
-                        tone = GlassButtonTone.Primary,
+                        tone = MyTokenButtonTone.Primary,
                         text = "立即刷新",
                     )
-                    GlassButton(
+                    MyTokenButton(
                         onClick = onEdit,
                         modifier = Modifier.weight(1f),
                         text = "编辑",

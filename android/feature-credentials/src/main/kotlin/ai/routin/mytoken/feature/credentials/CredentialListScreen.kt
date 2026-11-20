@@ -2,7 +2,7 @@ package ai.routin.mytoken.feature.credentials
 
 import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.model.ProviderId
-import ai.routin.mytoken.core.ui.LiquidGlassSurface
+import ai.routin.mytoken.core.ui.MyTokenSurface
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.MyTokenPalette
@@ -46,12 +46,12 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import ai.routin.mytoken.core.ui.GlassButton
-import ai.routin.mytoken.core.ui.GlassButtonTone
-import ai.routin.mytoken.core.ui.GlassHelpButton
+import ai.routin.mytoken.core.ui.MyTokenButton
+import ai.routin.mytoken.core.ui.MyTokenButtonTone
+import ai.routin.mytoken.core.ui.MyTokenHelpButton
 import ai.routin.mytoken.core.ui.HelpRow
 import ai.routin.mytoken.core.ui.HelpSection
-import ai.routin.mytoken.core.ui.GlassSwitch
+import ai.routin.mytoken.core.ui.MyTokenSwitch
 import ai.routin.mytoken.core.ui.MyTokenDialog
 import ai.routin.mytoken.core.ui.MyTokenDialogRow
 import ai.routin.mytoken.core.ui.MyTokenDialogSection
@@ -207,17 +207,17 @@ fun CredentialListScreen(
                 )
             },
             actions = {
-                GlassButton(
+                MyTokenButton(
                     text = "取消",
                     onClick = onDismissDelete,
                     modifier = Modifier.weight(1f),
-                    tone = GlassButtonTone.Neutral,
+                    tone = MyTokenButtonTone.Neutral,
                 )
-                GlassButton(
+                MyTokenButton(
                     text = "删除",
                     onClick = onConfirmDelete,
                     modifier = Modifier.weight(1f),
-                    tone = GlassButtonTone.Destructive,
+                    tone = MyTokenButtonTone.Destructive,
                 )
             },
         )
@@ -245,7 +245,7 @@ private fun CredentialPageHeader(
                     style = MyTokenType.pageTitle,
                 )
                 if (drawerMode) {
-                    GlassHelpButton(
+                    MyTokenHelpButton(
                         title = "凭证列表",
                         subtitle = "列表与首页共用同一组凭证",
                         sections = listOf(
@@ -396,7 +396,7 @@ private fun CredentialRow(
     onRequestDelete: () -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
-    LiquidGlassSurface(
+    MyTokenSurface(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(role = Role.Button, onClick = onEdit)
@@ -440,7 +440,7 @@ private fun CredentialRow(
                     maxLines = 1,
                 )
             }
-            GlassSwitch(
+            MyTokenSwitch(
                 checked = credential.isEnabled,
                 onCheckedChange = { onToggleEnabled() },
                 contentDescription = "启用 ${credential.name}",
@@ -523,13 +523,13 @@ private fun EmptyState(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(text = "暂无凭证", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
             Spacer(modifier = Modifier.height(24.dp))
-        GlassButton(
+        MyTokenButton(
             onClick = onImportFromMac,
-            tone = GlassButtonTone.Primary,
+            tone = MyTokenButtonTone.Primary,
             text = "从 Mac 导入",
         )
         Spacer(modifier = Modifier.height(8.dp))
-        GlassButton(
+        MyTokenButton(
             onClick = onAddManually,
             text = "添加凭证",
         )

@@ -45,15 +45,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import ai.routin.mytoken.core.ui.GlassButton
-import ai.routin.mytoken.core.ui.GlassButtonTone
-import ai.routin.mytoken.core.ui.GlassSwitch
-import ai.routin.mytoken.core.ui.GlassTextField
-import ai.routin.mytoken.core.ui.LiquidGlassSurface
+import ai.routin.mytoken.core.ui.MyTokenButton
+import ai.routin.mytoken.core.ui.MyTokenButtonTone
+import ai.routin.mytoken.core.ui.MyTokenSwitch
+import ai.routin.mytoken.core.ui.MyTokenTextField
+import ai.routin.mytoken.core.ui.MyTokenSurface
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
-import ai.routin.mytoken.core.ui.glassFilterChipBorder
-import ai.routin.mytoken.core.ui.glassFilterChipColors
+import ai.routin.mytoken.core.ui.myTokenFilterChipBorder
+import ai.routin.mytoken.core.ui.myTokenFilterChipColors
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -84,10 +84,10 @@ internal fun UsageShareDialog(
                 .testTag("share_actions_row"),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            GlassButton(
+            MyTokenButton(
                 text = "复制",
                 icon = Icons.Outlined.ContentCopy,
-                tone = GlassButtonTone.Primary,
+                tone = MyTokenButtonTone.Primary,
                 enabled = !isExporting,
                 onClick = {
                     scope.launch {
@@ -98,7 +98,7 @@ internal fun UsageShareDialog(
                 },
                 modifier = Modifier.weight(1f),
             )
-            GlassButton(
+            MyTokenButton(
                 text = "保存",
                 icon = Icons.Outlined.SaveAlt,
                 enabled = !isExporting,
@@ -111,7 +111,7 @@ internal fun UsageShareDialog(
                 },
                 modifier = Modifier.weight(1f),
             )
-            GlassButton(
+            MyTokenButton(
                 text = "更多",
                 icon = Icons.Outlined.Share,
                 enabled = !isExporting,
@@ -167,28 +167,28 @@ internal fun UsageShareDialog(
                         } else {
                             null
                         },
-                        colors = glassFilterChipColors(selected = draft.template == template),
-                        border = glassFilterChipBorder(selected = draft.template == template),
+                        colors = myTokenFilterChipColors(selected = draft.template == template),
+                        border = myTokenFilterChipBorder(selected = draft.template == template),
                     )
                 }
             }
         }
 
-        GlassTextField(
+        MyTokenTextField(
             value = draft.displayName,
             onValueChange = { draft = draft.copy(displayName = it) },
             label = "显示名称",
             supportingText = "仅用于本次图片展示",
             contentPadding = 8.dp,
         )
-        GlassTextField(
+        MyTokenTextField(
             value = draft.subtitle,
             onValueChange = { draft = draft.copy(subtitle = it) },
             label = "套餐文案",
             supportingText = "可补充团队说明",
             contentPadding = 8.dp,
         )
-        GlassTextField(
+        MyTokenTextField(
             value = draft.note,
             onValueChange = { draft = draft.copy(note = it) },
             label = "卡片附注说明（可选）",
@@ -321,7 +321,7 @@ private fun ShareControlSection(
     action: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    LiquidGlassSurface(
+    MyTokenSurface(
         surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
         shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
     ) {
@@ -384,7 +384,7 @@ private fun ShareToggleRow(
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodyMedium,
         )
-        GlassSwitch(
+        MyTokenSwitch(
             checked = checked,
             onCheckedChange = null,
             contentDescription = title,

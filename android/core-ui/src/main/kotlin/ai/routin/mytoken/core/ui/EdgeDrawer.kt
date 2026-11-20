@@ -282,7 +282,7 @@ fun MyTokenEdgeDrawerHost(
                 RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp)
             }
 
-            LiquidGlassSurface(
+            MyTokenSurface(
                 modifier = Modifier
                     .align(
                         if (activeSide == MyTokenEdgeDrawerSide.Start) {

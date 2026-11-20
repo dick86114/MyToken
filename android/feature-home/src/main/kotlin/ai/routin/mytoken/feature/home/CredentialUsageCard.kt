@@ -6,8 +6,8 @@ import ai.routin.mytoken.core.ui.MyTokenPalette
 import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
 import ai.routin.mytoken.core.ui.ProviderLogoPlate
-import ai.routin.mytoken.core.ui.GlassButton
-import ai.routin.mytoken.core.ui.GlassButtonTone
+import ai.routin.mytoken.core.ui.MyTokenButton
+import ai.routin.mytoken.core.ui.MyTokenButtonTone
 import ai.routin.mytoken.core.ui.MyTokenDialog
 import ai.routin.mytoken.core.ui.MyTokenDialogRow
 import ai.routin.mytoken.core.ui.MyTokenDialogSection
@@ -923,17 +923,17 @@ private fun RefreshFailureDialog(
             )
         },
         actions = {
-            GlassButton(
+            MyTokenButton(
                 text = "关闭",
                 onClick = onDismiss,
                 modifier = Modifier.weight(1f),
-                tone = GlassButtonTone.Neutral,
+                tone = MyTokenButtonTone.Neutral,
             )
-            GlassButton(
+            MyTokenButton(
                 text = "重试",
                 onClick = onRetry,
                 modifier = Modifier.weight(1f),
-                tone = GlassButtonTone.Primary,
+                tone = MyTokenButtonTone.Primary,
             )
         },
     )

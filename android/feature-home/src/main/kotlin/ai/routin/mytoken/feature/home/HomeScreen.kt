@@ -1,9 +1,9 @@
 package ai.routin.mytoken.feature.home
 
 import android.animation.ValueAnimator
-import ai.routin.mytoken.core.ui.GlassButton
-import ai.routin.mytoken.core.ui.GlassButtonTone
-import ai.routin.mytoken.core.ui.GlassHelpButton
+import ai.routin.mytoken.core.ui.MyTokenButton
+import ai.routin.mytoken.core.ui.MyTokenButtonTone
+import ai.routin.mytoken.core.ui.MyTokenHelpButton
 import ai.routin.mytoken.core.ui.HelpMarker
 import ai.routin.mytoken.core.ui.HelpRow
 import ai.routin.mytoken.core.ui.HelpSection
@@ -720,7 +720,7 @@ private fun HealthSummary(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 SyncPill(text = lastUpdatedText)
-                GlassHelpButton(
+                MyTokenHelpButton(
                     title = "账户健康",
                     subtitle = "按首页顺序排列，点击短条定位卡片",
                     sections = listOf(
@@ -923,13 +923,13 @@ private fun EmptyState(
             fontWeight = FontWeight.SemiBold,
         )
         Spacer(modifier = Modifier.height(24.dp))
-        GlassButton(
+        MyTokenButton(
             onClick = onImportFromMac,
-            tone = GlassButtonTone.Primary,
+            tone = MyTokenButtonTone.Primary,
             text = "从 Mac 导入",
         )
         Spacer(modifier = Modifier.height(8.dp))
-        GlassButton(
+        MyTokenButton(
             onClick = onAddManually,
             text = "添加凭证",
         )

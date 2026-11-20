@@ -75,9 +75,9 @@ import androidx.compose.material3.HorizontalDivider
 import ai.routin.mytoken.core.ui.SectionCard
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
-import ai.routin.mytoken.core.ui.GlassButton
-import ai.routin.mytoken.core.ui.GlassButtonTone
-import ai.routin.mytoken.core.ui.GlassHelpButton
+import ai.routin.mytoken.core.ui.MyTokenButton
+import ai.routin.mytoken.core.ui.MyTokenButtonTone
+import ai.routin.mytoken.core.ui.MyTokenHelpButton
 import ai.routin.mytoken.core.ui.HelpRow
 import ai.routin.mytoken.core.ui.HelpSection
 import ai.routin.mytoken.core.ui.MyTokenBrandMark
@@ -89,8 +89,8 @@ import ai.routin.mytoken.core.ui.MyTokenDialogStatus
 import ai.routin.mytoken.core.ui.MyTokenDialogTone
 import ai.routin.mytoken.core.ui.MyTokenPalette
 import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
-import ai.routin.mytoken.core.ui.glassFilterChipBorder
-import ai.routin.mytoken.core.ui.glassFilterChipColors
+import ai.routin.mytoken.core.ui.myTokenFilterChipBorder
+import ai.routin.mytoken.core.ui.myTokenFilterChipColors
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextDecoration
@@ -234,9 +234,9 @@ fun SettingsScreen(
                     toggleTag = "settings_migration_toggle",
                     modifier = Modifier.testTag("settings_migration_cell"),
                 ) {
-                    GlassButton(
+                    MyTokenButton(
                         onClick = onOpenTransfer,
-                        tone = GlassButtonTone.Primary,
+                        tone = MyTokenButtonTone.Primary,
                         text = "开始扫描",
                     )
                 }
@@ -455,27 +455,27 @@ private fun LogExportDialog(
     val actions: (@Composable RowScope.() -> Unit)? = when (state) {
         is LogExportUiState.Done -> {
             {
-                GlassButton(
+                MyTokenButton(
                     text = "关闭",
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f),
-                    tone = GlassButtonTone.Neutral,
+                    tone = MyTokenButtonTone.Neutral,
                 )
-                GlassButton(
+                MyTokenButton(
                     text = "分享",
                     onClick = onShare,
                     modifier = Modifier.weight(1f),
-                    tone = GlassButtonTone.Primary,
+                    tone = MyTokenButtonTone.Primary,
                 )
             }
         }
         is LogExportUiState.Failed -> {
             {
-                GlassButton(
+                MyTokenButton(
                     text = "关闭",
                     onClick = onDismiss,
                     modifier = Modifier.fillMaxWidth(),
-                    tone = GlassButtonTone.Neutral,
+                    tone = MyTokenButtonTone.Neutral,
                 )
             }
         }
@@ -546,17 +546,17 @@ private fun ReleaseHistoryDialog(
 ) {
     val isError = state is AppReleaseHistoryUiState.Error
     val actions: @Composable RowScope.() -> Unit = {
-        GlassButton(
+        MyTokenButton(
             text = "关闭",
             onClick = onDismiss,
             modifier = Modifier.weight(1f),
-            tone = GlassButtonTone.Neutral,
+            tone = MyTokenButtonTone.Neutral,
         )
-        GlassButton(
+        MyTokenButton(
             text = if (isError) "重试" else "完成",
             onClick = if (isError) onRetry else onDismiss,
             modifier = Modifier.weight(1f),
-            tone = if (isError) GlassButtonTone.Primary else GlassButtonTone.Neutral,
+            tone = if (isError) MyTokenButtonTone.Primary else MyTokenButtonTone.Neutral,
         )
     }
     MyTokenDialog(
@@ -673,10 +673,10 @@ private fun UpdateSection(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            GlassButton(
+            MyTokenButton(
                 onClick = onCheckForUpdates,
                 enabled = false,
-                tone = GlassButtonTone.Primary,
+                tone = MyTokenButtonTone.Primary,
                 text = "检测更新",
                 icon = Icons.Filled.Refresh,
                 modifier = Modifier
@@ -750,10 +750,10 @@ private fun UpdateSection(
                     modifier = Modifier.padding(top = 10.dp),
                 )
             }
-            GlassButton(
+            MyTokenButton(
                 onClick = { onDownloadAndInstall(state.version, state.downloadUrl) },
                 modifier = Modifier.fillMaxWidth().testTag("download_update_button"),
-                tone = GlassButtonTone.Primary,
+                tone = MyTokenButtonTone.Primary,
                 text = "下载并安装",
                 icon = Icons.Filled.Download,
             )
@@ -773,7 +773,7 @@ private fun UpdateSection(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            GlassButton(
+            MyTokenButton(
                 onClick = {
                     permissionRequestPending = true
                     onOpenInstallPermissionSettings()
@@ -781,7 +781,7 @@ private fun UpdateSection(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("install_permission_button"),
-                tone = GlassButtonTone.Primary,
+                tone = MyTokenButtonTone.Primary,
                 text = "授权并安装",
                 icon = Icons.AutoMirrored.Filled.OpenInNew,
             )
@@ -793,12 +793,12 @@ private fun UpdateSection(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            GlassButton(
+            MyTokenButton(
                 onClick = onInstallDownloadedUpdate,
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("install_update_button"),
-                tone = GlassButtonTone.Primary,
+                tone = MyTokenButtonTone.Primary,
                 text = "安装更新",
                 icon = Icons.Filled.ArrowUpward,
             )
@@ -810,12 +810,12 @@ private fun UpdateSection(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
-            GlassButton(
+            MyTokenButton(
                 onClick = onCheckForUpdates,
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("check_updates_button"),
-                tone = GlassButtonTone.Primary,
+                tone = MyTokenButtonTone.Primary,
                 text = "重试",
                 icon = Icons.Filled.Refresh,
             )
@@ -827,23 +827,23 @@ private fun UpdateSection(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            GlassButton(
+            MyTokenButton(
                 onClick = onCheckForUpdates,
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("check_updates_button"),
-                tone = GlassButtonTone.Primary,
+                tone = MyTokenButtonTone.Primary,
                 text = "检测更新",
                 icon = Icons.Filled.Refresh,
             )
         }
 
-        AppUpdateUiState.Idle -> GlassButton(
+        AppUpdateUiState.Idle -> MyTokenButton(
             onClick = onCheckForUpdates,
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("check_updates_button"),
-            tone = GlassButtonTone.Primary,
+            tone = MyTokenButtonTone.Primary,
             text = "检测更新",
             icon = Icons.Filled.Refresh,
         )
@@ -881,7 +881,7 @@ private fun SettingsProfileCard(appVersion: String) {
                 fontWeight = FontWeight.SemiBold,
             )
         }
-        GlassHelpButton(
+        MyTokenHelpButton(
             title = "隐私与刷新",
             subtitle = "凭证只在本机处理",
             sections = listOf(
@@ -956,8 +956,8 @@ private fun ThemeIconChip(
                 contentDescription = label,
             )
         },
-        colors = glassFilterChipColors(selected = selected),
-        border = glassFilterChipBorder(selected = selected),
+        colors = myTokenFilterChipColors(selected = selected),
+        border = myTokenFilterChipBorder(selected = selected),
     )
 }
 
@@ -971,8 +971,8 @@ private fun ThemeChip(
         selected = selected,
         onClick = onClick,
         label = { Text(text = label) },
-        colors = glassFilterChipColors(selected = selected),
-        border = glassFilterChipBorder(selected = selected),
+        colors = myTokenFilterChipColors(selected = selected),
+        border = myTokenFilterChipBorder(selected = selected),
     )
 }
 
@@ -1012,13 +1012,13 @@ private fun GitHubTokenSection(
                     placeholder = { Text("ghp_ 或 github_pat_ 令牌") },
                     visualTransformation = PasswordVisualTransformation(),
                 )
-                GlassButton(
+                MyTokenButton(
                     onClick = {
                         onSave(tokenInput)
                         tokenInput = ""
                     },
                     enabled = tokenInput.isNotBlank(),
-                    tone = GlassButtonTone.Primary,
+                    tone = MyTokenButtonTone.Primary,
                     text = "保存",
                     modifier = Modifier.testTag("github_token_save_button"),
                 )
@@ -1089,8 +1089,8 @@ private fun UpdateChannelSection(
                         Text("GitHub")
                     }
                 },
-                colors = glassFilterChipColors(selected = mirrorBase.isEmpty()),
-                border = glassFilterChipBorder(selected = mirrorBase.isEmpty()),
+                colors = myTokenFilterChipColors(selected = mirrorBase.isEmpty()),
+                border = myTokenFilterChipBorder(selected = mirrorBase.isEmpty()),
             )
             FilterChip(
                 selected = mirrorBase.isNotEmpty(),
@@ -1112,8 +1112,8 @@ private fun UpdateChannelSection(
                         Text("CDN")
                     }
                 },
-                colors = glassFilterChipColors(selected = mirrorBase.isNotEmpty()),
-                border = glassFilterChipBorder(selected = mirrorBase.isNotEmpty()),
+                colors = myTokenFilterChipColors(selected = mirrorBase.isNotEmpty()),
+                border = myTokenFilterChipBorder(selected = mirrorBase.isNotEmpty()),
             )
         }
         if (mirrorBase.isNotEmpty()) {
@@ -1128,8 +1128,8 @@ private fun UpdateChannelSection(
                         selected = mirrorBase == base,
                         onClick = { onMirrorBaseChange(base) },
                         label = { Text(text = base.removePrefix("https://")) },
-                        colors = glassFilterChipColors(selected = mirrorBase == base),
-                        border = glassFilterChipBorder(selected = mirrorBase == base),
+                        colors = myTokenFilterChipColors(selected = mirrorBase == base),
+                        border = myTokenFilterChipBorder(selected = mirrorBase == base),
                     )
                 }
             }

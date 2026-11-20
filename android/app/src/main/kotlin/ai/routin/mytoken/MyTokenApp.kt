@@ -18,8 +18,8 @@ import ai.routin.mytoken.feature.transfer.TransferPreviewScreen
 import ai.routin.mytoken.feature.transfer.TransferScannerScreen
 import ai.routin.mytoken.feature.transfer.TransferUiState
 import ai.routin.mytoken.feature.transfer.TransferViewModel
-import ai.routin.mytoken.core.ui.GlassButton
-import ai.routin.mytoken.core.ui.GlassButtonTone
+import ai.routin.mytoken.core.ui.MyTokenButton
+import ai.routin.mytoken.core.ui.MyTokenButtonTone
 import ai.routin.mytoken.core.ui.MyTokenEdgeDrawerHost
 import ai.routin.mytoken.core.ui.MyTokenEdgeDrawerSide
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
@@ -356,13 +356,13 @@ fun MyTokenApp(
                         )
                     },
                     actions = {
-                        GlassButton(
+                        MyTokenButton(
                             text = "取消",
                             onClick = { deletionTarget = null },
                             modifier = Modifier.weight(1f),
-                            tone = GlassButtonTone.Neutral,
+                            tone = MyTokenButtonTone.Neutral,
                         )
-                        GlassButton(
+                        MyTokenButton(
                             text = "删除",
                             onClick = {
                                 deletionTarget = null
@@ -381,7 +381,7 @@ fun MyTokenApp(
                                 }
                             },
                             modifier = Modifier.weight(1f),
-                            tone = GlassButtonTone.Destructive,
+                            tone = MyTokenButtonTone.Destructive,
                         )
                     },
                 )

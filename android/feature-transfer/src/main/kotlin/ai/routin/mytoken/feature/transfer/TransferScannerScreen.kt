@@ -22,7 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import ai.routin.mytoken.core.ui.GlassButton
+import ai.routin.mytoken.core.ui.MyTokenButton
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
@@ -142,7 +142,7 @@ fun TransferScannerScreen(
             }
         }
         }
-        GlassButton(onClick = onCancel, modifier = Modifier.fillMaxWidth(), text = "取消")
+        MyTokenButton(onClick = onCancel, modifier = Modifier.fillMaxWidth(), text = "取消")
     }
 }
 
