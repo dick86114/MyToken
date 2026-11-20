@@ -308,6 +308,7 @@ private fun DensityOption(
 @Composable
 internal fun HomeStatusRow(
     total: Int,
+    allTotal: Int = total,
     attention: Int,
     syncText: String,
     selectedProvider: ProviderId?,
@@ -389,7 +390,7 @@ internal fun HomeStatusRow(
                 onDismissRequest = { expanded = false },
             ) {
                 DropdownMenuItem(
-                    text = { Text(text = "全部 $total") },
+                    text = { Text(text = "全部 $allTotal") },
                     onClick = {
                         expanded = false
                         onSelect(null)

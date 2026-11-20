@@ -41,6 +41,14 @@ class CredentialUsageSurfaceStyleTest {
         assertTrue(source.contains("RingWithWindows"))
     }
 
+    @Test
+    fun `正常账户状态使用中性色文字`() {
+        val full = sourceText("FullSplitUsageContent.kt")
+        // 规格 §7.6：正常 = 中性点 + 中性文字；绿色只用于数据可视化。
+        assertTrue(full.contains("true -> MyTokenStatusTone.Neutral"))
+        assertFalse(full.contains("true -> MyTokenStatusTone.Positive"))
+    }
+
     private fun sourceText(name: String): String {
         val workingDir = File(System.getProperty("user.dir") ?: error("缺少 user.dir"))
         val candidates = listOf(

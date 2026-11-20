@@ -1105,7 +1105,7 @@ private fun FullAccountStatus(status: SplitAccountStatus) {
     MyTokenStatus(
         text = status.text,
         tone = when (status.healthy) {
-            true -> MyTokenStatusTone.Positive
+            true -> MyTokenStatusTone.Neutral
             false -> MyTokenStatusTone.Critical
             null -> MyTokenStatusTone.Neutral
         },

@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -52,7 +53,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /** 简洁卡片等高：2 列网格里页脚对齐；1.3× 字体退回单列后改为自适应高度。 */
-internal val CompactCardHeight = 216.dp
+internal val CompactCardHeight = 240.dp
 
 internal enum class UsageCardHealth { Normal, Warning, Critical, Stale, Failed, Loading, Disabled }
 
@@ -140,12 +141,21 @@ internal fun UsageCardFrame(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val compact = density.isCompact()
-    val fixedHeight = compact && LocalDensity.current.fontScale < 1.3f
+    val fontScale = LocalDensity.current.fontScale
+    // 1.0× 用固定高度保证网格行等高；更大字号改为最小高度，让内容撑开而不是裁切页脚。
+    val fixedHeight = compact && fontScale <= 1.0f
+    val minHeight = compact && !fixedHeight
     val interactionSource = remember { MutableInteractionSource() }
     MyTokenSurface(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (fixedHeight) Modifier.height(CompactCardHeight) else Modifier)
+            .then(
+                when {
+                    fixedHeight -> Modifier.height(CompactCardHeight)
+                    minHeight -> Modifier.heightIn(min = CompactCardHeight)
+                    else -> Modifier
+                },
+            )
             .myTokenPressScale(interactionSource, pressedScale = 0.99f)
             .clickable(
                 interactionSource = interactionSource,
@@ -156,17 +166,26 @@ internal fun UsageCardFrame(
         surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
         shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(if (compact) 14.dp else 16.dp),
-            verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
-        ) {
-            content()
-            if (fixedHeight) {
-                Spacer(modifier = Modifier.weight(1f))
+        val padding = if (compact) 14.dp else 16.dp
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(padding)
+                    // 给底部页脚留出空间：页脚固定在卡片底边，内容再高也不会被盖住。
+                    .padding(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
+            ) {
+                content()
             }
-            footer()
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .padding(start = padding, end = padding, bottom = padding),
+            ) {
+                footer()
+            }
         }
     }
 }

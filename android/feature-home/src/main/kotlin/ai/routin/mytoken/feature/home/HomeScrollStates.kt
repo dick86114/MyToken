@@ -1,5 +1,7 @@
 package ai.routin.mytoken.feature.home
 
+import ai.routin.mytoken.core.ui.MyTokenMotion
+
 import ai.routin.mytoken.domain.model.UsageCardDensity
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.lazy.LazyListState
@@ -69,15 +71,16 @@ internal suspend fun locateCard(
     mode: HomeScrollMode,
     index: Int,
     centerBiasPx: Float,
+    durationMillis: Int = MyTokenMotion.locateMillis,
 ) {
     when (mode) {
-        HomeScrollMode.CompactGrid -> locateInGrid(states.compact, index, centerBiasPx)
-        HomeScrollMode.FullWideGrid -> locateInGrid(states.fullWide, index, centerBiasPx)
-        HomeScrollMode.FullList -> locateInList(states.full, index, centerBiasPx)
+        HomeScrollMode.CompactGrid -> locateInGrid(states.compact, index, centerBiasPx, durationMillis)
+        HomeScrollMode.FullWideGrid -> locateInGrid(states.fullWide, index, centerBiasPx, durationMillis)
+        HomeScrollMode.FullList -> locateInList(states.full, index, centerBiasPx, durationMillis)
     }
 }
 
-private suspend fun locateInGrid(state: LazyGridState, index: Int, centerBiasPx: Float) {
+private suspend fun locateInGrid(state: LazyGridState, index: Int, centerBiasPx: Float, durationMillis: Int) {
     val viewportHeight = state.layoutInfo.viewportSize.height
     state.animateScrollToItem(index, -viewportHeight / 3)
     withFrameNanos { }
@@ -91,11 +94,11 @@ private suspend fun locateInGrid(state: LazyGridState, index: Int, centerBiasPx:
     val itemCenter = item.offset.y + item.size.height / 2f
     val delta = itemCenter - (viewportCenter - centerBiasPx)
     if (abs(delta) > 1f) {
-        state.animateScrollBy(delta, tween(240, easing = FastOutSlowInEasing))
+        state.animateScrollBy(delta, tween(durationMillis, easing = FastOutSlowInEasing))
     }
 }
 
-private suspend fun locateInList(state: LazyListState, index: Int, centerBiasPx: Float) {
+private suspend fun locateInList(state: LazyListState, index: Int, centerBiasPx: Float, durationMillis: Int) {
     val viewportHeight = state.layoutInfo.viewportSize.height
     state.animateScrollToItem(index, -viewportHeight / 3)
     withFrameNanos { }
@@ -109,6 +112,6 @@ private suspend fun locateInList(state: LazyListState, index: Int, centerBiasPx:
     val itemCenter = item.offset + item.size / 2f
     val delta = itemCenter - (viewportCenter - centerBiasPx)
     if (abs(delta) > 1f) {
-        state.animateScrollBy(delta, tween(240, easing = FastOutSlowInEasing))
+        state.animateScrollBy(delta, tween(durationMillis, easing = FastOutSlowInEasing))
     }
 }

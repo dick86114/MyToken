@@ -6,7 +6,9 @@ import ai.routin.mytoken.core.ui.MyTokenButton
 import ai.routin.mytoken.core.ui.MyTokenButtonTone
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.MyTokenSize
+import ai.routin.mytoken.core.ui.MyTokenMotion
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
+import ai.routin.mytoken.core.ui.rememberMyTokenMotionEnabled
 import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageCardDensity
@@ -99,6 +101,7 @@ fun HomeScreen(
     }
     val attentionCount = healthEntries.count { it.tone != HomeHealthTone.Normal }
 
+    val motionEnabled = rememberMyTokenMotionEnabled()
     val scope = rememberCoroutineScope()
     var highlightedCredentialId by remember { mutableStateOf<UUID?>(null) }
     var flashTick by remember { mutableIntStateOf(0) }
@@ -193,6 +196,7 @@ fun HomeScreen(
                                             mode = mode,
                                             index = index,
                                             centerBiasPx = centerBiasPx,
+                                            durationMillis = MyTokenMotion.locateDurationMillis(motionEnabled),
                                         )
                                         highlightedCredentialId = id
                                         flashTick += 1
@@ -208,6 +212,7 @@ fun HomeScreen(
                         )
                         HomeStatusRow(
                             total = visibleCards.size,
+                            allTotal = allCards.size,
                             attention = attentionCount,
                             syncText = state.lastUpdatedText ?: "刚刚同步",
                             selectedProvider = selectedProvider,

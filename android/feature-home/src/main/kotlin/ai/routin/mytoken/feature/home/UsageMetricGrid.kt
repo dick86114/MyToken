@@ -3,6 +3,7 @@ package ai.routin.mytoken.feature.home
 import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.core.ui.MyTokenRadius
+import ai.routin.mytoken.core.ui.MyTokenSize
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
@@ -12,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -276,12 +279,17 @@ internal fun ResetCardsBadge(
     val text = "${cards.size} 张重置卡"
     val detail = style == ResetCardsBadgeStyle.Detail
 
-    Row(
+    // 视觉 chip 很小，但触控区必须 ≥48dp（规格 §6.4）；外层 Box 承担点击与语义。
+    Box(
         modifier = modifier
+            .sizeIn(minWidth = MyTokenSize.touch, minHeight = MyTokenSize.touch)
             .clip(RoundedCornerShape(6.dp))
             .clickable { expanded = !expanded }
-            .semantics { contentDescription = text }
-            .padding(horizontal = if (detail) 4.dp else 2.dp, vertical = 1.dp),
+            .semantics { contentDescription = text },
+        contentAlignment = Alignment.Center,
+    ) {
+    Row(
+        modifier = Modifier.padding(horizontal = if (detail) 4.dp else 2.dp, vertical = 1.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
@@ -302,6 +310,7 @@ internal fun ResetCardsBadge(
             style = MyTokenType.micro,
             color = colors.muted,
         )
+    }
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },

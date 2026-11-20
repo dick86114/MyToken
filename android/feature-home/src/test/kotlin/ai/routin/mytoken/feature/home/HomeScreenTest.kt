@@ -619,6 +619,98 @@ class HomeScreenTest {
     }
 
     @Test
+    fun filterMenuKeepsAllCountAfterFiltering() {
+        val routinCard = card(credential("启用", ProviderId.Routin), metrics = listOf(balance(20.0)))
+        val deepSeekCard = card(credential("备用", ProviderId.DeepSeek), metrics = listOf(balance(10.0)))
+        composeRule.setContent {
+            MaterialTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = listOf(routinCard, deepSeekCard),
+                        groups = listOf(
+                            group(ProviderId.Routin, listOf(routinCard)),
+                            group(ProviderId.DeepSeek, listOf(deepSeekCard)),
+                        ),
+                        credentialCount = 2,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("provider_filter_menu").performClick()
+        composeRule.onNodeWithTag("provider_filter_item_routin").performClick()
+        composeRule.waitForIdle()
+
+        // 过滤后“全部”仍应代表所有启用凭证，而不是当前视图。
+        composeRule.onNodeWithTag("provider_filter_menu").performClick()
+        composeRule.onNodeWithText("全部 2").assertExists()
+    }
+
+    @Test
+    fun resetCardChipTouchTargetIsAtLeast48() {
+        val credential = credential("重置卡账户")
+        val metric = progress(42.0, 100.0).copy(
+            resetCards = listOf(
+                ai.routin.mytoken.domain.model.UsageResetCard(java.time.Instant.parse("2026-09-30T00:00:00Z")),
+            ),
+        )
+        composeRule.setContent {
+            MyTokenTheme {
+                CredentialUsageCard(
+                    card = card(credential, metrics = listOf(metric)),
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.COMPACT,
+                )
+            }
+        }
+
+        val bounds = composeRule.onNodeWithContentDescription("1 张重置卡", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        assertTrue(
+            "重置卡 chip 高度应 ≥48dp（实际 ${bounds.bottom - bounds.top}）",
+            bounds.bottom - bounds.top >= 48.dp,
+        )
+        assertTrue(
+            "重置卡 chip 宽度应 ≥48dp（实际 ${bounds.right - bounds.left}）",
+            bounds.right - bounds.left >= 48.dp,
+        )
+    }
+
+    @Test
+    fun compactCardHeightAllowsGrowthAboveNormalFontScale() {
+        val source = java.io.File(
+            System.getProperty("user.dir") ?: "",
+        ).resolve("src/main/kotlin/ai/routin/mytoken/feature/home/UsageCardSkeleton.kt")
+            .let { if (it.isFile) it else java.io.File("android/feature-home") .resolve("src/main/kotlin/ai/routin/mytoken/feature/home/UsageCardSkeleton.kt") }
+            .readText()
+        // 1.0× 时保持等高；更大字号用 heightIn(min) 允许内容撑高，避免页脚被裁切。
+        assertTrue(source.contains("heightIn(min = CompactCardHeight)"))
+        assertTrue(source.contains("fontScale <= 1.0f"))
+    }
+
+    @Test
+    fun locateScrollUsesMotionPolicy() {
+        fun read(name: String) = java.io.File(
+            System.getProperty("user.dir") ?: "",
+        ).resolve("src/main/kotlin/ai/routin/mytoken/feature/home/$name")
+            .let {
+                if (it.isFile) it
+                else java.io.File("android/feature-home").resolve("src/main/kotlin/ai/routin/mytoken/feature/home/$name")
+            }
+            .readText()
+
+        assertTrue(read("HomeScreen.kt").contains("MyTokenMotion.locateDurationMillis"))
+        assertTrue(!read("HomeScrollStates.kt").contains("tween(240)"))
+    }
+
+    @Test
     fun showsStandardCardWithMacStyleFields() {
         val credential = credential("熠")
         composeRule.setContent {
