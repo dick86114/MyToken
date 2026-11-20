@@ -469,7 +469,7 @@ class HomeScreenTest {
                 metrics = listOf(progress(index.toDouble(), 100.0)),
             )
         }
-        val gridState = androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState()
+        val homeScrollStates = HomeScrollStates()
         var showHome by mutableStateOf(true)
         composeRule.setContent {
             MyTokenTheme {
@@ -486,7 +486,7 @@ class HomeScreenTest {
                         onOpenCredential = {},
                         onImportFromMac = {},
                         onAddManually = {},
-                        gridState = gridState,
+                        homeScrollStates = homeScrollStates,
                     )
                 }
             }
@@ -495,20 +495,20 @@ class HomeScreenTest {
         composeRule.onNodeWithTag("home_toolbar").assertIsDisplayed()
         val toolbarBefore = composeRule.onNodeWithTag("home_toolbar")
             .getUnclippedBoundsInRoot()
-        composeRule.onNodeWithTag("home_grid_1_columns").performScrollToIndex(8)
+        composeRule.onNodeWithTag("home_list_full").performScrollToIndex(8)
         composeRule.waitForIdle()
         val toolbarAfter = composeRule.onNodeWithTag("home_toolbar")
             .getUnclippedBoundsInRoot()
         assertEquals(toolbarBefore.top.value, toolbarAfter.top.value, 0.5f)
 
-        val scrollIndex = gridState.firstVisibleItemIndex
+        val scrollIndex = homeScrollStates.full.firstVisibleItemIndex
         assertTrue("首页应已滚动", scrollIndex > 0)
         composeRule.runOnIdle { showHome = false }
         composeRule.waitForIdle()
         composeRule.runOnIdle { showHome = true }
         composeRule.waitForIdle()
 
-        assertEquals(scrollIndex, gridState.firstVisibleItemIndex)
+        assertEquals(scrollIndex, homeScrollStates.full.firstVisibleItemIndex)
     }
 
     @Test
@@ -1342,13 +1342,14 @@ class HomeScreenTest {
                     onImportFromMac = {},
                     onAddManually = {},
                     layoutMode = MyTokenLayoutMode.Expanded,
+                    usageCardDensity = UsageCardDensity.COMPACT,
                 )
             }
         }
 
-        composeRule.onNodeWithTag("home_grid_3_columns").assertExists()
-        composeRule.onNodeWithText("5 小时额度", useUnmergedTree = true).assertIsDisplayed()
-        composeRule.onNodeWithText("本周用量", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("home_grid_4_columns").assertExists()
+        composeRule.onNodeWithText("5 小时", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithText("周", useUnmergedTree = true).assertIsDisplayed()
         val cardBounds = composeRule.onNodeWithTag(
             "credential_card_${credential.id}",
             useUnmergedTree = true,
@@ -1400,10 +1401,11 @@ class HomeScreenTest {
         composeRule.onNodeWithText("启用").assertIsDisplayed()
         composeRule.onNodeWithText("停用").assertDoesNotExist()
 
+        composeRule.onNodeWithTag("provider_filter_menu").performClick()
         composeRule.onNodeWithTag("provider_filter_item_routin").performClick()
         composeRule.onNodeWithText("备用").assertDoesNotExist()
-        composeRule.onNodeWithTag("provider_filter_item_routin", useUnmergedTree = true)
-            .assertIsSelected()
+        composeRule.onNodeWithTag("provider_filter_menu").assertIsSelected()
+        composeRule.onNodeWithText("Routin", substring = true).assertIsDisplayed()
     }
 
     @Test
@@ -1635,15 +1637,21 @@ class HomeScreenTest {
     }
 
     @Test
-    fun 账户健康说明使用分组排版() {
+    fun 状态行显示需注意数量() {
+        val cards = listOf(
+            card(credential("正常账号"), metrics = listOf(progress(20.0, 100.0))),
+            card(credential("告警账号"), metrics = listOf(progress(60.0, 100.0))),
+            card(credential("超限账号"), metrics = listOf(progress(90.0, 100.0))),
+        )
         composeRule.setContent {
-            MaterialTheme {
+            MyTokenTheme {
                 HomeScreen(
                     state = HomeUiState(
                         isLoading = false,
-                        cards = listOf(card(credential("健康说明"))),
+                        cards = cards,
                         groups = emptyList(),
-                        credentialCount = 1,
+                        credentialCount = cards.size,
+                        lastUpdatedText = "刚刚同步",
                     ),
                     onRefreshAll = {},
                     onRefreshCredential = {},
@@ -1655,13 +1663,11 @@ class HomeScreenTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("查看账户健康 说明").performClick()
-        composeRule.onNodeWithTag("my_token_dialog").assertIsDisplayed()
-        composeRule.onNodeWithText("颜色").assertIsDisplayed()
-        composeRule.onNodeWithText("判定阈值").assertIsDisplayed()
-        composeRule.onNodeWithText("80% 标红 · 50% 标橙").assertIsDisplayed()
-        composeRule.onNodeWithText("知道了").performClick()
-        composeRule.onNodeWithTag("my_token_dialog").assertDoesNotExist()
+        composeRule.onNodeWithTag("home_status_row").assertIsDisplayed()
+        composeRule.onNodeWithText("2 个需注意", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("查看账户健康 说明").assertDoesNotExist()
+        composeRule.onNodeWithTag("health_segment_0").assertExists()
+        composeRule.onNodeWithTag("health_segment_2").assertExists()
     }
 
     @Test

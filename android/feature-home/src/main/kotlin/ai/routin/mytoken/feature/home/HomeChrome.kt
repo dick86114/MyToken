@@ -1,0 +1,547 @@
+package ai.routin.mytoken.feature.home
+
+import ai.routin.mytoken.core.ui.MyTokenSize
+import ai.routin.mytoken.core.ui.MyTokenSpacing
+import ai.routin.mytoken.core.ui.MyTokenThemeTokens
+import ai.routin.mytoken.core.ui.MyTokenType
+import ai.routin.mytoken.domain.model.ProviderId
+import ai.routin.mytoken.domain.model.UsageCardDensity
+import ai.routin.mytoken.domain.model.UsageMetric
+import ai.routin.mytoken.domain.model.UsageMetricHealthState
+import ai.routin.mytoken.domain.model.UsageMetricPresentation
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.dp
+import java.util.UUID
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
+
+internal enum class HomeHealthTone { Normal, Warning, Critical }
+
+internal fun homeHealthLabel(tone: HomeHealthTone): String = when (tone) {
+    HomeHealthTone.Normal -> "正常"
+    HomeHealthTone.Warning -> "需注意"
+    HomeHealthTone.Critical -> "已超限"
+}
+
+/** 卡片健康：失败/不可用为 critical，warning 次之；待刷新与加载保持中性。 */
+internal fun homeHealthTone(card: CredentialCardUi): HomeHealthTone {
+    if (card.status == ai.routin.mytoken.domain.usage.RefreshStatus.Failed || card.error != null) {
+        return HomeHealthTone.Critical
+    }
+    val tones = card.snapshot?.metrics.orEmpty().mapNotNull(::metricHealthTone)
+    return when {
+        tones.any { it == HomeHealthTone.Critical } -> HomeHealthTone.Critical
+        tones.any { it == HomeHealthTone.Warning } -> HomeHealthTone.Warning
+        else -> HomeHealthTone.Normal
+    }
+}
+
+private fun metricHealthTone(metric: UsageMetric): HomeHealthTone? = when (metric.healthState) {
+    UsageMetricHealthState.Critical,
+    UsageMetricHealthState.Unavailable,
+    -> HomeHealthTone.Critical
+
+    UsageMetricHealthState.Warning -> HomeHealthTone.Warning
+
+    UsageMetricHealthState.Normal -> HomeHealthTone.Normal
+
+    UsageMetricHealthState.Unknown -> fallbackHealthTone(metric)
+    UsageMetricHealthState.Stale -> null
+}
+
+/** 接口未给健康状态时按阈值兜底：进度 80%/50%，余额 ≤ 0 视为超限。 */
+private fun fallbackHealthTone(metric: UsageMetric): HomeHealthTone? {
+    if (metric.presentation == UsageMetricPresentation.Progress) {
+        val used = metric.used?.toDouble() ?: return null
+        val limit = metric.limit?.toDouble() ?: return null
+        if (limit <= 0.0) return HomeHealthTone.Normal
+        val percent = used / limit * 100.0
+        return when {
+            percent >= 80.0 -> HomeHealthTone.Critical
+            percent >= 50.0 -> HomeHealthTone.Warning
+            else -> HomeHealthTone.Normal
+        }
+    }
+    if (metric.presentation == UsageMetricPresentation.Balance) {
+        return if ((metric.value ?: return null) <= java.math.BigDecimal.ZERO) {
+            HomeHealthTone.Critical
+        } else {
+            HomeHealthTone.Normal
+        }
+    }
+    return null
+}
+
+internal data class HealthRulerEntry(
+    val credentialId: UUID,
+    val name: String,
+    val tone: HomeHealthTone,
+)
+
+/** 固定头部：凭证入口 / 简洁-完整切换 / 设置入口。 */
+@Composable
+internal fun HomeToolbar(
+    credentialCount: Int,
+    density: UsageCardDensity,
+    onToggleDensity: () -> Unit,
+    onOpenCredentials: () -> Unit,
+    onOpenSettings: () -> Unit,
+    hasUpdateAvailable: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MyTokenThemeTokens.colors
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = MyTokenSize.header)
+            .testTag("home_toolbar"),
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .size(MyTokenSize.touch)
+                .clip(CircleShape)
+                .clickable(role = Role.Button, onClick = onOpenCredentials)
+                .semantics { contentDescription = "打开凭证列表，共 $credentialCount 个凭证" }
+                .testTag("home_open_credentials"),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.FormatListBulleted,
+                contentDescription = null,
+                tint = colors.muted,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+
+        Box(modifier = Modifier.align(Alignment.Center)) {
+            DensitySwitch(
+                density = density,
+                onToggle = onToggleDensity,
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .size(MyTokenSize.touch)
+                .clickable(role = Role.Button, onClick = onOpenSettings)
+                .semantics {
+                    contentDescription = if (hasUpdateAvailable) {
+                        "打开设置，有可用更新"
+                    } else {
+                        "打开设置"
+                    }
+                }
+                .testTag("home_open_settings"),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Settings,
+                contentDescription = null,
+                tint = colors.muted,
+                modifier = Modifier.size(20.dp),
+            )
+            if (hasUpdateAvailable) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 6.dp, end = 6.dp)
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(colors.warningFill)
+                        .testTag("home_update_badge"),
+                )
+            }
+        }
+    }
+}
+
+/** 纯文字模式切换：选中项使用强调色 + 2dp 下划线。 */
+@Composable
+private fun DensitySwitch(
+    density: UsageCardDensity,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val compact = density.isCompact()
+    val colors = MyTokenThemeTokens.colors
+    val optionWidth = 56.dp
+    val underlineOffset by animateDpAsState(
+        targetValue = if (compact) 0.dp else optionWidth,
+        animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+        label = "densityUnderlineOffset",
+    )
+    Box(
+        modifier = modifier
+            .height(MyTokenSize.header)
+            .testTag("usage_density_toggle"),
+    ) {
+        Row(
+            modifier = Modifier
+                .height(MyTokenSize.header)
+                .selectableGroup(),
+        ) {
+            DensityOption(
+                text = "简洁",
+                compact = true,
+                selected = compact,
+                testTag = "usage_density_option_compact",
+                width = optionWidth,
+                onClick = { if (!compact) onToggle() },
+            )
+            DensityOption(
+                text = "完整",
+                compact = false,
+                selected = !compact,
+                testTag = "usage_density_option_full",
+                width = optionWidth,
+                onClick = { if (compact) onToggle() },
+            )
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .offset(x = underlineOffset + (optionWidth - 18.dp) / 2)
+                .width(18.dp)
+                .height(2.dp)
+                .clip(CircleShape)
+                .background(colors.actionFill),
+        )
+    }
+}
+
+@Composable
+private fun DensityOption(
+    text: String,
+    compact: Boolean,
+    selected: Boolean,
+    testTag: String,
+    width: androidx.compose.ui.unit.Dp,
+    onClick: () -> Unit,
+) {
+    val colors = MyTokenThemeTokens.colors
+    Box(
+        modifier = Modifier
+            .width(width)
+            .fillMaxHeight()
+            .selectable(
+                selected = selected,
+                role = Role.RadioButton,
+                onClick = onClick,
+            )
+            .semantics {
+                contentDescription = if (compact) "简洁模式" else "完整模式"
+                stateDescription = if (selected) "已选" else "未选"
+            }
+            .testTag(testTag),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text,
+            style = MyTokenType.label,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            color = if (selected) colors.actionText else colors.muted,
+            maxLines = 1,
+        )
+    }
+}
+
+/** 状态行：账户数 / 需注意数量 / 同步时间 + 供应商筛选。 */
+@Composable
+internal fun HomeStatusRow(
+    total: Int,
+    attention: Int,
+    syncText: String,
+    selectedProvider: ProviderId?,
+    providers: List<ProviderId>,
+    counts: Map<ProviderId, Int>,
+    onSelect: (ProviderId?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MyTokenThemeTokens.colors
+    var expanded by remember { mutableStateOf(false) }
+    val filterLabel = selectedProvider
+        ?.let { ProviderCatalog.displayName(it) }
+        ?: "全部供应商"
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(MyTokenSize.touch)
+            .testTag("home_status_row"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = buildAnnotatedString {
+                append("$total 个账户 · ")
+                if (attention > 0) {
+                    withStyle(SpanStyle(color = colors.warningText)) {
+                        append("$attention 个需注意")
+                    }
+                } else {
+                    append("全部正常")
+                }
+                append(" · $syncText")
+            },
+            modifier = Modifier.weight(1f),
+            style = MyTokenType.label,
+            color = colors.muted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(modifier = Modifier.width(MyTokenSpacing.sm))
+        Box(contentAlignment = Alignment.Center) {
+            Row(
+                modifier = Modifier
+                    .height(30.dp)
+                    .clip(RoundedCornerShape(MyTokenSize.switchHeight))
+                    .background(colors.subtle)
+                    .border(
+                        width = 1.dp,
+                        color = colors.line,
+                        shape = RoundedCornerShape(MyTokenSize.switchHeight),
+                    )
+                    .clickable(role = Role.Button) { expanded = true }
+                    .semantics { selected = selectedProvider != null }
+                    .testTag("provider_filter_menu")
+                    .padding(start = 10.dp, end = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = filterLabel,
+                    style = MyTokenType.label,
+                    color = colors.ink,
+                    maxLines = 1,
+                )
+                Icon(
+                    imageVector = Icons.Filled.ArrowDropDown,
+                    contentDescription = null,
+                    tint = colors.muted,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+            ) {
+                DropdownMenuItem(
+                    text = { Text(text = "全部 $total") },
+                    onClick = {
+                        expanded = false
+                        onSelect(null)
+                    },
+                )
+                providers.forEach { provider ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = "${ProviderCatalog.displayName(provider)} ${counts[provider] ?: 0}",
+                            )
+                        },
+                        onClick = {
+                            expanded = false
+                            onSelect(provider)
+                        },
+                        modifier = Modifier
+                            .testTag("provider_filter_item_${provider.rawValue}")
+                            .semantics { selected = provider == selectedProvider },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 健康标尺：4dp 视觉条 + 48dp 触控列，点击定位对应卡片。 */
+@Composable
+internal fun HealthRuler(
+    entries: List<HealthRulerEntry>,
+    onLocate: (UUID) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MyTokenThemeTokens.colors
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        entries.forEachIndexed { index, entry ->
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                // 触控带只占底部 14dp：标尺视觉仍是 4dp，同时避开状态行上的筛选 pill。
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(14.dp)
+                        .clickable { onLocate(entry.credentialId) }
+                        .semantics {
+                            contentDescription = "${entry.name}，${homeHealthLabel(entry.tone)}"
+                        }
+                        .testTag("health_segment_$index"),
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 2.dp)
+                            .height(MyTokenSize.healthBar)
+                            .clip(CircleShape)
+                            .background(
+                                when (entry.tone) {
+                                    HomeHealthTone.Normal -> colors.statusDotNormal
+                                    HomeHealthTone.Warning -> colors.warningFill
+                                    HomeHealthTone.Critical -> colors.criticalFill
+                                },
+                            ),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 更新提示：28dp 单行，唯一常驻呼吸动画（尊重减少动态）。 */
+@Composable
+internal fun HomeUpdateBanner(
+    version: String?,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MyTokenThemeTokens.colors
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 28.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(colors.subtle)
+            .border(1.dp, colors.line, RoundedCornerShape(14.dp))
+            .clickable(role = Role.Button, onClick = onOpenSettings)
+            .padding(horizontal = 10.dp, vertical = 5.dp)
+            .semantics { contentDescription = "有新版本可用，前往设置查看并更新" }
+            .testTag("home_update_banner"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        UpdateStar(modifier = Modifier.testTag("home_update_banner_icon"))
+        Text(
+            text = version?.takeIf { it.isNotBlank() }?.let { "发现新版本 $it" } ?: "发现新版本",
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 8.dp),
+            style = MyTokenType.label,
+            color = colors.ink,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = "去更新",
+            style = MyTokenType.label,
+            fontWeight = FontWeight.SemiBold,
+            color = colors.actionText,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun UpdateStar(modifier: Modifier = Modifier) {
+    val colors = MyTokenThemeTokens.colors
+    val animationsEnabled = remember { android.animation.ValueAnimator.areAnimatorsEnabled() }
+    val phase = if (animationsEnabled) {
+        rememberInfiniteTransition(label = "updateStar").animateFloat(
+            initialValue = 0.55f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 2_400, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "updateStarPhase",
+        )
+    } else {
+        remember { androidx.compose.runtime.mutableFloatStateOf(0.85f) }
+    }
+
+    Canvas(
+        modifier = modifier
+            .size(16.dp)
+            .graphicsLayer {
+                alpha = 0.72f + 0.28f * phase.value
+                scaleX = 0.94f + 0.06f * phase.value
+                scaleY = 0.94f + 0.06f * phase.value
+            },
+    ) {
+        val outer = size.minDimension * 0.48f
+        val inner = size.minDimension * 0.21f
+        val star = Path().apply {
+            repeat(10) { index ->
+                val radius = if (index % 2 == 0) outer else inner
+                val angle = (-90f + index * 36f) * PI.toFloat() / 180f
+                val x = center.x + radius * cos(angle)
+                val y = center.y + radius * sin(angle)
+                if (index == 0) moveTo(x, y) else lineTo(x, y)
+            }
+            close()
+        }
+        drawPath(path = star, color = colors.warningFill)
+    }
+}

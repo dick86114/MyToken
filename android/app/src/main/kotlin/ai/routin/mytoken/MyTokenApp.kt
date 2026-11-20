@@ -41,7 +41,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.CircularProgressIndicator
@@ -93,7 +92,7 @@ fun MyTokenApp(
     var screen by remember { mutableStateOf<AppScreen>(AppScreen.Home) }
     var drawerSide by remember { mutableStateOf<MyTokenEdgeDrawerSide?>(null) }
     var pageDirection by remember { mutableIntStateOf(1) }
-    val homeGridState = rememberLazyStaggeredGridState()
+    val homeScrollStates = ai.routin.mytoken.feature.home.rememberHomeScrollStates()
     val backStack = remember { mutableStateListOf<AppScreen>() }
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -316,9 +315,8 @@ fun MyTokenApp(
                         is ai.routin.mytoken.feature.settings.AppUpdateUiState.ReadyToInstall -> state.version
                         else -> null
                     },
-                    gridState = homeGridState,
-                )
-            }
+                    homeScrollStates = homeScrollStates,
+                )            }
         }
 
         is AppScreen.Detail -> {
