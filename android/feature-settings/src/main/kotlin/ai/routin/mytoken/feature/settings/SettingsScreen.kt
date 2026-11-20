@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -35,9 +36,12 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.BrightnessAuto
@@ -46,8 +50,6 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.CircularProgressIndicator
@@ -60,7 +62,6 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -71,7 +72,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.LifecycleResumeEffect
-import androidx.compose.material3.HorizontalDivider
 import ai.routin.mytoken.core.ui.SectionCard
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
@@ -81,6 +81,13 @@ import ai.routin.mytoken.core.ui.MyTokenHelpButton
 import ai.routin.mytoken.core.ui.HelpRow
 import ai.routin.mytoken.core.ui.HelpSection
 import ai.routin.mytoken.core.ui.MyTokenBrandMark
+import ai.routin.mytoken.core.ui.MyTokenRadius
+import ai.routin.mytoken.core.ui.MyTokenRow
+import ai.routin.mytoken.core.ui.MyTokenSegmented
+import ai.routin.mytoken.core.ui.MyTokenSection
+import ai.routin.mytoken.core.ui.MyTokenSize
+import ai.routin.mytoken.core.ui.MyTokenSurface
+import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.MyTokenDialog
 import ai.routin.mytoken.core.ui.MyTokenDialogRow
@@ -100,6 +107,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -140,9 +148,9 @@ fun SettingsScreen(
     onDismissLogExport: () -> Unit = {},
     layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
     drawerMode: Boolean = false,
+    onClose: (() -> Unit)? = null,
 ) {
     var showReleaseHistory by remember { mutableStateOf(false) }
-    var migrationExpanded by rememberSaveable { mutableStateOf(false) }
     var aboutExpanded by rememberSaveable { mutableStateOf(false) }
     var releaseNotesExpanded by rememberSaveable { mutableStateOf(false) }
     var updateAdvancedExpanded by rememberSaveable { mutableStateOf(false) }
@@ -180,19 +188,20 @@ fun SettingsScreen(
             columns = GridCells.Fixed(columns),
             modifier = Modifier
                 .fillMaxSize()
+                .then(if (drawerMode) Modifier.navigationBarsPadding() else Modifier)
                 .testTag(if (drawerMode) "settings_drawer_content" else "settings_list"),
             contentPadding = PaddingValues(
                 top = 12.dp,
                 bottom = if (drawerMode) 24.dp else 96.dp,
             ),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             item(
                 key = "settings_header",
                 span = { GridItemSpan(maxLineSpan) },
             ) {
-                SettingsHeader()
+                SettingsHeader(drawerMode = drawerMode, onClose = onClose)
             }
             item(
                 key = "settings_profile",
@@ -225,19 +234,39 @@ fun SettingsScreen(
                     onCredentialFailureAlertsChange = onCredentialFailureAlertsChange,
                 )
             }
-            item(key = "migration") {
-                ExpandableSettingsSection(
-                    title = "数据迁移",
-                    summary = "扫码导入",
-                    expanded = migrationExpanded,
-                    onExpandedChange = { migrationExpanded = it },
-                    toggleTag = "settings_migration_toggle",
+            item(key = "data") {
+                MyTokenSection(
+                    title = "数据",
                     modifier = Modifier.testTag("settings_migration_cell"),
                 ) {
-                    MyTokenButton(
+                    MyTokenRow(
+                        icon = Icons.Filled.QrCodeScanner,
+                        title = "从 Mac 导入",
+                        supportingText = "扫码接收 Mac 凭证",
                         onClick = onOpenTransfer,
-                        tone = MyTokenButtonTone.Primary,
-                        text = "开始扫描",
+                        trailing = {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = MyTokenThemeTokens.colors.muted,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        },
+                    )
+                    MyTokenRow(
+                        icon = Icons.Filled.Code,
+                        title = "导出诊断日志",
+                        supportingText = "生成已脱敏的本机日志",
+                        onClick = onExportLogs,
+                        modifier = Modifier.testTag("settings_export_logs"),
+                        trailing = {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = MyTokenThemeTokens.colors.muted,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        },
                     )
                 }
             }
@@ -299,7 +328,6 @@ fun SettingsScreen(
                             )
                         }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                     UpdateSection(
                         state = updateState,
                         currentVersion = appVersion,
@@ -333,7 +361,6 @@ fun SettingsScreen(
                             mirrorBase = state.update.mirrorBase,
                             onMirrorBaseChange = onMirrorBaseChange,
                         )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                         GitHubTokenSection(
                             tokenMask = state.update.githubTokenMask,
                             error = state.update.githubTokenError,
@@ -717,17 +744,20 @@ private fun UpdateSection(
                     )
                 }
                 Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
-                    val updateAccent = MaterialTheme.colorScheme.primary
-                    Text(
-                        text = "发现新版本",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = updateAccent,
-                        modifier = Modifier
-                            .background(updateAccent.copy(alpha = 0.12f), RoundedCornerShape(999.dp))
-                            .border(1.dp, updateAccent.copy(alpha = 0.30f), RoundedCornerShape(999.dp))
-                            .padding(horizontal = 8.dp, vertical = 3.dp),
-                    )
+                    val updateAccent = MyTokenThemeTokens.colors.actionText
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .background(MyTokenThemeTokens.colors.actionFill, RoundedCornerShape(MyTokenRadius.pill)),
+                        )
+                        Text(
+                            text = "发现新版本",
+                            modifier = Modifier.padding(start = 5.dp),
+                            style = MyTokenType.label,
+                            color = updateAccent,
+                        )
+                    }
                     Row(modifier = Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = "v${state.version}",
@@ -851,50 +881,89 @@ private fun UpdateSection(
 }
 
 @Composable
-private fun SettingsHeader() {
-    Text(
-        text = "设置",
-        style = MyTokenType.pageTitle,
-    )
+private fun SettingsHeader(drawerMode: Boolean, onClose: (() -> Unit)?) {
+    val colors = MyTokenThemeTokens.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(MyTokenSize.header),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "设置",
+            style = MyTokenType.title,
+            color = colors.ink,
+            modifier = Modifier.weight(1f),
+        )
+        if (drawerMode && onClose != null) {
+            Box(
+                modifier = Modifier
+                    .size(MyTokenSize.touch)
+                    .clip(RoundedCornerShape(MyTokenRadius.pill))
+                    .clickable(onClick = onClose)
+                    .semantics { contentDescription = "关闭设置" }
+                    .testTag("settings_close"),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = null,
+                    tint = colors.ink,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+    }
 }
 
 @Composable
 private fun SettingsProfileCard(appVersion: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f))
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    val colors = MyTokenThemeTokens.colors
+    MyTokenSurface(
+        modifier = Modifier.fillMaxWidth(),
+        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
+        shape = RoundedCornerShape(MyTokenRadius.card),
     ) {
-        MyTokenBrandMark(size = 36.dp)
-        Column(
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .padding(start = 10.dp),
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "MyToken $appVersion",
-                fontSize = 14.sp,
-                lineHeight = 19.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-        MyTokenHelpButton(
-            title = "隐私与刷新",
-            subtitle = "凭证只在本机处理",
-            sections = listOf(
-                HelpSection(
-                    title = "本机数据",
-                    rows = listOf(
-                        HelpRow("凭证存储", "加密保存在本机 Keystore"),
-                        HelpRow("后台刷新", "频率由“刷新”设置控制"),
+            MyTokenBrandMark(size = 36.dp)
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = "MyToken $appVersion",
+                    style = MyTokenType.body,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.ink,
+                )
+                Text(
+                    text = "凭证只在本机",
+                    style = MyTokenType.caption,
+                    color = colors.muted,
+                )
+            }
+            MyTokenHelpButton(
+                title = "隐私与刷新",
+                subtitle = "凭证只在本机处理",
+                sections = listOf(
+                    HelpSection(
+                        title = "本机数据",
+                        rows = listOf(
+                            HelpRow("凭证存储", "加密保存在本机 Keystore"),
+                            HelpRow("后台刷新", "频率由“刷新”设置控制"),
+                        ),
                     ),
                 ),
-            ),
-            modifier = Modifier.testTag("settings_privacy_help"),
-        )
+                modifier = Modifier.testTag("settings_privacy_help"),
+            )
+        }
     }
 }
 
@@ -903,76 +972,12 @@ private fun ThemeSelector(
     selected: AppThemeMode,
     onSelect: (AppThemeMode) -> Unit,
 ) {
-    BoxWithConstraints {
-        val availableWidth = this.maxWidth
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (availableWidth < 320.dp) {
-                ThemeIconChip(
-                    icon = Icons.Filled.BrightnessAuto,
-                    label = "跟随系统",
-                    selected = selected == AppThemeMode.SYSTEM,
-                    onClick = { onSelect(AppThemeMode.SYSTEM) },
-                )
-                ThemeIconChip(
-                    icon = Icons.Filled.LightMode,
-                    label = "浅色",
-                    selected = selected == AppThemeMode.LIGHT,
-                    onClick = { onSelect(AppThemeMode.LIGHT) },
-                )
-                ThemeIconChip(
-                    icon = Icons.Filled.DarkMode,
-                    label = "深色",
-                    selected = selected == AppThemeMode.DARK,
-                    onClick = { onSelect(AppThemeMode.DARK) },
-                )
-            } else {
-                ThemeChip("跟随系统", selected == AppThemeMode.SYSTEM) {
-                    onSelect(AppThemeMode.SYSTEM)
-                }
-                ThemeChip("浅色", selected == AppThemeMode.LIGHT) {
-                    onSelect(AppThemeMode.LIGHT)
-                }
-                ThemeChip("深色", selected == AppThemeMode.DARK) {
-                    onSelect(AppThemeMode.DARK)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ThemeIconChip(
-    icon: ImageVector,
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-            )
-        },
-        colors = myTokenFilterChipColors(selected = selected),
-        border = myTokenFilterChipBorder(selected = selected),
-    )
-}
-
-@Composable
-private fun ThemeChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(text = label) },
-        colors = myTokenFilterChipColors(selected = selected),
-        border = myTokenFilterChipBorder(selected = selected),
+    val options = listOf("跟随系统", "浅色", "深色")
+    val modes = listOf(AppThemeMode.SYSTEM, AppThemeMode.LIGHT, AppThemeMode.DARK)
+    MyTokenSegmented(
+        options = options,
+        selectedIndex = modes.indexOf(selected).coerceAtLeast(0),
+        onSelect = { index -> onSelect(modes[index]) },
     )
 }
 
@@ -1147,13 +1152,10 @@ private fun ExpandableSettingsSection(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Card(
+    MyTokenSurface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
+        shape = RoundedCornerShape(MyTokenRadius.card),
     ) {
         Column {
             DisclosureHeader(
@@ -1191,10 +1193,10 @@ private fun SettingsDisclosure(
     toggleTag: String,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Surface(
+    MyTokenSurface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.46f),
+        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Control,
+        shape = RoundedCornerShape(MyTokenRadius.inner),
     ) {
         Column {
             DisclosureHeader(

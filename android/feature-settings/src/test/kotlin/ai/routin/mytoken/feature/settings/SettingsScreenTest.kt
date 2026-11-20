@@ -40,6 +40,8 @@ class SettingsScreenTest {
         logExportState: LogExportUiState = LogExportUiState.Idle,
         onExportLogs: () -> Unit = {},
         onShareLogs: () -> Unit = {},
+        drawerMode: Boolean = false,
+        onClose: (() -> Unit)? = null,
     ) {
         val releaseHistoryState = AppReleaseHistoryUiState.Loaded(
             listOf(
@@ -77,6 +79,8 @@ class SettingsScreenTest {
                     logExportState = logExportState,
                     onExportLogs = onExportLogs,
                     onShareLogs = onShareLogs,
+                    drawerMode = drawerMode,
+                    onClose = onClose,
                 )
             }
         }
@@ -92,6 +96,10 @@ class SettingsScreenTest {
         composeRule.onNodeWithText("仅 Wi-Fi 下刷新").assertDoesNotExist()
         composeRule.onNodeWithText("打开应用时刷新").assertIsDisplayed()
         composeRule.onNodeWithText("失败后自动重试").assertIsDisplayed()
+        listOf("外观", "通知", "数据", "关于与更新").forEach { group ->
+            composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText(group))
+            composeRule.onNodeWithText(group).assertIsDisplayed()
+        }
     }
 
     @Test
@@ -105,15 +113,69 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun migrationEntryInvokesCallback() {
+    fun dataEntryInvokesTransferCallback() {
         var opened = 0
         setContent(onOpenTransfer = { opened++ })
 
-        expandDataMigration()
-        composeRule.onNodeWithText("开始扫描").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("开始扫描").performClick()
+        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText("数据"))
+        composeRule.onNodeWithText("从 Mac 导入").performClick()
 
         assertEquals(1, opened)
+    }
+
+    @Test
+    fun dataGroupExportsLogs() {
+        var exportCalls = 0
+        setContent(onExportLogs = { exportCalls++ })
+
+        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText("数据"))
+        composeRule.onNodeWithTag("settings_export_logs").performClick()
+
+        assertEquals(1, exportCalls)
+    }
+
+    @Test
+    fun drawerShowsCloseButton() {
+        var closed = 0
+        setContent(drawerMode = true, onClose = { closed++ })
+
+        composeRule.onNodeWithContentDescription("关闭设置", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_close", useUnmergedTree = true).performClick()
+
+        assertEquals(1, closed)
+    }
+
+    @Test
+    @Config(qualifiers = "w343dp-h800dp")
+    fun drawerSettingsSurvivesLargeFontAndGestureInsets() {
+        composeRule.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(
+                    androidx.compose.ui.platform.LocalDensity.current.density,
+                    1.3f,
+                ),
+            ) {
+                MaterialTheme {
+                    SettingsScreen(
+                        state = SettingsUiState(isLoading = false),
+                        appVersion = "0.1.0",
+                        onOpenAppRefreshChange = {},
+                        onRetryOnFailureChange = {},
+                        onThemeModeChange = {},
+                        onOpenTransfer = {},
+                        drawerMode = true,
+                        onClose = {},
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag("settings_close", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_theme_cell").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_refresh_cell").performScrollTo().assertIsDisplayed()
+        // 列表可滚动到底部的数据/关于分组，说明底部留白与手势区不遮挡内容。
+        composeRule.onNodeWithTag("settings_drawer_content").performScrollToNode(hasText("关于与更新"))
+        composeRule.onNodeWithText("关于与更新").assertIsDisplayed()
     }
 
     @Test
@@ -154,8 +216,8 @@ class SettingsScreenTest {
         scrollToAbout()
         expandAbout(alreadyScrolled = true)
         composeRule.onNodeWithText("关于与更新").assertIsDisplayed()
-        composeRule.onNodeWithTag("settings_about_version").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("打开 GitHub").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_about_version").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("打开 GitHub").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("更新日志").assertExists()
         composeRule.onNodeWithText("更新源与令牌").assertExists()
         composeRule.onNodeWithText("当前版本修复内容").assertDoesNotExist()
@@ -210,7 +272,6 @@ class SettingsScreenTest {
     fun advancedSettingsAreCollapsedUntilRequested() {
         setContent()
 
-        composeRule.onNodeWithText("从 Mac 导入").assertDoesNotExist()
         scrollToAbout()
         composeRule.onNodeWithTag("settings_about_toggle").assertIsDisplayed()
         composeRule.onNodeWithText("检测更新").assertDoesNotExist()
@@ -238,7 +299,7 @@ class SettingsScreenTest {
         setContent()
         expandAbout()
 
-        composeRule.onNodeWithText("检测更新").assertIsDisplayed()
+        composeRule.onNodeWithText("检测更新").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("更新日志").assertExists()
         composeRule.onNodeWithText("更新源与令牌").assertExists()
         composeRule.onNodeWithText("GitHub 令牌").assertDoesNotExist()
@@ -250,13 +311,6 @@ class SettingsScreenTest {
         expandUpdateAdvanced()
         composeRule.onNodeWithText("GitHub 令牌").assertExists()
         composeRule.onNodeWithTag("update_channel_selector").assertExists()
-    }
-
-    private fun expandDataMigration() {
-        composeRule.onNodeWithTag("settings_list")
-            .performScrollToNode(hasText("数据迁移"))
-        composeRule.onNodeWithTag("settings_migration_toggle").performClick()
-        composeRule.waitForIdle()
     }
 
     private fun scrollToAbout() {

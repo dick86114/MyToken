@@ -6,6 +6,8 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
@@ -50,9 +52,9 @@ class MyTokenAppTest {
 
         // 低频设置以摘要形式保留，展开后才出现具体操作。
         composeRule.onNodeWithTag("settings_drawer_content").performScrollToNode(
-            hasText("数据迁移"),
+            hasText("数据"),
         )
-        composeRule.onNodeWithText("扫码导入").assertIsDisplayed()
+        composeRule.onAllNodesWithText("从 Mac 导入", useUnmergedTree = true).onFirst().assertIsDisplayed()
     }
 
     @Test

@@ -54,7 +54,7 @@ class MainActivityNotificationPermissionTest {
         composeRule.onNodeWithTag("home_open_settings").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("settings_drawer_content").performScrollToNode(
-            hasText("系统通知权限：已允许"),
+            hasText("已允许"),
         )
     }
 
@@ -62,18 +62,18 @@ class MainActivityNotificationPermissionTest {
     fun permissionStatusUpdatesOnLifecycleResume() {
         composeRule.activityRule.scenario.onActivity { toggleNotifications(it, enabled = true) }
         openSettingsAndScrollToPermissionStatus()
-        composeRule.onNodeWithText("系统通知权限：已允许").assertIsDisplayed()
+        composeRule.onNodeWithText("已允许").assertIsDisplayed()
 
         // Simulate revocation in system settings + return to the app.
         composeRule.activityRule.scenario.onActivity { toggleNotifications(it, enabled = false) }
         relaunchThroughLifecycle()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("系统通知权限：未授予，提醒将静默").assertIsDisplayed()
+        composeRule.onNodeWithText("未授予").assertIsDisplayed()
 
         // Re-granting reflects again on the next resume.
         composeRule.activityRule.scenario.onActivity { toggleNotifications(it, enabled = true) }
         relaunchThroughLifecycle()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("系统通知权限：已允许").assertIsDisplayed()
+        composeRule.onNodeWithText("已允许").assertIsDisplayed()
     }
 }

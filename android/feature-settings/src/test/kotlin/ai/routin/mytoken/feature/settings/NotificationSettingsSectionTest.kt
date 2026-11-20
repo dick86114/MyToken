@@ -41,7 +41,7 @@ class NotificationSettingsSectionTest {
         composeRule.onNodeWithText("用量提醒低阈值").assertDoesNotExist()
         composeRule.onNodeWithText("用量提醒高阈值").assertDoesNotExist()
         composeRule.onNodeWithText("凭证失效提醒").assertIsDisplayed()
-        composeRule.onNodeWithText("系统通知权限：已允许").assertIsDisplayed()
+        composeRule.onNodeWithText("已允许").assertIsDisplayed()
         composeRule.onNodeWithText("去授权").assertDoesNotExist()
     }
 
@@ -59,7 +59,7 @@ class NotificationSettingsSectionTest {
             }
         }
 
-        composeRule.onNodeWithText("系统通知权限：未授予，提醒将静默").assertIsDisplayed()
+        composeRule.onNodeWithText("未授予").assertIsDisplayed()
         composeRule.onNodeWithText("去授权").performClick()
         assertEquals(1, requested)
     }

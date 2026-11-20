@@ -269,6 +269,7 @@ fun MyTokenApp(
                         onExportLogs = logExportController::export,
                         onShareLogs = logExportController::share,
                         onDismissLogExport = logExportController::dismiss,
+                        onClose = { drawerSide = null },
                     )
                 },
             ) {
