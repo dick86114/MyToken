@@ -2,6 +2,7 @@ package ai.routin.mytoken.feature.home
 
 import ai.routin.mytoken.core.ui.MyTokenStatus
 import ai.routin.mytoken.core.ui.MyTokenStatusTone
+import ai.routin.mytoken.core.ui.myTokenPressScale
 import ai.routin.mytoken.core.ui.MyTokenSurface
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
@@ -14,7 +15,9 @@ import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import ai.routin.mytoken.domain.usage.RefreshStatus
 import androidx.compose.foundation.background
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +37,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -137,11 +141,18 @@ internal fun UsageCardFrame(
 ) {
     val compact = density.isCompact()
     val fixedHeight = compact && LocalDensity.current.fontScale < 1.3f
+    val interactionSource = remember { MutableInteractionSource() }
     MyTokenSurface(
         modifier = modifier
             .fillMaxWidth()
             .then(if (fixedHeight) Modifier.height(CompactCardHeight) else Modifier)
-            .clickable(role = Role.Button, onClick = onClick),
+            .myTokenPressScale(interactionSource, pressedScale = 0.99f)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                role = Role.Button,
+                onClick = onClick,
+            ),
         surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
         shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
     ) {

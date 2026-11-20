@@ -16,7 +16,9 @@ import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import ai.routin.mytoken.domain.model.UsageMetricUnit
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.tween
+import ai.routin.mytoken.core.ui.MyTokenMotion
+import ai.routin.mytoken.core.ui.rememberMyTokenMotionEnabled
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,6 +47,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -95,6 +99,7 @@ fun CredentialUsageCard(
     // 只有“首次加载且没有缓存数据”才显示骨架；带数据刷新时保留内容，避免闪烁。
     val showsSkeleton = health == UsageCardHealth.Loading && card.snapshot?.metrics.isNullOrEmpty()
 
+    val motionEnabled = rememberMyTokenMotionEnabled()
     val locateLift = remember { Animatable(0f) }
     LaunchedEffect(highlightSignal) {
         if (highlightSignal <= 0) {
@@ -102,19 +107,9 @@ fun CredentialUsageCard(
             return@LaunchedEffect
         }
         locateLift.snapTo(0f)
-        locateLift.animateTo(
-            targetValue = 0f,
-            animationSpec = keyframes {
-                durationMillis = 860
-                0f at 0 using FastOutSlowInEasing
-                1f at 130 using FastOutSlowInEasing
-                0.18f at 270 using FastOutSlowInEasing
-                0.7f at 390 using FastOutSlowInEasing
-                0.08f at 530 using FastOutSlowInEasing
-                0.32f at 640 using FastOutSlowInEasing
-                0f at 820 using FastOutSlowInEasing
-            },
-        )
+        val duration = MyTokenMotion.locateDurationMillis(motionEnabled)
+        locateLift.animateTo(1f, tween(durationMillis = duration, easing = FastOutSlowInEasing))
+        locateLift.animateTo(0f, tween(durationMillis = duration, easing = FastOutSlowInEasing))
     }
     val locateBounceModifier = if (highlightSignal > 0) {
         Modifier.graphicsLayer {
@@ -127,11 +122,26 @@ fun CredentialUsageCard(
         Modifier
     }
 
+    val metrics = card.snapshot?.metrics.orEmpty()
+    val primaryMetric = metrics.firstOrNull()
+    val primaryText = when {
+        primaryMetric == null -> ""
+        primaryMetric.presentation == UsageMetricPresentation.Balance ->
+            formatCurrency(primaryMetric.value, primaryMetric.currencyCode)
+        else -> formatPercent(progressPercent(primaryMetric))
+    }
+    val cardDescription = listOfNotNull(
+        card.credential.name,
+        usageCardStatusText(health),
+        primaryText.takeIf { it.isNotBlank() },
+    ).joinToString("，")
+
     UsageCardFrame(
         density = usageCardDensity,
         onClick = onOpen,
         modifier = modifier
             .then(locateBounceModifier)
+            .semantics { contentDescription = cardDescription }
             .testTag("credential_card_${card.credential.id}"),
         footer = {
             if (showsSkeleton) {
@@ -299,7 +309,6 @@ private fun CompactBalanceLayout(
         val markSpan = SpanStyle(
             fontSize = 0.6.em,
             fontWeight = FontWeight(650),
-            letterSpacing = 0.sp,
             color = colors.muted,
         )
         Text(

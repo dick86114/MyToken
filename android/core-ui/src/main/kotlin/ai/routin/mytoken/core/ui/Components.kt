@@ -95,6 +95,7 @@ fun MyTokenButton(
     Box(
         modifier = modifier
             .defaultMinSize(minHeight = MyTokenSize.touch)
+            .myTokenPressScale(interactionSource, pressedScale = 0.97f)
             .clip(shape)
             .background(toneColors.container)
             .clickable(

@@ -203,7 +203,8 @@ fun HomeScreen(
                                     }
                                 }
                             },
-                            modifier = Modifier.matchParentSize(),
+                            // 末尾留给筛选 pill，保证每一段都可点。
+                            modifier = Modifier.matchParentSize().padding(end = 132.dp),
                         )
                         HomeStatusRow(
                             total = visibleCards.size,

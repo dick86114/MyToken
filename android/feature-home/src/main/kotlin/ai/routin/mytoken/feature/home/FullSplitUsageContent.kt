@@ -753,10 +753,7 @@ private fun FullSecondaryBalance(group: SplitCurrencyGroup, modifier: Modifier =
             )
             Text(
                 text = formatCurrency(group.balance.value, group.balance.currencyCode),
-                fontSize = 16.sp,
-                lineHeight = 20.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = (-0.35).sp,
+                style = MyTokenType.numericValue,
                 color = colors.ink,
                 maxLines = 1,
             )
@@ -898,8 +895,7 @@ private fun FullXiaomiUsage(
                     Text(
                         text = "tokens",
                         modifier = Modifier.padding(start = 2.dp, bottom = 1.dp),
-                        fontSize = 10.sp,
-                        lineHeight = 13.sp,
+                        style = MyTokenType.micro,
                         color = colors.muted,
                     )
                 }
@@ -1089,8 +1085,7 @@ private fun FullRealtimeLine(items: List<Pair<String, String>>) {
             ) {
                 Text(
                     text = item.first,
-                    fontSize = 10.sp,
-                    lineHeight = 13.sp,
+                    style = MyTokenType.micro,
                     color = colors.muted,
                 )
                 Spacer(modifier = Modifier.width(3.dp))

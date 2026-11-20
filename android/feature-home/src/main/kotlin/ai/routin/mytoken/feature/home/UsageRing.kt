@@ -1,7 +1,9 @@
 package ai.routin.mytoken.feature.home
 
+import ai.routin.mytoken.core.ui.MyTokenMotion
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
+import ai.routin.mytoken.core.ui.rememberMyTokenMotionEnabled
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -9,8 +11,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -42,6 +48,16 @@ internal fun UsageArcGauge(
         else -> colors.positiveFill
     }
     val clamped = ((percent ?: 0.0).coerceIn(0.0, 100.0)).toFloat()
+    // 数值变化时弧线平滑过渡；系统关闭动画时退化为瞬间跳变。
+    val motionEnabled = rememberMyTokenMotionEnabled()
+    val animatedPercent by animateFloatAsState(
+        targetValue = clamped,
+        animationSpec = tween(
+            durationMillis = MyTokenMotion.ringDurationMillis(motionEnabled),
+            easing = FastOutSlowInEasing,
+        ),
+        label = "usageArcPercent",
+    )
     val trackStroke = ArcStrokeWidth
     // 动态字体放大时同步放大弧线，避免圆心数字被 52dp 直径裁切。
     val scaledDiameter = diameter * LocalDensity.current.fontScale.coerceIn(1f, 1.35f)
@@ -66,10 +82,10 @@ internal fun UsageArcGauge(
                 style = Stroke(width = trackStroke.toPx(), cap = StrokeCap.Round),
             )
 
-            val progressSweep = if (clamped <= 0f) {
+            val progressSweep = if (animatedPercent <= 0f) {
                 ArcZeroSweepAngle
             } else {
-                ArcSweepAngle * clamped / 100f
+                ArcSweepAngle * animatedPercent / 100f
             }
             drawArc(
                 color = accent,

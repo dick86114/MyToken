@@ -94,7 +94,6 @@ import ai.routin.mytoken.core.ui.MyTokenDialogRow
 import ai.routin.mytoken.core.ui.MyTokenDialogSection
 import ai.routin.mytoken.core.ui.MyTokenDialogStatus
 import ai.routin.mytoken.core.ui.MyTokenDialogTone
-import ai.routin.mytoken.core.ui.MyTokenPalette
 import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
 import ai.routin.mytoken.core.ui.myTokenFilterChipBorder
 import ai.routin.mytoken.core.ui.myTokenFilterChipColors
@@ -529,12 +528,12 @@ private fun LogExportDialog(
                     Column {
                         Text(
                             text = "正在收集",
-                            fontSize = 13.sp,
+                            style = MyTokenType.body,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
                             text = "应用日志、设备信息与最近记录",
-                            fontSize = 11.sp,
+                            style = MyTokenType.caption,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -602,7 +601,7 @@ private fun ReleaseHistoryDialog(
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                     Text(
                         text = "正在加载发布记录",
-                        fontSize = 12.sp,
+                        style = MyTokenType.label,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }

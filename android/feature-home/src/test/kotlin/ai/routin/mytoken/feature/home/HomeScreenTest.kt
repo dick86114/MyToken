@@ -560,6 +560,65 @@ class HomeScreenTest {
     }
 
     @Test
+    fun touchTargetsAreAtLeast48() {
+        val credential = credential("主账号")
+        val item = card(credential, metrics = listOf(progress(42.0, 100.0)))
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = listOf(item),
+                        groups = listOf(group(ProviderId.Routin, listOf(item))),
+                        credentialCount = 1,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    onOpenCredentials = {},
+                    onOpenSettings = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        listOf(
+            "credential_refresh_${credential.id}",
+            "provider_filter_menu",
+            "health_segment_0",
+            "home_open_credentials",
+            "home_open_settings",
+        ).forEach { tag ->
+            val bounds = composeRule.onNodeWithTag(tag, useUnmergedTree = true)
+                .getUnclippedBoundsInRoot()
+            val height = bounds.bottom - bounds.top
+            val width = bounds.right - bounds.left
+            assertTrue("触控目标 $tag 高度应 ≥48dp（实际 $height）", height >= 48.dp)
+            assertTrue("触控目标 $tag 宽度应 ≥48dp（实际 $width）", width >= 48.dp)
+        }
+    }
+
+    @Test
+    fun cardExposesTalkBackSummary() {
+        val credential = credential("主账号")
+        composeRule.setContent {
+            MyTokenTheme {
+                CredentialUsageCard(
+                    card = card(credential, metrics = listOf(progress(42.0, 100.0))),
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.COMPACT,
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("主账号，正常，42%", substring = true)
+            .assertExists()
+    }
+
+    @Test
     fun showsStandardCardWithMacStyleFields() {
         val credential = credential("熠")
         composeRule.setContent {

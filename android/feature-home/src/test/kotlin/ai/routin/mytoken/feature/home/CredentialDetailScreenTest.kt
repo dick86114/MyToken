@@ -16,11 +16,13 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
 import java.math.BigDecimal
 import java.time.Instant
+import androidx.compose.ui.unit.dp
 import java.util.UUID
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -198,6 +200,30 @@ class CredentialDetailScreenTest {
         val refresh = composeRule.onNodeWithTag("detail_refresh_now", useUnmergedTree = true)
             .getUnclippedBoundsInRoot()
         assertTrue("立即刷新应在编辑右侧", refresh.left > edit.left)
+    }
+
+    @Test
+    fun detailShareAndMoreAre48() {
+        composeRule.setContent {
+            MyTokenTheme {
+                CredentialDetailScreen(
+                    card = card(),
+                    onBack = {},
+                    onRefresh = {},
+                    onEdit = {},
+                    onDelete = {},
+                )
+            }
+        }
+
+        listOf("分享用量", "更多操作", "返回").forEach { description ->
+            val bounds = composeRule.onNodeWithContentDescription(description, useUnmergedTree = true)
+                .getUnclippedBoundsInRoot()
+            assertTrue(
+                "$description 触控高度应 ≥48dp",
+                bounds.bottom - bounds.top >= 48.dp,
+            )
+        }
     }
 
     private fun balance(id: String, value: Double, currency: String) = UsageMetric(

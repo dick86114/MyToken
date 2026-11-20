@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
@@ -346,7 +347,16 @@ internal fun HomeStatusRow(
             overflow = TextOverflow.Ellipsis,
         )
         Spacer(modifier = Modifier.width(MyTokenSpacing.sm))
-        Box(contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .height(MyTokenSize.touch)
+                .widthIn(min = MyTokenSize.touch)
+                .clip(RoundedCornerShape(MyTokenSize.switchHeight))
+                .clickable(role = Role.Button) { expanded = true }
+                .semantics { selected = selectedProvider != null }
+                .testTag("provider_filter_menu"),
+            contentAlignment = Alignment.Center,
+        ) {
             Row(
                 modifier = Modifier
                     .height(30.dp)
@@ -357,9 +367,6 @@ internal fun HomeStatusRow(
                         color = colors.line,
                         shape = RoundedCornerShape(MyTokenSize.switchHeight),
                     )
-                    .clickable(role = Role.Button) { expanded = true }
-                    .semantics { selected = selectedProvider != null }
-                    .testTag("provider_filter_menu")
                     .padding(start = 10.dp, end = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -428,11 +435,12 @@ internal fun HealthRuler(
                     .fillMaxHeight(),
                 contentAlignment = Alignment.BottomCenter,
             ) {
-                // 触控带只占底部 14dp：标尺视觉仍是 4dp，同时避开状态行上的筛选 pill。
+                // 触控带占满 48dp 高度（视觉条仍在底部 4dp）；
+                // 右侧留给筛选 pill，避免 pill 覆盖最后一段的触控。
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(14.dp)
+                        .fillMaxHeight()
                         .clickable { onLocate(entry.credentialId) }
                         .semantics {
                             contentDescription = "${entry.name}，${homeHealthLabel(entry.tone)}"
