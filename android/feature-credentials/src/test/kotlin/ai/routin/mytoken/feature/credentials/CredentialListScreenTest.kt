@@ -18,7 +18,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -114,7 +116,7 @@ class CredentialListScreenTest {
 
         composeRule.onNodeWithText("主力 Key").assertIsDisplayed()
         composeRule.onNodeWithText("备用 Key").performScrollTo()
-        composeRule.onNodeWithText("已启用 2 / 2").assertIsDisplayed()
+        composeRule.onNodeWithText("2 个凭证 · 2 个启用").assertIsDisplayed()
     }
 
     @Test
@@ -175,13 +177,58 @@ class CredentialListScreenTest {
     fun emptyStateShowsImportAndManualAddEntries() {
         setContent()
 
-        composeRule.onNodeWithText("暂无凭证").assertIsDisplayed()
+        composeRule.onNodeWithText("还没有凭证").assertIsDisplayed()
         composeRule.onNodeWithText("从 Mac 导入").assertIsDisplayed()
-        composeRule.onNodeWithText("添加凭证").assertIsDisplayed()
+        composeRule.onNodeWithText("手动添加").assertIsDisplayed()
     }
 
     @Test
-    fun editButtonIsAvailableAndKindDescriptionIsHidden() {
+    fun emptyStateUsesBrandMarkAndTwoActions() {
+        setContent()
+
+        composeRule.onNodeWithTag("credential_empty_mark", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("从 Mac 导入").assertIsDisplayed()
+        composeRule.onNodeWithText("手动添加").assertIsDisplayed()
+    }
+
+    @Test
+    fun disabledRowUsesNeutralLabelWithoutDimming() {
+        val key = credential("00000001", "停用 Key").copy(isEnabled = false)
+        repository.credentials.value = listOf(key)
+        advanceVm()
+        setContent()
+
+        composeRule.onNodeWithText("已停用", useUnmergedTree = true).assertExists()
+        val rowBounds = composeRule.onNodeWithTag("credential_row_${key.id}", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        assertTrue(
+            "列表行高度应不小于 64dp（实际 ${rowBounds.bottom - rowBounds.top}）",
+            rowBounds.bottom - rowBounds.top >= 64.dp,
+        )
+    }
+
+    @Test
+    fun rowsExposeProviderAndKind() {
+        repository.credentials.value = listOf(credential("00000001", "主力 Key"))
+        advanceVm()
+        setContent()
+
+        composeRule.onNodeWithText("Routin · Bearer Token", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun listShowsSectionHeaderAndPrivacyFooter() {
+        repository.credentials.value = listOf(credential("00000001", "主力 Key"))
+        advanceVm()
+        setContent()
+
+        composeRule.onNodeWithText("全部凭证").assertIsDisplayed()
+        composeRule.onNodeWithText("长按拖动排序").assertIsDisplayed()
+        composeRule.onNodeWithTag("credential_privacy_footer", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun editButtonIsAvailableAndRowShowsKind() {
         val key = credential("00000001", "主力 Key")
         repository.credentials.value = listOf(key)
         advanceVm()
@@ -208,7 +255,7 @@ class CredentialListScreenTest {
         composeRule.onNodeWithContentDescription("更多操作 主力 Key").performClick()
         composeRule.onNodeWithText("编辑 主力 Key").performClick()
         assertEquals(key.id, edited)
-        composeRule.onAllNodesWithText("Bearer Token", substring = true).assertCountEquals(0)
+        composeRule.onNodeWithText("Routin · Bearer Token", useUnmergedTree = true).assertExists()
     }
 
     @Test

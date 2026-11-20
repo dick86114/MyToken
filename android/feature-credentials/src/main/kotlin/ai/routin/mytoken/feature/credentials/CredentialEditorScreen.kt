@@ -51,12 +51,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private fun kindLabel(kind: CredentialKind): String = when (kind) {
-    CredentialKind.BearerApiKey -> "Bearer Token"
-    CredentialKind.ApiKey -> "API Key"
-    CredentialKind.AccessKeyPair -> "Access Key Pair"
-}
-
 /**
  * Credential editor. Fields are shown dynamically per [CredentialKind]:
  * Bearer API Key (Routin/NewAPI), API Key (DeepSeek/GLM), or
