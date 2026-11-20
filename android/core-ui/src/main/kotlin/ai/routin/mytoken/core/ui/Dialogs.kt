@@ -18,7 +18,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -128,14 +127,14 @@ fun MyTokenDialog(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = title,
-                                style = MaterialTheme.typography.titleLarge,
+                                style = MyTokenType.detailTitle,
                                 color = colors.ink,
                             )
                             if (subtitle != null) {
                                 Text(
                                     text = subtitle,
                                     modifier = Modifier.padding(top = 3.dp),
-                                    style = MyTokenType.metricLabel,
+                                    style = MyTokenType.label,
                                     color = colors.muted,
                                 )
                             }
@@ -182,7 +181,7 @@ fun MyTokenDialogSection(
         if (title != null) {
             Text(
                 text = title,
-                style = MyTokenType.metricLabel,
+                style = MyTokenType.label,
                 fontWeight = FontWeight.SemiBold,
                 color = colors.muted,
             )
@@ -216,7 +215,7 @@ fun MyTokenDialogRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MyTokenType.body,
                 fontWeight = FontWeight.SemiBold,
                 color = colors.ink,
             )
@@ -224,7 +223,7 @@ fun MyTokenDialogRow(
                 Text(
                     text = detail,
                     modifier = Modifier.padding(top = 1.dp),
-                    style = MyTokenType.metricLabel,
+                    style = MyTokenType.label,
                     color = colors.muted,
                 )
             }
@@ -260,7 +259,7 @@ fun MyTokenDialogStatus(
         Text(
             text = message,
             modifier = Modifier.weight(1f),
-            style = MyTokenType.metricLabel,
+            style = MyTokenType.label,
             color = colors.ink,
         )
     }

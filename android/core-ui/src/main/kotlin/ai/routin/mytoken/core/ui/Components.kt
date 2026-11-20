@@ -29,7 +29,6 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -121,7 +120,7 @@ fun MyTokenButton(
             }
             Text(
                 text = text,
-                style = MyTokenType.metricLabel,
+                style = MyTokenType.label,
                 fontWeight = FontWeight.SemiBold,
                 color = toneColors.content.copy(alpha = contentAlpha),
                 maxLines = 1,
@@ -221,7 +220,7 @@ fun MyTokenTextField(
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = label,
-            style = MyTokenType.metricLabel,
+            style = MyTokenType.label,
             color = colors.muted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -254,7 +253,7 @@ fun MyTokenTextField(
             Text(
                 text = supportingText,
                 modifier = Modifier.padding(top = 4.dp),
-                style = MyTokenType.metricCaption,
+                style = MyTokenType.caption,
                 color = colors.muted,
             )
         }
@@ -326,7 +325,7 @@ fun MyTokenSection(
                 Text(
                     text = title,
                     modifier = Modifier.weight(1f),
-                    style = MyTokenType.sectionTitle,
+                    style = MyTokenType.section,
                     color = colors.ink,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -350,7 +349,7 @@ fun SectionCard(
         if (supportingText != null) {
             Text(
                 text = supportingText,
-                style = MyTokenType.metricCaption,
+                style = MyTokenType.caption,
                 color = MyTokenThemeTokens.colors.muted,
             )
         }
@@ -396,7 +395,7 @@ fun MyTokenRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MyTokenType.body,
                 color = colors.ink,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -404,7 +403,7 @@ fun MyTokenRow(
             if (supportingText != null) {
                 Text(
                     text = supportingText,
-                    style = MyTokenType.metricCaption,
+                    style = MyTokenType.caption,
                     color = colors.muted,
                     maxLines = 2,
                 )
@@ -413,7 +412,7 @@ fun MyTokenRow(
         if (value != null) {
             Text(
                 text = value,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MyTokenType.body,
                 color = colors.muted,
                 maxLines = 1,
             )
@@ -484,7 +483,7 @@ fun MyTokenSegmented(
             ) {
                 Text(
                     text = label,
-                    style = MyTokenType.metricLabel,
+                    style = MyTokenType.label,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
                     color = if (selected) colors.actionText else colors.muted,
                     maxLines = 1,
@@ -530,7 +529,7 @@ fun MyTokenStatus(
         )
         Text(
             text = text,
-            style = MyTokenType.metricCaption,
+            style = MyTokenType.caption,
             color = content,
             maxLines = 1,
         )
