@@ -597,7 +597,7 @@ private fun ProviderLogoAvatar(
     )
 }
 
-private fun providerLogoRes(providerId: ProviderId): Int = when (providerId) {
+internal fun providerLogoRes(providerId: ProviderId): Int = when (providerId) {
     ProviderId.Routin -> R.drawable.share_provider_routin_logo
     ProviderId.DeepSeek -> R.drawable.share_provider_deepseek_logo
     ProviderId.Glm -> R.drawable.share_provider_glm_logo
