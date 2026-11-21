@@ -132,6 +132,7 @@ private val shortResetFormatter = DateTimeFormatter.ofPattern("MM-dd HH:mm")
 private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 private val subscriptionFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 private val resetCardFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+private val resetCardCompactFormatter = DateTimeFormatter.ofPattern("MM-dd HH:mm")
 
 internal fun formatResetTime(instant: Instant): String {
     val zone = ZoneId.systemDefault()
@@ -213,6 +214,10 @@ internal fun formatSubscriptionTime(instant: Instant?): String {
 
 internal fun formatResetCardExpiry(instant: Instant): String =
     resetCardFormatter.format(instant.atZone(ZoneId.systemDefault()))
+
+/** 详情页日期 chip 的紧凑格式：MM-dd HH:mm。 */
+internal fun formatResetCardCompact(instant: Instant): String =
+    resetCardCompactFormatter.format(instant.atZone(ZoneId.systemDefault()))
 
 internal fun formatCommandCodeAmount(value: BigDecimal?): String =
     value?.setScale(2, java.math.RoundingMode.HALF_UP)?.toPlainString() ?: "-"
@@ -379,7 +384,7 @@ internal fun ResetCardsBadge(
 
 /** 设计稿叠卡图标：一张完整卡片 + 右上角露出的后卡折角。 */
 @Composable
-private fun ResetCardsGlyph(color: Color, modifier: Modifier = Modifier) {
+internal fun ResetCardsGlyph(color: Color, modifier: Modifier = Modifier) {
     Canvas(modifier = modifier) {
         val stroke = 1.dp.toPx()
         val w = size.width

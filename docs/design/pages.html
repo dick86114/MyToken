@@ -191,17 +191,19 @@
   .window-bar i { display: block; height: 100%; border-radius: 99px; background: var(--p-pos); }
   .window-bar i.warn { background: var(--p-warn); }
   .window-meta { display: flex; justify-content: space-between; gap: 8px; margin-top: 5px; font-size: 11.5px; color: var(--p-muted); }
-  .reset-dates { font-size: 11.5px; color: var(--p-muted); margin-top: 4px; line-height: 1.5; }
-  .reset-dates .mono { color: var(--p-ink); }
+  .reset-dates { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 7px; font-size: 11.5px; color: var(--p-muted); }
+  .reset-dates .reset-chip { margin-top: 0; color: var(--p-ink); font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-weight: 500; }
   .facts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
   .fact-k { font-size: 11.5px; color: var(--p-muted); }
   .fact-v { font-size: 13px; font-weight: 600; margin-top: 2px; line-height: 1.35; }
   .model-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--p-muted); }
   .model-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .model-chip { font-size: 12px; color: var(--p-ink); background: var(--p-subtle); border: 1px solid var(--p-line); border-radius: 8px; padding: 4px 8px; font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); }
-  .cfg-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 6px 0; }
-  .cfg-k { font-size: 12px; color: var(--p-muted); }
-  .cfg-v { font-size: 13px; font-weight: 550; text-align: right; line-height: 1.4; }
+  .model-chip.model-more { color: var(--p-action); font-family: inherit; font-weight: 600; }
+  .model-collapse { display: inline-block; margin-top: 8px; padding: 4px 6px; font-size: 11.5px; color: var(--p-muted); }
+  .cfg-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 6px 0; }
+  .cfg-k { font-size: 12px; color: var(--p-muted); flex: none; }
+  .cfg-v { font-size: 13px; font-weight: 550; text-align: right; line-height: 1.4; max-width: 74%; overflow-wrap: anywhere; }
   .cfg-v.link { color: var(--p-action); font-weight: 600; }
   .detail-actions { position: sticky; bottom: 0; }
 
@@ -482,13 +484,18 @@
             <div class="window-top"><span class="window-label">5 小时</span><span class="window-pct warn">78%</span></div>
             <div class="window-bar"><i class="warn" style="width:78%"></i></div>
             <div class="window-meta"><span>剩余 22%</span><span>2 小时 40 分后重置</span></div>
-            <div class="reset-dates">重置卡 2 张 · <span class="mono">12-01 08:00</span> · <span class="mono">12-15 08:00</span></div>
+            <div class="reset-dates"><span>重置卡 2 张</span><span class="reset-chip"><svg viewBox="0 0 12 10" fill="none" aria-hidden="true"><rect x="0.5" y="2.5" width="8" height="6.5" rx="1.5" stroke="currentColor"/><path d="M3 1.5h8.5v6.5" stroke="currentColor" stroke-linecap="round"/></svg>12-01 08:00</span><span class="reset-chip"><svg viewBox="0 0 12 10" fill="none" aria-hidden="true"><rect x="0.5" y="2.5" width="8" height="6.5" rx="1.5" stroke="currentColor"/><path d="M3 1.5h8.5v6.5" stroke="currentColor" stroke-linecap="round"/></svg>12-15 08:00</span></div>
           </div>
           <div class="window">
             <div class="window-top"><span class="window-label">周</span><span class="window-pct">46%</span></div>
             <div class="window-bar"><i style="width:46%"></i></div>
             <div class="window-meta"><span>剩余 54%</span><span>3 天 23 小时后重置</span></div>
-            <div class="reset-dates">重置卡 1 张 · <span class="mono">12-20 08:00</span></div>
+            <div class="reset-dates"><span>重置卡 1 张</span><span class="reset-chip"><svg viewBox="0 0 12 10" fill="none" aria-hidden="true"><rect x="0.5" y="2.5" width="8" height="6.5" rx="1.5" stroke="currentColor"/><path d="M3 1.5h8.5v6.5" stroke="currentColor" stroke-linecap="round"/></svg>12-20 08:00</span></div>
+          </div>
+          <div class="window">
+            <div class="window-top"><span class="window-label">月</span><span class="window-pct">31%</span></div>
+            <div class="window-bar"><i style="width:31%"></i></div>
+            <div class="window-meta"><span>剩余 69%</span><span>12 天后重置</span></div>
           </div>
         </div>
 
@@ -506,18 +513,16 @@
 
         <div class="section-label">账户与模型</div>
         <div class="card">
-          <div class="cfg-row"><span class="cfg-k">分组倍率</span><span class="cfg-v">编程组 ×1.0</span></div>
-          <div class="model-head" style="margin-top:8px"><span>允许模型</span><span>3 个 · 点击复制</span></div>
+          <div class="model-head"><span>允许模型</span><span>3 个 · 点击复制</span></div>
           <div class="model-chips">
             <span class="model-chip">glm-4.6</span>
-            <span class="model-chip">glm-4.5</span>
-            <span class="model-chip">glm-4.5-air</span>
+            <span class="model-chip model-more">更多 2</span>
           </div>
         </div>
 
         <div class="section-label">配置</div>
         <div class="card">
-          <div class="cfg-row"><span class="cfg-k">官网地址</span><span class="cfg-v link">z.ai</span></div>
+          <div class="cfg-row"><span class="cfg-k">官网地址</span><span class="cfg-v link">https:/&#8203;/&#8203;open.bigmodel.cn/&#8203;console/&#8203;usage/&#8203;plan-detail?&#8203;from=credential</span></div>
           <div class="cfg-row"><span class="cfg-k">凭证类型</span><span class="cfg-v">API Key</span></div>
         </div>
 
@@ -621,9 +626,10 @@
         <p class="intent">首页的弧线、状态、重置时间在这里放大；其余信息按“用量 → 订阅 → 账户 → 配置”推进，最后才是操作。</p>
         <h3>布局决策</h3>
         <ul>
-          <li><b>Hero 只有一件事：</b>88dp 弧线 + 剩余比例 + 重置时间 + 重置卡入口；状态只出现一次（接近上限）。</li>
-          <li><b>全部窗口：</b>5 小时与周各一行，百分比 + 细条 + 剩余 + 重置；重置卡的完整到期日期直接展开，不再藏在弹层里。</li>
-          <li><b>订阅与账户：</b>六项事实用 2 列网格，取消“套餐状态 / 订阅与周期”两张重复卡；模型以 chip 呈现，点击复制。</li>
+          <li><b>Hero 只有一件事：</b>默认取周期最短的额度（如 5 小时）画 88dp 弧线 + 剩余比例 + 重置时间 + 重置卡入口；状态只出现一次（接近上限）。</li>
+          <li><b>全部窗口：</b>按 5 小时 → 周 → 月排序，月永远在最后；每行百分比 + 细条 + 剩余 + 重置。重置卡按到期日拆成日期 chip（叠卡图标 + MM-dd HH:mm），不再拼成一行长文本。</li>
+          <li><b>订阅与账户：</b>六项事实用 2 列网格，取消“套餐状态 / 订阅与周期”两张重复卡；不再展示分组倍率。允许模型默认只显示一行，其余收进「更多 N」，展开后可「收起」；chip 点击复制。</li>
+          <li><b>配置：</b>官网地址展示完整 URL 并允许换行，超长路径不截断。</li>
           <li><b>数据时间：</b>合并到 Hero 页脚，删除详情页里“最近更新 / 数据时间”这类重复行。</li>
         </ul>
         <h3>关键交互</h3>

@@ -16,10 +16,13 @@ import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import ai.routin.mytoken.domain.model.UsageMetricUnit
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -41,12 +44,67 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.math.BigDecimal
+import java.time.Duration
 import java.time.Instant
+
+private enum class WindowKind { Daily, FiveHour, Weekly, Monthly, Unknown }
+
+private fun windowKind(metric: UsageMetric): WindowKind {
+    val id = metric.id.lowercase()
+    val label = metric.label
+    return when {
+        id.contains("today") || id.contains("day") || label.contains("日") -> WindowKind.Daily
+        id.contains("five") || id.contains("5hour") || id.contains("5-hour") ||
+            (label.contains("5") && label.contains("小时")) -> WindowKind.FiveHour
+        id.contains("week") || label.contains("周") -> WindowKind.Weekly
+        id.contains("month") || id.contains("credit-progress") || label.contains("月") ->
+            WindowKind.Monthly
+        else -> WindowKind.Unknown
+    }
+}
+
+private fun windowDurationSeconds(metric: UsageMetric): Long {
+    val start = metric.windowStart
+    val end = metric.windowEnd
+    if (start != null && end != null) {
+        return Duration.between(start, end).seconds.coerceAtLeast(0)
+    }
+    return when (windowKind(metric)) {
+        WindowKind.Daily -> 86_400
+        WindowKind.FiveHour -> 5 * 3_600
+        WindowKind.Weekly -> 7 * 86_400
+        WindowKind.Monthly -> 30 * 86_400
+        WindowKind.Unknown -> Long.MAX_VALUE / 2
+    }
+}
+
+/** 详情页 Hero 默认展示窗口时长最短的进度指标；余额卡返回 null。 */
+internal fun defaultHeroProgressMetric(metrics: List<UsageMetric>): UsageMetric? =
+    metrics
+        .filter { it.presentation == UsageMetricPresentation.Progress }
+        .minByOrNull(::windowDurationSeconds)
+
+/** 全部窗口顺序：日 → 5 小时 → 周 → 其他 → 月，月永远在最下面。 */
+internal fun windowDisplayRank(metric: UsageMetric): Int = when (windowKind(metric)) {
+    WindowKind.Daily -> 0
+    WindowKind.FiveHour -> 1
+    WindowKind.Weekly -> 2
+    WindowKind.Unknown -> 3
+    WindowKind.Monthly -> 4
+}
+
+/** 长 URL 插入零宽断点，窄卡片里可以完整换行而不是被截断。 */
+private fun wrapUrlForDisplay(url: String): String =
+    url.replace("/", "/\u200B")
+        .replace("?", "?\u200B")
+        .replace("&", "&\u200B")
 
 /** 详情页 Hero：身份 + 主指标（配额环或余额）+ 更新时间页脚。 */
 @Composable
@@ -54,7 +112,7 @@ internal fun DetailHero(card: CredentialCardUi, nextRefreshAt: Instant? = null) 
     val colors = MyTokenThemeTokens.colors
     val health = usageCardHealth(card)
     val metrics = card.snapshot?.metrics.orEmpty()
-    val primary = metrics.firstOrNull { it.presentation == UsageMetricPresentation.Progress }
+    val primary = defaultHeroProgressMetric(metrics)
     val balance = metrics.firstOrNull { it.presentation == UsageMetricPresentation.Balance }
 
     MyTokenSurface(
@@ -141,6 +199,7 @@ private fun QuotaHero(metric: UsageMetric, health: UsageCardHealth) {
                 style = MyTokenType.label,
                 color = colors.muted,
                 maxLines = 1,
+                modifier = Modifier.testTag("detail_hero_metric_label"),
             )
             Text(
                 text = "剩余 ${formatRemaining(metric)}",
@@ -297,13 +356,14 @@ internal fun DetailWindowsSection(card: CredentialCardUi) {
                 }
             }
         } else {
-            progress.forEach { metric ->
+            progress.sortedBy(::windowDisplayRank).forEach { metric ->
                 DetailWindowRow(metric)
             }
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DetailWindowRow(metric: UsageMetric) {
     val colors = MyTokenThemeTokens.colors
@@ -370,15 +430,40 @@ private fun DetailWindowRow(metric: UsageMetric) {
             )
         }
         if (metric.resetCards.isNotEmpty()) {
-            Text(
-                text = "重置卡 ${metric.resetCards.size} 张 · " +
-                    metric.resetCards.joinToString(" · ") { formatResetCardExpiry(it.expiresAt) },
-                modifier = Modifier.padding(top = 4.dp),
-                style = MyTokenType.caption,
-                color = colors.muted,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            FlowRow(
+                modifier = Modifier.padding(top = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = "重置卡 ${metric.resetCards.size} 张",
+                    style = MyTokenType.caption,
+                    color = colors.muted,
+                    modifier = Modifier.align(Alignment.CenterVertically),
+                )
+                metric.resetCards.forEach { card ->
+                    Row(
+                        modifier = Modifier
+                            .testTag("detail_reset_chip")
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(colors.subtle)
+                            .border(1.dp, colors.line, RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        ResetCardsGlyph(
+                            color = colors.muted,
+                            modifier = Modifier.size(width = 9.dp, height = 8.dp),
+                        )
+                        Text(
+                            text = formatResetCardCompact(card.expiresAt),
+                            style = MyTokenType.micro.copy(fontFamily = FontFamily.Monospace),
+                            color = colors.ink,
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -524,27 +609,6 @@ internal fun DetailFactsSection(card: CredentialCardUi) {
         title = "账户与模型",
         modifier = Modifier.testTag("detail_models"),
     ) {
-        Row(verticalAlignment = Alignment.Top) {
-            Text(
-                text = "分组倍率",
-                style = MyTokenType.caption,
-                color = colors.muted,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = if (snapshot.groupMultipliers.isEmpty()) {
-                    "-"
-                } else {
-                    snapshot.groupMultipliers.joinToString("、") {
-                        "${it.name} ×${formatDecimal(it.multiplier)}"
-                    }
-                },
-                style = MyTokenType.caption,
-                color = colors.ink,
-                textAlign = TextAlign.End,
-                modifier = Modifier.weight(1.4f),
-            )
-        }
         AllowedModelsSection(models = snapshot.allowedModels)
     }
 }
@@ -602,18 +666,22 @@ internal fun DetailConfigSection(
         }
         metadata.entries.sortedBy { it.key.rawValue }.forEach { (key, value) ->
             if (key == CredentialMetadataKey.WebsiteURL) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "官网地址", style = MyTokenType.caption, color = colors.muted)
-                    Spacer(modifier = Modifier.weight(1f))
+                Row(verticalAlignment = Alignment.Top) {
                     Text(
-                        text = value,
+                        text = "官网地址",
                         style = MyTokenType.caption,
+                        color = colors.muted,
+                        modifier = Modifier.padding(top = 1.dp),
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = wrapUrlForDisplay(value),
+                        style = MyTokenType.caption.copy(lineBreak = LineBreak.Paragraph),
                         color = colors.actionText,
                         textAlign = TextAlign.End,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
-                            .weight(1.2f, fill = false)
+                            .weight(1f)
+                            .testTag("detail_website_url")
                             .clickable(role = Role.Button) {
                                 runCatching { uriHandler.openUri(value) }
                             },
@@ -623,7 +691,7 @@ internal fun DetailConfigSection(
                         contentDescription = null,
                         tint = colors.actionText,
                         modifier = Modifier
-                            .padding(start = 4.dp)
+                            .padding(start = 4.dp, top = 2.dp)
                             .size(14.dp),
                     )
                 }

@@ -14,6 +14,7 @@ import ai.routin.mytoken.domain.usage.RefreshStatus
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
@@ -95,7 +96,7 @@ class CommandCodeDetailScreenTest {
         }
         composeRule.onNodeWithText("官网地址").performScrollTo().assertIsDisplayed()
         val urlLayoutResults = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
-        composeRule.onNodeWithText("https://commandcode.ai/", useUnmergedTree = true)
+        composeRule.onNodeWithTag("detail_website_url", useUnmergedTree = true)
             .performScrollTo()
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
                 action(urlLayoutResults)

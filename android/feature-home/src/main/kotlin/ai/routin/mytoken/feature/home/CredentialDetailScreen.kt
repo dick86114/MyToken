@@ -3,6 +3,8 @@ package ai.routin.mytoken.feature.home
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenButton
 import ai.routin.mytoken.core.ui.MyTokenButtonTone
+import ai.routin.mytoken.core.ui.MyTokenDropdownMenu
+import ai.routin.mytoken.core.ui.MyTokenDropdownMenuItem
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.MyTokenSize
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
@@ -31,10 +33,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -240,16 +241,19 @@ private fun DetailTopBar(
                             )
                         },
                     )
-                    DropdownMenu(
+                    MyTokenDropdownMenu(
                         expanded = moreExpanded,
                         onDismissRequest = onDismissMore,
                     ) {
-                        DropdownMenuItem(
-                            text = { Text("删除凭证", color = colors.criticalText) },
+                        MyTokenDropdownMenuItem(
+                            text = "删除凭证",
+                            destructive = true,
+                            leadingIcon = Icons.Filled.Delete,
                             onClick = {
                                 onDismissMore()
                                 onDelete()
                             },
+                            modifier = Modifier.testTag("detail_delete"),
                         )
                     }
                 }

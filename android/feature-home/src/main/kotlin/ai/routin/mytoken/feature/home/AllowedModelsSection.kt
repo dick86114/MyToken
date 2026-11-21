@@ -4,6 +4,7 @@ import ai.routin.mytoken.core.ui.MyTokenRadius
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -24,7 +25,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -36,6 +40,7 @@ import kotlinx.coroutines.delay
 @Composable
 internal fun AllowedModelsSection(models: List<String>, modifier: Modifier = Modifier) {
     var copiedModelID by remember { mutableStateOf<String?>(null) }
+    var expanded by remember(models) { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
     val colors = MyTokenThemeTokens.colors
 
@@ -73,10 +78,11 @@ internal fun AllowedModelsSection(models: List<String>, modifier: Modifier = Mod
 
     FlowRow(
         modifier = modifier.fillMaxWidth().padding(top = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        models.forEach { modelID ->
+        val visibleModels = if (expanded) models else models.take(1)
+        visibleModels.forEach { modelID ->
             ModelIDChip(
                 modelID = modelID,
                 isCopied = copiedModelID == modelID,
@@ -86,6 +92,44 @@ internal fun AllowedModelsSection(models: List<String>, modifier: Modifier = Mod
                 },
             )
         }
+        if (!expanded && models.size > 1) {
+            ModelOverflowChip(
+                label = "更多 ${models.size - 1}",
+                testTag = "detail_models_more",
+                onClick = { expanded = true },
+            )
+        }
+    }
+    if (expanded && models.size > 1) {
+        Text(
+            text = "收起",
+            style = MyTokenType.caption,
+            color = colors.muted,
+            modifier = Modifier
+                .testTag("detail_models_collapse")
+                .clip(RoundedCornerShape(6.dp))
+                .clickable(role = Role.Button) { expanded = false }
+                .padding(horizontal = 6.dp, vertical = 4.dp),
+        )
+    }
+}
+
+@Composable
+private fun ModelOverflowChip(label: String, testTag: String, onClick: () -> Unit) {
+    val colors = MyTokenThemeTokens.colors
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(8.dp),
+        color = colors.subtle,
+        border = BorderStroke(1.dp, colors.line),
+        modifier = Modifier.testTag(testTag),
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            style = MyTokenType.caption,
+            color = colors.actionText,
+        )
     }
 }
 

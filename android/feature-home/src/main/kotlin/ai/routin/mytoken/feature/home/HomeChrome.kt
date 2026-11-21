@@ -1,5 +1,7 @@
 package ai.routin.mytoken.feature.home
 
+import ai.routin.mytoken.core.ui.MyTokenDropdownMenu
+import ai.routin.mytoken.core.ui.MyTokenDropdownMenuItem
 import ai.routin.mytoken.core.ui.MyTokenSize
 import ai.routin.mytoken.core.ui.MyTokenSpacing
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
@@ -43,8 +45,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -408,31 +408,30 @@ internal fun HomeStatusRow(
                     modifier = Modifier.size(16.dp),
                 )
             }
-            DropdownMenu(
+            MyTokenDropdownMenu(
                 expanded = expanded,
                 onDismissRequest = { expanded = false },
             ) {
-                DropdownMenuItem(
-                    text = { Text(text = "全部 $allTotal") },
+                MyTokenDropdownMenuItem(
+                    text = "全部",
+                    count = allTotal.toString(),
+                    selected = selectedProvider == null,
                     onClick = {
                         expanded = false
                         onSelect(null)
                     },
+                    modifier = Modifier.testTag("provider_filter_item_all"),
                 )
                 providers.forEach { provider ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = "${ProviderCatalog.displayName(provider)} ${counts[provider] ?: 0}",
-                            )
-                        },
+                    MyTokenDropdownMenuItem(
+                        text = ProviderCatalog.displayName(provider),
+                        count = (counts[provider] ?: 0).toString(),
+                        selected = provider == selectedProvider,
                         onClick = {
                             expanded = false
                             onSelect(provider)
                         },
-                        modifier = Modifier
-                            .testTag("provider_filter_item_${provider.rawValue}")
-                            .semantics { selected = provider == selectedProvider },
+                        modifier = Modifier.testTag("provider_filter_item_${provider.rawValue}"),
                     )
                 }
             }

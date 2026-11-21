@@ -4,27 +4,38 @@ import ai.routin.mytoken.core.ui.MyTokenTheme
 import ai.routin.mytoken.domain.model.AppError
 import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.model.CredentialKind
+import ai.routin.mytoken.domain.model.CredentialMetadataKey
 import ai.routin.mytoken.domain.model.ProviderId
+import ai.routin.mytoken.domain.model.UsageGroupMultiplier
 import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import ai.routin.mytoken.domain.model.UsageMetricSemantic
 import ai.routin.mytoken.domain.model.UsageMetricUnit
+import ai.routin.mytoken.domain.model.UsageResetCard
 import ai.routin.mytoken.domain.model.UsageSnapshot
 import ai.routin.mytoken.domain.usage.RefreshStatus
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.style.TextOverflow
 import java.math.BigDecimal
 import java.time.Instant
 import androidx.compose.ui.unit.dp
 import java.util.UUID
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -40,11 +51,15 @@ class CredentialDetailScreenTest {
 
     private val fetchedAt = Instant.parse("2026-09-14T08:30:00Z")
 
-    private fun credential(provider: ProviderId = ProviderId.Routin) = Credential(
+    private fun credential(
+        provider: ProviderId = ProviderId.Routin,
+        metadata: Map<CredentialMetadataKey, String> = emptyMap(),
+    ) = Credential(
         id = UUID.fromString("00000001-0000-0000-0000-000000000000"),
         providerId = provider,
         credentialKind = CredentialKind.BearerApiKey,
         name = "主力账户",
+        metadata = metadata,
     )
 
     private fun progress(id: String = "fiveHour") = UsageMetric(
@@ -66,6 +81,8 @@ class CredentialDetailScreenTest {
         status: RefreshStatus = RefreshStatus.Ready,
         error: AppError? = null,
         isStale: Boolean = false,
+        allowedModels: List<String> = emptyList(),
+        groupMultipliers: List<UsageGroupMultiplier> = emptyList(),
     ) = CredentialCardUi(
         credential = credential,
         status = status,
@@ -74,6 +91,8 @@ class CredentialDetailScreenTest {
             fetchedAt = fetchedAt,
             metrics = metrics,
             planName = "成长版",
+            allowedModels = allowedModels,
+            groupMultipliers = groupMultipliers,
         ),
         isStale = isStale,
         error = error,
@@ -224,6 +243,172 @@ class CredentialDetailScreenTest {
                 bounds.bottom - bounds.top >= 48.dp,
             )
         }
+    }
+
+    @Test
+    fun heroDefaultsToShortestWindowMetric() {
+        val weekly = progress("weekly").copy(
+            label = "周",
+            windowStart = fetchedAt.minusSeconds(7 * 86_400),
+            windowEnd = fetchedAt,
+        )
+        val fiveHour = progress("five-hour").copy(
+            label = "5 小时",
+            windowStart = fetchedAt.minusSeconds(5 * 3_600),
+            windowEnd = fetchedAt,
+        )
+
+        composeRule.setContent {
+            MyTokenTheme {
+                CredentialDetailScreen(
+                    card = card(metrics = listOf(weekly, fiveHour)),
+                    onBack = {},
+                    onRefresh = {},
+                    onEdit = {},
+                    onDelete = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("detail_hero_metric_label", useUnmergedTree = true)
+            .assertTextEquals("5 小时用量")
+    }
+
+    @Test
+    fun detailWindowsShowResetCardsAsCompactChips() {
+        val first = Instant.parse("2026-12-01T08:00:00Z")
+        val second = Instant.parse("2026-12-15T08:00:00Z")
+        val metric = progress("five-hour").copy(
+            label = "5 小时用量",
+            resetCards = listOf(UsageResetCard(first), UsageResetCard(second)),
+        )
+
+        composeRule.setContent {
+            MyTokenTheme {
+                CredentialDetailScreen(
+                    card = card(metrics = listOf(metric)),
+                    onBack = {},
+                    onRefresh = {},
+                    onEdit = {},
+                    onDelete = {},
+                )
+            }
+        }
+
+        val chips = composeRule.onAllNodesWithTag("detail_reset_chip", useUnmergedTree = true)
+            .fetchSemanticsNodes()
+        assertEquals("重置卡应按到期日拆成日期 chip", 2, chips.size)
+        composeRule.onNodeWithText(formatResetCardCompact(first), useUnmergedTree = true)
+            .assertExists()
+        composeRule.onNodeWithText("重置卡 2 张 ·", substring = true, useUnmergedTree = true)
+            .assertDoesNotExist()
+    }
+
+    @Test
+    fun detailModelsDropMultiplierAndCollapseToSingleLine() {
+        val models = listOf(
+            "glm-5.3-air",
+            "glm-5.3-airx",
+            "glm-5.3-flash",
+            "glm-5.3-pro",
+            "glm-5.3-max",
+        )
+
+        composeRule.setContent {
+            MyTokenTheme {
+                CredentialDetailScreen(
+                    card = card(
+                        allowedModels = models,
+                        groupMultipliers = listOf(
+                            UsageGroupMultiplier("编程组", BigDecimal("1.0")),
+                        ),
+                    ),
+                    onBack = {},
+                    onRefresh = {},
+                    onEdit = {},
+                    onDelete = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("分组倍率").assertDoesNotExist()
+        composeRule.onNodeWithTag("detail_models_more", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("detail_models_more", useUnmergedTree = true)
+            .performClick()
+        composeRule.onNodeWithContentDescription("复制模型 ID glm-5.3-max")
+            .performScrollTo()
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun detailConfigWrapsLongWebsiteUrl() {
+        // Robolectric 每个字形约 1px，URL 需要足够长才能触发换行。
+        val url = "https://example.com/" +
+            (1..40).joinToString("/") { "very-long-segment-$it" } +
+            "?token=abcdefghijklmnop"
+        val credential = credential(
+            metadata = mapOf(CredentialMetadataKey.WebsiteURL to url),
+        )
+
+        composeRule.setContent {
+            MyTokenTheme {
+                CredentialDetailScreen(
+                    card = card(credential = credential),
+                    onBack = {},
+                    onRefresh = {},
+                    onEdit = {},
+                    onDelete = {},
+                )
+            }
+        }
+
+        val results = mutableListOf<TextLayoutResult>()
+        composeRule.onNodeWithTag("detail_website_url", useUnmergedTree = true)
+            .performScrollTo()
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
+                action(results)
+            }
+        val layout = results.single()
+        assertEquals("官网地址不应限制行数", Int.MAX_VALUE, layout.layoutInput.maxLines)
+        assertEquals("官网地址不能用省略号截断", TextOverflow.Clip, layout.layoutInput.overflow)
+        assertEquals(
+            "官网地址应完整展示",
+            url,
+            layout.layoutInput.text.text.replace("\u200B", ""),
+        )
+        assertFalse("官网地址不应被截断", layout.hasVisualOverflow)
+    }
+
+    @Test
+    fun detailWindowsAlwaysPutMonthLast() {
+        val monthly = progress("credit-progress").copy(label = "月")
+        val weekly = progress("weekly").copy(label = "周")
+        val fiveHour = progress("five-hour").copy(label = "5 小时")
+
+        composeRule.setContent {
+            MyTokenTheme {
+                CredentialDetailScreen(
+                    card = card(metrics = listOf(monthly, weekly, fiveHour)),
+                    onBack = {},
+                    onRefresh = {},
+                    onEdit = {},
+                    onDelete = {},
+                )
+            }
+        }
+
+        val tops = listOf("5 小时", "周", "月").map { label ->
+            composeRule.onNodeWithText(label, useUnmergedTree = true)
+                .getUnclippedBoundsInRoot()
+                .top
+                .value
+        }
+        assertTrue(
+            "全部窗口应按 5 小时 → 周 → 月 排列，实际 $tops",
+            tops[0] < tops[1] && tops[1] < tops[2],
+        )
     }
 
     private fun balance(id: String, value: Double, currency: String) = UsageMetric(
