@@ -201,6 +201,7 @@
   .model-chip { font-size: 12px; color: var(--p-ink); background: var(--p-subtle); border: 1px solid var(--p-line); border-radius: 8px; padding: 4px 8px; font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); }
   .model-chip.model-more { color: var(--p-action); font-family: inherit; font-weight: 600; }
   .model-collapse { display: inline-block; margin-top: 8px; padding: 4px 6px; font-size: 11.5px; color: var(--p-muted); }
+  .model-view-more { display: inline-block; margin-top: 8px; padding: 4px 6px; font-size: 11.5px; font-weight: 600; color: var(--p-action); }
   .cfg-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 6px 0; }
   .cfg-k { font-size: 12px; color: var(--p-muted); flex: none; }
   .cfg-v { font-size: 13px; font-weight: 550; text-align: right; line-height: 1.4; max-width: 74%; overflow-wrap: anywhere; }
@@ -513,11 +514,15 @@
 
         <div class="section-label">账户与模型</div>
         <div class="card">
-          <div class="model-head"><span>允许模型</span><span>3 个 · 点击复制</span></div>
+          <div class="model-head"><span>允许模型</span><span>7 个 · 点击复制</span></div>
           <div class="model-chips">
             <span class="model-chip">glm-4.6</span>
-            <span class="model-chip model-more">更多 2</span>
+            <span class="model-chip">glm-4.5</span>
+            <span class="model-chip">glm-4.5-air</span>
+            <span class="model-chip">glm-4.6-airx</span>
+            <span class="model-chip">glm-4.5-flash</span>
           </div>
+          <span class="model-view-more">查看更多</span>
         </div>
 
         <div class="section-label">配置</div>
@@ -628,7 +633,7 @@
         <ul>
           <li><b>Hero 只有一件事：</b>默认取周期最短的额度（如 5 小时）画 88dp 弧线 + 剩余比例 + 重置时间 + 重置卡入口；状态只出现一次（接近上限）。</li>
           <li><b>全部窗口：</b>按 5 小时 → 周 → 月排序，月永远在最后；每行百分比 + 细条 + 剩余 + 重置。重置卡按到期日拆成日期 chip（叠卡图标 + MM-dd HH:mm），不再拼成一行长文本。</li>
-          <li><b>订阅与账户：</b>六项事实用 2 列网格，取消“套餐状态 / 订阅与周期”两张重复卡；不再展示分组倍率。允许模型默认只显示一行，其余收进「更多 N」，展开后可「收起」；chip 点击复制。</li>
+          <li><b>订阅与账户：</b>六项事实用 2 列网格，取消“套餐状态 / 订阅与周期”两张重复卡；不再展示分组倍率。允许模型默认最多两行，超出部分在第三行显示「查看更多」，展开后可「收起」；chip 点击复制。</li>
           <li><b>配置：</b>官网地址展示完整 URL 并允许换行，超长路径不截断。</li>
           <li><b>数据时间：</b>合并到 Hero 页脚，删除详情页里“最近更新 / 数据时间”这类重复行。</li>
         </ul>

@@ -6,6 +6,8 @@ import ai.routin.mytoken.core.ui.MyTokenType
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -27,11 +29,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
@@ -43,6 +48,8 @@ internal fun AllowedModelsSection(models: List<String>, modifier: Modifier = Mod
     var expanded by remember(models) { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
     val colors = MyTokenThemeTokens.colors
+    val density = LocalDensity.current
+    val textMeasurer = rememberTextMeasurer()
 
     LaunchedEffect(copiedModelID) {
         if (copiedModelID != null) {
@@ -76,61 +83,102 @@ internal fun AllowedModelsSection(models: List<String>, modifier: Modifier = Mod
         return
     }
 
-    FlowRow(
-        modifier = modifier.fillMaxWidth().padding(top = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        val visibleModels = if (expanded) models else models.take(1)
-        visibleModels.forEach { modelID ->
-            ModelIDChip(
-                modelID = modelID,
-                isCopied = copiedModelID == modelID,
-                onCopy = { copied ->
-                    clipboard.setText(AnnotatedString(copied))
-                    copiedModelID = copied
-                },
-            )
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val availableWidth = constraints.maxWidth.toFloat() - with(density) { 1.dp.toPx() }
+        val chipPadding = with(density) { 20.dp.toPx() }
+        val chipSpacing = with(density) { 6.dp.toPx() }
+        val chipWidths = remember(models, availableWidth, density) {
+            models.map { modelID ->
+                val textWidth = textMeasurer.measure(
+                    text = AnnotatedString(modelID),
+                    style = MyTokenType.caption.copy(fontFamily = FontFamily.Monospace),
+                ).size.width.toFloat()
+                (textWidth + chipPadding).coerceAtMost(availableWidth)
+            }
         }
-        if (!expanded && models.size > 1) {
-            ModelOverflowChip(
-                label = "更多 ${models.size - 1}",
-                testTag = "detail_models_more",
-                onClick = { expanded = true },
-            )
+        val fitCount = remember(chipWidths, availableWidth, chipSpacing) {
+            fitModelsInLines(chipWidths, availableWidth, chipSpacing, maxLines = 2)
         }
-    }
-    if (expanded && models.size > 1) {
-        Text(
-            text = "收起",
-            style = MyTokenType.caption,
-            color = colors.muted,
-            modifier = Modifier
-                .testTag("detail_models_collapse")
-                .clip(RoundedCornerShape(6.dp))
-                .clickable(role = Role.Button) { expanded = false }
-                .padding(horizontal = 6.dp, vertical = 4.dp),
-        )
+
+        Column(modifier = Modifier.fillMaxWidth()) {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                maxLines = if (expanded) Int.MAX_VALUE else 2,
+            ) {
+                val visibleModels = if (expanded) models else models.take(fitCount)
+                visibleModels.forEach { modelID ->
+                    ModelIDChip(
+                        modelID = modelID,
+                        isCopied = copiedModelID == modelID,
+                        onCopy = { copied ->
+                            clipboard.setText(AnnotatedString(copied))
+                            copiedModelID = copied
+                        },
+                    )
+                }
+            }
+            if (!expanded && fitCount < models.size) {
+                ModelViewMoreButton(
+                    modifier = Modifier.padding(top = 8.dp),
+                    onClick = { expanded = true },
+                )
+            } else if (expanded && models.size > fitCount) {
+                Text(
+                    text = "收起",
+                    style = MyTokenType.caption,
+                    color = colors.muted,
+                    modifier = Modifier
+                        .testTag("detail_models_collapse")
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable(role = Role.Button) { expanded = false }
+                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                )
+            }
+        }
     }
 }
 
-@Composable
-private fun ModelOverflowChip(label: String, testTag: String, onClick: () -> Unit) {
-    val colors = MyTokenThemeTokens.colors
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(8.dp),
-        color = colors.subtle,
-        border = BorderStroke(1.dp, colors.line),
-        modifier = Modifier.testTag(testTag),
-    ) {
-        Text(
-            text = label,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            style = MyTokenType.caption,
-            color = colors.actionText,
-        )
+/** 按实际 chip 宽度贪心排版，返回能放进 [maxLines] 行的模型数量。 */
+private fun fitModelsInLines(
+    widths: List<Float>,
+    availableWidth: Float,
+    spacing: Float,
+    maxLines: Int,
+): Int {
+    if (availableWidth <= 0f || maxLines <= 0) return 0
+    var line = 1
+    var used = 0f
+    var count = 0
+    for (width in widths) {
+        val needed = if (used == 0f) width else used + spacing + width
+        if (needed <= availableWidth) {
+            used = needed
+            count++
+        } else {
+            if (line >= maxLines) break
+            line++
+            used = width
+            count++
+        }
     }
+    return count
+}
+
+@Composable
+private fun ModelViewMoreButton(modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val colors = MyTokenThemeTokens.colors
+    Text(
+        text = "查看更多",
+        style = MyTokenType.caption,
+        color = colors.actionText,
+        modifier = modifier
+            .testTag("detail_models_more")
+            .clip(RoundedCornerShape(6.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+    )
 }
 
 /** 模型 chip：subtle 容器 + hairline，选中复制后 actionText + 勾。 */

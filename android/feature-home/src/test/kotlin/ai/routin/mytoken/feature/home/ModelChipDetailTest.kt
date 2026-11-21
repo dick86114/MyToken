@@ -69,10 +69,8 @@ class ModelChipDetailTest {
         composeRule.onNodeWithText("自动续费").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Running").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("ark-code-latest").performScrollTo().assertIsDisplayed()
-        // 默认只显示一行模型，其余折叠在“更多”里。
-        composeRule.onNodeWithTag("detail_models_more", useUnmergedTree = true)
-            .performScrollTo()
-            .performClick()
+        // 两个模型能放进两行，不需要“查看更多”。
+        composeRule.onNodeWithTag("detail_models_more", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithContentDescription("复制模型 ID glm-5.3").performScrollTo()
         composeRule.onNodeWithContentDescription("复制模型 ID glm-5.3").performClick()
         composeRule.onNodeWithContentDescription("已复制模型 ID glm-5.3").assertIsDisplayed()
