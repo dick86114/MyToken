@@ -858,7 +858,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun providerLogoHeightMatchesTwoLineIdentity() {
+    fun providerLogoKeepsDesignSize() {
         val compactCredential = credential("Logo 简洁")
         val fullCredential = credential("Logo 完整")
         composeRule.setContent {
@@ -885,24 +885,8 @@ class HomeScreenTest {
             .getUnclippedBoundsInRoot()
             .let { it.bottom.value - it.top.value }
 
-        fun identityHeight(id: UUID): Float = composeRule
-            .onNodeWithTag("credential_identity_$id", useUnmergedTree = true)
-            .getUnclippedBoundsInRoot()
-            .let { it.bottom.value - it.top.value }
-
-        val compactAvatar = avatarHeight(compactCredential.id)
-        assertTrue("简洁卡 logo 应加大到两行身份信息的高度，实际 ${compactAvatar}dp", compactAvatar >= 32f)
-        assertTrue(
-            "简洁卡 logo 不应高于两行身份信息",
-            compactAvatar <= identityHeight(compactCredential.id) + 1f,
-        )
-
-        val fullAvatar = avatarHeight(fullCredential.id)
-        assertTrue("完整卡 logo 应加大到两行身份信息的高度，实际 ${fullAvatar}dp", fullAvatar >= 36f)
-        assertTrue(
-            "完整卡 logo 不应高于两行身份信息",
-            fullAvatar <= identityHeight(fullCredential.id) + 1f,
-        )
+        assertEquals("简洁卡 logo 按设计稿 24dp", 24f, avatarHeight(compactCredential.id), 1f)
+        assertEquals("完整卡 logo 按设计稿 28dp", 28f, avatarHeight(fullCredential.id), 1f)
     }
 
     @Test

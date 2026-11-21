@@ -181,8 +181,8 @@ internal fun UsageCardIdentity(
     val statusText = usageCardStatusText(health)
 
     Row(modifier = Modifier.heightIn(min = 35.dp), verticalAlignment = Alignment.Top) {
-        // logo 高度对齐右侧“别名 + 套餐”两行文本，避免头部视觉重心偏小。
-        val logoSize = if (compact) 34.dp else 36.dp
+        // 设计稿尺寸：简洁 24dp、完整 28dp；更大的 logo 会压过身份文字。
+        val logoSize = if (compact) 24.dp else 28.dp
         Box(
             modifier = Modifier.size(logoSize),
             contentAlignment = Alignment.TopStart,
@@ -191,8 +191,8 @@ internal fun UsageCardIdentity(
                 painter = painterResource(ProviderCatalog.logoRes(card.credential.providerId)),
                 contentDescription = null,
                 size = logoSize,
-                shape = RoundedCornerShape(10.dp),
-                contentPadding = 4.dp,
+                shape = RoundedCornerShape(if (compact) 7.dp else 8.dp),
+                contentPadding = 3.dp,
                 modifier = Modifier.testTag("credential_avatar_${card.credential.id}"),
             )
         }

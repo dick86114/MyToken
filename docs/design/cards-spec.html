@@ -39,7 +39,7 @@
   }
   .card.full { width: 400px; padding: 16px; }
   .card.compact { width: 190px; }
-  .card-head { display: flex; align-items: flex-start; gap: 7px; min-width: 0; }
+  .card-head { display: flex; align-items: flex-start; gap: 7px; min-width: 0; min-height: 35px; }
   .logo-plate { width: 24px; height: 24px; border-radius: 7px; flex: none; background: #fff; border: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: center; overflow: hidden; }
   .card.full .logo-plate { width: 28px; height: 28px; border-radius: 8px; }
   .logo-plate img { width: 100%; height: 100%; object-fit: contain; padding: 3px; }
@@ -65,12 +65,12 @@
   .ring b { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12.5px; font-weight: 700; letter-spacing: -.3px; font-variant-numeric: tabular-nums; }
   .card.full .ring { width: 64px; height: 64px; margin-top: 7px; }
   .card.full .ring b { font-size: 15px; letter-spacing: -.5px; }
-  .ring-label-row { display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 11.5px; font-weight: 600; }
+  .ring-label-row { display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 11.5px; font-weight: 600; min-height: 24px; }
   .reset-chip { display: inline-flex; align-items: center; gap: 3px; height: 17px; padding: 0 4px; border-radius: 5px; background: #f6f7f9; border: 1px solid #e5e7eb; color: #6b7076; font-size: 10px; font-weight: 650; line-height: 1; }
   .reset-chip.full { font-size: 11px; height: 19px; padding: 0 6px; gap: 4px; }
   .reset-chip svg { width: 9px; height: 8px; }
   .mini-list { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
-  .mini-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .mini-row { display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 18px; }
   .mini-label { font-size: 11.5px; color: #6b7076; flex: none; }
   .mini-bar { flex: 1; height: 3px; border-radius: 99px; background: #e9ebee; overflow: hidden; min-width: 14px; }
   .mini-bar i { display: block; height: 100%; border-radius: 99px; background: #30c48d; }
@@ -84,9 +84,11 @@
   .balance-label { font-size: 11.5px; color: #6b7076; margin-top: 4px; }
   .comp-bar { height: 5px; border-radius: 99px; background: #e9ebee; overflow: hidden; display: flex; margin-top: 8px; }
   .comp-bar i { display: block; height: 100%; }
-  .legend { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px; font-size: 11.5px; color: #6b7076; }
+  .legend { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; font-size: 11.5px; color: #6b7076; }
   .legend span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
   .legend em { width: 5px; height: 5px; border-radius: 50%; display: inline-block; }
+  /* 简洁卡宽度只有约 190px，构成图例改为纵向排列并留出行距。 */
+  .card.compact .legend { flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 6px; }
 
   .card-foot { display: flex; align-items: center; gap: 6px; margin-top: 9px; font-size: 11.5px; color: #6b7076; min-width: 0; }
   .card-foot .left { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -99,7 +101,8 @@
   .full-left { width: 40%; padding-right: 14px; min-width: 0; }
   .full-right { flex: 1; min-width: 0; }
   .hero-label { font-size: 12px; color: #6b7076; }
-  .label-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+  /* 主指标标签一行，重置卡 chip 固定换行到标签下方（与 Android 实现一致）。 */
+  .label-row { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
   .remaining { font-size: 11.5px; color: #6b7076; margin-top: 6px; }
   .reset-line { font-size: 11.5px; color: #6b7076; margin-top: 1px; }
   .metric-row { padding-bottom: 0; margin-bottom: 14px; border-bottom: 0; }
@@ -122,18 +125,18 @@
   .balance-side { text-align: right; padding-bottom: 2px; }
   .balance-side .k { font-size: 11.5px; color: #6b7076; }
   .balance-side .v { font-size: 13px; font-weight: 650; margin-top: 1px; }
-  .facts-line { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 14px; padding-top: 0; border-top: 0; font-size: 11.5px; color: #6b7076; }
+  .facts-line { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 12px; padding-top: 0; border-top: 0; font-size: 11.5px; color: #6b7076; }
   .facts-line b { color: #17181a; font-weight: 600; font-variant-numeric: tabular-nums; }
 
   .composition { margin-top: 14px; padding-top: 0; border-top: 0; }
-  .comp-label { font-size: 11.5px; color: #6b7076; margin-top: 10px; }
+  .comp-label { font-size: 11.5px; color: #6b7076; margin-top: 12px; }
   .comp-head { margin-top: 14px; margin-bottom: 4px; }
   .composition .comp-head { margin-top: 0; }
   .comp-head + .comp-bar { margin-top: 4px; }
   .comp-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
   .comp-head .k { font-size: 11.5px; color: #6b7076; }
   .comp-head .v { font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
-  .composition .legend { margin-top: 6px; }
+  .composition .legend { margin-top: 6px; row-gap: 4px; }
   .composition .facts-line { border-top: 0; padding-top: 0; margin-top: 8px; }
 
   .token-row { display: flex; align-items: baseline; gap: 8px; padding: 6px 0; border-bottom: 0; }
@@ -301,13 +304,13 @@ const ARCHETYPES = [
     extra:`<div class="reset-pop"><div class="k">重置卡到期时间</div><div class="row"><b>1</b><span>2026-12-01 08:00:00</span></div><div class="row"><b>2</b><span>2026-12-15 08:00:00</span></div></div>`
   },
   {
-    tag:'three-windows', title:'5h + 周 + 月', desc:'<b>Command Code</b>：主弧 5h，周/月用细条；完整模式底部再加额度构成（月度/购买/赠送）与请求数。简洁模式用“余额”一行代替构成条。',
+    tag:'three-windows', title:'5h + 周 + 月', desc:'<b>Command Code</b>：主弧 5h，周/月用细条；完整模式底部再加额度构成（月度/购买/赠送）与请求数。简洁模式只保留窗口细条，不再重复余额。',
     card:{
       id:'three-windows', logo:'commandcode', name:'Command Code', meta:'Command Code · Pro', compactMeta:'Pro', kind:'hybrid', state:'warn', status:'接近上限',
       primary:{percent:62,label:'5 小时',remaining:'剩余 38%',reset:'2 小时 40 分后重置'},
       windows:[{label:'周',percent:38,value:'38%'},{label:'月',percent:24,value:'24%'}],
       composition:[{label:'月度',value:'$12.40',percent:67,tint:P.cat1},{label:'购买',value:'$5.00',percent:27,tint:P.cat2},{label:'赠送',value:'$1.00',percent:6,tint:P.cat3}],
-      balance:'$18.40', mini:[{label:'余额',value:'$18.40'}],
+      balance:'$18.40',
       facts:[['累计请求','1,284 次'],['本周期消费','$8.20']],
       footLeft:'接近上限', footRight:'2h40m 后重置', footer:'20:04 更新'
     }

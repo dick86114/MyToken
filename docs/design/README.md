@@ -10,3 +10,14 @@
 
 这些是设计稿，不是产品代码。实现规格与决策见
 `docs/superpowers/specs/2026-11-21-mytoken-android-visual-refresh-design.md`。
+
+## 与实现同步（2026-11-21）
+
+三份 HTML 已按 Android 落地结果回写，后续改动以这里和实现规格为准：
+
+- 简洁卡高度随内容自适应，首页简洁网格用瀑布流（`LazyVerticalStaggeredGrid`，HTML 用 CSS columns 模拟）。
+- 重置卡 chip：简洁 17px 仅数字，完整 19px「重置卡 N」；主指标 chip 换行到标签下方，窗口 chip 紧跟窗口标签。
+- 供应商 logo 保持 24px（简洁）/ 28px（完整），不再放大。
+- CommandCode 简洁卡只保留窗口细条，不再重复余额行。
+- 余额构成图例在简洁卡纵向排列（行距 8px）；完整卡图例与 facts 间距同步加大。
+- 凭证列表入口图标为「两长一短」三横线；健康标尺到卡片区间距 14px。
