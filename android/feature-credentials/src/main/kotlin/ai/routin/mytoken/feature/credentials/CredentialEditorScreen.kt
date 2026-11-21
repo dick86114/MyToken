@@ -97,6 +97,7 @@ fun CredentialEditorScreen(
     onTestConnection: () -> Unit,
     onSave: () -> Unit,
     layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
+    topBarStatusPadding: Boolean = true,
 ) {
     val colors = MyTokenThemeTokens.colors
     var providerSheetOpen by remember { mutableStateOf(false) }
@@ -105,6 +106,7 @@ fun CredentialEditorScreen(
             EditorTopBar(
                 title = if (state.isNew) "新增凭证" else "编辑凭证",
                 onBack = onBack,
+                statusPadding = topBarStatusPadding,
             )
         },
         bottomBar = {
@@ -330,13 +332,17 @@ fun CredentialEditorScreen(
 }
 
 @Composable
-private fun EditorTopBar(title: String, onBack: () -> Unit) {
+private fun EditorTopBar(
+    title: String,
+    onBack: () -> Unit,
+    statusPadding: Boolean,
+) {
     val colors = MyTokenThemeTokens.colors
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(colors.canvas)
-            .statusBarsPadding()
+            .then(if (statusPadding) Modifier.statusBarsPadding() else Modifier)
             .height(MyTokenSize.header),
         verticalAlignment = Alignment.CenterVertically,
     ) {

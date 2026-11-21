@@ -179,8 +179,8 @@ class SettingsScreenTest {
         val titleBounds = composeRule.onNodeWithTag("settings_title", useUnmergedTree = true)
             .getUnclippedBoundsInRoot()
         assertTrue(
-            "关闭按钮应位于标题左侧，实际 close.right=${closeBounds.right.value} title.left=${titleBounds.left.value}",
-            closeBounds.right.value <= titleBounds.left.value,
+            "关闭按钮应位于标题右侧，实际 close.left=${closeBounds.left.value} title.right=${titleBounds.right.value}",
+            closeBounds.left.value >= titleBounds.right.value,
         )
         composeRule.onNodeWithTag("settings_close", useUnmergedTree = true).performClick()
 

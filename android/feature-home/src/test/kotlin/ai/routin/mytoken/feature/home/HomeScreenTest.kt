@@ -27,6 +27,9 @@ import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.filterToOne
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -67,6 +70,15 @@ import org.robolectric.annotation.Config
 class HomeScreenTest {
     @get:Rule val composeRule = createComposeRule()
     private val now = Instant.parse("2026-09-07T12:00:00Z")
+
+    /** 两页都会提前组合；测试只取当前页的节点，避免隐藏页重复命中。 */
+    private fun activeNode(tag: String) = composeRule
+        .onAllNodesWithTag(tag, useUnmergedTree = true)
+        .filterToOne(hasAnyAncestor(hasTestTag("home_page_active")))
+
+    private fun activeText(text: String) = composeRule
+        .onAllNodesWithText(text, useUnmergedTree = true)
+        .filterToOne(hasAnyAncestor(hasTestTag("home_page_active")))
 
     private fun credential(name: String, provider: ProviderId = ProviderId.Routin) = Credential(
         id = UUID.randomUUID(),
@@ -935,7 +947,7 @@ class HomeScreenTest {
         val toolbarBottom = composeRule.onNodeWithTag("home_provider_toolbar")
             .getUnclippedBoundsInRoot()
             .bottom
-        val cardTop = composeRule.onNodeWithTag("credential_card_${credential.id}")
+        val cardTop = activeNode("credential_card_${credential.id}")
             .getUnclippedBoundsInRoot()
             .top
         val gap = cardTop.value - toolbarBottom.value
@@ -1102,10 +1114,7 @@ class HomeScreenTest {
         }
         composeRule.waitForIdle()
 
-        fun bounds(id: UUID) = composeRule.onNodeWithTag(
-            "credential_card_$id",
-            useUnmergedTree = true,
-        ).getUnclippedBoundsInRoot()
+        fun bounds(id: UUID) = activeNode("credential_card_$id").getUnclippedBoundsInRoot()
 
         val shortBounds = bounds(short.credential.id)
         val tallBounds = bounds(tall.credential.id)
@@ -1142,8 +1151,8 @@ class HomeScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("熠").assertIsDisplayed()
-        composeRule.onNodeWithText("5 小时额度").assertIsDisplayed()
+        activeText("熠").assertIsDisplayed()
+        activeText("5 小时额度").assertIsDisplayed()
         composeRule.onAllNodesWithText("剩余", substring = true, useUnmergedTree = true).onFirst().assertIsDisplayed()
     }
 
@@ -2078,10 +2087,8 @@ class HomeScreenTest {
         composeRule.onNodeWithTag("home_grid_4_columns").assertExists()
         composeRule.onNodeWithText("5 小时", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithText("周", useUnmergedTree = true).assertIsDisplayed()
-        val cardBounds = composeRule.onNodeWithTag(
-            "credential_card_${credential.id}",
-            useUnmergedTree = true,
-        ).getUnclippedBoundsInRoot()
+        val cardBounds = activeNode("credential_card_${credential.id}")
+            .getUnclippedBoundsInRoot()
         val rootBounds = composeRule.onRoot().getUnclippedBoundsInRoot()
         val availableWidth = rootBounds.right.value - rootBounds.left.value
         assertTrue(
@@ -2126,7 +2133,7 @@ class HomeScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("启用").assertIsDisplayed()
+        activeText("启用").assertIsDisplayed()
         composeRule.onNodeWithText("停用").assertDoesNotExist()
 
         composeRule.onNodeWithTag("provider_filter_menu").performClick()
@@ -2138,31 +2145,86 @@ class HomeScreenTest {
     }
 
     @Test
-    fun pullRefreshIsOnlyAttachedWhenCredentialCardsExist() {
-        val credential = credential("首页")
-        var state by mutableStateOf(HomeUiState(isLoading = false))
+    fun 从页面顶部下拉在报告上方显示黄色刷新指示器并触发刷新() {
+        val cards = (1..3).map { index ->
+            card(credential("下拉 $index"), metrics = listOf(progress(20.0, 100.0)))
+        }
+        var refreshCalls = 0
         composeRule.setContent {
-            MaterialTheme {
+            MyTokenTheme {
                 HomeScreen(
-                    state = state,
-                    onRefreshAll = {},
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = cards,
+                        groups = emptyList(),
+                        credentialCount = cards.size,
+                    ),
+                    onRefreshAll = { refreshCalls += 1 },
                     onRefreshCredential = {},
                     onOpenCredential = {},
                     onImportFromMac = {},
                     onAddManually = {},
+                    usageCardDensity = UsageCardDensity.FULL,
                 )
             }
         }
-        composeRule.onNodeWithTag("home_pull_refresh").assertDoesNotExist()
 
-        state = HomeUiState(
-            isLoading = false,
-            cards = listOf(card(credential, metrics = listOf(balance(20.0)))),
-            groups = listOf(group(ProviderId.Routin, listOf(card(credential, metrics = listOf(balance(20.0)))))),
-            credentialCount = 1,
-        )
+        composeRule.onNodeWithTag("home_list_full").performTouchInput {
+            down(Offset(width / 2f, 20f))
+            moveTo(Offset(width / 2f, 460f), delayMillis = 220)
+        }
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("home_pull_refresh").assertExists()
+
+        composeRule.onNodeWithTag("home_pull_indicator", useUnmergedTree = true)
+            .assertIsDisplayed()
+        val indicatorBounds = composeRule
+            .onNodeWithTag("home_pull_indicator", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val reportBounds = composeRule
+            .onNodeWithTag("home_health_report")
+            .getUnclippedBoundsInRoot()
+        assertTrue(
+            "刷新指示器应出现在报告上方，实际 indicator.bottom=${indicatorBounds.bottom.value} report.top=${reportBounds.top.value}",
+            indicatorBounds.bottom.value <= reportBounds.top.value + 1f,
+        )
+
+        composeRule.onNodeWithTag("home_list_full").performTouchInput { up() }
+        composeRule.waitUntil(5_000) { refreshCalls > 0 }
+        assertEquals(1, refreshCalls)
+    }
+
+    @Test
+    fun 从列表下方一路滑到顶部不会触发刷新() {
+        val cards = (1..8).map { index ->
+            card(credential("长列表 $index"), metrics = listOf(progress(20.0, 100.0)))
+        }
+        var refreshCalls = 0
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = cards,
+                        groups = emptyList(),
+                        credentialCount = cards.size,
+                    ),
+                    onRefreshAll = { refreshCalls += 1 },
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("home_list_full").performScrollToIndex(1)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("home_list_full").performTouchInput {
+            swipeUp(startY = height * 0.92f, endY = height * 0.08f, durationMillis = 500)
+        }
+        composeRule.waitForIdle()
+        assertEquals(0, refreshCalls)
     }
 
     @Test
@@ -2270,8 +2332,7 @@ class HomeScreenTest {
         composeRule.waitForIdle()
 
         val root = composeRule.onRoot().getUnclippedBoundsInRoot()
-        val card = composeRule
-            .onNodeWithTag("credential_card_${cards[3].credential.id}")
+        val card = activeNode("credential_card_${cards[3].credential.id}")
             .getUnclippedBoundsInRoot()
         val rootCenter = (root.top.value + root.bottom.value) / 2f
         val cardCenter = (card.top.value + card.bottom.value) / 2f
@@ -2616,15 +2677,13 @@ class HomeScreenTest {
             }
         }
 
-        composeRule.onNodeWithTag("home_add_credential", useUnmergedTree = true)
-            .assertIsDisplayed()
-        composeRule.onNodeWithText("把其他账户也放到这里", useUnmergedTree = true).assertIsDisplayed()
-        composeRule.onNodeWithTag("home_manage_credentials", useUnmergedTree = true)
-            .assertIsDisplayed()
-        composeRule.onNodeWithText("启停、编辑与调整顺序", useUnmergedTree = true).assertIsDisplayed()
+        activeNode("home_add_credential").assertIsDisplayed()
+        activeText("把其他账户也放到这里").assertIsDisplayed()
+        activeNode("home_manage_credentials").assertIsDisplayed()
+        activeText("启停、编辑与调整顺序").assertIsDisplayed()
 
-        composeRule.onNodeWithTag("home_add_credential", useUnmergedTree = true).performClick()
-        composeRule.onNodeWithTag("home_manage_credentials", useUnmergedTree = true).performClick()
+        activeNode("home_add_credential").performClick()
+        activeNode("home_manage_credentials").performClick()
         assertEquals(1, addCalls)
         assertEquals(1, manageCalls)
     }
@@ -2737,7 +2796,7 @@ class HomeScreenTest {
             .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithTag("credential_card_${routin.credential.id}").assertExists()
+        activeNode("credential_card_${routin.credential.id}").assertExists()
         composeRule.onNodeWithTag("credential_card_${deepSeek.credential.id}").assertDoesNotExist()
         // 报告始终展示全部凭证，不受下方筛选影响。
         composeRule.onNodeWithTag("health_finding_${deepSeek.credential.id}").assertExists()
@@ -2792,7 +2851,7 @@ class HomeScreenTest {
                 .fetchSemanticsNodes()
                 .isNotEmpty()
         }
-        composeRule.onNodeWithTag("credential_card_${deepSeek.credential.id}").assertIsDisplayed()
+        activeNode("credential_card_${deepSeek.credential.id}").assertIsDisplayed()
     }
 
     @Test
@@ -2969,27 +3028,19 @@ class HomeScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithTag(
-            "credential_refresh_${credential.id}",
-            useUnmergedTree = true,
-        ).performSemanticsAction(SemanticsActions.OnClick)
-        val refreshBounds = composeRule.onNodeWithTag(
-            "credential_refresh_${credential.id}",
-            useUnmergedTree = true,
-        ).getUnclippedBoundsInRoot()
-        val failureBounds = composeRule.onNodeWithTag(
-            "credential_failure_${credential.id}",
-            useUnmergedTree = true,
-        ).getUnclippedBoundsInRoot()
+        activeNode("credential_refresh_${credential.id}")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        val refreshBounds = activeNode("credential_refresh_${credential.id}")
+            .getUnclippedBoundsInRoot()
+        val failureBounds = activeNode("credential_failure_${credential.id}")
+            .getUnclippedBoundsInRoot()
         assertTrue(failureBounds.left < refreshBounds.left)
         // 头像承载在 44dp 触摸区内、按钮 30dp，中心对齐后顶部差约 7dp。
         assertTrue(kotlin.math.abs(failureBounds.top.value - refreshBounds.top.value) < 10f)
         assertTrue(refreshBounds.right <= composeRule.onRoot().getUnclippedBoundsInRoot().right)
         assertEquals(true, refreshed)
-        composeRule.onNodeWithTag(
-            "credential_failure_${credential.id}",
-            useUnmergedTree = true,
-        ).performSemanticsAction(SemanticsActions.OnClick)
+        activeNode("credential_failure_${credential.id}")
+            .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.onNodeWithText("刷新失败").assertIsDisplayed()
         composeRule.onNodeWithText("凭证无效").assertIsDisplayed()
         composeRule.onNodeWithText("重试").performClick()

@@ -20,14 +20,16 @@ import ai.routin.mytoken.feature.transfer.TransferUiState
 import ai.routin.mytoken.feature.transfer.TransferViewModel
 import ai.routin.mytoken.core.ui.MyTokenButton
 import ai.routin.mytoken.core.ui.MyTokenButtonTone
-import ai.routin.mytoken.core.ui.MyTokenEdgeDrawerHost
-import ai.routin.mytoken.core.ui.MyTokenEdgeDrawerSide
-import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.MyTokenDialog
 import ai.routin.mytoken.core.ui.MyTokenDialogRow
 import ai.routin.mytoken.core.ui.MyTokenDialogSection
 import ai.routin.mytoken.core.ui.MyTokenDialogStatus
 import ai.routin.mytoken.core.ui.MyTokenDialogTone
+import ai.routin.mytoken.core.ui.MyTokenEdgeDrawerHost
+import ai.routin.mytoken.core.ui.MyTokenEdgeDrawerSide
+import ai.routin.mytoken.core.ui.MyTokenLayoutMode
+import ai.routin.mytoken.core.ui.MyTokenRadius
+import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.rememberMyTokenLayoutMode
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -39,34 +41,47 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.util.UUID
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 /** 首页 + 详情/编辑/迁移的轻量返回栈。 */
 sealed interface AppScreen {
@@ -75,6 +90,9 @@ sealed interface AppScreen {
     data class Editor(val credentialId: UUID?) : AppScreen
     data object Transfer : AppScreen
 }
+
+/** 首页卡片末尾的两个凭证入口；都从底部滑入。 */
+private enum class HomeCredentialSheet { Add, Manage }
 
 /**
  * 首页是唯一主轴；凭证与设置分别从左右两侧以工具抽屉浮出。
@@ -91,6 +109,7 @@ fun MyTokenApp(
 ) {
     var screen by remember { mutableStateOf<AppScreen>(AppScreen.Home) }
     var drawerSide by remember { mutableStateOf<MyTokenEdgeDrawerSide?>(null) }
+    var homeSheet by remember { mutableStateOf<HomeCredentialSheet?>(null) }
     var pageDirection by remember { mutableIntStateOf(1) }
     val homeScrollStates = ai.routin.mytoken.feature.home.rememberHomeScrollStates()
     val backStack = remember { mutableStateListOf<AppScreen>() }
@@ -108,6 +127,7 @@ fun MyTokenApp(
     fun navigate(target: AppScreen) {
         pageDirection = 1
         drawerSide = null
+        homeSheet = null
         backStack.add(screen)
         screen = target
     }
@@ -115,6 +135,7 @@ fun MyTokenApp(
     fun goBack() {
         pageDirection = -1
         drawerSide = null
+        homeSheet = null
         screen = backStack.removeLastOrNull() ?: AppScreen.Home
     }
 
@@ -303,8 +324,9 @@ fun MyTokenApp(
                     },
                     onOpenCredential = { id -> navigate(AppScreen.Detail(id)) },
                     onImportFromMac = { navigate(AppScreen.Transfer) },
-                    onAddManually = { navigate(AppScreen.Editor(null)) },
+                    onAddManually = { homeSheet = HomeCredentialSheet.Add },
                     onOpenCredentials = { drawerSide = MyTokenEdgeDrawerSide.Start },
+                    onManageCredentials = { homeSheet = HomeCredentialSheet.Manage },
                     onOpenSettings = { drawerSide = MyTokenEdgeDrawerSide.End },
                     hasUpdateAvailable = updateState is ai.routin.mytoken.feature.settings.AppUpdateUiState.Available ||
                         updateState is ai.routin.mytoken.feature.settings.AppUpdateUiState.NeedsInstallPermission ||
@@ -381,38 +403,17 @@ fun MyTokenApp(
         }
 
         is AppScreen.Editor -> {
-            val editorViewModel = remember(current.credentialId) {
-                CredentialEditorViewModel(
-                    repository = graph.credentialRepository,
-                    providers = graph.providers,
-                    credentialId = current.credentialId,
-                )
-            }
-            val editorState by editorViewModel.state.collectAsStateWithLifecycle()
-            CredentialEditorScreen(
-                state = editorState,
+            CredentialEditorRoute(
+                graph = graph,
+                credentialId = current.credentialId,
                 layoutMode = layoutMode,
+                topBarStatusPadding = true,
                 onBack = { goBack() },
-                onProviderChange = editorViewModel::setProviderId,
-                onNameChange = editorViewModel::setName,
-                onApiKeyChange = editorViewModel::setApiKey,
-                onAccessKeyIDChange = editorViewModel::setAccessKeyID,
-                onSecretAccessKeyChange = editorViewModel::setSecretAccessKey,
-                onRegionChange = editorViewModel::setRegion,
-                onBaseURLChange = editorViewModel::setBaseURL,
-                onUserIDChange = editorViewModel::setUserID,
-                onXiaomiUsageKindChange = editorViewModel::setXiaomiUsageKind,
-                onWebsiteURLChange = editorViewModel::setWebsiteURL,
-                onToggleSecretVisible = editorViewModel::toggleSecretVisible,
-                onTestConnection = editorViewModel::testConnection,
-                onSave = editorViewModel::save,
-            )
-            if (editorState.saveCompleted) {
-                LaunchedEffect(editorState.saveCompleted) {
+                onSaved = {
                     homeViewModel.refreshAfterExternalChange()
                     goBack()
-                }
-            }
+                },
+            )
         }
 
         AppScreen.Transfer -> {
@@ -461,6 +462,138 @@ fun MyTokenApp(
                 }
             }
         }
+        }
+    }
+
+    when (homeSheet) {
+        HomeCredentialSheet.Add -> HomeCredentialSheet(
+            heightFraction = 0.92f,
+            testTag = "home_sheet_add",
+            onDismiss = { homeSheet = null },
+        ) { dismiss ->
+            CredentialEditorRoute(
+                graph = graph,
+                credentialId = null,
+                layoutMode = layoutMode,
+                topBarStatusPadding = false,
+                onBack = { dismiss { } },
+                onSaved = {
+                    homeViewModel.refreshAfterExternalChange()
+                    dismiss { }
+                },
+            )
+        }
+
+        HomeCredentialSheet.Manage -> HomeCredentialSheet(
+            heightFraction = 0.88f,
+            testTag = "home_sheet_manage",
+            onDismiss = { homeSheet = null },
+        ) { dismiss ->
+            CredentialListScreen(
+                state = listState,
+                layoutMode = MyTokenLayoutMode.Compact,
+                drawerMode = true,
+                onToggleEnabled = credentialListViewModel::toggleEnabled,
+                onMove = credentialListViewModel::move,
+                onEditCredential = { id -> dismiss { navigate(AppScreen.Editor(id)) } },
+                onRequestDelete = credentialListViewModel::requestDelete,
+                onDismissDelete = credentialListViewModel::dismissDelete,
+                onConfirmDelete = credentialListViewModel::confirmDelete,
+                onImportFromMac = { dismiss { navigate(AppScreen.Transfer) } },
+                onAddManually = { dismiss { homeSheet = HomeCredentialSheet.Add } },
+            )
+        }
+
+        null -> Unit
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HomeCredentialSheet(
+    heightFraction: Float,
+    testTag: String,
+    onDismiss: () -> Unit,
+    content: @Composable ((after: () -> Unit) -> Unit) -> Unit,
+) {
+    val colors = MyTokenThemeTokens.colors
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    val dismissThen: ((after: () -> Unit) -> Unit) = { after ->
+        scope.launch { sheetState.hide() }.invokeOnCompletion {
+            onDismiss()
+            after()
+        }
+    }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = colors.canvas,
+        shape = RoundedCornerShape(
+            topStart = MyTokenRadius.sheetTop,
+            topEnd = MyTokenRadius.sheetTop,
+        ),
+        dragHandle = {
+            Box(modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 36.dp, height = 4.dp)
+                        .clip(RoundedCornerShape(MyTokenRadius.pill))
+                        .background(colors.line),
+                )
+            }
+        },
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(heightFraction)
+                .testTag(testTag),
+        ) {
+            content(dismissThen)
+        }
+    }
+}
+
+@Composable
+private fun CredentialEditorRoute(
+    graph: AppGraph,
+    credentialId: UUID?,
+    layoutMode: MyTokenLayoutMode,
+    topBarStatusPadding: Boolean,
+    onBack: () -> Unit,
+    onSaved: () -> Unit,
+) {
+    val editorViewModel = remember(credentialId) {
+        CredentialEditorViewModel(
+            repository = graph.credentialRepository,
+            providers = graph.providers,
+            credentialId = credentialId,
+        )
+    }
+    val editorState by editorViewModel.state.collectAsStateWithLifecycle()
+    CredentialEditorScreen(
+        state = editorState,
+        layoutMode = layoutMode,
+        topBarStatusPadding = topBarStatusPadding,
+        onBack = onBack,
+        onProviderChange = editorViewModel::setProviderId,
+        onNameChange = editorViewModel::setName,
+        onApiKeyChange = editorViewModel::setApiKey,
+        onAccessKeyIDChange = editorViewModel::setAccessKeyID,
+        onSecretAccessKeyChange = editorViewModel::setSecretAccessKey,
+        onRegionChange = editorViewModel::setRegion,
+        onBaseURLChange = editorViewModel::setBaseURL,
+        onUserIDChange = editorViewModel::setUserID,
+        onXiaomiUsageKindChange = editorViewModel::setXiaomiUsageKind,
+        onWebsiteURLChange = editorViewModel::setWebsiteURL,
+        onToggleSecretVisible = editorViewModel::toggleSecretVisible,
+        onTestConnection = editorViewModel::testConnection,
+        onSave = editorViewModel::save,
+    )
+    if (editorState.saveCompleted) {
+        LaunchedEffect(editorState.saveCompleted) {
+            onSaved()
         }
     }
 }

@@ -49,6 +49,18 @@ class CredentialUsageSurfaceStyleTest {
         assertFalse(full.contains("true -> MyTokenStatusTone.Positive"))
     }
 
+    @Test
+    fun `报告在任何健康状态都保持琥珀票面`() {
+        val report = sourceText("HomeHealthReport.kt")
+        // 用户明确覆盖设计稿：全部正常时也不再退回灰色。
+        assertTrue(report.contains(".background(colors.reportTicket, ReportTicketShape)"))
+        assertFalse(report.contains("reportTicketNormal"))
+        assertFalse(report.contains("reportDialTrackNormal"))
+        // 刷新按钮与下拉指示器共用票面黄。
+        assertTrue(report.contains(".background(colors.reportTicket)"))
+        assertTrue(sourceText("HomeScreen.kt").contains(".background(colors.reportTicket)"))
+    }
+
     private fun sourceText(name: String): String {
         val workingDir = File(System.getProperty("user.dir") ?: error("缺少 user.dir"))
         val candidates = listOf(

@@ -3,9 +3,15 @@ package ai.routin.mytoken.feature.home
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.ProviderLogoPlate
+import ai.routin.mytoken.core.ui.rememberMyTokenMotionEnabled
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import ai.routin.mytoken.domain.usage.RefreshStatus
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,24 +25,27 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
@@ -172,6 +181,14 @@ internal fun HomeHealthReport(
     modifier: Modifier = Modifier,
 ) {
     val colors = MyTokenThemeTokens.colors
+    val motionEnabled = rememberMyTokenMotionEnabled()
+    val refreshSpin = rememberInfiniteTransition(label = "report-refresh")
+    val spin by refreshSpin.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 900, easing = LinearEasing)),
+        label = "report-refresh-spin",
+    )
     val findings = remember(cards) { homeReportFindings(cards) }
     val total = cards.size
     val attention = findings.size
@@ -188,9 +205,6 @@ internal fun HomeHealthReport(
         .removeSuffix("同步")
         .trim()
         .ifBlank { syncText }
-    val ticketColor = if (isNormal) colors.reportTicketNormal else colors.reportTicket
-    val ticketMuted = if (isNormal) colors.reportTicketNormalMuted else colors.reportTicketMuted
-    val dialTrack = if (isNormal) colors.reportDialTrackNormal else colors.reportDialTrack
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -201,7 +215,7 @@ internal fun HomeHealthReport(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(ticketColor, ReportTicketShape)
+                .background(colors.reportTicket, ReportTicketShape)
                 .heightIn(min = 106.dp)
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -226,15 +240,13 @@ internal fun HomeHealthReport(
                     text = tail,
                     modifier = Modifier.testTag("report_tail"),
                     style = MyTokenType.section,
-                    color = if (isNormal) ticketMuted else colors.reportTicketInk,
+                    color = colors.reportTicketInk,
                 )
             }
             ReportDial(
                 tones = cards.map(::homeHealthTone),
                 normal = normal,
                 total = total,
-                trackColor = dialTrack,
-                mutedColor = ticketMuted,
             )
         }
 
@@ -286,12 +298,25 @@ internal fun HomeHealthReport(
                     .testTag("report_refresh"),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Refresh,
-                    contentDescription = null,
-                    tint = colors.reportInk,
-                    modifier = Modifier.size(18.dp),
-                )
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(colors.reportTicket)
+                        .testTag("report_refresh_circle"),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = null,
+                        tint = colors.reportTicketInk,
+                        modifier = Modifier
+                            .size(18.dp)
+                            .graphicsLayer {
+                                rotationZ = if (isRefreshing && motionEnabled) spin else 0f
+                            },
+                    )
+                }
             }
         }
     }
@@ -373,8 +398,6 @@ private fun ReportDial(
     tones: List<HomeHealthTone>,
     normal: Int,
     total: Int,
-    trackColor: Color,
-    mutedColor: Color,
     modifier: Modifier = Modifier,
 ) {
     val colors = MyTokenThemeTokens.colors
@@ -397,7 +420,7 @@ private fun ReportDial(
             tones.forEachIndexed { index, tone ->
                 drawArc(
                     color = if (tone == HomeHealthTone.Normal) {
-                        trackColor
+                        colors.reportDialTrack
                     } else {
                         colors.reportTicketInk
                     },
@@ -424,13 +447,13 @@ private fun ReportDial(
                     text = " / $total",
                     modifier = Modifier.padding(bottom = 2.dp),
                     style = MyTokenType.caption,
-                    color = mutedColor,
+                    color = colors.reportTicketMuted,
                 )
             }
             Text(
                 text = "用量正常",
                 style = MyTokenType.caption,
-                color = mutedColor,
+                color = colors.reportTicketMuted,
             )
         }
     }

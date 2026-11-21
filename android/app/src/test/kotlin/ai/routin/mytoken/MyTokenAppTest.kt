@@ -1,13 +1,11 @@
 package ai.routin.mytoken
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
@@ -50,11 +48,11 @@ class MyTokenAppTest {
         composeRule.onNodeWithTag("edge_drawer_end").assertIsDisplayed()
         composeRule.onNodeWithTag("settings_drawer_content").assertIsDisplayed()
 
-        // 低频设置以摘要形式保留，展开后才出现具体操作。
+        // 低频设置滚动到可见后再断言，避免只是滚动到了分组标题。
         composeRule.onNodeWithTag("settings_drawer_content").performScrollToNode(
-            hasText("数据"),
+            hasTestTag("settings_import_from_mac"),
         )
-        composeRule.onAllNodesWithText("从 Mac 导入", useUnmergedTree = true).onFirst().assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_import_from_mac").assertIsDisplayed()
     }
 
     @Test

@@ -242,6 +242,7 @@ fun SettingsScreen(
                         supportingText = "扫码接收 Mac 凭证",
                         iconPlate = true,
                         onClick = onOpenTransfer,
+                        modifier = Modifier.testTag("settings_import_from_mac"),
                         trailing = {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
@@ -968,8 +969,16 @@ private fun SettingsHeader(drawerMode: Boolean, onClose: (() -> Unit)?) {
             .testTag("settings_header"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // 设计稿：关闭按钮在左，标题紧跟其后。
+        Text(
+            text = "设置",
+            style = MyTokenType.section,
+            color = colors.ink,
+            modifier = Modifier
+                .weight(1f)
+                .testTag("settings_title"),
+        )
         if (drawerMode && onClose != null) {
+            Spacer(modifier = Modifier.size(2.dp))
             Box(
                 modifier = Modifier
                     .size(MyTokenSize.header)
@@ -986,16 +995,7 @@ private fun SettingsHeader(drawerMode: Boolean, onClose: (() -> Unit)?) {
                     modifier = Modifier.size(20.dp),
                 )
             }
-            Spacer(modifier = Modifier.size(2.dp))
         }
-        Text(
-            text = "设置",
-            style = MyTokenType.section,
-            color = colors.ink,
-            modifier = Modifier
-                .weight(1f)
-                .testTag("settings_title"),
-        )
     }
 }
 

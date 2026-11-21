@@ -43,12 +43,9 @@ data class MyTokenColors(
     val reportLine: Color,
     val reportAccent: Color,
     val reportTicket: Color,
-    val reportTicketNormal: Color,
     val reportTicketInk: Color,
     val reportTicketMuted: Color,
-    val reportTicketNormalMuted: Color,
     val reportDialTrack: Color,
-    val reportDialTrackNormal: Color,
 )
 
 internal val MyTokenLightColors = MyTokenColors(
@@ -78,12 +75,9 @@ internal val MyTokenLightColors = MyTokenColors(
     reportLine = Color(0xFF4A4F56),
     reportAccent = Color(0xFFFFCE70),
     reportTicket = Color(0xFFF3CB73),
-    reportTicketNormal = Color(0xFFE5E7EB),
     reportTicketInk = Color(0xFF17181A),
     reportTicketMuted = Color(0xFF625126),
-    reportTicketNormalMuted = Color(0xFF696D73),
     reportDialTrack = Color(0xFFB4A071),
-    reportDialTrackNormal = Color(0xFFA3A9B0),
 )
 
 internal val MyTokenDarkColors = MyTokenColors(
@@ -113,12 +107,9 @@ internal val MyTokenDarkColors = MyTokenColors(
     reportLine = Color(0xFFD2D6DC),
     reportAccent = Color(0xFF9A5B00),
     reportTicket = Color(0xFFF3CB73),
-    reportTicketNormal = Color(0xFFE5E7EB),
     reportTicketInk = Color(0xFF17181A),
     reportTicketMuted = Color(0xFF625126),
-    reportTicketNormalMuted = Color(0xFF696D73),
     reportDialTrack = Color(0xFFB4A071),
-    reportDialTrackNormal = Color(0xFFA3A9B0),
 )
 
 internal val LocalMyTokenColors: ProvidableCompositionLocal<MyTokenColors> =
