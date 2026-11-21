@@ -684,3 +684,8 @@ provider 逻辑和视觉。
     `LineBreak.Paragraph`，不省略）。详情页右上角菜单与「全部供应商」筛选统一改用
     `core-ui` 的 `MyTokenDropdownMenu`（实色 surface、hairline、12dp 圆角、12dp 投影、
     48dp 行高、选中勾）。设计稿 `pages.html` 已同步上述详情页样式。
+15. **用量分享弹层（2026-11-21）**：`ModalBottomSheet` 容器改用
+    `MyTokenThemeTokens.colors.canvas`，消除 M3 默认 surfaceContainer 的粉紫底色；
+    模板风格改为四等分「上图下字」选项（不显示模式副标题）；展示字段改为可点击胶囊
+    （再点取消），默认一行 + 「更多」，展开后可「收起」，四项以内直接全部展示；
+    复制/保存/分享收进右上角图标（48dp 触控），操作结果改用 Toast，移除内联状态行。
