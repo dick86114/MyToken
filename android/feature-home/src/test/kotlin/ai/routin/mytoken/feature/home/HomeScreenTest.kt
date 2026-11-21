@@ -15,6 +15,9 @@ import ai.routin.mytoken.domain.model.UsageMetricUnit
 import ai.routin.mytoken.domain.model.UsageResetCard
 import ai.routin.mytoken.domain.model.UsageSnapshot
 import ai.routin.mytoken.domain.usage.RefreshStatus
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.unit.dp
@@ -674,9 +677,10 @@ class HomeScreenTest {
 
         val bounds = composeRule.onNodeWithContentDescription("1 张重置卡", useUnmergedTree = true)
             .getUnclippedBoundsInRoot()
+        // 设计稿 chip 很小；它与弧线标签行（24dp）同高，保证卡片间节奏一致。
         assertTrue(
-            "重置卡 chip 高度应 ≥48dp（实际 ${bounds.bottom - bounds.top}）",
-            bounds.bottom - bounds.top >= 48.dp,
+            "重置卡 chip 高度应与标签行一致（实际 ${bounds.bottom - bounds.top}）",
+            bounds.bottom - bounds.top >= 24.dp,
         )
         assertTrue(
             "重置卡 chip 宽度应 ≥48dp（实际 ${bounds.right - bounds.left}）",
@@ -691,9 +695,10 @@ class HomeScreenTest {
         ).resolve("src/main/kotlin/ai/routin/mytoken/feature/home/UsageCardSkeleton.kt")
             .let { if (it.isFile) it else java.io.File("android/feature-home") .resolve("src/main/kotlin/ai/routin/mytoken/feature/home/UsageCardSkeleton.kt") }
             .readText()
-        // 简洁卡用最小高度：内容多时随内容撑高，不再固定高度裁切。
+        // 1.0× 固定高度保证卡片与内部节奏统一；更大字号退回最小高度避免裁切。
+        assertTrue(source.contains("fontScale <= 1.0f"))
+        assertTrue(source.contains("Modifier.height(CompactCardHeight)"))
         assertTrue(source.contains("heightIn(min = CompactCardHeight)"))
-        assertTrue(!source.contains("Modifier.height(CompactCardHeight)"))
     }
 
     @Test
@@ -709,6 +714,76 @@ class HomeScreenTest {
 
         assertTrue(read("HomeScreen.kt").contains("MyTokenMotion.locateDurationMillis"))
         assertTrue(!read("HomeScrollStates.kt").contains("tween(240)"))
+    }
+
+    @Test
+    fun compactCardsShareInternalRhythm() {
+        val glm = card(
+            credential("GLM 节奏", ProviderId.Glm),
+            metrics = listOf(
+                progress(42.0, 100.0).copy(id = "five-hour", label = "5 小时"),
+                progress(20.0, 100.0).copy(id = "weekly", label = "周"),
+            ),
+        )
+        val command = card(
+            credential("Command 节奏", ProviderId.CommandCode),
+            metrics = listOf(
+                progress(42.0, 100.0).copy(id = "five-hour", label = "5 小时"),
+                progress(20.0, 100.0).copy(id = "weekly", label = "周"),
+                progress(30.0, 100.0).copy(id = "monthly", label = "月"),
+                progress(10.0, 100.0).copy(id = "credit-progress", label = "月额度"),
+            ),
+        )
+        composeRule.setContent {
+            MyTokenTheme {
+                Row(
+                    modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    CredentialUsageCard(
+                        card = glm,
+                        onOpen = {},
+                        onRetry = {},
+                        usageCardDensity = UsageCardDensity.COMPACT,
+                        modifier = androidx.compose.ui.Modifier.weight(1f),
+                    )
+                    CredentialUsageCard(
+                        card = command,
+                        onOpen = {},
+                        onRetry = {},
+                        usageCardDensity = UsageCardDensity.COMPACT,
+                        modifier = androidx.compose.ui.Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+
+        val cardA = composeRule.onNodeWithTag(
+            "credential_card_${glm.credential.id}",
+            useUnmergedTree = true,
+        ).getUnclippedBoundsInRoot()
+        val cardB = composeRule.onNodeWithTag(
+            "credential_card_${command.credential.id}",
+            useUnmergedTree = true,
+        ).getUnclippedBoundsInRoot()
+        assertEquals("卡片高度应一致", cardA.bottom - cardA.top, cardB.bottom - cardB.top)
+
+        val rings = composeRule.onAllNodesWithTag("compact_ring_primary", useUnmergedTree = true)
+            .fetchSemanticsNodes()
+            .map { it.boundsInRoot }
+        assertEquals("弧线数量", 2, rings.size)
+        assertEquals(
+            "弧线中心应在同一水平线",
+            rings[0].center.y,
+            rings[1].center.y,
+            1f,
+        )
+
+        val footers = composeRule.onAllNodesWithTag("card_footer_left", useUnmergedTree = true)
+            .fetchSemanticsNodes()
+            .map { it.boundsInRoot }
+        assertEquals("页脚数量", 2, footers.size)
+        assertEquals("页脚应贴底对齐", footers[0].top, footers[1].top, 1f)
     }
 
     @Test

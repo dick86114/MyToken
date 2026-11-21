@@ -248,6 +248,7 @@ private fun CompactRingWithWindows(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Row(
+                modifier = Modifier.height(24.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
@@ -326,6 +327,7 @@ private fun CompactMiniProgressRow(metric: UsageMetric) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .height(18.dp)
             .testTag("compact_window_row_${metric.id}"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -363,7 +365,9 @@ private fun CompactMiniProgressRow(metric: UsageMetric) {
 private fun CompactMiniTextRow(label: String, value: String) {
     val colors = MyTokenThemeTokens.colors
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(

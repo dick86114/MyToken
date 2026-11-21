@@ -55,7 +55,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /** 简洁卡片等高：2 列网格里页脚对齐；1.3× 字体退回单列后改为自适应高度。 */
-internal val CompactCardHeight = 240.dp
+internal val CompactCardHeight = 288.dp
 
 internal enum class UsageCardHealth { Normal, Warning, Critical, Stale, Failed, Loading, Disabled }
 
@@ -143,11 +143,18 @@ internal fun UsageCardFrame(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val compact = density.isCompact()
+    val fixedHeight = compact && LocalDensity.current.fontScale <= 1.0f
     val interactionSource = remember { MutableInteractionSource() }
     MyTokenSurface(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (compact) Modifier.heightIn(min = CompactCardHeight) else Modifier)
+            .then(
+                when {
+                    fixedHeight -> Modifier.height(CompactCardHeight)
+                    compact -> Modifier.heightIn(min = CompactCardHeight)
+                    else -> Modifier
+                },
+            )
             .myTokenPressScale(interactionSource, pressedScale = 0.99f)
             .clickable(
                 interactionSource = interactionSource,
@@ -158,14 +165,32 @@ internal fun UsageCardFrame(
         surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
         shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(if (compact) 14.dp else 16.dp),
-            verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
-        ) {
-            content()
-            footer()
+        val padding = if (compact) 14.dp else 16.dp
+        if (fixedHeight) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    content()
+                }
+                footer()
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(padding),
+                verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
+            ) {
+                content()
+                footer()
+            }
         }
     }
 }
@@ -187,7 +212,7 @@ internal fun UsageCardIdentity(
     }
     val statusText = usageCardStatusText(health)
 
-    Row(verticalAlignment = Alignment.Top) {
+    Row(modifier = Modifier.heightIn(min = 35.dp), verticalAlignment = Alignment.Top) {
         Box(
             modifier = Modifier.size(if (compact) 24.dp else 28.dp),
             contentAlignment = Alignment.TopStart,
