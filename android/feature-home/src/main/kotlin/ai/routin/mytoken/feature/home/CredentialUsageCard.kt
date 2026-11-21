@@ -296,25 +296,14 @@ private fun compactMiniRows(
         .filter { it.presentation == UsageMetricPresentation.Progress }
         .forEach { add(CompactMiniRow.Progress(it)) }
 
-    val byId = card.snapshot?.metrics.orEmpty().associateBy(UsageMetric::id)
     val usageKind = card.credential.metadata[ai.routin.mytoken.domain.model.CredentialMetadataKey.UsageKind]
         ?: card.snapshot?.usageKind
-    when {
-        usageKind == "plan" || usageKind == "tokenPack" -> {
-            val plan = metrics.firstOrNull()
-            val remaining = plan?.remaining
-            val limit = plan?.limit
-            if (remaining != null && limit != null) {
-                add(CompactMiniRow.Text("剩余", "${formatCompact(remaining)} / ${formatCompact(limit)}"))
-            }
-        }
-        card.credential.providerId == ai.routin.mytoken.domain.model.ProviderId.CommandCode -> {
-            val amounts = listOf("monthly-remaining", "purchased-remaining", "free-remaining")
-                .mapNotNull { id -> byId[id]?.value }
-            if (amounts.isNotEmpty()) {
-                val total = amounts.fold(BigDecimal.ZERO, BigDecimal::add)
-                add(CompactMiniRow.Text("余额", formatCurrency(total, byId["monthly-remaining"]?.currencyCode ?: "$")))
-            }
+    if (usageKind == "plan" || usageKind == "tokenPack") {
+        val plan = metrics.firstOrNull()
+        val remaining = plan?.remaining
+        val limit = plan?.limit
+        if (remaining != null && limit != null) {
+            add(CompactMiniRow.Text("剩余", "${formatCompact(remaining)} / ${formatCompact(limit)}"))
         }
     }
 }
@@ -440,7 +429,7 @@ private fun CompactBalanceLayout(
         if (composition.isNotEmpty()) {
             Text(
                 text = "余额构成",
-                modifier = Modifier.padding(top = 10.dp),
+                modifier = Modifier.padding(top = 12.dp),
                 style = MyTokenType.caption,
                 color = colors.muted,
             )
@@ -472,8 +461,8 @@ private fun CompactBalanceLayout(
                 }
             }
             Column(
-                modifier = Modifier.padding(top = 5.dp),
-                verticalArrangement = Arrangement.spacedBy(5.dp),
+                modifier = Modifier.padding(top = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 composition.forEach { segment ->
                     CompactBalanceLegend(
@@ -484,7 +473,7 @@ private fun CompactBalanceLayout(
             }
         }
         if (modelCount > 0) {
-            Spacer(modifier = Modifier.height(5.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             CompactMiniTextRow(label = "可用模型", value = "$modelCount 个")
         }
     }
@@ -501,6 +490,7 @@ private fun CompactBalanceLegend(
         CompactBalanceSegmentKind.Granted -> colors.cat2
     }
     Row(
+        modifier = Modifier.testTag("compact_balance_legend"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {

@@ -40,7 +40,6 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Settings
@@ -56,7 +55,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -165,12 +166,26 @@ internal fun HomeToolbar(
                 .testTag("home_open_credentials"),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = Icons.Filled.Menu,
-                contentDescription = null,
-                tint = colors.muted,
-                modifier = Modifier.size(20.dp),
-            )
+            // 设计稿入口图标：两长一短三横线（20dp viewport，1.6dp 圆头描边）。
+            Canvas(
+                modifier = Modifier
+                    .size(20.dp)
+                    .testTag("home_menu_icon"),
+            ) {
+                val stroke = 1.6.dp.toPx()
+                fun line(y: Float, endX: Float) {
+                    drawLine(
+                        color = colors.muted,
+                        start = Offset(3.dp.toPx(), y.dp.toPx()),
+                        end = Offset(endX.dp.toPx(), y.dp.toPx()),
+                        strokeWidth = stroke,
+                        cap = StrokeCap.Round,
+                    )
+                }
+                line(y = 5f, endX = 17f)
+                line(y = 10f, endX = 17f)
+                line(y = 15f, endX = 12f)
+            }
         }
 
         Box(modifier = Modifier.align(Alignment.Center)) {

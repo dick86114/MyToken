@@ -3,7 +3,6 @@ package ai.routin.mytoken.feature.home
 import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.core.ui.MyTokenRadius
-import ai.routin.mytoken.core.ui.MyTokenSize
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
@@ -22,7 +21,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,7 +38,12 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -297,39 +300,39 @@ internal fun ResetCardsBadge(
     val colors = MyTokenThemeTokens.colors
     val text = "${cards.size} 张重置卡"
     val detail = style == ResetCardsBadgeStyle.Detail
+    val chipShape = RoundedCornerShape(5.dp)
 
-    // 视觉 chip 很小，但触控区必须 ≥48dp（规格 §6.4）；外层 Box 承担点击与语义。
+    // 设计稿 chip：浅底 hairline + 叠卡图标。击区保持 24dp 行高，不撑开标签行。
     Box(
         modifier = modifier
-            .sizeIn(minWidth = MyTokenSize.touch, minHeight = MyTokenSize.touch)
+            .height(24.dp)
             .clip(RoundedCornerShape(6.dp))
             .clickable { expanded = !expanded }
             .semantics { contentDescription = text },
         contentAlignment = Alignment.Center,
     ) {
-    Row(
-        modifier = Modifier.padding(horizontal = if (detail) 4.dp else 2.dp, vertical = 1.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        Canvas(modifier = Modifier.size(width = 12.dp, height = 9.dp)) {
-            drawRoundRect(
-                color = colors.track,
-                cornerRadius = CornerRadius(2.5.dp.toPx(), 2.5.dp.toPx()),
-            )
-            drawRoundRect(
+        Row(
+            modifier = Modifier
+                .height(if (detail) 19.dp else 17.dp)
+                .clip(chipShape)
+                .background(colors.subtle)
+                .border(1.dp, colors.line, chipShape)
+                .testTag("reset_chip")
+                .padding(horizontal = if (detail) 6.dp else 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(if (detail) 4.dp else 3.dp),
+        ) {
+            ResetCardsGlyph(
                 color = colors.muted,
-                topLeft = Offset(2.dp.toPx(), 3.8.dp.toPx()),
-                size = Size(8.dp.toPx(), 1.4.dp.toPx()),
-                cornerRadius = CornerRadius(0.7.dp.toPx(), 0.7.dp.toPx()),
+                modifier = Modifier.size(width = 9.dp, height = 8.dp),
+            )
+            Text(
+                text = if (detail) "重置卡 ${cards.size}" else cards.size.toString(),
+                style = MyTokenType.micro,
+                fontWeight = FontWeight(650),
+                color = colors.muted,
             )
         }
-        Text(
-            text = if (detail) "重置卡 ${cards.size}" else cards.size.toString(),
-            style = MyTokenType.micro,
-            color = colors.muted,
-        )
-    }
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
@@ -371,6 +374,33 @@ internal fun ResetCardsBadge(
                 }
             }
         }
+    }
+}
+
+/** 设计稿叠卡图标：一张完整卡片 + 右上角露出的后卡折角。 */
+@Composable
+private fun ResetCardsGlyph(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val stroke = 1.dp.toPx()
+        val w = size.width
+        val h = size.height
+        val back = Path().apply {
+            moveTo(w * 0.25f, stroke / 2f)
+            lineTo(w * 0.94f, stroke / 2f)
+            lineTo(w * 0.94f, h * 0.78f)
+        }
+        drawPath(
+            path = back,
+            color = color,
+            style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round),
+        )
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(stroke / 2f, h * 0.28f),
+            size = Size(w * 0.70f, h * 0.64f),
+            cornerRadius = CornerRadius(w * 0.128f, w * 0.128f),
+            style = Stroke(width = stroke),
+        )
     }
 }
 

@@ -16,6 +16,7 @@ import ai.routin.mytoken.domain.model.UsageResetCard
 import ai.routin.mytoken.domain.model.UsageSnapshot
 import ai.routin.mytoken.domain.usage.RefreshStatus
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
@@ -657,7 +658,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun resetCardChipTouchTargetIsAtLeast48() {
+    fun resetCardChipMatchesDesignGeometry() {
         val credential = credential("重置卡账户")
         val metric = progress(42.0, 100.0).copy(
             resetCards = listOf(
@@ -675,17 +676,266 @@ class HomeScreenTest {
             }
         }
 
-        val bounds = composeRule.onNodeWithContentDescription("1 张重置卡", useUnmergedTree = true)
+        val chip = composeRule.onNodeWithTag("reset_chip", useUnmergedTree = true)
             .getUnclippedBoundsInRoot()
-        // 设计稿 chip 很小；它与弧线标签行（24dp）同高，保证卡片间节奏一致。
+        // 设计稿简洁 chip：17dp 高、数字居中，紧贴窗口标签。
+        assertEquals("chip 视觉高度应为 17dp", 17f, (chip.bottom - chip.top).value, 1f)
+        val label = composeRule.onNodeWithText("5 小时", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val gap = chip.left.value - label.right.value
+        assertTrue("chip 应紧贴标签，实际间隙 ${gap}dp", gap in 0f..8f)
+        val touch = composeRule.onNodeWithContentDescription("1 张重置卡", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
         assertTrue(
-            "重置卡 chip 高度应与标签行一致（实际 ${bounds.bottom - bounds.top}）",
-            bounds.bottom - bounds.top >= 24.dp,
+            "chip 可点击高度应 ≥24dp（实际 ${touch.bottom - touch.top}）",
+            touch.bottom - touch.top >= 24.dp,
         )
+    }
+
+    @Test
+    fun fullResetChipsSitNextToTheirLabels() {
+        val credential = credential("完整重置卡", ProviderId.Glm)
+        val testCard = card(
+            credential,
+            metrics = listOf(
+                glmProgressMetric("five-hour", "5 小时用量", resetCards = 2),
+                glmProgressMetric("weekly", "每周用量", resetCards = 1),
+            ),
+        )
+        composeRule.setContent {
+            MyTokenTheme {
+                CredentialUsageCard(
+                    card = testCard,
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        val chips = composeRule.onAllNodesWithTag("reset_chip", useUnmergedTree = true)
+            .fetchSemanticsNodes()
+            .map { it.boundsInRoot }
+        assertEquals("完整卡重置 chip 数量", 2, chips.size)
+        val primaryLabel = composeRule.onNodeWithText("5 小时用量", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        assertTrue("主指标 chip 应在标签下方换行", chips[0].top >= primaryLabel.bottom.value - 1f)
         assertTrue(
-            "重置卡 chip 宽度应 ≥48dp（实际 ${bounds.right - bounds.left}）",
-            bounds.right - bounds.left >= 48.dp,
+            "主指标 chip 应与标签左对齐",
+            abs(primaryLabel.left.value - chips[0].left) <= 2f,
         )
+        val weeklyLabel = composeRule.onNodeWithText("本周用量", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val gap = chips[1].left - weeklyLabel.right.value
+        assertTrue("窗口 chip 应紧贴其标签，实际间隙 ${gap}dp", gap in 0f..10f)
+    }
+
+    @Test
+    fun commandCodeCompactCardOmitsBalanceRow() {
+        val credential = credential("Command 简洁", ProviderId.CommandCode)
+        val monthlyBalance = UsageMetric(
+            id = "monthly-remaining",
+            label = "月度余额",
+            value = BigDecimal("12.30"),
+            unit = UsageMetricUnit.Currency,
+            presentation = UsageMetricPresentation.Balance,
+            semantic = UsageMetricSemantic.Balance,
+            currencyCode = "USD",
+            healthState = UsageMetricHealthState.Normal,
+        )
+        val testCard = card(
+            credential,
+            metrics = listOf(
+                progress(42.0, 100.0).copy(id = "five-hour", label = "5 小时"),
+                progress(20.0, 100.0).copy(id = "weekly", label = "周"),
+                progress(30.0, 100.0).copy(id = "credit-progress", label = "月额度"),
+                monthlyBalance,
+            ),
+        )
+        composeRule.setContent {
+            MyTokenTheme {
+                CredentialUsageCard(
+                    card = testCard,
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.COMPACT,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("compact_window_row_credit-progress", useUnmergedTree = true)
+            .assertIsDisplayed()
+        assertTrue(
+            "CommandCode 简洁卡不应再显示余额行",
+            composeRule.onAllNodesWithText("余额", substring = true, useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isEmpty(),
+        )
+    }
+
+    @Test
+    fun compactBalanceCardGivesLowerHalfBreathingRoom() {
+        val credential = credential("DeepSeek 简洁余额", ProviderId.DeepSeek)
+        val total = balance(38.40).copy(id = "balance")
+        val toppedUp = total.copy(
+            id = "toppedUpBalance",
+            label = "充值余额",
+            value = BigDecimal("33.40"),
+            presentation = UsageMetricPresentation.Value,
+            semantic = UsageMetricSemantic.Value,
+        )
+        val granted = total.copy(
+            id = "grantedBalance",
+            label = "赠金余额",
+            value = BigDecimal("5.00"),
+            presentation = UsageMetricPresentation.Value,
+            semantic = UsageMetricSemantic.Value,
+        )
+        composeRule.setContent {
+            MyTokenTheme {
+                CredentialUsageCard(
+                    card = card(
+                        credential,
+                        metrics = listOf(total, toppedUp, granted),
+                        planName = "API 余额",
+                        subscriptionEndAt = null,
+                    ),
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.COMPACT,
+                )
+            }
+        }
+
+        val legends = composeRule.onAllNodesWithTag("compact_balance_legend", useUnmergedTree = true)
+            .fetchSemanticsNodes()
+            .map { it.boundsInRoot }
+        assertEquals("余额构成应有两行", 2, legends.size)
+        val gap = legends[1].top - legends[0].bottom
+        assertTrue("余额构成两行之间应留出行距，实际 ${gap}dp", gap >= 8f)
+    }
+
+    @Test
+    fun fullBalanceCardSpacesLegendAndFacts() {
+        val credential = credential("DeepSeek 完整余额", ProviderId.DeepSeek)
+        val total = balance(38.40).copy(id = "balance")
+        val toppedUp = total.copy(
+            id = "toppedUpBalance",
+            label = "充值余额",
+            value = BigDecimal("33.40"),
+            presentation = UsageMetricPresentation.Value,
+            semantic = UsageMetricSemantic.Value,
+        )
+        val granted = total.copy(
+            id = "grantedBalance",
+            label = "赠金余额",
+            value = BigDecimal("5.00"),
+            presentation = UsageMetricPresentation.Value,
+            semantic = UsageMetricSemantic.Value,
+        )
+        composeRule.setContent {
+            MyTokenTheme {
+                CredentialUsageCard(
+                    card = card(
+                        credential,
+                        metrics = listOf(total, toppedUp, granted),
+                        planName = "API 余额",
+                        subscriptionEndAt = null,
+                    ),
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        val legend = composeRule.onNodeWithTag("full_balance_legend_row", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val facts = composeRule.onNodeWithTag("full_balance_facts", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val gap = facts.top.value - legend.bottom.value
+        assertTrue("图例与 facts 之间应留出行距，实际 ${gap}dp", gap >= 10f)
+    }
+
+    @Test
+    fun providerLogoHeightMatchesTwoLineIdentity() {
+        val compactCredential = credential("Logo 简洁")
+        val fullCredential = credential("Logo 完整")
+        composeRule.setContent {
+            MyTokenTheme {
+                Column {
+                    CredentialUsageCard(
+                        card = card(compactCredential, metrics = listOf(progress(42.0, 100.0))),
+                        onOpen = {},
+                        onRetry = {},
+                        usageCardDensity = UsageCardDensity.COMPACT,
+                    )
+                    CredentialUsageCard(
+                        card = card(fullCredential, metrics = listOf(progress(42.0, 100.0))),
+                        onOpen = {},
+                        onRetry = {},
+                        usageCardDensity = UsageCardDensity.FULL,
+                    )
+                }
+            }
+        }
+
+        fun avatarHeight(id: UUID): Float = composeRule
+            .onNodeWithTag("credential_avatar_$id", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+            .let { it.bottom.value - it.top.value }
+
+        fun identityHeight(id: UUID): Float = composeRule
+            .onNodeWithTag("credential_identity_$id", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+            .let { it.bottom.value - it.top.value }
+
+        val compactAvatar = avatarHeight(compactCredential.id)
+        assertTrue("简洁卡 logo 应加大到两行身份信息的高度，实际 ${compactAvatar}dp", compactAvatar >= 32f)
+        assertTrue(
+            "简洁卡 logo 不应高于两行身份信息",
+            compactAvatar <= identityHeight(compactCredential.id) + 1f,
+        )
+
+        val fullAvatar = avatarHeight(fullCredential.id)
+        assertTrue("完整卡 logo 应加大到两行身份信息的高度，实际 ${fullAvatar}dp", fullAvatar >= 36f)
+        assertTrue(
+            "完整卡 logo 不应高于两行身份信息",
+            fullAvatar <= identityHeight(fullCredential.id) + 1f,
+        )
+    }
+
+    @Test
+    fun 健康标尺与卡片区域之间保持紧凑间距() {
+        val credential = credential("间距")
+        val usage = card(credential, metrics = listOf(progress(42.0, 100.0)))
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = listOf(usage),
+                        groups = listOf(group(ProviderId.Routin, listOf(usage))),
+                        credentialCount = 1,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    usageCardDensity = UsageCardDensity.COMPACT,
+                )
+            }
+        }
+
+        val rulerBottom = composeRule.onNodeWithTag("health_segment_0")
+            .getUnclippedBoundsInRoot()
+            .bottom
+        val cardTop = composeRule.onNodeWithTag("credential_card_${credential.id}")
+            .getUnclippedBoundsInRoot()
+            .top
+        val gap = cardTop.value - rulerBottom.value
+        assertTrue("健康标尺与首张卡片间距应缩小到 8dp 内，实际 ${gap}dp", gap <= 8f)
     }
 
     @Test

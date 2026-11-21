@@ -219,7 +219,7 @@ fun HomeScreen(
                                     }
                                 }
                             },
-                            modifier = Modifier.padding(top = 1.dp, bottom = 14.dp),
+                            modifier = Modifier.padding(top = 1.dp, bottom = 6.dp),
                         )
                     }
                 }
@@ -245,7 +245,8 @@ fun HomeScreen(
                             .weight(1f)
                             .fillMaxWidth(),
                     ) {
-                        val contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp)
+                        // 健康标尺已留出 6dp；卡片紧跟标尺，避免顶部空隙过大。
+                        val contentPadding = PaddingValues(top = 0.dp, bottom = 24.dp)
                         val spacing = if (usageCardDensity.isCompact()) 8.dp else 12.dp
                         PullToRefreshBox(
                             isRefreshing = state.isRefreshingAll,

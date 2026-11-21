@@ -308,22 +308,20 @@ private fun FullQuotaFocus(
     val percent = progressPercent(metric)
     val tone = splitTone(metric, percent)
     Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-        ) {
-            Text(
-                text = label,
-                style = MyTokenType.caption,
-                color = colors.muted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
+        Text(
+            text = label,
+            style = MyTokenType.caption,
+            color = colors.muted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        // 设计稿：重置卡 chip 换行到主指标标签下方，与标签左对齐。
+        if (metric.resetCards.isNotEmpty()) {
+            ResetCardsBadge(
+                metric = metric,
+                style = ResetCardsBadgeStyle.Detail,
+                modifier = Modifier.padding(top = 4.dp),
             )
-            if (metric.resetCards.isNotEmpty()) {
-                ResetCardsBadge(metric = metric, style = ResetCardsBadgeStyle.Detail)
-            }
         }
         UsageArcGauge(
             percent = percent,
@@ -381,11 +379,11 @@ private fun FullWindowRow(
                 color = colors.muted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
             )
             if (metric.resetCards.isNotEmpty()) {
                 ResetCardsBadge(metric = metric, style = ResetCardsBadgeStyle.Detail)
             }
+            Spacer(modifier = Modifier.weight(1f))
             Text(
                 text = formatPercent(percent),
                 style = MyTokenType.label.copy(fontWeight = FontWeight(650)),
@@ -726,7 +724,8 @@ private fun FullBalanceHero(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 6.dp),
+                .padding(top = 8.dp)
+                .testTag("full_balance_legend_row"),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -745,9 +744,11 @@ private fun FullBalanceHero(
         }
         if (facts.isNotEmpty()) {
             FlowRow(
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier
+                    .padding(top = 12.dp)
+                    .testTag("full_balance_facts"),
                 horizontalArrangement = Arrangement.spacedBy(18.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 facts.forEach { (label, value) ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -976,9 +977,9 @@ private fun FullXiaomiUsage(
         FlowRow(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 4.dp),
+                .padding(top = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             FullTokenLegend("未命中 ${formatGrouped(inputTokens?.value)}", colors.cat1)
             FullTokenLegend("输出 ${formatGrouped(outputTokens?.value)}", colors.cat2)
