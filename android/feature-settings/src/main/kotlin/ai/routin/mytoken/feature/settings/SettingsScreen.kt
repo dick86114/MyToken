@@ -72,6 +72,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import ai.routin.mytoken.core.ui.SectionCard
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.MyTokenButton
@@ -79,9 +80,10 @@ import ai.routin.mytoken.core.ui.MyTokenButtonTone
 import ai.routin.mytoken.core.ui.MyTokenBrandMark
 import ai.routin.mytoken.core.ui.MyTokenRadius
 import ai.routin.mytoken.core.ui.MyTokenRow
-import ai.routin.mytoken.core.ui.MyTokenSegmented
+import ai.routin.mytoken.core.ui.MyTokenSection
 import ai.routin.mytoken.core.ui.MyTokenSize
 import ai.routin.mytoken.core.ui.MyTokenSpacing
+import ai.routin.mytoken.core.ui.MyTokenSurface
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.MyTokenDialog
@@ -89,13 +91,16 @@ import ai.routin.mytoken.core.ui.MyTokenDialogRow
 import ai.routin.mytoken.core.ui.MyTokenDialogSection
 import ai.routin.mytoken.core.ui.MyTokenDialogStatus
 import ai.routin.mytoken.core.ui.MyTokenDialogTone
+import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
 import ai.routin.mytoken.core.ui.myTokenFilterChipBorder
 import ai.routin.mytoken.core.ui.myTokenFilterChipColors
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Alignment
@@ -201,10 +206,7 @@ fun SettingsScreen(
                 }
             }
             item(key = "theme") {
-                SettingsGroup(
-                    title = "外观",
-                    modifier = Modifier.testTag("settings_theme_cell"),
-                ) {
+                SectionCard(title = "外观", modifier = Modifier.testTag("settings_theme_cell")) {
                     ThemeSelector(
                         selected = state.display.themeMode,
                         onSelect = onThemeModeChange,
@@ -229,7 +231,7 @@ fun SettingsScreen(
                 )
             }
             item(key = "data") {
-                SettingsGroup(
+                MyTokenSection(
                     title = "数据",
                     modifier = Modifier.testTag("settings_migration_cell"),
                 ) {
@@ -268,7 +270,7 @@ fun SettingsScreen(
                 key = "about",
                 span = { GridItemSpan(maxLineSpan) },
             ) {
-                SettingsGroup(
+                MyTokenSection(
                     title = "关于",
                     modifier = Modifier.testTag("settings_about_span"),
                 ) {
@@ -992,55 +994,39 @@ private fun SettingsHeader(drawerMode: Boolean, onClose: (() -> Unit)?) {
 
 @Composable
 private fun SettingsProfileCard(appVersion: String) {
-    Row(
+    val colors = MyTokenThemeTokens.colors
+    MyTokenSurface(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag("settings_profile")
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .testTag("settings_profile"),
+        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
+        shape = RoundedCornerShape(MyTokenRadius.card),
     ) {
-        MyTokenBrandMark(
-            modifier = Modifier.testTag("settings_brand_logo"),
-            size = 44.dp,
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "MyToken",
-                style = MyTokenType.title.copy(fontWeight = FontWeight(700)),
-                color = MyTokenThemeTokens.colors.ink,
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            MyTokenBrandMark(
+                modifier = Modifier.testTag("settings_brand_logo"),
+                size = 44.dp,
             )
-            Text(
-                text = "v$appVersion · 凭证只在本机",
-                modifier = Modifier.padding(top = 2.dp),
-                style = MyTokenType.caption,
-                color = MyTokenThemeTokens.colors.muted,
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "MyToken",
+                    style = MyTokenType.title.copy(fontWeight = FontWeight(700)),
+                    color = colors.ink,
+                )
+                Text(
+                    text = "v$appVersion · 凭证只在本机",
+                    modifier = Modifier.padding(top = 2.dp),
+                    style = MyTokenType.caption,
+                    color = colors.muted,
+                )
+            }
         }
-    }
-}
-
-/** 设置分组只保留分节标签与内容，不再叠加卡片；容器本身已是 surface。 */
-@Composable
-private fun SettingsGroup(
-    title: String,
-    modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = title,
-            modifier = Modifier.padding(start = 2.dp, end = 2.dp, bottom = 8.dp),
-            style = MyTokenType.sectionLabel,
-            color = MyTokenThemeTokens.colors.muted,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            content = content,
-        )
     }
 }
 
@@ -1049,13 +1035,51 @@ private fun ThemeSelector(
     selected: AppThemeMode,
     onSelect: (AppThemeMode) -> Unit,
 ) {
-    val options = listOf("跟随系统", "浅色", "深色")
-    val modes = listOf(AppThemeMode.SYSTEM, AppThemeMode.LIGHT, AppThemeMode.DARK)
-    MyTokenSegmented(
-        options = options,
-        selectedIndex = modes.indexOf(selected).coerceAtLeast(0),
-        onSelect = { index -> onSelect(modes[index]) },
+    val colors = MyTokenThemeTokens.colors
+    val options = listOf(
+        "跟随系统" to AppThemeMode.SYSTEM,
+        "浅色" to AppThemeMode.LIGHT,
+        "深色" to AppThemeMode.DARK,
     )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .selectableGroup(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        options.forEach { (label, mode) ->
+            val isSelected = mode == selected
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(44.dp)
+                    .testTag("theme_option_${mode.name}")
+                    .selectable(
+                        selected = isSelected,
+                        role = Role.RadioButton,
+                        onClick = { onSelect(mode) },
+                    ),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    text = label,
+                    style = MyTokenType.label,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                    color = if (isSelected) colors.ink else colors.muted,
+                    maxLines = 1,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier
+                        .size(width = 18.dp, height = 2.dp)
+                        .clip(RoundedCornerShape(MyTokenRadius.pill))
+                        .background(if (isSelected) colors.ink else Color.Transparent),
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -1228,7 +1252,7 @@ private val DEFAULT_UPDATE_CDN_BASES = listOf(
 @Composable
 internal fun Section(
     title: String,
-    content: @Composable ColumnScope.() -> Unit,
+    content: @Composable () -> Unit,
 ) {
-    SettingsGroup(title = title, content = content)
+    SectionCard(title = title) { content() }
 }

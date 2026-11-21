@@ -2,6 +2,8 @@ package ai.routin.mytoken.feature.settings
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -13,6 +15,10 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.testTag
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -62,12 +68,13 @@ class SettingsScreenTest {
             ),
         )
         composeRule.setContent {
+            var themeMode by remember { mutableStateOf(displayStore.state.value.themeMode) }
             MaterialTheme {
                 SettingsScreen(
                     state = SettingsUiState(
                         isLoading = false,
                         refresh = refreshStore.state.value,
-                        display = displayStore.state.value,
+                        display = displayStore.state.value.copy(themeMode = themeMode),
                         update = UpdateSettings(mirrorBase = mirrorBase),
                     ),
                     appVersion = "0.1.0",
@@ -75,7 +82,10 @@ class SettingsScreenTest {
                     releaseHistoryState = releaseHistoryState,
                     onOpenAppRefreshChange = { refreshStore.state.value = refreshStore.state.value.copy(openAppRefresh = it) },
                     onRetryOnFailureChange = { refreshStore.state.value = refreshStore.state.value.copy(retryOnFailure = it) },
-                    onThemeModeChange = { displayStore.state.value = displayStore.state.value.copy(themeMode = it) },
+                    onThemeModeChange = {
+                        themeMode = it
+                        displayStore.state.value = displayStore.state.value.copy(themeMode = it)
+                    },
                     onOpenTransfer = onOpenTransfer,
                     onOpenInstallPermissionSettings = onOpenInstallPermissionSettings,
                     onCheckForUpdates = onCheckForUpdates,
@@ -138,14 +148,17 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun drawerSettingsUseFlatGroupsWithoutNestedCards() {
-        setContent(drawerMode = true)
+    fun themeSelectorUsesBorderlessSingleRowOptions() {
+        setContent()
 
-        composeRule.onNodeWithText("刷新").performScrollTo()
-        val label = composeRule.onNodeWithText("刷新").getUnclippedBoundsInRoot()
-        val firstRow = composeRule.onNodeWithText("打开应用时刷新").getUnclippedBoundsInRoot()
-        val gap = firstRow.top.value - label.bottom.value
-        assertTrue("抽屉设置分组不应再套卡片，实际 ${gap}dp", gap <= 12f)
+        val tags = listOf("theme_option_SYSTEM", "theme_option_LIGHT", "theme_option_DARK")
+        val tops = tags.map { tag ->
+            composeRule.onNodeWithTag(tag).getUnclippedBoundsInRoot().top.value
+        }
+        assertEquals("三个主题选项应在同一行", 1, tops.distinct().size)
+        composeRule.onNodeWithTag("theme_option_SYSTEM").assertIsSelected()
+        composeRule.onNodeWithTag("theme_option_DARK").performClick().assertIsSelected()
+        composeRule.onNodeWithTag("theme_option_SYSTEM").assertIsNotSelected()
     }
 
     @Test
