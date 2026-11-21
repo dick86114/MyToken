@@ -43,9 +43,12 @@ data class MyTokenColors(
     val reportLine: Color,
     val reportAccent: Color,
     val reportTicket: Color,
+    val reportTicketNormal: Color,
     val reportTicketInk: Color,
     val reportTicketMuted: Color,
+    val reportTicketNormalMuted: Color,
     val reportDialTrack: Color,
+    val reportDialTrackNormal: Color,
 )
 
 internal val MyTokenLightColors = MyTokenColors(
@@ -75,9 +78,12 @@ internal val MyTokenLightColors = MyTokenColors(
     reportLine = Color(0xFF4A4F56),
     reportAccent = Color(0xFFFFCE70),
     reportTicket = Color(0xFFF3CB73),
+    reportTicketNormal = Color(0xFFE5E7EB),
     reportTicketInk = Color(0xFF17181A),
     reportTicketMuted = Color(0xFF625126),
+    reportTicketNormalMuted = Color(0xFF696D73),
     reportDialTrack = Color(0xFFB4A071),
+    reportDialTrackNormal = Color(0xFFA3A9B0),
 )
 
 internal val MyTokenDarkColors = MyTokenColors(
@@ -107,13 +113,33 @@ internal val MyTokenDarkColors = MyTokenColors(
     reportLine = Color(0xFFD2D6DC),
     reportAccent = Color(0xFF9A5B00),
     reportTicket = Color(0xFFF3CB73),
+    reportTicketNormal = Color(0xFFE5E7EB),
     reportTicketInk = Color(0xFF17181A),
     reportTicketMuted = Color(0xFF625126),
+    reportTicketNormalMuted = Color(0xFF696D73),
     reportDialTrack = Color(0xFFB4A071),
+    reportDialTrackNormal = Color(0xFFA3A9B0),
 )
 
 internal val LocalMyTokenColors: ProvidableCompositionLocal<MyTokenColors> =
     staticCompositionLocalOf { MyTokenLightColors }
+
+/**
+ * 设置页主题预览卡的固定场景色：无论当前外观如何，预览卡都要展示
+ * 浅色、深色和跟随系统的真实对比，因此不能取自当前主题。
+ */
+object MyTokenThemePreviewColors {
+    val lightScene = Color(0xFFFFFFFF)
+    val darkScene = Color(0xFF16181C)
+    val lightLine = Color(0xFFC9CDD3)
+    val lightCard = Color(0xFFEEF0F2)
+    val darkLine = Color(0xFF4A4F56)
+    val darkCard = Color(0xFF292D33)
+    val darkBorder = Color(0xFF292D33)
+    val systemLine = Color(0xFF9BA1A8)
+    val systemCard = Color(0xFF9BA1A8)
+    val sceneBorder = Color(0xFFE5E7EB)
+}
 
 /** 业务代码读取颜色的唯一入口。 */
 object MyTokenThemeTokens {

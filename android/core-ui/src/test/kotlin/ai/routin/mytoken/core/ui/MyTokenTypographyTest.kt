@@ -29,6 +29,10 @@ class MyTokenTypographyTest {
         assertEquals(16.sp, MyTokenType.caption.lineHeight)
         assertEquals(11.sp, MyTokenType.micro.fontSize)
         assertEquals(15.sp, MyTokenType.micro.lineHeight)
+        assertEquals(11.5.sp, MyTokenType.sectionLabel.fontSize)
+        assertEquals(0.sp, MyTokenType.sectionLabel.letterSpacing)
+        assertEquals(18.sp, MyTokenType.profileName.fontSize)
+        assertEquals(FontWeight(700), MyTokenType.profileName.fontWeight)
     }
 
     @Test

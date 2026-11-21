@@ -375,6 +375,7 @@ fun MyTokenRow(
     trailing: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    iconPlate: Boolean = false,
 ) {
     val colors = MyTokenThemeTokens.colors
     Row(
@@ -393,17 +394,35 @@ fun MyTokenRow(
         horizontalArrangement = Arrangement.spacedBy(MyTokenSpacing.md),
     ) {
         icon?.let {
-            Icon(
-                imageVector = it,
-                contentDescription = null,
-                tint = colors.muted,
-                modifier = Modifier.size(18.dp),
-            )
+            if (iconPlate) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .background(colors.subtle, RoundedCornerShape(8.dp))
+                        .border(1.dp, colors.line, RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = it,
+                        contentDescription = null,
+                        tint = colors.muted,
+                        modifier = Modifier.size(15.dp),
+                    )
+                }
+            } else {
+                Icon(
+                    imageVector = it,
+                    contentDescription = null,
+                    tint = colors.muted,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
                 style = MyTokenType.body,
+                fontWeight = FontWeight(550),
                 color = colors.ink,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -411,6 +430,7 @@ fun MyTokenRow(
             if (supportingText != null) {
                 Text(
                     text = supportingText,
+                    modifier = Modifier.padding(top = 1.dp),
                     style = MyTokenType.caption,
                     color = colors.muted,
                     maxLines = 2,
@@ -420,7 +440,8 @@ fun MyTokenRow(
         if (value != null) {
             Text(
                 text = value,
-                style = MyTokenType.body,
+                style = MyTokenType.caption,
+                fontWeight = FontWeight(550),
                 color = colors.muted,
                 maxLines = 1,
             )

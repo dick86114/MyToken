@@ -84,6 +84,7 @@ import ai.routin.mytoken.core.ui.MyTokenSection
 import ai.routin.mytoken.core.ui.MyTokenSize
 import ai.routin.mytoken.core.ui.MyTokenSpacing
 import ai.routin.mytoken.core.ui.MyTokenSurface
+import ai.routin.mytoken.core.ui.MyTokenThemePreviewColors
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.MyTokenDialog
@@ -99,7 +100,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -239,6 +240,7 @@ fun SettingsScreen(
                         icon = Icons.Filled.QrCodeScanner,
                         title = "从 Mac 导入",
                         supportingText = "扫码接收 Mac 凭证",
+                        iconPlate = true,
                         onClick = onOpenTransfer,
                         trailing = {
                             Icon(
@@ -250,9 +252,10 @@ fun SettingsScreen(
                         },
                     )
                     MyTokenRow(
-                        icon = Icons.Filled.Code,
+                        icon = Icons.Filled.Download,
                         title = "导出诊断日志",
                         supportingText = "生成已脱敏的本机日志",
+                        iconPlate = true,
                         onClick = onExportLogs,
                         modifier = Modifier.testTag("settings_export_logs"),
                         trailing = {
@@ -961,20 +964,15 @@ private fun SettingsHeader(drawerMode: Boolean, onClose: (() -> Unit)?) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(MyTokenSize.header)
+            .height(MyTokenSize.touch)
             .testTag("settings_header"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = "设置",
-            style = MyTokenType.title,
-            color = colors.ink,
-            modifier = Modifier.weight(1f),
-        )
+        // 设计稿：关闭按钮在左，标题紧跟其后。
         if (drawerMode && onClose != null) {
             Box(
                 modifier = Modifier
-                    .size(MyTokenSize.touch)
+                    .size(MyTokenSize.header)
                     .clip(RoundedCornerShape(MyTokenRadius.pill))
                     .clickable(onClick = onClose)
                     .semantics { contentDescription = "关闭设置" }
@@ -988,7 +986,16 @@ private fun SettingsHeader(drawerMode: Boolean, onClose: (() -> Unit)?) {
                     modifier = Modifier.size(20.dp),
                 )
             }
+            Spacer(modifier = Modifier.size(2.dp))
         }
+        Text(
+            text = "设置",
+            style = MyTokenType.section,
+            color = colors.ink,
+            modifier = Modifier
+                .weight(1f)
+                .testTag("settings_title"),
+        )
     }
 }
 
@@ -1016,7 +1023,7 @@ private fun SettingsProfileCard(appVersion: String) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "MyToken",
-                    style = MyTokenType.title.copy(fontWeight = FontWeight(700)),
+                    style = MyTokenType.profileName,
                     color = colors.ink,
                 )
                 Text(
@@ -1044,16 +1051,15 @@ private fun ThemeSelector(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(44.dp)
             .selectableGroup(),
-        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.Top,
     ) {
         options.forEach { (label, mode) ->
             val isSelected = mode == selected
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .height(44.dp)
                     .testTag("theme_option_${mode.name}")
                     .selectable(
                         selected = isSelected,
@@ -1061,24 +1067,109 @@ private fun ThemeSelector(
                         onClick = { onSelect(mode) },
                     ),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
             ) {
+                ThemePreviewScene(
+                    mode = mode,
+                    selected = isSelected,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("theme_scene_${mode.name}"),
+                )
                 Text(
                     text = label,
-                    style = MyTokenType.label,
-                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                    modifier = Modifier.padding(top = 7.dp),
+                    style = MyTokenType.caption,
+                    fontWeight = if (isSelected) FontWeight(650) else FontWeight(550),
                     color = if (isSelected) colors.ink else colors.muted,
                     maxLines = 1,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Box(
-                    modifier = Modifier
-                        .size(width = 18.dp, height = 2.dp)
-                        .clip(RoundedCornerShape(MyTokenRadius.pill))
-                        .background(if (isSelected) colors.ink else Color.Transparent),
+                    textAlign = TextAlign.Center,
                 )
             }
         }
+    }
+}
+
+/** 三张主题预览卡：固定展示浅色/深色场景，选中时用墨色描边。 */
+@Composable
+private fun ThemePreviewScene(
+    mode: AppThemeMode,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MyTokenThemeTokens.colors
+    val preview = MyTokenThemePreviewColors
+    val shape = RoundedCornerShape(10.dp)
+    val isSystem = mode == AppThemeMode.SYSTEM
+    val isDark = mode == AppThemeMode.DARK
+    val baseColor = when (mode) {
+        AppThemeMode.DARK -> preview.darkScene
+        else -> preview.lightScene
+    }
+    val lineColor = when {
+        isSystem -> preview.systemLine
+        isDark -> preview.darkLine
+        else -> preview.lightLine
+    }
+    val cardColor = when {
+        isSystem -> preview.systemCard
+        isDark -> preview.darkCard
+        else -> preview.lightCard
+    }
+    val borderColor = when {
+        selected -> colors.ink
+        isDark -> preview.darkBorder
+        else -> preview.sceneBorder
+    }
+    Box(
+        modifier = modifier
+            .height(54.dp)
+            .clip(shape)
+            .background(baseColor)
+            .border(if (selected) 2.dp else 1.dp, borderColor, shape),
+    ) {
+        if (isSystem) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxSize()
+                        .background(preview.lightScene),
+                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxSize()
+                        .background(preview.darkScene),
+                )
+            }
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = 8.dp, top = 9.dp)
+                .fillMaxWidth(0.36f)
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(lineColor),
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = 8.dp, end = 8.dp, top = 21.dp)
+                .fillMaxWidth()
+                .height(11.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(cardColor),
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = 8.dp, end = 8.dp, top = 36.dp)
+                .fillMaxWidth()
+                .height(11.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(cardColor),
+        )
     }
 }
 

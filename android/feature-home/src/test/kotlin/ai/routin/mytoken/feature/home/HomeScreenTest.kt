@@ -42,6 +42,8 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.runtime.getValue
@@ -600,6 +602,8 @@ class HomeScreenTest {
             "report_refresh" to 48.dp,
             "home_open_credentials" to 48.dp,
             "home_open_settings" to 48.dp,
+            "usage_density_option_compact" to 48.dp,
+            "usage_density_option_full" to 48.dp,
         ).forEach { (tag, minSize) ->
             val bounds = composeRule.onNodeWithTag(tag, useUnmergedTree = true)
                 .getUnclippedBoundsInRoot()
@@ -654,12 +658,15 @@ class HomeScreenTest {
         }
 
         composeRule.onNodeWithTag("provider_filter_menu").performClick()
-        composeRule.onNodeWithTag("provider_filter_item_routin").performClick()
+        composeRule.onNodeWithTag("provider_filter_sheet", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag("provider_filter_item_routin")
+            .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.waitForIdle()
 
         // 过滤后“全部”仍应代表所有启用凭证，而不是当前视图。
         composeRule.onNodeWithTag("provider_filter_menu").performClick()
-        composeRule.onNodeWithText("全部 2").assertExists()
+        composeRule.onNodeWithText("全部供应商", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("2 个凭证", useUnmergedTree = true).assertExists()
     }
 
     @Test
@@ -2123,7 +2130,8 @@ class HomeScreenTest {
         composeRule.onNodeWithText("停用").assertDoesNotExist()
 
         composeRule.onNodeWithTag("provider_filter_menu").performClick()
-        composeRule.onNodeWithTag("provider_filter_item_routin").performClick()
+        composeRule.onNodeWithTag("provider_filter_item_routin")
+            .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.onNodeWithText("备用").assertDoesNotExist()
         composeRule.onNodeWithTag("provider_filter_menu").assertIsSelected()
         composeRule.onNodeWithText("Routin").assertIsDisplayed()
@@ -2428,7 +2436,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun 报告为空时给出正常说明() {
+    fun 报告为空时只保留同步行() {
         composeRule.setContent {
             MyTokenTheme {
                 HomeScreen(
@@ -2449,7 +2457,223 @@ class HomeScreenTest {
 
         composeRule.onNodeWithTag("report_tail").assertTextEquals("用量正常")
         composeRule.onNodeWithText("全部凭证的当前用量正常。", substring = true)
+            .assertDoesNotExist()
+        composeRule.onNodeWithText("最近同步", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("report_refresh").assertIsDisplayed()
+    }
+
+    @Test
+    fun 上滑时供应商工具条跟随卡片上移并固顶在导航下方() {
+        val cards = (1..20).map { index ->
+            card(credential("上滑 $index"), metrics = listOf(progress(20.0, 100.0)))
+        }
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = cards,
+                        groups = emptyList(),
+                        credentialCount = cards.size,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        val navBottom = composeRule.onNodeWithTag("home_toolbar")
+            .getUnclippedBoundsInRoot()
+            .bottom
+        val toolbarBefore = composeRule.onNodeWithTag("home_provider_toolbar")
+            .getUnclippedBoundsInRoot()
+        val reportBefore = composeRule.onNodeWithTag("home_health_report")
+            .getUnclippedBoundsInRoot()
+        assertTrue(
+            "初始时报告应在工具条上方，实际 nav=${navBottom.value} toolbar=${toolbarBefore.top.value}",
+            toolbarBefore.top.value > navBottom.value + 50f,
+        )
+        assertTrue(
+            "初始时报告应完整可见，实际底部 ${reportBefore.bottom.value}",
+            reportBefore.bottom.value > navBottom.value + 100f,
+        )
+
+        composeRule.onNodeWithTag("home_list_full").performTouchInput {
+            swipeUp(startY = height * 0.75f, endY = height * 0.1f, durationMillis = 300)
+        }
+        composeRule.waitForIdle()
+
+        val toolbarAfter = composeRule.onNodeWithTag("home_provider_toolbar")
+            .getUnclippedBoundsInRoot()
+        val reportAfter = composeRule.onNodeWithTag("home_health_report")
+            .getUnclippedBoundsInRoot()
+        assertEquals(
+            "工具条应固顶在导航下方",
+            navBottom.value,
+            toolbarAfter.top.value,
+            2f,
+        )
+        assertTrue(
+            "报告应随卡片一起滑出视口，实际底部 ${reportAfter.bottom.value}",
+            reportAfter.bottom.value <= navBottom.value + 2f,
+        )
+
+        repeat(2) {
+            composeRule.onNodeWithTag("home_list_full").performTouchInput {
+                swipeDown(startY = height * 0.15f, endY = height * 0.85f, durationMillis = 300)
+            }
+            composeRule.waitForIdle()
+        }
+        val reportRestored = composeRule.onNodeWithTag("home_health_report")
+            .getUnclippedBoundsInRoot()
+        assertTrue(
+            "下拉到列表顶部后报告应重新展开，实际底部 ${reportRestored.bottom.value}",
+            reportRestored.bottom.value > navBottom.value + 100f,
+        )
+    }
+
+    @Test
+    fun 在报告上拖拽也能收起并重新展开头部() {
+        val cards = (1..10).map { index ->
+            card(credential("报告拖拽 $index"), metrics = listOf(progress(20.0, 100.0)))
+        }
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = cards,
+                        groups = emptyList(),
+                        credentialCount = cards.size,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        val navBottom = composeRule.onNodeWithTag("home_toolbar")
+            .getUnclippedBoundsInRoot()
+            .bottom
+        composeRule.onNodeWithTag("home_health_report").performTouchInput {
+            // 报告本身只有一百多 dp；把指针拖出报告边界也应由头部手势继续处理。
+            swipeUp(startY = height * 0.9f, endY = height * 0.1f - height * 1.5f, durationMillis = 300)
+        }
+        composeRule.waitForIdle()
+        assertEquals(
+            "在报告上上滑也应把工具条固顶到导航下方",
+            navBottom.value,
+            composeRule.onNodeWithTag("home_provider_toolbar")
+                .getUnclippedBoundsInRoot()
+                .top
+                .value,
+            2f,
+        )
+
+        composeRule.onNodeWithTag("home_collapsing_header").performTouchInput {
+            swipeDown(startY = 10f, endY = 600f, durationMillis = 300)
+        }
+        composeRule.waitForIdle()
+        val reportBottom = composeRule.onNodeWithTag("home_health_report")
+            .getUnclippedBoundsInRoot()
+            .bottom
+        assertTrue(
+            "在固顶工具条上下拉应重新展开报告，实际底部 ${reportBottom.value}",
+            reportBottom.value > navBottom.value + 100f,
+        )
+    }
+
+    @Test
+    fun 卡片末尾提供新增与管理凭证入口() {
+        val credential = credential("入口")
+        var addCalls = 0
+        var manageCalls = 0
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = listOf(card(credential, metrics = listOf(progress(20.0, 100.0)))),
+                        groups = emptyList(),
+                        credentialCount = 1,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = { addCalls++ },
+                    onOpenCredentials = { manageCalls++ },
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("home_add_credential", useUnmergedTree = true)
             .assertIsDisplayed()
+        composeRule.onNodeWithText("把其他账户也放到这里", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("home_manage_credentials", useUnmergedTree = true)
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("启停、编辑与调整顺序", useUnmergedTree = true).assertIsDisplayed()
+
+        composeRule.onNodeWithTag("home_add_credential", useUnmergedTree = true).performClick()
+        composeRule.onNodeWithTag("home_manage_credentials", useUnmergedTree = true).performClick()
+        assertEquals(1, addCalls)
+        assertEquals(1, manageCalls)
+    }
+
+    @Test
+    fun 供应商筛选使用底部面板并保留全部计数() {
+        val routin = card(
+            credential("Routin 账户", ProviderId.Routin),
+            metrics = listOf(progress(20.0, 100.0)),
+        )
+        val deepSeek = card(
+            credential("DeepSeek 账户", ProviderId.DeepSeek),
+            metrics = listOf(progress(30.0, 100.0)),
+        )
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = listOf(routin, deepSeek),
+                        groups = listOf(
+                            group(ProviderId.Routin, listOf(routin)),
+                            group(ProviderId.DeepSeek, listOf(deepSeek)),
+                        ),
+                        credentialCount = 2,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("provider_filter_menu").performClick()
+        composeRule.onNodeWithTag("provider_filter_sheet", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("选择供应商", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText(
+            "仅筛选下方用量卡片，报告始终展示全部凭证",
+            useUnmergedTree = true,
+        ).assertExists()
+        composeRule.onNodeWithTag("provider_filter_item_all", useUnmergedTree = true)
+            .assertIsSelected()
+        composeRule.onNodeWithText("2 个凭证", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag("provider_filter_item_deepseek", useUnmergedTree = true)
+            .assertExists()
+        composeRule.onNodeWithTag("provider_filter_cancel", useUnmergedTree = true)
+            .assertExists()
     }
 
     @Test
@@ -2509,7 +2733,8 @@ class HomeScreenTest {
         }
 
         composeRule.onNodeWithTag("provider_filter_menu").performClick()
-        composeRule.onNodeWithTag("provider_filter_item_routin").performClick()
+        composeRule.onNodeWithTag("provider_filter_item_routin")
+            .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.waitForIdle()
 
         composeRule.onNodeWithTag("credential_card_${routin.credential.id}").assertExists()
@@ -2554,7 +2779,8 @@ class HomeScreenTest {
         }
 
         composeRule.onNodeWithTag("provider_filter_menu").performClick()
-        composeRule.onNodeWithTag("provider_filter_item_routin").performClick()
+        composeRule.onNodeWithTag("provider_filter_item_routin")
+            .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("credential_card_${deepSeek.credential.id}").assertDoesNotExist()
 

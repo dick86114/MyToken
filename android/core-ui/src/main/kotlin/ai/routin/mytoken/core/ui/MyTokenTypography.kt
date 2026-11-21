@@ -122,12 +122,20 @@ object MyTokenType {
         fontFeatureSettings = "tnum",
     )
 
-    /** 分节小标题（设计稿 section-label）：11sp 大写字距。 */
+    /** 分节小标题（设计稿 section-label）：11.5sp，中文不加字距。 */
     val sectionLabel = TextStyle(
-        fontSize = 11.sp,
+        fontSize = 11.5.sp,
         lineHeight = 16.sp,
         fontWeight = FontWeight(650),
-        letterSpacing = 0.9.sp,
+        letterSpacing = 0.sp,
+    )
+
+    /** 设置页身份卡产品名。 */
+    val profileName = TextStyle(
+        fontSize = 18.sp,
+        lineHeight = 24.sp,
+        fontWeight = FontWeight(700),
+        letterSpacing = (-0.2).sp,
     )
 
     /** 百分号符号，仅用于数字旁。 */

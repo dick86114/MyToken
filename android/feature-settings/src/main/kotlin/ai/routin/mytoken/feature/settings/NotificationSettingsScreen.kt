@@ -13,6 +13,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -47,16 +50,30 @@ fun NotificationSettingsSection(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    MyTokenStatus(
-                        text = if (permissionGranted) "已允许" else "未授予",
-                        tone = if (permissionGranted) {
-                            MyTokenStatusTone.Neutral
-                        } else {
-                            MyTokenStatusTone.Warning
-                        },
-                        modifier = Modifier.testTag("settings_permission_status"),
-                    )
-                    if (!permissionGranted) {
+                    if (permissionGranted) {
+                        Row(
+                            modifier = Modifier.testTag("settings_permission_status"),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Check,
+                                contentDescription = null,
+                                tint = colors.muted,
+                                modifier = Modifier.size(12.dp),
+                            )
+                            Text(
+                                text = "已允许",
+                                style = MyTokenType.caption,
+                                color = colors.muted,
+                            )
+                        }
+                    } else {
+                        MyTokenStatus(
+                            text = "未授予",
+                            tone = MyTokenStatusTone.Warning,
+                            modifier = Modifier.testTag("settings_permission_status"),
+                        )
                         Text(
                             text = "去授权",
                             style = MyTokenType.label,

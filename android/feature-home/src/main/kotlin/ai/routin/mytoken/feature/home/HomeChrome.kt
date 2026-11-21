@@ -1,11 +1,11 @@
 package ai.routin.mytoken.feature.home
 
 import ai.routin.mytoken.core.ui.MyTokenBrandMark
-import ai.routin.mytoken.core.ui.MyTokenDropdownMenu
-import ai.routin.mytoken.core.ui.MyTokenDropdownMenuItem
+import ai.routin.mytoken.core.ui.MyTokenRadius
 import ai.routin.mytoken.core.ui.MyTokenSize
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
+import ai.routin.mytoken.core.ui.ProviderLogoPlate
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageCardDensity
 import androidx.compose.foundation.Canvas
@@ -15,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -22,6 +23,8 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -32,14 +35,20 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,18 +57,22 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import java.util.UUID
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 internal enum class HomeHealthTone { Normal, Warning, Critical }
 
@@ -219,7 +232,7 @@ private fun ProviderFilter(
                 .semantics { selected = selectedProvider != null }
                 .testTag("provider_filter_menu"),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
         ) {
             Text(
                 text = filterLabel,
@@ -231,37 +244,243 @@ private fun ProviderFilter(
                 imageVector = Icons.Outlined.KeyboardArrowDown,
                 contentDescription = null,
                 tint = colors.muted,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(16.dp),
             )
-        }
-        MyTokenDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-        ) {
-            MyTokenDropdownMenuItem(
-                text = "全部",
-                count = allTotal.toString(),
-                selected = selectedProvider == null,
-                onClick = {
-                    expanded = false
-                    onSelect(null)
-                },
-                modifier = Modifier.testTag("provider_filter_item_all"),
-            )
-            providers.forEach { provider ->
-                MyTokenDropdownMenuItem(
-                    text = ProviderCatalog.displayName(provider),
-                    count = (counts[provider] ?: 0).toString(),
-                    selected = provider == selectedProvider,
-                    onClick = {
-                        expanded = false
-                        onSelect(provider)
-                    },
-                    modifier = Modifier.testTag("provider_filter_item_${provider.rawValue}"),
-                )
-            }
         }
     }
+    if (expanded) {
+        ProviderPickerSheet(
+            selectedProvider = selectedProvider,
+            providers = providers,
+            counts = counts,
+            allTotal = allTotal,
+            onSelect = onSelect,
+            onDismiss = { expanded = false },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProviderPickerSheet(
+    selectedProvider: ProviderId?,
+    providers: List<ProviderId>,
+    counts: Map<ProviderId, Int>,
+    allTotal: Int,
+    onSelect: (ProviderId?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = MyTokenThemeTokens.colors
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    // 先播放收起动画再移除，避免 dialog 窗口被直接丢弃。
+    val dismissThen: (() -> Unit) -> Unit = { action ->
+        scope.launch { sheetState.hide() }.invokeOnCompletion { action() }
+    }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = colors.surface,
+        shape = RoundedCornerShape(
+            topStart = MyTokenRadius.sheetTop,
+            topEnd = MyTokenRadius.sheetTop,
+        ),
+        dragHandle = {
+            Box(modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 36.dp, height = 4.dp)
+                        .clip(RoundedCornerShape(MyTokenRadius.pill))
+                        .background(colors.line),
+                )
+            }
+        },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 16.dp)
+                .testTag("provider_filter_sheet"),
+        ) {
+            Text(
+                text = "选择供应商",
+                style = MyTokenType.section,
+                fontWeight = FontWeight(700),
+                color = colors.ink,
+            )
+            Text(
+                text = "仅筛选下方用量卡片，报告始终展示全部凭证",
+                modifier = Modifier.padding(top = 3.dp, bottom = 12.dp),
+                style = MyTokenType.caption,
+                color = colors.muted,
+            )
+            ProviderAllTile(
+                selected = selectedProvider == null,
+                count = allTotal,
+                onClick = {
+                    onSelect(null)
+                    dismissThen(onDismiss)
+                },
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            providers.chunked(2).forEach { rowProviders ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    rowProviders.forEach { provider ->
+                        ProviderSheetTile(
+                            provider = provider,
+                            count = counts[provider] ?: 0,
+                            selected = provider == selectedProvider,
+                            onClick = {
+                                onSelect(provider)
+                                dismissThen(onDismiss)
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    if (rowProviders.size == 1) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            Text(
+                text = "取消",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .clip(RoundedCornerShape(MyTokenRadius.pill))
+                    .clickable { dismissThen(onDismiss) }
+                    .padding(vertical = 12.dp)
+                    .testTag("provider_filter_cancel"),
+                style = MyTokenType.label,
+                fontWeight = FontWeight(600),
+                color = colors.muted,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProviderAllTile(
+    selected: Boolean,
+    count: Int,
+    onClick: () -> Unit,
+) {
+    val colors = MyTokenThemeTokens.colors
+    val shape = RoundedCornerShape(14.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 54.dp)
+            .clip(shape)
+            .background(colors.surface)
+            .border(
+                width = if (selected) 2.dp else 1.dp,
+                color = if (selected) colors.actionFill else colors.line,
+                shape = shape,
+            )
+            .clickable(role = Role.RadioButton, onClick = onClick)
+            .semantics { this.selected = selected }
+            .testTag("provider_filter_item_all")
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.GridView,
+            contentDescription = null,
+            tint = colors.ink,
+            modifier = Modifier.size(24.dp),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "全部供应商",
+                style = MyTokenType.label,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.ink,
+            )
+            Text(
+                text = "$count 个凭证",
+                modifier = Modifier.padding(top = 2.dp),
+                style = MyTokenType.caption,
+                color = colors.muted,
+            )
+        }
+        if (selected) {
+            SelectedCheck()
+        }
+    }
+}
+
+@Composable
+private fun ProviderSheetTile(
+    provider: ProviderId,
+    count: Int,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MyTokenThemeTokens.colors
+    val shape = RoundedCornerShape(14.dp)
+    Box(
+        modifier = modifier
+            .heightIn(min = 88.dp)
+            .clip(shape)
+            .background(colors.surface)
+            .border(
+                width = if (selected) 2.dp else 1.dp,
+                color = if (selected) colors.actionFill else colors.line,
+                shape = shape,
+            )
+            .clickable(role = Role.RadioButton, onClick = onClick)
+            .semantics {
+                this.selected = selected
+                contentDescription = "${ProviderCatalog.displayName(provider)}，$count 个凭证"
+            }
+            .testTag("provider_filter_item_${provider.rawValue}")
+            .padding(12.dp),
+    ) {
+        Column {
+            ProviderLogoPlate(
+                painter = painterResource(ProviderCatalog.logoRes(provider)),
+                contentDescription = null,
+                size = 26.dp,
+                shape = RoundedCornerShape(7.dp),
+                contentPadding = 3.dp,
+            )
+            Text(
+                text = ProviderCatalog.displayName(provider),
+                modifier = Modifier.padding(top = 6.dp),
+                style = MyTokenType.label,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.ink,
+                maxLines = 1,
+            )
+            Text(
+                text = "$count 个凭证",
+                modifier = Modifier.padding(top = 2.dp),
+                style = MyTokenType.caption,
+                color = colors.muted,
+                maxLines = 1,
+            )
+        }
+        if (selected) {
+            SelectedCheck(modifier = Modifier.align(Alignment.TopEnd))
+        }
+    }
+}
+
+@Composable
+private fun SelectedCheck(modifier: Modifier = Modifier) {
+    Icon(
+        imageVector = Icons.Filled.Check,
+        contentDescription = null,
+        tint = MyTokenThemeTokens.colors.actionFill,
+        modifier = modifier.size(14.dp),
+    )
 }
 
 /** 设计稿的纯图标密度滑块：双列 / 单列图标，选中块随分页进度滑动。 */
@@ -274,35 +493,43 @@ private fun DensityModeSwitch(
 ) {
     val compact = density.isCompact()
     val colors = MyTokenThemeTokens.colors
-    BoxWithConstraints(
+    // 视觉高度保持设计稿的 42dp，但把触控区扩展到 48dp；滑块仍在 42dp 轨道内移动。
+    Box(
         modifier = modifier
             .width(104.dp)
-            .height(42.dp)
-            .clip(RoundedCornerShape(13.dp))
-            .background(colors.surface)
-            .border(1.dp, colors.line, RoundedCornerShape(13.dp))
+            .height(MyTokenSize.touch)
             .testTag("usage_density_toggle"),
+        contentAlignment = Alignment.Center,
     ) {
-        val inset = 3.dp
-        val segmentWidth = (maxWidth - inset * 2) / 2
-        val segmentHeight = maxHeight - inset * 2
-        val insetPx = with(LocalDensity.current) { inset.toPx() }
-        val segmentWidthPx = with(LocalDensity.current) { segmentWidth.toPx() }
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
-                .offset {
-                    IntOffset(
-                        x = insetPx.roundToInt() +
-                            (segmentWidthPx * progress().coerceIn(0f, 1f)).roundToInt(),
-                        y = insetPx.roundToInt(),
-                    )
-                }
-                .width(segmentWidth)
-                .height(segmentHeight)
-                .clip(RoundedCornerShape(10.dp))
-                .background(colors.ink)
-                .testTag("usage_density_thumb"),
-        )
+                .width(104.dp)
+                .height(42.dp)
+                .clip(RoundedCornerShape(13.dp))
+                .background(colors.surface)
+                .border(1.dp, colors.line, RoundedCornerShape(13.dp)),
+        ) {
+            val inset = 3.dp
+            val segmentWidth = (maxWidth - inset * 2) / 2
+            val segmentHeight = maxHeight - inset * 2
+            val insetPx = with(LocalDensity.current) { inset.toPx() }
+            val segmentWidthPx = with(LocalDensity.current) { segmentWidth.toPx() }
+            Box(
+                modifier = Modifier
+                    .offset {
+                        IntOffset(
+                            x = insetPx.roundToInt() +
+                                (segmentWidthPx * progress().coerceIn(0f, 1f)).roundToInt(),
+                            y = insetPx.roundToInt(),
+                        )
+                    }
+                    .width(segmentWidth)
+                    .height(segmentHeight)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(colors.ink)
+                    .testTag("usage_density_thumb"),
+            )
+        }
         Row(
             modifier = Modifier
                 .fillMaxSize()
@@ -351,44 +578,50 @@ private fun RowScope.DensityIconOption(
         DensityGlyph(
             compact = compact,
             tint = if (selected) colors.canvas else colors.muted,
+            emphasized = selected,
         )
     }
 }
 
+/**
+ * 按设计稿 24×24 图标几何等比缩放到 19dp：简洁为两块竖版圆角矩形，
+ * 完整为三条横向圆角矩形；选中时线宽从 1.7 提到 1.9。
+ */
 @Composable
 private fun DensityGlyph(
     compact: Boolean,
     tint: Color,
+    emphasized: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Canvas(modifier = modifier.size(19.dp)) {
-        val padding = 1.5.dp.toPx()
-        val gap = 2.5.dp.toPx()
-        val radius = CornerRadius(1.6.dp.toPx())
+        val scale = size.width / 24f
+        val stroke = Stroke(width = (if (emphasized) 1.9f else 1.7f) * scale)
         if (compact) {
-            val cellWidth = (size.width - padding * 2 - gap) / 2
-            val cellHeight = size.height - padding * 2
-            drawRoundRect(
-                color = tint,
-                topLeft = Offset(padding, padding),
-                size = Size(cellWidth, cellHeight),
-                cornerRadius = radius,
-            )
-            drawRoundRect(
-                color = tint,
-                topLeft = Offset(padding + cellWidth + gap, padding),
-                size = Size(cellWidth, cellHeight),
-                cornerRadius = radius,
-            )
+            val top = 4f * scale
+            val height = 16f * scale
+            val width = 7.5f * scale
+            val radius = CornerRadius(2f * scale)
+            listOf(3.5f, 13f).forEach { left ->
+                drawRoundRect(
+                    color = tint,
+                    topLeft = Offset(left * scale, top),
+                    size = Size(width, height),
+                    cornerRadius = radius,
+                    style = stroke,
+                )
+            }
         } else {
-            val cellWidth = size.width - padding * 2
-            val cellHeight = (size.height - padding * 2 - gap * 2) / 3
+            val width = 17f * scale
+            val height = 4.5f * scale
+            val radius = CornerRadius(1.6f * scale)
             repeat(3) { index ->
                 drawRoundRect(
                     color = tint,
-                    topLeft = Offset(padding, padding + index * (cellHeight + gap)),
-                    size = Size(cellWidth, cellHeight),
+                    topLeft = Offset(3.5f * scale, (4f + index * 6f) * scale),
+                    size = Size(width, height),
                     cornerRadius = radius,
+                    style = stroke,
                 )
             }
         }

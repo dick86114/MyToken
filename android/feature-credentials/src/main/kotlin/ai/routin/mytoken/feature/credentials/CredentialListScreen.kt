@@ -2,6 +2,7 @@ package ai.routin.mytoken.feature.credentials
 
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenButton
+import ai.routin.mytoken.core.ui.MyTokenBrandMark
 import ai.routin.mytoken.core.ui.MyTokenButtonTone
 import ai.routin.mytoken.core.ui.MyTokenDialog
 import ai.routin.mytoken.core.ui.MyTokenDialogRow
@@ -618,20 +619,10 @@ private fun EmptyState(
     val colors = MyTokenThemeTokens.colors
     Box(modifier = modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(
-                modifier = Modifier
-                    .size(54.dp)
-                    .testTag("credential_empty_mark"),
-                contentAlignment = Alignment.Center,
-            ) {
-                ProviderLogoPlate(
-                    painter = painterResource(ai.routin.mytoken.core.ui.R.drawable.mytoken_brand_logo),
-                    contentDescription = null,
-                    size = 54.dp,
-                    shape = RoundedCornerShape(14.dp),
-                    contentPadding = 0.dp,
-                )
-            }
+            MyTokenBrandMark(
+                modifier = Modifier.testTag("credential_empty_mark"),
+                size = 54.dp,
+            )
             Text(
                 text = "还没有凭证",
                 modifier = Modifier.padding(top = 16.dp),

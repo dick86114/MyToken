@@ -29,7 +29,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
@@ -39,9 +44,69 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import java.util.UUID
 import kotlin.math.roundToInt
+
+/**
+ * 设计稿的票据切角：左上、右下保持 20dp 圆角，右上、左下各切掉 20dp。
+ * 只作为 background 的 Shape 使用，不用 Modifier.clip，避免吞掉行内点击。
+ */
+private class ReportCornerShape(
+    private val cutCorner: Boolean,
+    private val roundBottomEnd: Boolean,
+) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density,
+    ): Outline {
+        val limit = minOf(size.width, size.height) / 2f
+        fun Dp.px(): Float = with(density) { toPx() }.coerceIn(0f, limit)
+        val cut = 20.dp.px()
+        val topStart = 20.dp.px()
+        val bottomEnd = if (roundBottomEnd) 20.dp.px() else 0f
+        val path = Path().apply {
+            moveTo(topStart, 0f)
+            lineTo(size.width - cut, 0f)
+            lineTo(size.width, cut)
+            if (cutCorner) {
+                lineTo(size.width, size.height - bottomEnd)
+                arcTo(
+                    rect = Rect(
+                        size.width - bottomEnd * 2f,
+                        size.height - bottomEnd * 2f,
+                        size.width,
+                        size.height,
+                    ),
+                    startAngleDegrees = 0f,
+                    sweepAngleDegrees = 90f,
+                    forceMoveTo = false,
+                )
+                lineTo(cut, size.height)
+                lineTo(0f, size.height - cut)
+            } else {
+                lineTo(size.width, size.height)
+                lineTo(0f, size.height)
+            }
+            lineTo(0f, topStart)
+            arcTo(
+                rect = Rect(0f, 0f, topStart * 2f, topStart * 2f),
+                startAngleDegrees = 180f,
+                sweepAngleDegrees = 90f,
+                forceMoveTo = false,
+            )
+            close()
+        }
+        return Outline.Generic(path)
+    }
+}
+
+private val ReportBodyShape = ReportCornerShape(cutCorner = true, roundBottomEnd = true)
+private val ReportTicketShape = ReportCornerShape(cutCorner = false, roundBottomEnd = false)
 
 internal data class HomeReportFinding(
     val credentialId: UUID,
@@ -123,30 +188,20 @@ internal fun HomeHealthReport(
         .removeSuffix("同步")
         .trim()
         .ifBlank { syncText }
-    val reportShape = RoundedCornerShape(
-        topStart = 20.dp,
-        topEnd = 5.dp,
-        bottomEnd = 20.dp,
-        bottomStart = 5.dp,
-    )
-    val ticketShape = RoundedCornerShape(
-        topStart = 20.dp,
-        topEnd = 5.dp,
-        bottomEnd = 0.dp,
-        bottomStart = 0.dp,
-    )
-
+    val ticketColor = if (isNormal) colors.reportTicketNormal else colors.reportTicket
+    val ticketMuted = if (isNormal) colors.reportTicketNormalMuted else colors.reportTicketMuted
+    val dialTrack = if (isNormal) colors.reportDialTrackNormal else colors.reportDialTrack
     Column(
         modifier = modifier
             .fillMaxWidth()
-            // 不用 Modifier.clip：异形圆角会吞掉报告内的点击命中区。
-            .background(colors.reportSurface, reportShape)
+            // 不用 Modifier.clip：异形切角会吞掉报告内的点击命中区。
+            .background(colors.reportSurface, ReportBodyShape)
             .testTag("home_health_report"),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(colors.reportTicket, ticketShape)
+                .background(ticketColor, ReportTicketShape)
                 .heightIn(min = 106.dp)
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -171,29 +226,24 @@ internal fun HomeHealthReport(
                     text = tail,
                     modifier = Modifier.testTag("report_tail"),
                     style = MyTokenType.section,
-                    color = if (isNormal) colors.reportTicketMuted else colors.reportTicketInk,
+                    color = if (isNormal) ticketMuted else colors.reportTicketInk,
                 )
             }
             ReportDial(
                 tones = cards.map(::homeHealthTone),
                 normal = normal,
                 total = total,
+                trackColor = dialTrack,
+                mutedColor = ticketMuted,
             )
         }
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-        ) {
-            if (isNormal) {
-                Text(
-                    text = "全部凭证的当前用量正常。\n各窗口的剩余额度可在下方卡片查看。",
-                    modifier = Modifier.padding(vertical = 12.dp),
-                    style = MyTokenType.caption,
-                    color = colors.reportMuted,
-                )
-            } else {
+        if (!isNormal) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+            ) {
                 findings.forEach { finding ->
                     ReportFindingRow(
                         finding = finding,
@@ -211,7 +261,7 @@ internal fun HomeHealthReport(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "最近同步 · $syncLabel",
+                text = "最近同步 $syncLabel",
                 modifier = Modifier.weight(1f),
                 style = MyTokenType.caption,
                 color = colors.reportMuted,
@@ -323,6 +373,8 @@ private fun ReportDial(
     tones: List<HomeHealthTone>,
     normal: Int,
     total: Int,
+    trackColor: Color,
+    mutedColor: Color,
     modifier: Modifier = Modifier,
 ) {
     val colors = MyTokenThemeTokens.colors
@@ -345,7 +397,7 @@ private fun ReportDial(
             tones.forEachIndexed { index, tone ->
                 drawArc(
                     color = if (tone == HomeHealthTone.Normal) {
-                        colors.reportDialTrack
+                        trackColor
                     } else {
                         colors.reportTicketInk
                     },
@@ -372,13 +424,13 @@ private fun ReportDial(
                     text = " / $total",
                     modifier = Modifier.padding(bottom = 2.dp),
                     style = MyTokenType.caption,
-                    color = colors.reportTicketMuted,
+                    color = mutedColor,
                 )
             }
             Text(
                 text = "用量正常",
                 style = MyTokenType.caption,
-                color = colors.reportTicketMuted,
+                color = mutedColor,
             )
         }
     }

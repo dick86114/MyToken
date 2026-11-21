@@ -148,7 +148,7 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun themeSelectorUsesBorderlessSingleRowOptions() {
+    fun themeSelectorUsesThreePreviewTilesInOneRow() {
         setContent()
 
         val tags = listOf("theme_option_SYSTEM", "theme_option_LIGHT", "theme_option_DARK")
@@ -156,6 +156,13 @@ class SettingsScreenTest {
             composeRule.onNodeWithTag(tag).getUnclippedBoundsInRoot().top.value
         }
         assertEquals("三个主题选项应在同一行", 1, tops.distinct().size)
+        tags.forEach { tag ->
+            composeRule.onNodeWithTag(tag).assertIsDisplayed()
+            composeRule.onNodeWithTag(
+                tag.replace("theme_option_", "theme_scene_"),
+                useUnmergedTree = true,
+            ).assertIsDisplayed()
+        }
         composeRule.onNodeWithTag("theme_option_SYSTEM").assertIsSelected()
         composeRule.onNodeWithTag("theme_option_DARK").performClick().assertIsSelected()
         composeRule.onNodeWithTag("theme_option_SYSTEM").assertIsNotSelected()
@@ -167,6 +174,14 @@ class SettingsScreenTest {
         setContent(drawerMode = true, onClose = { closed++ })
 
         composeRule.onNodeWithContentDescription("关闭设置", useUnmergedTree = true).assertIsDisplayed()
+        val closeBounds = composeRule.onNodeWithTag("settings_close", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val titleBounds = composeRule.onNodeWithTag("settings_title", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        assertTrue(
+            "关闭按钮应位于标题左侧，实际 close.right=${closeBounds.right.value} title.left=${titleBounds.left.value}",
+            closeBounds.right.value <= titleBounds.left.value,
+        )
         composeRule.onNodeWithTag("settings_close", useUnmergedTree = true).performClick()
 
         assertEquals(1, closed)
