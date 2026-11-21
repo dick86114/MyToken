@@ -35,6 +35,7 @@ fun NotificationSettingsSection(
     Section(title = "通知") {
         SettingSwitchRow(
             label = "凭证失效提醒",
+            supportingText = "Key 失效或权限不足时通知",
             checked = settings.credentialFailureAlertsEnabled,
             onChange = onCredentialFailureAlertsChange,
         )

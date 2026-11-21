@@ -72,7 +72,7 @@ class MyTokenTokensTest {
         assertEquals(8.dp, MyTokenSpacing.gridCompact)
         assertEquals(12.dp, MyTokenSpacing.gridFull)
         assertEquals(24.dp, MyTokenSpacing.section)
-        assertEquals(20.dp, MyTokenSpacing.settingsSection)
+        assertEquals(18.dp, MyTokenSpacing.settingsSection)
 
         assertEquals(20.dp, MyTokenRadius.card)
         assertEquals(12.dp, MyTokenRadius.inner)

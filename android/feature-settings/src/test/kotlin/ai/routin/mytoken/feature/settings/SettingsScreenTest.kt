@@ -2,6 +2,7 @@ package ai.routin.mytoken.feature.settings
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -37,6 +38,7 @@ class SettingsScreenTest {
         updateState: AppUpdateUiState = AppUpdateUiState.Idle,
         mirrorBase: String = "",
         onOpenInstallPermissionSettings: () -> Unit = {},
+        onCheckForUpdates: () -> Unit = {},
         logExportState: LogExportUiState = LogExportUiState.Idle,
         onExportLogs: () -> Unit = {},
         onShareLogs: () -> Unit = {},
@@ -76,6 +78,7 @@ class SettingsScreenTest {
                     onThemeModeChange = { displayStore.state.value = displayStore.state.value.copy(themeMode = it) },
                     onOpenTransfer = onOpenTransfer,
                     onOpenInstallPermissionSettings = onOpenInstallPermissionSettings,
+                    onCheckForUpdates = onCheckForUpdates,
                     logExportState = logExportState,
                     onExportLogs = onExportLogs,
                     onShareLogs = onShareLogs,
@@ -96,7 +99,7 @@ class SettingsScreenTest {
         composeRule.onNodeWithText("仅 Wi-Fi 下刷新").assertDoesNotExist()
         composeRule.onNodeWithText("打开应用时刷新").assertIsDisplayed()
         composeRule.onNodeWithText("失败后自动重试").assertIsDisplayed()
-        listOf("外观", "通知", "数据", "关于与更新").forEach { group ->
+        listOf("外观", "通知", "数据", "关于").forEach { group ->
             composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText(group))
             composeRule.onNodeWithText(group).assertIsDisplayed()
         }
@@ -174,8 +177,8 @@ class SettingsScreenTest {
         composeRule.onNodeWithTag("settings_theme_cell").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("settings_refresh_cell").performScrollTo().assertIsDisplayed()
         // 列表可滚动到底部的数据/关于分组，说明底部留白与手势区不遮挡内容。
-        composeRule.onNodeWithTag("settings_drawer_content").performScrollToNode(hasText("关于与更新"))
-        composeRule.onNodeWithText("关于与更新").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_drawer_content").performScrollToNode(hasText("关于"))
+        composeRule.onNodeWithText("关于").assertIsDisplayed()
     }
 
     @Test
@@ -183,7 +186,7 @@ class SettingsScreenTest {
         var exportCalls = 0
         setContent(onExportLogs = { exportCalls++ })
 
-        expandAbout()
+        scrollToAbout()
         composeRule.onNodeWithTag("settings_about_version")
             .performScrollTo()
             .performTouchInput { longClick() }
@@ -210,23 +213,23 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun aboutSectionUsesIconsAndConciseCopy() {
+    fun aboutSectionMatchesDesignRows() {
         setContent()
 
         scrollToAbout()
-        expandAbout(alreadyScrolled = true)
-        composeRule.onNodeWithText("关于与更新").assertIsDisplayed()
+        composeRule.onNodeWithText("关于").assertIsDisplayed()
+        composeRule.onNodeWithText("关于与更新").assertDoesNotExist()
         composeRule.onNodeWithTag("settings_about_version").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("打开 GitHub").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("版本").assertIsDisplayed()
+        composeRule.onNodeWithText("检查更新").assertIsDisplayed()
         composeRule.onNodeWithText("更新日志").assertExists()
         composeRule.onNodeWithText("更新源与令牌").assertExists()
+        composeRule.onNodeWithContentDescription("打开 GitHub").assertDoesNotExist()
         composeRule.onNodeWithText("当前版本修复内容").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("查看历史版本").assertDoesNotExist()
         composeRule.onNodeWithText("GitHub 令牌").assertDoesNotExist()
-        composeRule.onNodeWithText("当前版本更新日志").assertDoesNotExist()
-        composeRule.onNodeWithText("应用更新").assertDoesNotExist()
-        composeRule.onNodeWithText("查看历史版本").assertDoesNotExist()
-        composeRule.onNodeWithTag("check_updates_button").assertExists()
+        composeRule.onNodeWithTag("check_updates_button").assertDoesNotExist()
+        composeRule.onNodeWithTag("settings_check_updates").assertExists()
         composeRule.onNodeWithTag("update_channel_selector").assertDoesNotExist()
 
         // macOS-only settings must not appear on Android.
@@ -236,9 +239,59 @@ class SettingsScreenTest {
     }
 
     @Test
+    fun settingsProfileUsesProductLogo() {
+        setContent()
+
+        val logo = composeRule.onNodeWithTag("settings_brand_logo", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+            .getUnclippedBoundsInRoot()
+        assertEquals("品牌 logo 应保持 44dp", 44f, (logo.bottom - logo.top).value, 1f)
+        composeRule.onNodeWithText("M").assertDoesNotExist()
+    }
+
+    @Test
+    fun settingsRowsAndSectionsUseDesignRhythm() {
+        setContent()
+
+        // 设计稿为开关行补了说明文案；两行行高不再显得空旷。
+        composeRule.onNodeWithText("启动后立即拉取一次用量").assertIsDisplayed()
+        composeRule.onNodeWithText("网络波动时静默重试一次").assertIsDisplayed()
+        composeRule.onNodeWithText("Key 失效或权限不足时通知").assertIsDisplayed()
+
+        val header = composeRule.onNodeWithTag("settings_header").getUnclippedBoundsInRoot()
+        val profile = composeRule.onNodeWithTag("settings_profile").getUnclippedBoundsInRoot()
+        val headerGap = profile.top.value - header.bottom.value
+        assertTrue("资料卡应贴近页头，实际 ${headerGap}dp", headerGap <= 8f)
+
+        val appearance = composeRule.onNodeWithText("外观").getUnclippedBoundsInRoot()
+        val groupGap = appearance.top.value - profile.bottom.value
+        assertTrue("资料卡与首个分组间距应≤18dp，实际 ${groupGap}dp", groupGap <= 18f)
+
+        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText("通知"))
+        val refresh = composeRule.onNodeWithTag("settings_refresh_cell").getUnclippedBoundsInRoot()
+        val notification = composeRule.onNodeWithText("通知").getUnclippedBoundsInRoot()
+        val sectionGap = notification.top.value - refresh.bottom.value
+        assertTrue("设置分组间距应≤18dp，实际 ${sectionGap}dp", sectionGap <= 18f)
+    }
+
+    @Test
+    fun aboutCheckUpdateRowStartsCheck() {
+        var checks = 0
+        setContent(onCheckForUpdates = { checks++ })
+
+        scrollToAbout()
+        composeRule.onNodeWithTag("settings_check_updates")
+            .performScrollTo()
+            .performClick()
+
+        assertEquals(1, checks)
+    }
+
+    @Test
     fun historyIconOpensReleaseHistoryDialog() {
         setContent()
-        expandAbout()
+        scrollToAbout()
         expandReleaseNotes()
 
         composeRule.onNodeWithContentDescription("查看历史版本")
@@ -256,7 +309,7 @@ class SettingsScreenTest {
             updateState = AppUpdateUiState.NeedsInstallPermission("0.2.0"),
             onOpenInstallPermissionSettings = { openedPermissionSettings++ },
         )
-        expandAbout()
+        scrollToAbout()
 
         composeRule.onNodeWithText("授权并安装").assertExists()
         composeRule.onNodeWithText("打开安装权限设置").assertDoesNotExist()
@@ -273,14 +326,14 @@ class SettingsScreenTest {
         setContent()
 
         scrollToAbout()
-        composeRule.onNodeWithTag("settings_about_toggle").assertIsDisplayed()
-        composeRule.onNodeWithText("检测更新").assertDoesNotExist()
-        composeRule.onNodeWithText("更新日志").assertDoesNotExist()
-        composeRule.onNodeWithText("更新源与令牌").assertDoesNotExist()
+        composeRule.onNodeWithTag("settings_release_notes_toggle").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_update_advanced_toggle").assertIsDisplayed()
+        composeRule.onNodeWithTag("update_channel_selector").assertDoesNotExist()
+        composeRule.onNodeWithText("GitHub 令牌").assertDoesNotExist()
     }
 
     @Test
-    fun collapsedAboutSummarySurfacesAvailableUpdate() {
+    fun aboutRowSurfacesAvailableUpdate() {
         setContent(
             updateState = AppUpdateUiState.Available(
                 version = "0.2.0",
@@ -290,16 +343,16 @@ class SettingsScreenTest {
         )
 
         scrollToAbout()
-        composeRule.onNodeWithText("MyToken 0.1.0 · 发现新版本 v0.2.0").assertIsDisplayed()
-        composeRule.onNodeWithText("下载并安装").assertDoesNotExist()
+        composeRule.onNodeWithText("发现 v0.2.0").assertIsDisplayed()
+        composeRule.onNodeWithText("下载并安装").performScrollTo().assertIsDisplayed()
     }
 
     @Test
     fun aboutAndUpdateDetailsDiscloseProgressively() {
         setContent()
-        expandAbout()
+        scrollToAbout()
 
-        composeRule.onNodeWithText("检测更新").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_check_updates").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("更新日志").assertExists()
         composeRule.onNodeWithText("更新源与令牌").assertExists()
         composeRule.onNodeWithText("GitHub 令牌").assertDoesNotExist()
@@ -314,15 +367,7 @@ class SettingsScreenTest {
     }
 
     private fun scrollToAbout() {
-        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText("关于与更新"))
-        composeRule.waitForIdle()
-    }
-
-    private fun expandAbout(alreadyScrolled: Boolean = false) {
-        if (!alreadyScrolled) {
-            scrollToAbout()
-        }
-        composeRule.onNodeWithTag("settings_about_toggle").performClick()
+        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText("关于"))
         composeRule.waitForIdle()
     }
 

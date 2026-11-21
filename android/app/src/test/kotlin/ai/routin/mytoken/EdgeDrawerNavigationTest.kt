@@ -1,6 +1,7 @@
 package ai.routin.mytoken
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -10,6 +11,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -58,6 +60,44 @@ class EdgeDrawerNavigationTest {
             composeRule.onAllNodesWithTag("edge_drawer_end").fetchSemanticsNodes().isEmpty()
         }
         composeRule.onNodeWithTag("edge_drawer_end").assertDoesNotExist()
+    }
+
+    @Test
+    fun 抽屉手柄竖条居中于面板边框与页边距之间() {
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("home_open_credentials").performClick()
+        composeRule.waitForIdle()
+        val startDrawer = composeRule.onNodeWithTag("edge_drawer_start").getUnclippedBoundsInRoot()
+        val startBar = composeRule
+            .onNodeWithTag("edge_drawer_handle_bar_start", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val startCenter = (startBar.left.value + startBar.right.value) / 2f
+        assertEquals(
+            "左侧抽屉手柄应在 16dp 页边距中居中",
+            8f,
+            startDrawer.right.value - startCenter,
+            1f,
+        )
+
+        composeRule.onNodeWithTag("edge_drawer_scrim_start")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitUntil(3_000) {
+            composeRule.onAllNodesWithTag("edge_drawer_start").fetchSemanticsNodes().isEmpty()
+        }
+        composeRule.onNodeWithTag("home_open_settings").performClick()
+        composeRule.waitForIdle()
+        val endDrawer = composeRule.onNodeWithTag("edge_drawer_end").getUnclippedBoundsInRoot()
+        val endBar = composeRule
+            .onNodeWithTag("edge_drawer_handle_bar_end", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val endCenter = (endBar.left.value + endBar.right.value) / 2f
+        assertEquals(
+            "右侧抽屉手柄应在 16dp 页边距中居中",
+            8f,
+            endCenter - endDrawer.left.value,
+            1f,
+        )
     }
 
     @Test

@@ -18,7 +18,7 @@ object MyTokenSpacing {
     val gridCompact = 8.dp
     val gridFull = 12.dp
     val section = 24.dp
-    val settingsSection = 20.dp
+    val settingsSection = 18.dp
 }
 
 /** 圆角：卡片 20、内嵌/按钮 12、列表行 18、sheet 顶部 24。 */

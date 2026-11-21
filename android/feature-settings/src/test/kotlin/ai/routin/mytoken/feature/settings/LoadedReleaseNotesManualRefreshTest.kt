@@ -51,8 +51,7 @@ class LoadedReleaseNotesManualRefreshTest {
         }
 
         composeRule.onNodeWithTag("settings_list")
-            .performScrollToNode(hasText("关于与更新"))
-        composeRule.onNodeWithTag("settings_about_toggle").performClick()
+            .performScrollToNode(hasText("关于"))
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("settings_release_notes_toggle")
             .performScrollTo()

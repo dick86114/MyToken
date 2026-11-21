@@ -338,7 +338,8 @@ fun MyTokenEdgeDrawerHost(
                                 Alignment.CenterStart
                             },
                         )
-                        .width(24.dp)
+                        // 16dp 与抽屉页边距同宽，3dp 手柄正好落在页边距与面板边框中间。
+                        .width(16.dp)
                         .height(240.dp)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
@@ -360,7 +361,14 @@ fun MyTokenEdgeDrawerHost(
                             .width(3.dp)
                             .height(64.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)),
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f))
+                            .testTag(
+                                if (activeSide == MyTokenEdgeDrawerSide.Start) {
+                                    "edge_drawer_handle_bar_start"
+                                } else {
+                                    "edge_drawer_handle_bar_end"
+                                }
+                            ),
                     )
                 }
             }
