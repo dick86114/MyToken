@@ -8,6 +8,8 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
@@ -20,14 +22,14 @@ import kotlinx.coroutines.delay
 /** 首页三种滚动容器各自持有状态，离开首页再返回时保留位置。 */
 @Stable
 class HomeScrollStates(
-    val compact: LazyGridState = LazyGridState(),
+    val compact: LazyStaggeredGridState = LazyStaggeredGridState(),
     val full: LazyListState = LazyListState(),
     val fullWide: LazyGridState = LazyGridState(),
 )
 
 @Composable
 fun rememberHomeScrollStates(): HomeScrollStates {
-    val compact = rememberLazyGridState()
+    val compact = rememberLazyStaggeredGridState()
     val full = rememberLazyListState()
     val fullWide = rememberLazyGridState()
     return remember(compact, full, fullWide) { HomeScrollStates(compact, full, fullWide) }
@@ -74,9 +76,33 @@ internal suspend fun locateCard(
     durationMillis: Int = MyTokenMotion.locateMillis,
 ) {
     when (mode) {
-        HomeScrollMode.CompactGrid -> locateInGrid(states.compact, index, centerBiasPx, durationMillis)
+        HomeScrollMode.CompactGrid ->
+            locateInStaggeredGrid(states.compact, index, centerBiasPx, durationMillis)
         HomeScrollMode.FullWideGrid -> locateInGrid(states.fullWide, index, centerBiasPx, durationMillis)
         HomeScrollMode.FullList -> locateInList(states.full, index, centerBiasPx, durationMillis)
+    }
+}
+
+private suspend fun locateInStaggeredGrid(
+    state: LazyStaggeredGridState,
+    index: Int,
+    centerBiasPx: Float,
+    durationMillis: Int,
+) {
+    val viewportHeight = state.layoutInfo.viewportSize.height
+    state.animateScrollToItem(index, -viewportHeight / 3)
+    withFrameNanos { }
+    var item = state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
+    if (item == null) {
+        delay(16)
+        item = state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
+    }
+    item ?: return
+    val viewportCenter = state.layoutInfo.viewportSize.height / 2f
+    val itemCenter = item.offset.y + item.size.height / 2f
+    val delta = itemCenter - (viewportCenter - centerBiasPx)
+    if (abs(delta) > 1f) {
+        state.animateScrollBy(delta, tween(durationMillis, easing = FastOutSlowInEasing))
     }
 }
 

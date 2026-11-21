@@ -689,16 +689,30 @@ class HomeScreenTest {
     }
 
     @Test
-    fun compactCardHeightAllowsGrowthAboveNormalFontScale() {
-        val source = java.io.File(
-            System.getProperty("user.dir") ?: "",
-        ).resolve("src/main/kotlin/ai/routin/mytoken/feature/home/UsageCardSkeleton.kt")
-            .let { if (it.isFile) it else java.io.File("android/feature-home") .resolve("src/main/kotlin/ai/routin/mytoken/feature/home/UsageCardSkeleton.kt") }
-            .readText()
-        // 1.0× 固定高度保证卡片与内部节奏统一；更大字号退回最小高度避免裁切。
-        assertTrue(source.contains("fontScale <= 1.0f"))
-        assertTrue(source.contains("Modifier.height(CompactCardHeight)"))
-        assertTrue(source.contains("heightIn(min = CompactCardHeight)"))
+    fun compactCardsAreNotPinnedToFixedHeight() {
+        val credential = credential("单指标账户", ProviderId.Glm)
+        val usage = card(
+            credential,
+            metrics = listOf(progress(42.0, 100.0).copy(id = "five-hour", label = "5 小时")),
+        )
+        composeRule.setContent {
+            MyTokenTheme {
+                CredentialUsageCard(
+                    card = usage,
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.COMPACT,
+                )
+            }
+        }
+
+        val bounds = composeRule.onNodeWithTag(
+            "credential_card_${credential.id}",
+            useUnmergedTree = true,
+        ).getUnclippedBoundsInRoot()
+        val height = bounds.bottom - bounds.top
+        // 高度由内容决定：单行内容应明显低于旧的 288dp 固定高度。
+        assertTrue("简洁卡高度应随内容收缩，实际 $height", height < 280.dp)
     }
 
     @Test
@@ -717,7 +731,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun compactCardsShareInternalRhythm() {
+    fun compactCardsShareTopRhythmAndAdaptHeight() {
         val glm = card(
             credential("GLM 节奏", ProviderId.Glm),
             metrics = listOf(
@@ -730,8 +744,7 @@ class HomeScreenTest {
             metrics = listOf(
                 progress(42.0, 100.0).copy(id = "five-hour", label = "5 小时"),
                 progress(20.0, 100.0).copy(id = "weekly", label = "周"),
-                progress(30.0, 100.0).copy(id = "monthly", label = "月"),
-                progress(10.0, 100.0).copy(id = "credit-progress", label = "月额度"),
+                progress(30.0, 100.0).copy(id = "credit-progress", label = "月额度"),
             ),
         )
         composeRule.setContent {
@@ -766,7 +779,7 @@ class HomeScreenTest {
             "credential_card_${command.credential.id}",
             useUnmergedTree = true,
         ).getUnclippedBoundsInRoot()
-        assertEquals("卡片高度应一致", cardA.bottom - cardA.top, cardB.bottom - cardB.top)
+        assertEquals("卡片顶边应一致", cardA.top.value, cardB.top.value, 1f)
 
         val rings = composeRule.onAllNodesWithTag("compact_ring_primary", useUnmergedTree = true)
             .fetchSemanticsNodes()
@@ -779,11 +792,80 @@ class HomeScreenTest {
             1f,
         )
 
+        assertTrue(
+            "卡片高度应随内容自适应：多一行窗口的卡更高",
+            cardB.bottom - cardB.top > cardA.bottom - cardA.top,
+        )
+
         val footers = composeRule.onAllNodesWithTag("card_footer_left", useUnmergedTree = true)
             .fetchSemanticsNodes()
             .map { it.boundsInRoot }
         assertEquals("页脚数量", 2, footers.size)
-        assertEquals("页脚应贴底对齐", footers[0].top, footers[1].top, 1f)
+        assertTrue("页脚应跟随内容，而不是被固定高度撑开", footers[0].top < footers[1].top)
+    }
+
+    @Test
+    fun 简洁模式卡片按瀑布流排列() {
+        val short = card(
+            credential("瀑布短卡", ProviderId.Glm),
+            metrics = listOf(
+                progress(42.0, 100.0).copy(id = "five-hour", label = "5 小时"),
+                progress(20.0, 100.0).copy(id = "weekly", label = "周"),
+            ),
+        )
+        val tall = card(
+            credential("瀑布长卡", ProviderId.CommandCode),
+            metrics = listOf(
+                progress(42.0, 100.0).copy(id = "five-hour", label = "5 小时"),
+                progress(20.0, 100.0).copy(id = "weekly", label = "周"),
+                progress(30.0, 100.0).copy(id = "credit-progress", label = "月额度"),
+            ),
+        )
+        val third = card(
+            credential("瀑布第三张"),
+            metrics = listOf(progress(15.0, 100.0)),
+        )
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = listOf(short, tall, third),
+                        groups = listOf(
+                            group(ProviderId.Glm, listOf(short)),
+                            group(ProviderId.CommandCode, listOf(tall)),
+                        ),
+                        credentialCount = 3,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    usageCardDensity = UsageCardDensity.COMPACT,
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        fun bounds(id: UUID) = composeRule.onNodeWithTag(
+            "credential_card_$id",
+            useUnmergedTree = true,
+        ).getUnclippedBoundsInRoot()
+
+        val shortBounds = bounds(short.credential.id)
+        val tallBounds = bounds(tall.credential.id)
+        val thirdBounds = bounds(third.credential.id)
+
+        assertEquals("两列卡片顶边应对齐", shortBounds.top.value, tallBounds.top.value, 1f)
+        assertTrue(
+            "第三张应落在较矮的一列下方，而不是另起一行",
+            thirdBounds.top < tallBounds.bottom,
+        )
+        assertTrue(
+            "瀑布流不允许卡片重叠",
+            thirdBounds.top >= shortBounds.bottom,
+        )
     }
 
     @Test

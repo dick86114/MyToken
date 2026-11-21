@@ -24,8 +24,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -44,7 +42,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
@@ -53,9 +50,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-
-/** 简洁卡片等高：2 列网格里页脚对齐；1.3× 字体退回单列后改为自适应高度。 */
-internal val CompactCardHeight = 288.dp
 
 internal enum class UsageCardHealth { Normal, Warning, Critical, Stale, Failed, Loading, Disabled }
 
@@ -133,7 +127,7 @@ internal fun usageCardRingTone(health: UsageCardHealth): UsageMetricTone = when 
 internal fun usageCardRingInactive(health: UsageCardHealth): Boolean =
     health == UsageCardHealth.Stale || health == UsageCardHealth.Failed || health == UsageCardHealth.Loading
 
-/** 卡片外框：实色表面 + hairline，无阴影；简洁模式固定高度让网格行等高。 */
+/** 卡片外框：实色表面 + hairline，无阴影；高度随内容，内部节奏由固定行高保持。 */
 @Composable
 internal fun UsageCardFrame(
     density: UsageCardDensity,
@@ -143,18 +137,10 @@ internal fun UsageCardFrame(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val compact = density.isCompact()
-    val fixedHeight = compact && LocalDensity.current.fontScale <= 1.0f
     val interactionSource = remember { MutableInteractionSource() }
     MyTokenSurface(
         modifier = modifier
             .fillMaxWidth()
-            .then(
-                when {
-                    fixedHeight -> Modifier.height(CompactCardHeight)
-                    compact -> Modifier.heightIn(min = CompactCardHeight)
-                    else -> Modifier
-                },
-            )
             .myTokenPressScale(interactionSource, pressedScale = 0.99f)
             .clickable(
                 interactionSource = interactionSource,
@@ -165,32 +151,14 @@ internal fun UsageCardFrame(
         surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
         shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
     ) {
-        val padding = if (compact) 14.dp else 16.dp
-        if (fixedHeight) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    content()
-                }
-                footer()
-            }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(padding),
-                verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
-            ) {
-                content()
-                footer()
-            }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(if (compact) 14.dp else 16.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
+        ) {
+            content()
+            footer()
         }
     }
 }

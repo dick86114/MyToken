@@ -28,6 +28,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items as staggeredItems
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
@@ -284,17 +287,18 @@ fun HomeScreen(
                                     ) { card -> cardItem(card) }
                                 }
 
-                                HomeScrollMode.CompactGrid -> LazyVerticalGrid(
+                                // 简洁卡高度随内容自适应，用瀑布流避免相邻列因行数不同而对不齐。
+                                HomeScrollMode.CompactGrid -> LazyVerticalStaggeredGrid(
+                                    columns = StaggeredGridCells.Fixed(columns),
                                     state = homeScrollStates.compact,
-                                    columns = GridCells.Fixed(columns),
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .testTag(gridTag),
                                     contentPadding = contentPadding,
+                                    verticalItemSpacing = spacing,
                                     horizontalArrangement = Arrangement.spacedBy(spacing),
-                                    verticalArrangement = Arrangement.spacedBy(spacing),
                                 ) {
-                                    gridItems(
+                                    staggeredItems(
                                         items = visibleCards,
                                         key = { it.credential.id },
                                         contentType = { "credential-usage-card" },
