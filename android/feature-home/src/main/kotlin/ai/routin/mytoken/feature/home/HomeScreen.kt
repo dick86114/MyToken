@@ -14,6 +14,7 @@ import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageCardDensity
 import ai.routin.mytoken.domain.usage.RefreshStatus
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -111,6 +113,7 @@ fun HomeScreen(
     var headerHeightPx by remember { mutableIntStateOf(0) }
 
     val fontScale = LocalDensity.current.fontScale
+    val densitySwipeThreshold = with(LocalDensity.current) { 48.dp.toPx() }
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
     val mode = homeScrollMode(usageCardDensity, screenWidthDp)
     val columns = homeGridColumns(mode, screenWidthDp, fontScale)
@@ -159,7 +162,12 @@ fun HomeScreen(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .background(colors.canvas),
+                .background(colors.canvas)
+                .swipeToSwitchDensity(
+                    density = usageCardDensity,
+                    onToggleDensity = onToggleUsageCardDensity,
+                    thresholdPx = densitySwipeThreshold,
+                ),
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 Column(
@@ -361,4 +369,28 @@ private fun EmptyState(
             text = "添加凭证",
         )
     }
+}
+
+/** 左滑切到完整模式，右滑切回简洁模式；到边界不循环。 */
+private fun Modifier.swipeToSwitchDensity(
+    density: UsageCardDensity,
+    onToggleDensity: () -> Unit,
+    thresholdPx: Float,
+): Modifier = pointerInput(density, thresholdPx) {
+    var totalDrag = 0f
+    detectHorizontalDragGestures(
+        onDragStart = { totalDrag = 0f },
+        onDragCancel = { totalDrag = 0f },
+        onHorizontalDrag = { change, dragAmount ->
+            totalDrag += dragAmount
+            change.consume()
+        },
+        onDragEnd = {
+            if (totalDrag <= -thresholdPx && density == UsageCardDensity.COMPACT) {
+                onToggleDensity()
+            } else if (totalDrag >= thresholdPx && density == UsageCardDensity.FULL) {
+                onToggleDensity()
+            }
+        },
+    )
 }

@@ -1,7 +1,10 @@
 package ai.routin.mytoken
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -101,61 +104,52 @@ class EdgeDrawerNavigationTest {
     }
 
     @Test
-    fun 主页中部右滑可以打开凭证抽屉() {
+    fun 主页左滑切到完整模式且不打开抽屉() {
         composeRule.waitForIdle()
+        selectDensity(compact = true)
 
-        composeRule.onRoot().performTouchInput {
-            val y = height / 2f
-            down(Offset(width * 0.42f, y))
-            moveTo(Offset(width * 0.88f, y), delayMillis = 180)
-            up()
-        }
+        swipeAcrossHome(left = true)
 
         composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithTag("edge_drawer_start").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodes(hasTestTag("usage_density_option_full") and isSelected())
+                .fetchSemanticsNodes()
+                .isNotEmpty()
         }
-        composeRule.onNodeWithTag("edge_drawer_start").assertIsDisplayed()
+        composeRule.onNodeWithTag("usage_density_option_full").assertIsSelected()
+        composeRule.onAllNodesWithTag("edge_drawer_start").fetchSemanticsNodes().isEmpty()
+        composeRule.onAllNodesWithTag("edge_drawer_end").fetchSemanticsNodes().isEmpty()
     }
 
     @Test
-    fun 主页中部左滑可以打开设置抽屉() {
+    fun 主页右滑切回简洁模式且不打开抽屉() {
         composeRule.waitForIdle()
+        selectDensity(compact = false)
 
-        composeRule.onRoot().performTouchInput {
-            val y = height / 2f
-            down(Offset(width * 0.58f, y))
-            moveTo(Offset(width * 0.12f, y), delayMillis = 180)
-            up()
-        }
+        swipeAcrossHome(left = false)
 
         composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithTag("edge_drawer_end").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodes(hasTestTag("usage_density_option_compact") and isSelected())
+                .fetchSemanticsNodes()
+                .isNotEmpty()
         }
-        composeRule.onNodeWithTag("edge_drawer_end").assertIsDisplayed()
+        composeRule.onNodeWithTag("usage_density_option_compact").assertIsSelected()
+        composeRule.onAllNodesWithTag("edge_drawer_start").fetchSemanticsNodes().isEmpty()
+        composeRule.onAllNodesWithTag("edge_drawer_end").fetchSemanticsNodes().isEmpty()
     }
 
     @Test
-    fun 抽屉反复开合后首页仍然可以点击() {
+    fun 按钮反复开合抽屉后首页仍然可以点击() {
         composeRule.waitForIdle()
 
         repeat(3) {
-            composeRule.onRoot().performTouchInput {
-                val y = height / 2f
-                down(Offset(width * 0.42f, y))
-                moveTo(Offset(width * 0.88f, y), delayMillis = 140)
-                up()
-            }
+            composeRule.onNodeWithTag("home_open_credentials").performClick()
             composeRule.waitUntil(5_000) {
                 composeRule.onAllNodesWithTag("edge_drawer_start")
                     .fetchSemanticsNodes()
                     .isNotEmpty()
             }
-            composeRule.onNodeWithTag("edge_drawer_start").performTouchInput {
-                val y = height / 2f
-                down(Offset(width * 0.82f, y))
-                moveTo(Offset(width * 0.08f, y), delayMillis = 140)
-                up()
-            }
+            composeRule.onNodeWithTag("edge_drawer_scrim_start")
+                .performSemanticsAction(SemanticsActions.OnClick)
             composeRule.waitUntil(5_000) {
                 composeRule.onAllNodesWithTag("edge_drawer_start")
                     .fetchSemanticsNodes()
@@ -170,5 +164,29 @@ class EdgeDrawerNavigationTest {
                 .isNotEmpty()
         }
         composeRule.onNodeWithTag("edge_drawer_end").assertIsDisplayed()
+    }
+
+    private fun selectDensity(compact: Boolean) {
+        val tag = if (compact) "usage_density_option_compact" else "usage_density_option_full"
+        composeRule.onNodeWithTag(tag).performClick()
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodes(hasTestTag(tag) and isSelected())
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+    }
+
+    private fun swipeAcrossHome(left: Boolean) {
+        composeRule.onRoot().performTouchInput {
+            val y = height * 0.55f
+            if (left) {
+                down(Offset(width * 0.62f, y))
+                moveTo(Offset(width * 0.18f, y), delayMillis = 180)
+            } else {
+                down(Offset(width * 0.38f, y))
+                moveTo(Offset(width * 0.82f, y), delayMillis = 180)
+            }
+            up()
+        }
     }
 }

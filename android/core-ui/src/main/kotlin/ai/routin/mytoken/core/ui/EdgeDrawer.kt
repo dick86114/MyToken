@@ -57,7 +57,6 @@ enum class MyTokenEdgeDrawerSide {
 @Composable
 fun MyTokenEdgeDrawerHost(
     drawerSide: MyTokenEdgeDrawerSide?,
-    onDrawerOpenRequested: (MyTokenEdgeDrawerSide) -> Unit,
     onDismissRequest: () -> Unit,
     startDrawer: @Composable () -> Unit,
     endDrawer: @Composable () -> Unit,
@@ -126,51 +125,6 @@ fun MyTokenEdgeDrawerHost(
                 }
             }
         }
-        // 收起动画还没结束就再次滑动时，也允许直接取消旧动画并拉出另一侧。
-        // 手势开始后会设置 dragging=true；此处不能把 dragging 作为指针输入开关，
-        // 否则 pointerInput 会在识别过程中被移除，表现为完全滑不动。
-        val edgeSwipeEnabled = drawerSide == null
-
-        fun beginEdgeDrag(sideValue: MyTokenEdgeDrawerSide) {
-            dragging = true
-            dragSide = sideValue
-            mountedSide = sideValue
-            dragProgress = 0f
-            releaseVelocity = 0f
-        }
-
-        fun finishEdgeDrag(sideValue: MyTokenEdgeDrawerSide, velocity: Float) {
-            val inwardVelocity = if (sideValue == MyTokenEdgeDrawerSide.Start) velocity else -velocity
-            val projectedPx = (inwardVelocity / 1000f) * 0.998f / (1f - 0.998f)
-            val projectedProgress = dragProgress + projectedPx / drawerWidthPx
-            val shouldOpen = dragProgress > 0.22f || projectedProgress > 0.45f
-            val progressVelocity = (inwardVelocity / drawerWidthPx).coerceIn(-8f, 8f)
-            val current = dragProgress
-            scope.launch {
-                progress.snapTo(current)
-                dragging = false
-                dragSide = null
-                mountedSide = sideValue
-                releaseVelocity = progressVelocity
-                if (shouldOpen) {
-                    onDrawerOpenRequested(sideValue)
-                } else {
-                    onDismissRequest()
-                }
-            }
-        }
-
-        fun cancelEdgeDrag(sideValue: MyTokenEdgeDrawerSide) {
-            val current = dragProgress
-            scope.launch {
-                progress.snapTo(current)
-                dragging = false
-                dragSide = null
-                mountedSide = sideValue
-                releaseVelocity = 0f
-            }
-        }
-
         fun beginDismissDrag() {
             dragging = true
             dragProgress = progress.value
@@ -219,16 +173,6 @@ fun MyTokenEdgeDrawerHost(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .edgeSwipeToOpen(
-                    enabled = edgeSwipeEnabled,
-                    drawerWidthPx = drawerWidthPx,
-                    onStart = ::beginEdgeDrag,
-                    onDelta = { delta ->
-                        dragProgress = (dragProgress + delta).coerceIn(0f, 1f)
-                    },
-                    onCancel = ::cancelEdgeDrag,
-                    onEnd = ::finishEdgeDrag,
-                )
                 .graphicsLayer {
                     val p = if (dragging) dragProgress else progress.value
                     val scale = 1f - 0.015f * p
@@ -374,84 +318,6 @@ fun MyTokenEdgeDrawerHost(
             }
         }
 
-    }
-}
-
-private fun Modifier.edgeSwipeToOpen(
-    enabled: Boolean,
-    drawerWidthPx: Float,
-    onStart: (MyTokenEdgeDrawerSide) -> Unit,
-    onDelta: (Float) -> Unit,
-    onCancel: (MyTokenEdgeDrawerSide) -> Unit,
-    onEnd: (MyTokenEdgeDrawerSide, Float) -> Unit,
-): Modifier {
-    if (!enabled) return this
-    return pointerInput(enabled, drawerWidthPx) {
-        val touchSlop = viewConfiguration.touchSlop
-        awaitEachGesture {
-            val down = awaitFirstDown(requireUnconsumed = false)
-            val tracker = VelocityTracker()
-            tracker.addPosition(down.uptimeMillis, down.position)
-            var totalX = 0f
-            var totalY = 0f
-            var started = false
-            var aborted = false
-            var canceled = false
-            var side: MyTokenEdgeDrawerSide? = null
-
-            var finalized = false
-            try {
-                while (true) {
-                    val event = awaitPointerEvent()
-                    val change = event.changes.firstOrNull { it.id == down.id }
-                    if (change == null) {
-                        canceled = true
-                        break
-                    }
-                    val dx = change.position.x - change.previousPosition.x
-                    val dy = change.position.y - change.previousPosition.y
-                    totalX += dx
-                    totalY += dy
-                    tracker.addPosition(change.uptimeMillis, change.position)
-                    if (!started && !aborted) {
-                        if (abs(totalX) > touchSlop && abs(totalX) > abs(totalY)) {
-                            side = if (totalX > 0) {
-                                MyTokenEdgeDrawerSide.Start
-                            } else {
-                                MyTokenEdgeDrawerSide.End
-                            }
-                            started = true
-                            onStart(side)
-                            val direction = if (side == MyTokenEdgeDrawerSide.Start) 1f else -1f
-                            onDelta(totalX * direction / drawerWidthPx)
-                            change.consume()
-                        } else if (abs(totalY) > touchSlop && abs(totalY) > abs(totalX)) {
-                            aborted = true
-                        }
-                    } else if (started) {
-                        val direction = if (side == MyTokenEdgeDrawerSide.Start) 1f else -1f
-                        onDelta(dx * direction / drawerWidthPx)
-                        change.consume()
-                    }
-                    if (!change.pressed) break
-                }
-                if (started) {
-                    if (canceled) {
-                        onCancel(side ?: MyTokenEdgeDrawerSide.Start)
-                    } else {
-                        onEnd(
-                            side ?: MyTokenEdgeDrawerSide.Start,
-                            tracker.calculateVelocity().x,
-                        )
-                    }
-                }
-                finalized = true
-            } finally {
-                if (started && !finalized) {
-                    onCancel(side ?: MyTokenEdgeDrawerSide.Start)
-                }
-            }
-        }
     }
 }
 

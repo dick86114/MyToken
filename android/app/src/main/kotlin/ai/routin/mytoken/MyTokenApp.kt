@@ -224,7 +224,6 @@ fun MyTokenApp(
         AppScreen.Home -> {
             MyTokenEdgeDrawerHost(
                 drawerSide = drawerSide,
-                onDrawerOpenRequested = { drawerSide = it },
                 onDismissRequest = { drawerSide = null },
                 startDrawer = {
                     CredentialListScreen(
