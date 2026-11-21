@@ -37,7 +37,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -76,6 +75,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -94,11 +94,9 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import java.util.UUID
 import kotlin.math.min
-import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -121,6 +119,9 @@ fun HomeScreen(
     onOpenSettings: () -> Unit = {},
     hasUpdateAvailable: Boolean = false,
     updateVersion: String? = null,
+    updateReleaseNotes: String? = null,
+    updateConfirmLabel: String = "下载并安装",
+    onConfirmUpdate: () -> Unit = onOpenSettings,
     layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
     usageCardDensity: UsageCardDensity = UsageCardDensity.FULL,
     onToggleUsageCardDensity: () -> Unit = {},
@@ -165,6 +166,7 @@ fun HomeScreen(
     var pullTriggered by remember { mutableStateOf(false) }
     var pullSettleJob by remember { mutableStateOf<Job?>(null) }
     var pendingLocateId by remember { mutableStateOf<UUID?>(null) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
 
     val density = LocalDensity.current
     val topNavHeightPx = with(density) { 60.dp.toPx() }
@@ -174,7 +176,7 @@ fun HomeScreen(
     val chromeVisible = !state.isLoading && allCards.isNotEmpty()
     val latestRefreshing by rememberUpdatedState(state.isRefreshingAll)
     val latestRefreshAll by rememberUpdatedState(onRefreshAll)
-    // 头部折叠只改绘制位移，不再改变分页区高度；列表仍按原生滚动手感走。
+    // 列表原生滚动；头部在 onPostScroll 里同步跟随，不再拦截 fling。
     val pullConnection = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(
@@ -183,15 +185,9 @@ fun HomeScreen(
             ): Offset {
                 if (source != NestedScrollSource.UserInput) return Offset.Zero
                 if (available.y < 0f) {
-                    // 手势一旦向上滚动就不再允许它在回顶后顺带触发刷新。
                     pullArmed = false
-                    val current = collapsedPx.coerceIn(0f, headerHeightPx.toFloat())
-                    val consume = min(-available.y, headerHeightPx - current)
-                    if (consume <= 0f) return Offset.Zero
-                    collapsedPx = current + consume
-                    return Offset(0f, -consume)
+                    return Offset.Zero
                 }
-                // 报告完全展开、列表也在顶部时先截住下拉增量做刷新。
                 if (!pullArmed || latestRefreshing || collapsedPx > 0f) {
                     return Offset.Zero
                 }
@@ -206,15 +202,12 @@ fun HomeScreen(
                 available: Offset,
                 source: NestedScrollSource,
             ): Offset {
-                if (source != NestedScrollSource.UserInput || available.y <= 0f) {
-                    return Offset.Zero
+                val max = headerHeightPx.toFloat()
+                if (max > 0f && consumed.y != 0f) {
+                    // 列表滚了多少，头部就同步收起/展开多少。
+                    collapsedPx = (collapsedPx - consumed.y).coerceIn(0f, max)
                 }
-                // 列表先滚回顶部，剩余下拉距离再展开报告。
-                val current = collapsedPx.coerceIn(0f, headerHeightPx.toFloat())
-                if (current <= 0f) return Offset.Zero
-                val expand = min(available.y, current)
-                collapsedPx = current - expand
-                return Offset(0f, expand)
+                return Offset.Zero
             }
         }
     }
@@ -224,8 +217,6 @@ fun HomeScreen(
             collapsedPx = 0f
         }
     }
-    // 报告条目变化会改变头部高度；收起位移不能超过新的头部高度，
-    // 否则分页内容会被推到导航上方。
     LaunchedEffect(headerHeightPx) {
         if (collapsedPx > headerHeightPx) {
             collapsedPx = headerHeightPx.toFloat()
@@ -256,8 +247,32 @@ fun HomeScreen(
         HomeScrollMode.FullList -> homeScrollStates.full
     }
 
-    // 头部与分页内容共用同一个收起位移；读取只发生在布局/绘制阶段，
-    // 滚动时不会触发整页重组，也不会改变分页区高度。
+    // 程序化定位不会派发 nested scroll；直接读第一张卡的布局位移来同步头部。
+    // 首卡 offset 恰为负的列表滚动量，offset 缺失即已滚过整块头部。
+    fun collapseTargetFromList(): Float {
+        val max = headerHeightPx.toFloat()
+        if (max <= 0f) return 0f
+        val firstCardOffset = when (homeScrollMode(usageCardDensity, screenWidthDp)) {
+            HomeScrollMode.FullList ->
+                homeScrollStates.full.layoutInfo.visibleItemsInfo
+                    .firstOrNull { it.index == 0 }?.offset
+            HomeScrollMode.FullWideGrid ->
+                homeScrollStates.fullWide.layoutInfo.visibleItemsInfo
+                    .firstOrNull { it.index == 0 }?.offset?.y
+            HomeScrollMode.CompactGrid ->
+                homeScrollStates.compact.layoutInfo.visibleItemsInfo
+                    .firstOrNull { it.index == 0 }?.offset?.y
+        }
+        return if (firstCardOffset == null) {
+            max
+        } else {
+            (-firstCardOffset).toFloat().coerceIn(0f, max)
+        }
+    }
+
+    val headerHeightDp = with(density) { headerHeightPx.toDp() }
+
+    // 收起进度只读同步累积的位移；读取发生在布局/绘制阶段，不触发整页重组。
     val collapseProgressState = remember {
         derivedStateOf {
             if (headerHeightPx <= 0) 0f else (collapsedPx / headerHeightPx).coerceIn(0f, 1f)
@@ -361,19 +376,22 @@ fun HomeScreen(
         val index = visibleCards.indexOfFirst { it.credential.id == id }
         if (index < 0) return
         scope.launch {
-            // 定位会把内容滚上来，报告同步收起，分页区因此恢复完整高度；
-            // 这样最后一张卡片也能进入可视区域，而不是被覆盖层压到屏幕下方。
-            if (headerHeightPx > 0) {
-                collapsedPx = headerHeightPx.toFloat()
+            // 定位滚动不会派发 nested scroll，让头部跟随定位过程同步收起。
+            val collapseTracker = launch {
+                snapshotFlow { collapseTargetFromList() }
+                    .distinctUntilChanged()
+                    .collect { collapsedPx = it }
             }
             locateCard(
                 states = homeScrollStates,
                 mode = homeScrollMode(usageCardDensity, screenWidthDp),
                 index = index,
-                // 分页区从固定导航下方开始，补偿导航高度的一半即可居中。
-                centerBiasPx = topNavHeightPx / 2f,
+                // 列表带有与覆盖层等高的顶部留白；居中时要同时补偿导航与留白。
+                centerBiasPx = topNavHeightPx / 2f + headerHeightPx,
                 durationMillis = MyTokenMotion.locateDurationMillis(motionEnabled),
             )
+            collapseTracker.cancel()
+            collapsedPx = collapseTargetFromList()
             highlightedCredentialId = id
             flashTick += 1
             delay(1_000)
@@ -440,7 +458,7 @@ fun HomeScreen(
         }
 
         Box(modifier = Modifier.fillMaxSize()) {
-            val contentPadding = PaddingValues(top = 2.dp, bottom = 12.dp)
+            val contentPadding = PaddingValues(top = headerHeightDp + 2.dp, bottom = 12.dp)
             val spacing = if (pageDensity.isCompact()) 8.dp else 12.dp
             when (pageMode) {
                     HomeScrollMode.FullList -> LazyColumn(
@@ -574,9 +592,7 @@ fun HomeScreen(
                             beyondViewportPageCount = 1,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .graphicsLayer {
-                                    translationY = pullOffsetPx + headerHeightPx - collapsedPx
-                                }
+                                .graphicsLayer { translationY = pullOffsetPx }
                                 .testTag("home_pager"),
                             key = { page -> page },
                         ) { page ->
@@ -617,37 +633,29 @@ fun HomeScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .offset {
-                                        IntOffset(
-                                            0,
-                                            (
-                                                pullOffsetPx - collapsedPx
-                                                ).roundToInt(),
-                                        )
+                                    // 只用图层位移，滚动时不会让整块头部重新测量。
+                                    .graphicsLayer {
+                                        translationY =
+                                            pullOffsetPx - headerHeightPx * collapseProgress()
+                                    }
+                                    // 底色必须放在图层内，否则收起后仍以原尺寸盖住下方卡片。
+                                    .background(colors.canvas)
+                                    // 完全收起后不再绘制整块报告，深列表快速 fling 更轻。
+                                    .drawWithContent {
+                                        if (collapseProgress() < 1f) drawContent()
                                     }
                                     .onSizeChanged { headerHeightPx = it.height }
                                     // 报告本身不可滚动：在头部直接上/下拖也驱动当前列表滚动，
                                     // 与在卡片列表上的纵向手势保持一致。
                                     .pointerInput(Unit) {
                                         detectVerticalDragGestures { change, dragAmount ->
-                                            val max = headerHeightPx.toFloat()
                                             if (dragAmount < 0f) {
                                                 // 同一次手势只要向上滚过，就要求重新起手才能下拉刷新。
                                                 pullArmed = false
-                                                val current = collapsedPx.coerceIn(0f, max)
-                                                val collapse = min(-dragAmount, max - current)
-                                                if (collapse > 0f) {
-                                                    collapsedPx = current + collapse
-                                                }
-                                                val leftover = -dragAmount - collapse
-                                                if (leftover > 0f) {
-                                                    // 报告收起后剩余距离继续驱动列表滚动。
-                                                    activeScrollableState().dispatchRawDelta(leftover)
-                                                }
-                                            } else if (collapsedPx > 0f) {
-                                                collapsedPx =
-                                                    (collapsedPx - min(dragAmount, collapsedPx))
-                                                        .coerceAtLeast(0f)
+                                                // dispatchRawDelta 正值向列表尾部滚动，与手势方向相反。
+                                                val consumed = activeScrollableState().dispatchRawDelta(-dragAmount)
+                                                collapsedPx = (collapsedPx + consumed)
+                                                    .coerceIn(0f, headerHeightPx.toFloat())
                                             } else if (activePageAtTop()) {
                                                 if (
                                                     pullArmed &&
@@ -665,8 +673,9 @@ fun HomeScreen(
                                                     }
                                                 }
                                             } else {
-                                                // dispatchRawDelta 正值向列表尾部滚动，与手势方向相反。
-                                                activeScrollableState().dispatchRawDelta(-dragAmount)
+                                                val consumed = activeScrollableState().dispatchRawDelta(-dragAmount)
+                                                collapsedPx = (collapsedPx + consumed)
+                                                    .coerceIn(0f, headerHeightPx.toFloat())
                                             }
                                             change.consume()
                                         }
@@ -676,7 +685,7 @@ fun HomeScreen(
                                 if (hasUpdateAvailable) {
                                     HomeUpdateBanner(
                                         version = updateVersion,
-                                        onOpenSettings = onOpenSettings,
+                                        onOpenUpdate = { showUpdateDialog = true },
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
                                 }
@@ -733,6 +742,19 @@ fun HomeScreen(
                 }
             }
         }
+    }
+
+    if (showUpdateDialog) {
+        HomeUpdateDialog(
+            version = updateVersion,
+            releaseNotes = updateReleaseNotes,
+            confirmLabel = updateConfirmLabel,
+            onConfirm = {
+                showUpdateDialog = false
+                onConfirmUpdate()
+            },
+            onDismiss = { showUpdateDialog = false },
+        )
     }
 }
 

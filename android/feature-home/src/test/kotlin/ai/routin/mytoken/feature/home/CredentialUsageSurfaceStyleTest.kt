@@ -88,6 +88,23 @@ class CredentialUsageSurfaceStyleTest {
     }
 
     @Test
+    fun `头部底色跟随收起位移而不是留在原位遮挡卡片`() {
+        val home = sourceText("HomeScreen.kt")
+        val header = home
+            .substringAfter("// 报告和工具条是覆盖层")
+            .substringBefore(".testTag(\"home_collapsing_header\")")
+        val layer = header.indexOf(".graphicsLayer")
+        val background = header.indexOf(".background(colors.canvas)")
+
+        assertTrue("头部缺少位移图层", layer >= 0)
+        assertTrue("头部缺少实色底", background >= 0)
+        assertTrue(
+            "头部底色必须画在位移民图层内部，否则收起后仍会覆盖下方卡片",
+            layer < background,
+        )
+    }
+
+    @Test
     fun `密度切换组件不做加载动画`() {
         val chrome = sourceText("HomeChrome.kt")
 

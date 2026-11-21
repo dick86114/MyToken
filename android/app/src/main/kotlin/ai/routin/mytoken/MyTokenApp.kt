@@ -206,6 +206,26 @@ fun MyTokenApp(
         is AppUpdateUiState.ReadyToInstall -> update.version
         else -> null
     }
+    val pendingUpdateNotes = (updateState as? AppUpdateUiState.Available)?.releaseNotes
+    val pendingUpdateConfirmLabel = when (updateState) {
+        is AppUpdateUiState.ReadyToInstall,
+        is AppUpdateUiState.NeedsInstallPermission,
+        -> "安装更新"
+        else -> "下载并安装"
+    }
+    val confirmPendingUpdate: () -> Unit = when (val update = updateState) {
+        is AppUpdateUiState.Available -> {
+            { settingsViewModel.downloadAndInstall(update.version, update.downloadUrl) }
+        }
+        is AppUpdateUiState.ReadyToInstall,
+        is AppUpdateUiState.NeedsInstallPermission,
+        -> {
+            { settingsViewModel.installDownloadedUpdate() }
+        }
+        else -> {
+            {}
+        }
+    }
 
     LaunchedEffect(settingsState.isLoading) {
         if (!settingsState.isLoading && settingsState.refresh.openAppRefresh) {
@@ -337,6 +357,9 @@ fun MyTokenApp(
                     onOpenSettings = { drawerSide = MyTokenEdgeDrawerSide.End },
                     hasUpdateAvailable = pendingUpdateVersion != null,
                     updateVersion = pendingUpdateVersion,
+                    updateReleaseNotes = pendingUpdateNotes,
+                    updateConfirmLabel = pendingUpdateConfirmLabel,
+                    onConfirmUpdate = confirmPendingUpdate,
                     homeScrollStates = homeScrollStates,
                 )            }
         }

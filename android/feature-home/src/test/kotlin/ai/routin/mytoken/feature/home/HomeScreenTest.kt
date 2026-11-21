@@ -2412,6 +2412,9 @@ class HomeScreenTest {
         }
         composeRule.waitForIdle()
 
+        // 定位由程序化滚动驱动，头部也必须同步收起，不能继续盖住居中的卡片。
+        composeRule.onNodeWithTag("home_nav_summary", useUnmergedTree = true)
+            .assertIsDisplayed()
         val root = composeRule.onRoot().getUnclippedBoundsInRoot()
         val card = activeNode("credential_card_${cards[3].credential.id}")
             .getUnclippedBoundsInRoot()
@@ -2679,6 +2682,49 @@ class HomeScreenTest {
         )
         composeRule.onNodeWithTag("home_nav_summary", useUnmergedTree = true)
             .assertDoesNotExist()
+    }
+
+    @Test
+    fun 小幅上滑时报告跟手收起而不是整块消失() {
+        val cards = (1..8).map { index ->
+            card(credential("小幅 $index"), metrics = listOf(progress(90.0, 100.0)))
+        }
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = cards,
+                        groups = emptyList(),
+                        credentialCount = cards.size,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        val navBottom = composeRule.onNodeWithTag("home_toolbar")
+            .getUnclippedBoundsInRoot()
+            .bottom
+        composeRule.onNodeWithTag("home_list_full").performTouchInput {
+            val startY = height * 0.88f
+            down(Offset(width / 2f, startY))
+            moveTo(Offset(width / 2f, startY - 120f), delayMillis = 600)
+            up()
+        }
+        composeRule.waitForIdle()
+
+        val report = composeRule.onNodeWithTag("home_health_report")
+            .getUnclippedBoundsInRoot()
+        assertTrue(
+            "小幅上滑后报告仍应有一部分留在视口内，实际 top=${report.top.value} bottom=${report.bottom.value} nav=${navBottom.value}",
+            report.top.value < navBottom.value && report.bottom.value > navBottom.value + 20f,
+        )
     }
 
     @Test
@@ -3127,8 +3173,9 @@ class HomeScreenTest {
     }
 
     @Test
-    fun 有可用更新时报告上方显示黄色更新提示条并可进设置() {
+    fun 有可用更新时报告上方显示星星提示条并弹窗确认更新() {
         var openedSettings = 0
+        var confirmedUpdates = 0
         composeRule.setContent {
             MaterialTheme {
                 HomeScreen(
@@ -3146,11 +3193,14 @@ class HomeScreenTest {
                     onOpenSettings = { openedSettings++ },
                     hasUpdateAvailable = true,
                     updateVersion = "6.1.0",
+                    updateReleaseNotes = "## 本次更新\n- 修复快速滑动卡顿\n- 更新提示支持星星光效",
+                    onConfirmUpdate = { confirmedUpdates++ },
                 )
             }
         }
 
         composeRule.onNodeWithTag("home_update_badge", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag("home_update_star", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithTag("home_update_banner").assertIsDisplayed()
         composeRule.onNodeWithText("发现新版本 6.1.0", useUnmergedTree = true).assertIsDisplayed()
         val banner = composeRule.onNodeWithTag("home_update_banner")
@@ -3163,9 +3213,17 @@ class HomeScreenTest {
         )
 
         composeRule.onNodeWithTag("home_update_banner").performClick()
-        assertEquals(1, openedSettings)
+        composeRule.onNodeWithTag("home_update_dialog").assertIsDisplayed()
+        composeRule.onNodeWithText("本次更新", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithText("修复快速滑动卡顿", substring = true, useUnmergedTree = true).assertIsDisplayed()
+        assertEquals(0, openedSettings)
+
+        composeRule.onNodeWithTag("home_update_confirm").performClick()
+        assertEquals(1, confirmedUpdates)
+        assertEquals(0, openedSettings)
+        composeRule.onNodeWithTag("home_update_dialog").assertDoesNotExist()
         composeRule.onNodeWithTag("home_open_settings").performClick()
-        assertEquals(2, openedSettings)
+        assertEquals(1, openedSettings)
     }
 
     @Test
