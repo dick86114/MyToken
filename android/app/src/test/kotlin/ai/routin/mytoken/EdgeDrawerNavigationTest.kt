@@ -177,14 +177,14 @@ class EdgeDrawerNavigationTest {
     }
 
     private fun swipeAcrossHome(left: Boolean) {
-        composeRule.onRoot().performTouchInput {
-            val y = height * 0.55f
+        composeRule.onNodeWithTag("home_pager").performTouchInput {
+            val y = height * 0.4f
             if (left) {
-                down(Offset(width * 0.62f, y))
-                moveTo(Offset(width * 0.18f, y), delayMillis = 180)
+                down(Offset(width * 0.8f, y))
+                moveTo(Offset(width * 0.2f, y), delayMillis = 180)
             } else {
-                down(Offset(width * 0.38f, y))
-                moveTo(Offset(width * 0.82f, y), delayMillis = 180)
+                down(Offset(width * 0.2f, y))
+                moveTo(Offset(width * 0.8f, y), delayMillis = 180)
             }
             up()
         }

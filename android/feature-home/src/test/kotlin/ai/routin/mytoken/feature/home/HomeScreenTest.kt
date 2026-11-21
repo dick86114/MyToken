@@ -38,6 +38,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -2294,6 +2296,64 @@ class HomeScreenTest {
         composeRule.onNodeWithTag("usage_density_option_full").performClick()
         composeRule.onNodeWithTag("usage_density_option_full").assertIsSelected()
         assertEquals(1, toggleCount)
+    }
+
+    @Test
+    fun 横向拖动卡片区切换模式并在松手后停靠() {
+        var density by mutableStateOf(UsageCardDensity.COMPACT)
+        composeRule.setContent {
+            MaterialTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = listOf(card(credential("滑动手势"))),
+                        groups = emptyList(),
+                        credentialCount = 1,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    usageCardDensity = density,
+                    onToggleUsageCardDensity = {
+                        density = if (density == UsageCardDensity.COMPACT) {
+                            UsageCardDensity.FULL
+                        } else {
+                            UsageCardDensity.COMPACT
+                        }
+                    },
+                )
+            }
+        }
+
+        // 按住并拖到一半：页面应已经跟着手指平移，而不是松手后才切换。
+        composeRule.onNodeWithTag("home_pager").performTouchInput {
+            down(Offset(width * 0.8f, height * 0.4f))
+            moveTo(Offset(width * 0.5f, height * 0.4f), delayMillis = 150)
+        }
+        composeRule.waitForIdle()
+        val draggedBounds = composeRule.onNodeWithTag("home_grid_2_columns")
+            .getUnclippedBoundsInRoot()
+        assertTrue(
+            "左滑过程中简洁页应跟随手势左移，实际 left=${draggedBounds.left}",
+            draggedBounds.left.value < -10f,
+        )
+        composeRule.onNodeWithTag("home_list_full").assertExists()
+        composeRule.onNodeWithTag("home_pager").performTouchInput {
+            moveTo(Offset(width * 0.2f, height * 0.4f), delayMillis = 100)
+            up()
+        }
+        composeRule.waitUntil(5_000) { density == UsageCardDensity.FULL }
+        assertEquals(UsageCardDensity.FULL, density)
+
+        composeRule.onNodeWithTag("home_pager").performTouchInput {
+            down(Offset(width * 0.2f, height * 0.4f))
+            moveTo(Offset(width * 0.8f, height * 0.4f), delayMillis = 150)
+            up()
+        }
+        composeRule.waitUntil(5_000) { density == UsageCardDensity.COMPACT }
+        assertEquals(UsageCardDensity.COMPACT, density)
     }
 
     @Test
