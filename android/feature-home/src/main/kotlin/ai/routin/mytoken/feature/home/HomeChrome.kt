@@ -6,8 +6,11 @@ import ai.routin.mytoken.core.ui.MyTokenSize
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.ProviderLogoPlate
+import ai.routin.mytoken.core.ui.isMyTokenDarkTheme
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageCardDensity
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -52,12 +55,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -68,10 +74,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import java.util.UUID
-import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 internal enum class HomeHealthTone { Normal, Warning, Critical }
@@ -98,45 +102,132 @@ internal fun homeHealthTone(card: CredentialCardUi): HomeHealthTone =
 @Composable
 internal fun HomeToolbar(
     credentialCount: Int,
+    headlineCount: Int,
+    summaryTail: String,
+    alertProviders: List<ProviderId>,
+    collapseProgress: Float,
     onOpenCredentials: () -> Unit,
     onOpenSettings: () -> Unit,
     hasUpdateAvailable: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val colors = MyTokenThemeTokens.colors
+    val darkTheme = isMyTokenDarkTheme()
+    val progress = collapseProgress.coerceIn(0f, 1f)
+    // 字标先退场、摘要再进场，避免两段文案在中间状态叠在一起。
+    val wordmarkAlpha = (1f - progress * 2.2f).coerceIn(0f, 1f)
+    val summaryAlpha = ((progress - 0.45f) / 0.55f).coerceIn(0f, 1f)
+    // 页面上滑时导航底色由画布色过渡到报告票面黄，logo 保持原位；
+    // 品牌字标上移淡出，报告摘要与报警供应商 logo 从右侧淡入。
     Row(
         modifier = modifier
             .fillMaxWidth()
             .height(60.dp)
+            .background(lerp(colors.canvas, colors.reportTicket, progress))
             .testTag("home_toolbar"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
             modifier = Modifier
                 .height(48.dp)
-                .widthIn(min = MyTokenSize.touch)
+                .weight(1f)
                 .clip(RoundedCornerShape(12.dp))
                 .clickable(role = Role.Button, onClick = onOpenCredentials)
-                .semantics { contentDescription = "MyToken，打开凭证列表，共 $credentialCount 个凭证" }
+                .semantics {
+                    contentDescription = if (progress > 0.5f) {
+                        "MyToken，$headlineCount 个凭证$summaryTail，打开凭证列表"
+                    } else {
+                        "MyToken，打开凭证列表，共 $credentialCount 个凭证"
+                    }
+                }
                 .testTag("home_open_credentials"),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
         ) {
-            MyTokenBrandMark(
-                size = 28.dp,
-                modifier = Modifier.testTag("home_brand"),
-            )
-            Text(
-                text = "MyToken",
-                modifier = Modifier.testTag("home_wordmark"),
-                style = MyTokenType.section,
-                fontWeight = FontWeight(700),
-                color = colors.ink,
-                maxLines = 1,
-            )
+            Box(modifier = Modifier.size(28.dp)) {
+                if (darkTheme) {
+                    MyTokenBrandMark(
+                        size = 28.dp,
+                        modifier = Modifier
+                            .alpha(1f - progress)
+                            .testTag("home_brand"),
+                    )
+                    // 黄色导航上用黑色标，避免深色外观的白标失去对比。
+                    MyTokenBrandMark(
+                        size = 28.dp,
+                        darkTheme = false,
+                        modifier = Modifier.alpha(progress),
+                    )
+                } else {
+                    MyTokenBrandMark(
+                        size = 28.dp,
+                        modifier = Modifier.testTag("home_brand"),
+                    )
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
+                    .padding(start = 9.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text(
+                    text = "MyToken",
+                    modifier = Modifier
+                        .graphicsLayer {
+                            alpha = wordmarkAlpha
+                            translationY = -6.dp.toPx() * progress
+                        }
+                        .testTag("home_wordmark"),
+                    style = MyTokenType.section,
+                    fontWeight = FontWeight(700),
+                    color = colors.ink,
+                    maxLines = 1,
+                )
+                if (summaryAlpha > 0.01f) {
+                    Row(
+                        modifier = Modifier
+                            .graphicsLayer {
+                                alpha = summaryAlpha
+                                translationY = (1f - summaryAlpha) * 4.dp.toPx()
+                            }
+                            .testTag("home_nav_summary"),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    ) {
+                        Text(
+                            text = "${headlineCount}个凭证",
+                            modifier = Modifier.testTag("home_nav_summary_count"),
+                            style = MyTokenType.label,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colors.reportTicketInk,
+                            maxLines = 1,
+                        )
+                        Text(
+                            text = summaryTail,
+                            modifier = Modifier
+                                .weight(1f, fill = false)
+                                .testTag("home_nav_summary_tail"),
+                            style = MyTokenType.caption,
+                            fontWeight = FontWeight.Medium,
+                            color = colors.reportTicketMuted,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        )
+                        alertProviders.take(4).forEachIndexed { index, provider ->
+                            ProviderLogoPlate(
+                                painter = painterResource(ProviderCatalog.logoRes(provider)),
+                                contentDescription = null,
+                                size = 20.dp,
+                                shape = RoundedCornerShape(6.dp),
+                                contentPadding = 2.dp,
+                                modifier = Modifier.testTag("home_nav_alert_logo_$index"),
+                            )
+                        }
+                    }
+                }
+            }
         }
-
-        Spacer(modifier = Modifier.weight(1f))
 
         Box(
             modifier = Modifier
@@ -155,7 +246,7 @@ internal fun HomeToolbar(
             Icon(
                 imageVector = Icons.Outlined.Settings,
                 contentDescription = null,
-                tint = colors.ink,
+                tint = lerp(colors.ink, colors.reportTicketInk, progress),
                 modifier = Modifier.size(20.dp),
             )
             if (hasUpdateAvailable) {
@@ -512,19 +603,16 @@ private fun DensityModeSwitch(
             val inset = 3.dp
             val segmentWidth = (maxWidth - inset * 2) / 2
             val segmentHeight = maxHeight - inset * 2
-            val insetPx = with(LocalDensity.current) { inset.toPx() }
             val segmentWidthPx = with(LocalDensity.current) { segmentWidth.toPx() }
             Box(
                 modifier = Modifier
-                    .offset {
-                        IntOffset(
-                            x = insetPx.roundToInt() +
-                                (segmentWidthPx * progress().coerceIn(0f, 1f)).roundToInt(),
-                            y = insetPx.roundToInt(),
-                        )
-                    }
+                    .offset(x = inset, y = inset)
                     .width(segmentWidth)
                     .height(segmentHeight)
+                    // 只用 draw 阶段位移，拖动分页时不会整块重新布局而闪动。
+                    .graphicsLayer {
+                        translationX = segmentWidthPx * progress().coerceIn(0f, 1f)
+                    }
                     .clip(RoundedCornerShape(10.dp))
                     .background(colors.ink)
                     .testTag("usage_density_thumb"),
@@ -575,9 +663,15 @@ private fun RowScope.DensityIconOption(
             .testTag(testTag),
         contentAlignment = Alignment.Center,
     ) {
+        // 选中态在落页时切换；用短过渡代替瞬时反色，避免整个切换控件闪一下。
+        val tint by animateColorAsState(
+            targetValue = if (selected) colors.canvas else colors.muted,
+            animationSpec = tween(durationMillis = 180),
+            label = "density-glyph-tint",
+        )
         DensityGlyph(
             compact = compact,
-            tint = if (selected) colors.canvas else colors.muted,
+            tint = tint,
             emphasized = selected,
         )
     }

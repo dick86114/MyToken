@@ -493,6 +493,7 @@ fun MyTokenApp(
                 state = listState,
                 layoutMode = MyTokenLayoutMode.Compact,
                 drawerMode = true,
+                applyWindowInsets = false,
                 onToggleEnabled = credentialListViewModel::toggleEnabled,
                 onMove = credentialListViewModel::move,
                 onEditCredential = { id -> dismiss { navigate(AppScreen.Editor(id)) } },

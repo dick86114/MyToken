@@ -2524,7 +2524,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun 上滑时供应商工具条跟随卡片上移并固顶在导航下方() {
+    fun 上滑后固定导航展示用量摘要且供应商工具条不再固顶() {
         val cards = (1..20).map { index ->
             card(credential("上滑 $index"), metrics = listOf(progress(20.0, 100.0)))
         }
@@ -2572,16 +2572,17 @@ class HomeScreenTest {
             .getUnclippedBoundsInRoot()
         val reportAfter = composeRule.onNodeWithTag("home_health_report")
             .getUnclippedBoundsInRoot()
-        assertEquals(
-            "工具条应固顶在导航下方",
-            navBottom.value,
-            toolbarAfter.top.value,
-            2f,
+        assertTrue(
+            "供应商工具条应完全滑出视口，实际底部 ${toolbarAfter.bottom.value}",
+            toolbarAfter.bottom.value <= navBottom.value + 2f,
         )
         assertTrue(
             "报告应随卡片一起滑出视口，实际底部 ${reportAfter.bottom.value}",
             reportAfter.bottom.value <= navBottom.value + 2f,
         )
+        composeRule.onNodeWithTag("home_nav_summary", useUnmergedTree = true)
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("home_open_settings").assertIsDisplayed()
 
         repeat(2) {
             composeRule.onNodeWithTag("home_list_full").performTouchInput {
@@ -2595,6 +2596,8 @@ class HomeScreenTest {
             "下拉到列表顶部后报告应重新展开，实际底部 ${reportRestored.bottom.value}",
             reportRestored.bottom.value > navBottom.value + 100f,
         )
+        composeRule.onNodeWithTag("home_nav_summary", useUnmergedTree = true)
+            .assertDoesNotExist()
     }
 
     @Test
@@ -2629,31 +2632,31 @@ class HomeScreenTest {
             swipeUp(startY = height * 0.9f, endY = height * 0.1f - height * 1.5f, durationMillis = 300)
         }
         composeRule.waitForIdle()
-        assertEquals(
-            "在报告上上滑也应把工具条固顶到导航下方",
-            navBottom.value,
+        assertTrue(
+            "在报告上上滑也应把报告和工具条一起收起",
             composeRule.onNodeWithTag("home_provider_toolbar")
                 .getUnclippedBoundsInRoot()
-                .top
-                .value,
-            2f,
+                .bottom
+                .value <= navBottom.value + 2f,
         )
+        composeRule.onNodeWithTag("home_nav_summary", useUnmergedTree = true)
+            .assertIsDisplayed()
 
-        composeRule.onNodeWithTag("home_collapsing_header").performTouchInput {
-            swipeDown(startY = 10f, endY = 600f, durationMillis = 300)
+        composeRule.onNodeWithTag("home_list_full").performTouchInput {
+            swipeDown(startY = height * 0.15f, endY = height * 0.85f, durationMillis = 300)
         }
         composeRule.waitForIdle()
         val reportBottom = composeRule.onNodeWithTag("home_health_report")
             .getUnclippedBoundsInRoot()
             .bottom
         assertTrue(
-            "在固顶工具条上下拉应重新展开报告，实际底部 ${reportBottom.value}",
+            "从列表顶部下拉应重新展开报告，实际底部 ${reportBottom.value}",
             reportBottom.value > navBottom.value + 100f,
         )
     }
 
     @Test
-    fun 卡片末尾提供新增与管理凭证入口() {
+    fun 卡片末尾只保留居中的管理凭证胶囊() {
         val credential = credential("入口")
         var addCalls = 0
         var manageCalls = 0
@@ -2677,15 +2680,74 @@ class HomeScreenTest {
             }
         }
 
-        activeNode("home_add_credential").assertIsDisplayed()
-        activeText("把其他账户也放到这里").assertIsDisplayed()
+        activeNode("home_add_credential").assertDoesNotExist()
+        activeText("把其他账户也放到这里").assertDoesNotExist()
         activeNode("home_manage_credentials").assertIsDisplayed()
-        activeText("启停、编辑与调整顺序").assertIsDisplayed()
+        activeText("管理凭证").assertIsDisplayed()
 
-        activeNode("home_add_credential").performClick()
+        val pillBounds = activeNode("home_manage_credentials").getUnclippedBoundsInRoot()
+        val rootBounds = composeRule.onRoot().getUnclippedBoundsInRoot()
+        val pillCenter = (pillBounds.left.value + pillBounds.right.value) / 2f
+        val rootCenter = (rootBounds.left.value + rootBounds.right.value) / 2f
+        assertTrue(
+            "管理凭证胶囊应水平居中，实际 pill=$pillCenter root=$rootCenter",
+            abs(pillCenter - rootCenter) <= 2f,
+        )
+
         activeNode("home_manage_credentials").performClick()
-        assertEquals(1, addCalls)
+        assertEquals(0, addCalls)
         assertEquals(1, manageCalls)
+    }
+
+    @Test
+    fun 上滑后导航摘要展示报警供应商logo() {
+        val warningRoutin = card(
+            credential("报警 Routin", ProviderId.Routin),
+            metrics = listOf(progress(90.0, 100.0)),
+        )
+        val warningGlm = card(
+            credential("报警 GLM", ProviderId.Glm),
+            metrics = listOf(progress(95.0, 100.0)),
+        )
+        val cards = listOf(warningRoutin, warningGlm) + (1..18).map { index ->
+            card(credential("普通 $index"), metrics = listOf(progress(10.0, 100.0)))
+        }
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = cards,
+                        groups = emptyList(),
+                        credentialCount = cards.size,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("home_list_full").performTouchInput {
+            swipeUp(startY = height * 0.75f, endY = height * 0.1f, durationMillis = 300)
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("home_nav_summary", useUnmergedTree = true)
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("home_nav_summary_count", useUnmergedTree = true)
+            .assertTextEquals("2个凭证")
+        composeRule.onNodeWithTag("home_nav_summary_tail", useUnmergedTree = true)
+            .assertTextEquals("接近上限")
+        composeRule.onNodeWithTag("home_nav_alert_logo_0", useUnmergedTree = true)
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("home_nav_alert_logo_1", useUnmergedTree = true)
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("home_nav_alert_logo_2", useUnmergedTree = true)
+            .assertDoesNotExist()
     }
 
     @Test

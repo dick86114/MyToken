@@ -7,6 +7,7 @@ import ai.routin.mytoken.core.ui.MyTokenButtonTone
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.MyTokenMotion
 import ai.routin.mytoken.core.ui.MyTokenRadius
+import ai.routin.mytoken.core.ui.MyTokenSize
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.rememberMyTokenMotionEnabled
@@ -35,7 +36,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -53,10 +53,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.outlined.ListAlt
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -81,6 +77,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -143,6 +140,17 @@ fun HomeScreen(
             ?.let { provider -> allCards.filter { it.credential.providerId == provider } }
             ?: allCards
     }
+    // 固定导航收起后展示与报告一致的摘要；报警凭证的供应商 logo 横向跟随。
+    val reportFindings = remember(allCards) { homeReportFindings(allCards) }
+    val navHeadlineCount = if (reportFindings.isEmpty()) allCards.size else reportFindings.size
+    val navSummaryTail = when {
+        reportFindings.isEmpty() -> "用量正常"
+        reportFindings.any { it.failed } -> "需注意"
+        else -> "接近上限"
+    }
+    val navAlertProviders = remember(reportFindings) {
+        reportFindings.map { it.providerId }.distinct().take(4)
+    }
 
     val motionEnabled = rememberMyTokenMotionEnabled()
     val scope = rememberCoroutineScope()
@@ -158,14 +166,12 @@ fun HomeScreen(
 
     val density = LocalDensity.current
     val topNavHeightPx = with(density) { 60.dp.toPx() }
-    val toolbarHeightPx = with(density) { 64.dp.toPx() }
     val pullThresholdPx = with(density) { 56.dp.toPx() }
     val pullMaxPx = with(density) { 96.dp.toPx() }
     val pullHoldPx = with(density) { 56.dp.toPx() }
     val chromeVisible = !state.isLoading && allCards.isNotEmpty()
-    val latestMaxCollapsePx by rememberUpdatedState(
-        (headerHeightPx - toolbarHeightPx).coerceAtLeast(0f),
-    )
+    // 供应商工具条不再固顶：报告与工具条一起完全收起，只留下固定导航。
+    val latestMaxCollapsePx by rememberUpdatedState(headerHeightPx.toFloat())
     val latestRefreshing by rememberUpdatedState(state.isRefreshingAll)
     val latestRefreshAll by rememberUpdatedState(onRefreshAll)
     // 只响应用户手势：报告定位等程序化滚动应保持报告可见，不被折叠逻辑截走。
@@ -424,10 +430,7 @@ fun HomeScreen(
                             contentType = { "credential-usage-card" },
                         ) { card -> cardItem(card, pageDensity) }
                         item(key = "credential_end", contentType = "credential-end") {
-                            CredentialEndActions(
-                                onAdd = onAddManually,
-                                onManage = onManageCredentials,
-                            )
+                            CredentialEndActions(onManage = onManageCredentials)
                         }
                     }
 
@@ -452,10 +455,7 @@ fun HomeScreen(
                             contentType = "credential-end",
                             span = { GridItemSpan(maxLineSpan) },
                         ) {
-                            CredentialEndActions(
-                                onAdd = onAddManually,
-                                onManage = onManageCredentials,
-                            )
+                            CredentialEndActions(onManage = onManageCredentials)
                         }
                     }
 
@@ -481,10 +481,7 @@ fun HomeScreen(
                             contentType = "credential-end",
                             span = StaggeredGridItemSpan.FullLine,
                         ) {
-                            CredentialEndActions(
-                                onAdd = onAddManually,
-                                onManage = onManageCredentials,
-                            )
+                            CredentialEndActions(onManage = onManageCredentials)
                         }
                     }
                 }
@@ -506,166 +503,200 @@ fun HomeScreen(
         }
     }
 
+    val navCollapseProgress = if (headerHeightPx > 0) {
+        (collapsedPx / headerHeightPx).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
     Scaffold { padding ->
-        MyTokenAdaptiveContent(
-            maxWidth = 1440.dp,
-            horizontalPadding = 16.dp,
+        Box(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
                 .background(colors.canvas),
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                HomeToolbar(
-                    credentialCount = state.cards.size,
-                    onOpenCredentials = onOpenCredentials,
-                    onOpenSettings = onOpenSettings,
-                    hasUpdateAvailable = hasUpdateAvailable,
-                )
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .then(pullGestureModifier),
-                ) {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        if (pullOffsetPx > 0.5f) {
-                            Spacer(
-                                modifier = Modifier.height(
-                                    with(density) { pullOffsetPx.toDp() },
-                                ),
-                            )
-                        }
-                        if (chromeVisible) {
-                            // 报告和筛选工具条一起上移；只收起报告高度，工具条最终停在导航下方。
-                            Layout(
-                                content = {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .onSizeChanged { headerHeightPx = it.height },
-                                    ) {
-                                        HomeHealthReport(
-                                            cards = allCards,
-                                            syncText = state.lastUpdatedText ?: "刚刚同步",
-                                            isRefreshing = state.isRefreshingAll,
-                                            onRefresh = onRefreshAll,
-                                            onLocate = ::requestLocate,
-                                        )
-                                        HomeProviderToolbar(
-                                            selectedProvider = selectedProvider,
-                                            providers = visibleProviders,
-                                            counts = providerCounts,
-                                            allTotal = allCards.size,
-                                            onSelect = {
-                                                pendingLocateId = null
-                                                selectedProvider = it
-                                            },
-                                            density = usageCardDensity,
-                                            onToggleDensity = onToggleUsageCardDensity,
-                                            densityProgress = {
-                                                (pagerState.currentPage + pagerState.currentPageOffsetFraction)
-                                                    .coerceIn(0f, 1f)
-                                            },
-                                        )
-                                    }
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clipToBounds()
-                                    // 报告本身不可滚动：在头部直接上/下拖也能收起或展开，
-                                    // 与在卡片列表上的纵向手势保持一致。
-                                    .pointerInput(Unit) {
-                                        detectVerticalDragGestures { change, dragAmount ->
-                                            val max = latestMaxCollapsePx
-                                            if (max <= 0f) return@detectVerticalDragGestures
-                                            val current = collapsedPx.coerceIn(0f, max)
-                                            if (dragAmount < 0f) {
-                                                val delta = min(-dragAmount, max - current)
-                                                if (delta != 0f) {
-                                                    collapsedPx = current + delta
-                                                    change.consume()
-                                                }
-                                            } else if (current > 0f) {
-                                                val delta = min(dragAmount, current)
-                                                if (delta != 0f) {
-                                                    collapsedPx = current - delta
-                                                    change.consume()
-                                                }
-                                            } else if (pullArmed && !latestRefreshing && !pullTriggered) {
-                                                val remaining = (pullMaxPx - pullOffsetPx).coerceAtLeast(0f)
-                                                if (remaining > 0f) {
-                                                    pullOffsetPx += min(dragAmount * 0.55f, remaining)
-                                                    change.consume()
+            // 导航底色铺满屏幕宽度，内容仍按 1440dp 居中。
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp)
+                    .background(
+                        lerp(colors.canvas, colors.reportTicket, navCollapseProgress),
+                    ),
+            )
+            MyTokenAdaptiveContent(
+                maxWidth = 1440.dp,
+                horizontalPadding = 16.dp,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    HomeToolbar(
+                        credentialCount = state.cards.size,
+                        headlineCount = navHeadlineCount,
+                        summaryTail = navSummaryTail,
+                        alertProviders = navAlertProviders,
+                        collapseProgress = navCollapseProgress,
+                        onOpenCredentials = onOpenCredentials,
+                        onOpenSettings = onOpenSettings,
+                        hasUpdateAvailable = hasUpdateAvailable,
+                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .then(pullGestureModifier),
+                    ) {
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            if (pullOffsetPx > 0.5f) {
+                                Spacer(
+                                    modifier = Modifier.height(
+                                        with(density) { pullOffsetPx.toDp() },
+                                    ),
+                                )
+                            }
+                            if (chromeVisible) {
+                                // 报告和供应商工具条一起完全收起，固定导航负责展示摘要。
+                                Layout(
+                                    content = {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .onSizeChanged { headerHeightPx = it.height },
+                                        ) {
+                                            HomeHealthReport(
+                                                cards = allCards,
+                                                syncText = state.lastUpdatedText ?: "刚刚同步",
+                                                isRefreshing = state.isRefreshingAll,
+                                                onRefresh = onRefreshAll,
+                                                onLocate = ::requestLocate,
+                                            )
+                                            HomeProviderToolbar(
+                                                selectedProvider = selectedProvider,
+                                                providers = visibleProviders,
+                                                counts = providerCounts,
+                                                allTotal = allCards.size,
+                                                onSelect = {
+                                                    pendingLocateId = null
+                                                    selectedProvider = it
+                                                },
+                                                density = usageCardDensity,
+                                                // 点击只驱动分页动画；落页后再持久化模式，
+                                                // 避免选中态先跳变造成整块闪烁。
+                                                onToggleDensity = {
+                                                    val targetPage =
+                                                        if (pagerState.currentPage == 0) 1 else 0
+                                                    scope.launch {
+                                                        if (motionEnabled) {
+                                                            pagerState.animateScrollToPage(targetPage)
+                                                        } else {
+                                                            pagerState.scrollToPage(targetPage)
+                                                        }
+                                                    }
+                                                },
+                                                densityProgress = {
+                                                    (pagerState.currentPage + pagerState.currentPageOffsetFraction)
+                                                        .coerceIn(0f, 1f)
+                                                },
+                                            )
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clipToBounds()
+                                        // 报告本身不可滚动：在头部直接上/下拖也能收起或展开，
+                                        // 与在卡片列表上的纵向手势保持一致。
+                                        .pointerInput(Unit) {
+                                            detectVerticalDragGestures { change, dragAmount ->
+                                                val max = latestMaxCollapsePx
+                                                if (max <= 0f) return@detectVerticalDragGestures
+                                                val current = collapsedPx.coerceIn(0f, max)
+                                                if (dragAmount < 0f) {
+                                                    val delta = min(-dragAmount, max - current)
+                                                    if (delta != 0f) {
+                                                        collapsedPx = current + delta
+                                                        change.consume()
+                                                    }
+                                                } else if (current > 0f) {
+                                                    val delta = min(dragAmount, current)
+                                                    if (delta != 0f) {
+                                                        collapsedPx = current - delta
+                                                        change.consume()
+                                                    }
+                                                } else if (pullArmed && !latestRefreshing && !pullTriggered) {
+                                                    val remaining = (pullMaxPx - pullOffsetPx).coerceAtLeast(0f)
+                                                    if (remaining > 0f) {
+                                                        pullOffsetPx += min(dragAmount * 0.55f, remaining)
+                                                        change.consume()
+                                                    }
                                                 }
                                             }
                                         }
-                                    }
-                                    .testTag("home_collapsing_header"),
-                            ) { measurables, constraints ->
-                                val content = measurables.first().measure(
-                                    constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity),
-                                )
-                                val maxCollapse = (content.height - toolbarHeightPx).coerceAtLeast(0f)
-                                val collapse = collapsedPx.coerceIn(0f, maxCollapse).roundToInt()
-                                layout(constraints.maxWidth, (content.height - collapse).coerceAtLeast(0)) {
-                                    content.place(0, -collapse)
-                                }
-                            }
-                        }
-
-                        HorizontalPager(
-                            state = pagerState,
-                            // 两种密度都提前组合并测量，首次滑动不会像“重新加载”一页。
-                            beyondViewportPageCount = 1,
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth()
-                                .testTag("home_pager"),
-                            key = { page -> page },
-                        ) { page ->
-                            val pageDensity = if (page == 0) {
-                                UsageCardDensity.COMPACT
-                            } else {
-                                UsageCardDensity.FULL
-                            }
-                            // 两页都提前组合；静止时只有当前页进入无障碍树和测试语义树。
-                            val pageActive = pagerState.isScrollInProgress || pagerState.settledPage == page
-                            val pageSemantics = if (pageActive) {
-                                Modifier.testTag("home_page_active")
-                            } else {
-                                Modifier.clearAndSetSemantics { }
-                            }
-                            Box(modifier = Modifier.fillMaxSize().then(pageSemantics)) {
-                                when {
-                                    state.isLoading -> Box(
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        CircularProgressIndicator()
-                                    }
-
-                                    allCards.isEmpty() -> EmptyState(
-                                        modifier = Modifier.fillMaxSize(),
-                                        onImportFromMac = onImportFromMac,
-                                        onAddManually = onAddManually,
+                                        .testTag("home_collapsing_header"),
+                                ) { measurables, constraints ->
+                                    val content = measurables.first().measure(
+                                        constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity),
                                     )
+                                    val maxCollapse = content.height.toFloat()
+                                    val collapse = collapsedPx.coerceIn(0f, maxCollapse).roundToInt()
+                                    layout(constraints.maxWidth, (content.height - collapse).coerceAtLeast(0)) {
+                                        content.place(0, -collapse)
+                                    }
+                                }
+                            }
 
-                                    else -> modePage(pageDensity = pageDensity)
+                            HorizontalPager(
+                                state = pagerState,
+                                // 两种密度都提前组合并测量，首次滑动不会像“重新加载”一页。
+                                beyondViewportPageCount = 1,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
+                                    .testTag("home_pager"),
+                                key = { page -> page },
+                            ) { page ->
+                                val pageDensity = if (page == 0) {
+                                    UsageCardDensity.COMPACT
+                                } else {
+                                    UsageCardDensity.FULL
+                                }
+                                // 两页都提前组合；静止时只有当前页进入无障碍树和测试语义树。
+                                val pageActive = pagerState.isScrollInProgress || pagerState.settledPage == page
+                                val pageSemantics = if (pageActive) {
+                                    Modifier.testTag("home_page_active")
+                                } else {
+                                    Modifier.clearAndSetSemantics { }
+                                }
+                                Box(modifier = Modifier.fillMaxSize().then(pageSemantics)) {
+                                    when {
+                                        state.isLoading -> Box(
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            CircularProgressIndicator()
+                                        }
+
+                                        allCards.isEmpty() -> EmptyState(
+                                            modifier = Modifier.fillMaxSize(),
+                                            onImportFromMac = onImportFromMac,
+                                            onAddManually = onAddManually,
+                                        )
+
+                                        else -> modePage(pageDensity = pageDensity)
+                                    }
                                 }
                             }
                         }
-                    }
-                    if (pullOffsetPx > 0.5f || pullTriggered) {
-                        HomePullIndicator(
-                            offsetPx = pullOffsetPx,
-                            thresholdPx = pullThresholdPx,
-                            refreshing = pullTriggered,
-                            motionEnabled = motionEnabled,
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .padding(top = 6.dp),
-                        )
+                        if (pullOffsetPx > 0.5f || pullTriggered) {
+                            HomePullIndicator(
+                                offsetPx = pullOffsetPx,
+                                thresholdPx = pullThresholdPx,
+                                refreshing = pullTriggered,
+                                motionEnabled = motionEnabled,
+                                modifier = Modifier
+                                    .align(Alignment.TopCenter)
+                                    .padding(top = 6.dp),
+                            )
+                        }
                     }
                 }
             }
@@ -703,16 +734,17 @@ private fun HomePullIndicator(
             }
             .clip(CircleShape)
             .background(colors.reportTicket)
+            .semantics {
+                contentDescription = if (refreshing) {
+                    "正在刷新全部凭证"
+                } else {
+                    "下拉刷新全部凭证"
+                }
+            }
             .testTag("home_pull_indicator"),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector = Icons.Outlined.Refresh,
-            contentDescription = if (refreshing) {
-                "正在刷新全部凭证"
-            } else {
-                "下拉刷新全部凭证"
-            },
+        ReportRefreshGlyph(
             tint = colors.reportTicketInk,
             modifier = Modifier
                 .size(20.dp)
@@ -721,106 +753,46 @@ private fun HomePullIndicator(
     }
 }
 
-/** 卡片末尾的凭证入口：新增直接进新增页，管理打开现有凭证列表。 */
+/** 卡片末尾的小胶囊入口：集中管理已有凭证。 */
 @Composable
 private fun CredentialEndActions(
-    onAdd: () -> Unit,
     onManage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = MyTokenThemeTokens.colors
-    val shape = RoundedCornerShape(MyTokenRadius.card)
-    Column(
+    val shape = RoundedCornerShape(MyTokenRadius.pill)
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 12.dp)
-            .clip(shape)
-            .background(colors.surface)
-            .border(1.dp, colors.line, shape),
+            .padding(top = 10.dp, bottom = 2.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        CredentialEndRow(
-            title = "新增凭证",
-            supportingText = "把其他账户也放到这里",
-            emphasized = true,
-            onClick = onAdd,
-            testTag = "home_add_credential",
-            icon = {
-                Icon(
-                    imageVector = Icons.Outlined.Add,
-                    contentDescription = null,
-                    tint = colors.canvas,
-                    modifier = Modifier.size(18.dp),
-                )
-            },
-        )
-        CredentialEndRow(
-            title = "管理已有凭证",
-            supportingText = "启停、编辑与调整顺序",
-            emphasized = false,
-            onClick = onManage,
-            testTag = "home_manage_credentials",
-            icon = {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.ListAlt,
-                    contentDescription = null,
-                    tint = colors.muted,
-                    modifier = Modifier.size(18.dp),
-                )
-            },
-        )
-    }
-}
-
-@Composable
-private fun CredentialEndRow(
-    title: String,
-    supportingText: String,
-    emphasized: Boolean,
-    onClick: () -> Unit,
-    testTag: String,
-    icon: @Composable () -> Unit,
-) {
-    val colors = MyTokenThemeTokens.colors
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 64.dp)
-            .clickable(role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = "$title，$supportingText" }
-            .testTag(testTag)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Box(
+        Row(
             modifier = Modifier
-                .size(32.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(if (emphasized) colors.ink else colors.subtle),
-            contentAlignment = Alignment.Center,
+                .height(MyTokenSize.touch)
+                .clip(shape)
+                .clickable(role = Role.Button, onClick = onManage)
+                .semantics { contentDescription = "管理凭证" }
+                .testTag("home_manage_credentials"),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            icon()
+            Row(
+                modifier = Modifier
+                    .height(32.dp)
+                    .clip(shape)
+                    .background(colors.surface)
+                    .border(1.dp, colors.line, shape)
+                    .padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "管理凭证",
+                    style = MyTokenType.caption,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.ink,
+                )
+            }
         }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MyTokenType.label,
-                fontWeight = FontWeight.SemiBold,
-                color = colors.ink,
-            )
-            Text(
-                text = supportingText,
-                modifier = Modifier.padding(top = 2.dp),
-                style = MyTokenType.caption,
-                color = colors.muted,
-            )
-        }
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = colors.muted,
-            modifier = Modifier.size(15.dp),
-        )
     }
 }
 

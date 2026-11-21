@@ -142,8 +142,9 @@ fun MyTokenSwitch(
     contentDescription: String? = null,
 ) {
     val colors = MyTokenThemeTokens.colors
+    // 开关统一使用报告票面黄；黄色底上用深色滑块保证对比度。
     val trackColor by animateColorAsState(
-        targetValue = if (checked) colors.actionFill else colors.track,
+        targetValue = if (checked) colors.reportTicket else colors.track,
         animationSpec = spring(dampingRatio = 1f, stiffness = 700f),
         label = "myTokenSwitchTrack",
     )
@@ -176,7 +177,7 @@ fun MyTokenSwitch(
                     .padding(start = thumbOffset)
                     .requiredSize(23.dp)
                     .clip(RoundedCornerShape(MyTokenRadius.pill))
-                    .background(colors.surface),
+                    .background(if (checked) colors.reportTicketInk else colors.surface),
             )
         }
     }

@@ -61,6 +61,21 @@ class CredentialUsageSurfaceStyleTest {
         assertTrue(sourceText("HomeScreen.kt").contains(".background(colors.reportTicket)"))
     }
 
+    @Test
+    fun `刷新按钮使用设计稿图标并反色`() {
+        val report = sourceText("HomeHealthReport.kt")
+        val home = sourceText("HomeScreen.kt")
+        val glyph = sourceText("HomeRefreshGlyph.kt")
+
+        assertTrue(report.contains("ReportRefreshGlyph"))
+        assertTrue(home.contains("ReportRefreshGlyph"))
+        assertFalse(report.contains("Icons.Outlined.Refresh"))
+        assertFalse(home.contains("Icons.Outlined.Refresh"))
+        assertTrue(glyph.contains("M20 7v5h-5"))
+        assertTrue(glyph.contains("tint: Color"))
+        assertTrue(report.contains("tint = colors.reportTicketInk"))
+    }
+
     private fun sourceText(name: String): String {
         val workingDir = File(System.getProperty("user.dir") ?: error("缺少 user.dir"))
         val candidates = listOf(

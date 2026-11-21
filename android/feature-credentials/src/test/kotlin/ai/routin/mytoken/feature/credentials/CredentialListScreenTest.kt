@@ -26,6 +26,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
+import java.io.File
 import java.util.UUID
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -285,5 +286,16 @@ class CredentialListScreenTest {
 
         composeRule.onNodeWithText("主力 Key").performClick()
         assertEquals(key.id, edited)
+    }
+
+    @Test
+    fun `抽屉模式不叠加状态栏内边距`() {
+        val source = File(System.getProperty("user.dir"))
+            .walkTopDown()
+            .first { it.name == "CredentialListScreen.kt" }
+            .readText()
+
+        assertTrue(source.contains("contentWindowInsets = if (applyWindowInsets)"))
+        assertTrue(source.contains("WindowInsets(0, 0, 0, 0)"))
     }
 }

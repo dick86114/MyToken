@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -57,6 +58,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -97,10 +99,18 @@ fun CredentialListScreen(
     onAddManually: () -> Unit,
     layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
     drawerMode: Boolean = false,
+    applyWindowInsets: Boolean = true,
 ) {
     val colors = MyTokenThemeTokens.colors
     Scaffold(
         containerColor = if (drawerMode) Color.Transparent else colors.canvas,
+        // 底部弹窗已经由宿主管安全区，不再叠加状态栏内边距，
+        // 否则管理凭证面板顶部会多出一大块空白；抽屉仍保留系统内边距。
+        contentWindowInsets = if (applyWindowInsets) {
+            ScaffoldDefaults.contentWindowInsets
+        } else {
+            WindowInsets(0, 0, 0, 0)
+        },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -271,7 +281,7 @@ private fun AddButton(onClick: () -> Unit) {
             modifier = Modifier
                 .height(34.dp)
                 .clip(RoundedCornerShape(MyTokenRadius.pill))
-                .background(colors.actionFill)
+                .background(colors.reportTicket)
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -279,13 +289,13 @@ private fun AddButton(onClick: () -> Unit) {
             Icon(
                 imageVector = Icons.Filled.Add,
                 contentDescription = null,
-                tint = colors.onAction,
+                tint = colors.reportTicketInk,
                 modifier = Modifier.size(16.dp),
             )
             Text(
                 text = "添加",
                 style = MyTokenType.label.copy(fontWeight = FontWeight(650)),
-                color = colors.onAction,
+                color = colors.reportTicketInk,
             )
         }
     }
