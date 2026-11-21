@@ -138,6 +138,17 @@ class SettingsScreenTest {
     }
 
     @Test
+    fun drawerSettingsUseFlatGroupsWithoutNestedCards() {
+        setContent(drawerMode = true)
+
+        composeRule.onNodeWithText("刷新").performScrollTo()
+        val label = composeRule.onNodeWithText("刷新").getUnclippedBoundsInRoot()
+        val firstRow = composeRule.onNodeWithText("打开应用时刷新").getUnclippedBoundsInRoot()
+        val gap = firstRow.top.value - label.bottom.value
+        assertTrue("抽屉设置分组不应再套卡片，实际 ${gap}dp", gap <= 12f)
+    }
+
+    @Test
     fun drawerShowsCloseButton() {
         var closed = 0
         setContent(drawerMode = true, onClose = { closed++ })

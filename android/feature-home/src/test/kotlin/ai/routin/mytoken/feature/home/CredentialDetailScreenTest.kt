@@ -306,8 +306,8 @@ class CredentialDetailScreenTest {
     }
 
     @Test
-    fun detailModelsDropMultiplierAndShowTwoLines() {
-        val models = (1..40).map { "model-$it-extra-long-name" }
+    fun detailModelsUseStackedDeckAndExpandToGrid() {
+        val models = (1..12).map { "glm-5.$it" }
 
         composeRule.setContent {
             MyTokenTheme {
@@ -327,33 +327,36 @@ class CredentialDetailScreenTest {
         }
 
         composeRule.onNodeWithText("分组倍率").assertDoesNotExist()
-        val more = composeRule.onNodeWithTag("detail_models_more", useUnmergedTree = true)
+        val deck = composeRule.onNodeWithTag("detail_models_more", useUnmergedTree = true)
             .performScrollTo()
             .assertIsDisplayed()
-        val chips = composeRule.onAllNodesWithContentDescription(
-            "复制模型 ID",
-            substring = true,
-            useUnmergedTree = true,
-        ).fetchSemanticsNodes()
-        val chipTops = chips.map { it.boundsInRoot.top }.distinct()
-        assertTrue("默认应显示超过 2 个模型，实际 ${chips.size} 个", chips.size > 2)
-        assertTrue("默认最多两行，实际 ${chipTops.size} 行", chipTops.size <= 2)
-        val moreTop = more.fetchSemanticsNode().boundsInRoot.top
-        assertTrue(
-            "查看更多应在模型列表的下一行，模型行 ${chipTops.maxOrNull()}，按钮 $moreTop",
-            moreTop > chipTops.maxOrNull()!!,
-        )
-        composeRule.onNodeWithText("查看更多").assertIsDisplayed()
+        composeRule.onNodeWithText("glm-5.1").assertExists()
+        composeRule.onNodeWithText("另有 11 个模型", substring = true, useUnmergedTree = true)
+            .assertExists()
+        composeRule.onNodeWithContentDescription("复制模型 ID glm-5.2").assertDoesNotExist()
 
-        more.performClick()
-        composeRule.onNodeWithContentDescription("复制模型 ID model-40-extra-long-name")
+        deck.performClick()
+        composeRule.waitForIdle()
+        val first = composeRule.onNodeWithContentDescription("复制模型 ID glm-5.1")
+            .performScrollTo()
+            .getUnclippedBoundsInRoot()
+        val second = composeRule.onNodeWithContentDescription("复制模型 ID glm-5.2")
+            .getUnclippedBoundsInRoot()
+        assertEquals("展开后模型应排成两列", first.top, second.top)
+        assertTrue("第二个模型应在右侧一列", second.left > first.left)
+        composeRule.onNodeWithContentDescription("复制模型 ID glm-5.12")
             .performScrollTo()
             .assertIsDisplayed()
+
+        composeRule.onNodeWithTag("detail_models_collapse", useUnmergedTree = true)
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithTag("detail_models_more", useUnmergedTree = true).assertExists()
     }
 
     @Test
-    fun detailModelsHideViewMoreWhenEverythingFits() {
-        val models = listOf("glm-5.3-air", "glm-5.3-pro")
+    fun detailModelsWithSingleModelShowDirectCopyRow() {
+        val models = listOf("glm-5.3-air")
 
         composeRule.setContent {
             MyTokenTheme {
@@ -368,7 +371,7 @@ class CredentialDetailScreenTest {
         }
 
         composeRule.onNodeWithTag("detail_models_more", useUnmergedTree = true).assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("复制模型 ID glm-5.3-pro")
+        composeRule.onNodeWithContentDescription("复制模型 ID glm-5.3-air")
             .performScrollTo()
             .assertIsDisplayed()
     }

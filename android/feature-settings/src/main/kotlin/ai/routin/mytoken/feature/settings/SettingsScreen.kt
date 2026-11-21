@@ -72,7 +72,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.LifecycleResumeEffect
-import ai.routin.mytoken.core.ui.SectionCard
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.MyTokenButton
@@ -81,10 +80,8 @@ import ai.routin.mytoken.core.ui.MyTokenBrandMark
 import ai.routin.mytoken.core.ui.MyTokenRadius
 import ai.routin.mytoken.core.ui.MyTokenRow
 import ai.routin.mytoken.core.ui.MyTokenSegmented
-import ai.routin.mytoken.core.ui.MyTokenSection
 import ai.routin.mytoken.core.ui.MyTokenSize
 import ai.routin.mytoken.core.ui.MyTokenSpacing
-import ai.routin.mytoken.core.ui.MyTokenSurface
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.MyTokenDialog
@@ -92,13 +89,13 @@ import ai.routin.mytoken.core.ui.MyTokenDialogRow
 import ai.routin.mytoken.core.ui.MyTokenDialogSection
 import ai.routin.mytoken.core.ui.MyTokenDialogStatus
 import ai.routin.mytoken.core.ui.MyTokenDialogTone
-import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
 import ai.routin.mytoken.core.ui.myTokenFilterChipBorder
 import ai.routin.mytoken.core.ui.myTokenFilterChipColors
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Alignment
@@ -204,7 +201,10 @@ fun SettingsScreen(
                 }
             }
             item(key = "theme") {
-                SectionCard(title = "外观", modifier = Modifier.testTag("settings_theme_cell")) {
+                SettingsGroup(
+                    title = "外观",
+                    modifier = Modifier.testTag("settings_theme_cell"),
+                ) {
                     ThemeSelector(
                         selected = state.display.themeMode,
                         onSelect = onThemeModeChange,
@@ -229,7 +229,7 @@ fun SettingsScreen(
                 )
             }
             item(key = "data") {
-                MyTokenSection(
+                SettingsGroup(
                     title = "数据",
                     modifier = Modifier.testTag("settings_migration_cell"),
                 ) {
@@ -268,7 +268,7 @@ fun SettingsScreen(
                 key = "about",
                 span = { GridItemSpan(maxLineSpan) },
             ) {
-                MyTokenSection(
+                SettingsGroup(
                     title = "关于",
                     modifier = Modifier.testTag("settings_about_span"),
                 ) {
@@ -992,39 +992,55 @@ private fun SettingsHeader(drawerMode: Boolean, onClose: (() -> Unit)?) {
 
 @Composable
 private fun SettingsProfileCard(appVersion: String) {
-    val colors = MyTokenThemeTokens.colors
-    MyTokenSurface(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag("settings_profile"),
-        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
-        shape = RoundedCornerShape(MyTokenRadius.card),
+            .testTag("settings_profile")
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            MyTokenBrandMark(
-                modifier = Modifier.testTag("settings_brand_logo"),
-                size = 44.dp,
+        MyTokenBrandMark(
+            modifier = Modifier.testTag("settings_brand_logo"),
+            size = 44.dp,
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "MyToken",
+                style = MyTokenType.title.copy(fontWeight = FontWeight(700)),
+                color = MyTokenThemeTokens.colors.ink,
             )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "MyToken",
-                    style = MyTokenType.title.copy(fontWeight = FontWeight(700)),
-                    color = colors.ink,
-                )
-                Text(
-                    text = "v$appVersion · 凭证只在本机",
-                    modifier = Modifier.padding(top = 2.dp),
-                    style = MyTokenType.caption,
-                    color = colors.muted,
-                )
-            }
+            Text(
+                text = "v$appVersion · 凭证只在本机",
+                modifier = Modifier.padding(top = 2.dp),
+                style = MyTokenType.caption,
+                color = MyTokenThemeTokens.colors.muted,
+            )
         }
+    }
+}
+
+/** 设置分组只保留分节标签与内容，不再叠加卡片；容器本身已是 surface。 */
+@Composable
+private fun SettingsGroup(
+    title: String,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            text = title,
+            modifier = Modifier.padding(start = 2.dp, end = 2.dp, bottom = 8.dp),
+            style = MyTokenType.sectionLabel,
+            color = MyTokenThemeTokens.colors.muted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            content = content,
+        )
     }
 }
 
@@ -1212,7 +1228,7 @@ private val DEFAULT_UPDATE_CDN_BASES = listOf(
 @Composable
 internal fun Section(
     title: String,
-    content: @Composable () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
-    SectionCard(title = title) { content() }
+    SettingsGroup(title = title, content = content)
 }
