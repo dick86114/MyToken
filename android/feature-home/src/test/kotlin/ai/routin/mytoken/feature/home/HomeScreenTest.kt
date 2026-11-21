@@ -1943,6 +1943,41 @@ class HomeScreenTest {
     }
 
     @Test
+    fun 简洁模式健康短条可定位到瀑布流中的凭证卡片() {
+        val cards = (1..20).map { index ->
+            val item = credential("瀑布定位 $index")
+            card(item, metrics = listOf(progress(index.toDouble(), 100.0)))
+        }
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = cards,
+                        groups = emptyList(),
+                        credentialCount = cards.size,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    usageCardDensity = UsageCardDensity.COMPACT,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("health_segment_19").performClick()
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithTag("credential_card_${cards[19].credential.id}")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeRule.onNodeWithTag("credential_card_${cards[19].credential.id}")
+            .assertIsDisplayed()
+    }
+
+    @Test
     fun 点击账户健康短条会把中间凭证卡片定位到屏幕中心() {
         val cards = (1..7).map { index ->
             val item = credential("健康居中 $index")
