@@ -12,7 +12,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 
 private val LightColors = lightColorScheme(
     primary = MyTokenLightColors.actionFill,
-    onPrimary = MyTokenLightColors.onAction,
+    onPrimary = MyTokenLightColors.reportTicketInk,
     primaryContainer = MyTokenLightColors.subtle,
     onPrimaryContainer = MyTokenLightColors.actionText,
     secondary = MyTokenLightColors.positiveFill,
@@ -39,7 +39,7 @@ private val LightColors = lightColorScheme(
 
 private val DarkColors = darkColorScheme(
     primary = MyTokenDarkColors.actionFill,
-    onPrimary = MyTokenDarkColors.onAction,
+    onPrimary = MyTokenDarkColors.reportTicketInk,
     primaryContainer = MyTokenDarkColors.subtle,
     onPrimaryContainer = MyTokenDarkColors.actionText,
     secondary = MyTokenDarkColors.positiveFill,

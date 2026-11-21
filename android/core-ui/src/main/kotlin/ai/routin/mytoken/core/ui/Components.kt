@@ -72,7 +72,8 @@ private data class ButtonToneColors(
 private fun buttonToneColors(tone: MyTokenButtonTone): ButtonToneColors {
     val colors = MyTokenThemeTokens.colors
     return when (tone) {
-        MyTokenButtonTone.Primary -> ButtonToneColors(colors.actionFill, colors.onAction, colors.actionFill)
+        // 黄色主按钮统一使用深墨字，避免白字在票面黄上失去对比。
+        MyTokenButtonTone.Primary -> ButtonToneColors(colors.actionFill, colors.reportTicketInk, colors.actionFill)
         MyTokenButtonTone.Neutral -> ButtonToneColors(colors.ink, colors.ink, colors.subtle)
         MyTokenButtonTone.Destructive -> ButtonToneColors(colors.criticalFill, colors.onAction, colors.criticalFill)
     }

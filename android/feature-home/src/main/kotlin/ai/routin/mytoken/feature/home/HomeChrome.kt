@@ -9,8 +9,6 @@ import ai.routin.mytoken.core.ui.ProviderLogoPlate
 import ai.routin.mytoken.core.ui.isMyTokenDarkTheme
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageCardDensity
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -42,12 +40,14 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,8 +55,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -105,7 +105,7 @@ internal fun HomeToolbar(
     headlineCount: Int,
     summaryTail: String,
     alertProviders: List<ProviderId>,
-    collapseProgress: Float,
+    collapseProgress: () -> Float,
     onOpenCredentials: () -> Unit,
     onOpenSettings: () -> Unit,
     hasUpdateAvailable: Boolean,
@@ -113,17 +113,24 @@ internal fun HomeToolbar(
 ) {
     val colors = MyTokenThemeTokens.colors
     val darkTheme = isMyTokenDarkTheme()
-    val progress = collapseProgress.coerceIn(0f, 1f)
-    // 字标先退场、摘要再进场，避免两段文案在中间状态叠在一起。
-    val wordmarkAlpha = (1f - progress * 2.2f).coerceIn(0f, 1f)
-    val summaryAlpha = ((progress - 0.45f) / 0.55f).coerceIn(0f, 1f)
+    // 进度只在绘制/图层阶段读取；滚动时这里不会整棵导航重组。
+    fun progress(): Float = collapseProgress().coerceIn(0f, 1f)
+
+    val summaryVisible by remember {
+        derivedStateOf { progress() > 0.01f }
+    }
+    val collapsed by remember {
+        derivedStateOf { progress() > 0.5f }
+    }
     // 页面上滑时导航底色由画布色过渡到报告票面黄，logo 保持原位；
     // 品牌字标上移淡出，报告摘要与报警供应商 logo 从右侧淡入。
     Row(
         modifier = modifier
             .fillMaxWidth()
             .height(60.dp)
-            .background(lerp(colors.canvas, colors.reportTicket, progress))
+            .drawBehind {
+                drawRect(lerp(colors.canvas, colors.reportTicket, progress()))
+            }
             .testTag("home_toolbar"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -134,7 +141,7 @@ internal fun HomeToolbar(
                 .clip(RoundedCornerShape(12.dp))
                 .clickable(role = Role.Button, onClick = onOpenCredentials)
                 .semantics {
-                    contentDescription = if (progress > 0.5f) {
+                    contentDescription = if (collapsed) {
                         "MyToken，$headlineCount 个凭证$summaryTail，打开凭证列表"
                     } else {
                         "MyToken，打开凭证列表，共 $credentialCount 个凭证"
@@ -148,14 +155,14 @@ internal fun HomeToolbar(
                     MyTokenBrandMark(
                         size = 28.dp,
                         modifier = Modifier
-                            .alpha(1f - progress)
+                            .graphicsLayer { alpha = 1f - progress() }
                             .testTag("home_brand"),
                     )
                     // 黄色导航上用黑色标，避免深色外观的白标失去对比。
                     MyTokenBrandMark(
                         size = 28.dp,
                         darkTheme = false,
-                        modifier = Modifier.alpha(progress),
+                        modifier = Modifier.graphicsLayer { alpha = progress() },
                     )
                 } else {
                     MyTokenBrandMark(
@@ -175,8 +182,9 @@ internal fun HomeToolbar(
                     text = "MyToken",
                     modifier = Modifier
                         .graphicsLayer {
-                            alpha = wordmarkAlpha
-                            translationY = -6.dp.toPx() * progress
+                            val p = progress()
+                            alpha = (1f - p * 2.2f).coerceIn(0f, 1f)
+                            translationY = -6.dp.toPx() * p
                         }
                         .testTag("home_wordmark"),
                     style = MyTokenType.section,
@@ -184,12 +192,14 @@ internal fun HomeToolbar(
                     color = colors.ink,
                     maxLines = 1,
                 )
-                if (summaryAlpha > 0.01f) {
+                if (summaryVisible) {
                     Row(
                         modifier = Modifier
                             .graphicsLayer {
-                                alpha = summaryAlpha
-                                translationY = (1f - summaryAlpha) * 4.dp.toPx()
+                                val p = progress()
+                                val alpha = ((p - 0.45f) / 0.55f).coerceIn(0f, 1f)
+                                this.alpha = alpha
+                                translationY = (1f - alpha) * 4.dp.toPx()
                             }
                             .testTag("home_nav_summary"),
                         verticalAlignment = Alignment.CenterVertically,
@@ -243,24 +253,113 @@ internal fun HomeToolbar(
                 .testTag("home_open_settings"),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = Icons.Outlined.Settings,
-                contentDescription = null,
-                tint = lerp(colors.ink, colors.reportTicketInk, progress),
-                modifier = Modifier.size(20.dp),
-            )
+            if (darkTheme) {
+                Icon(
+                    imageVector = Icons.Outlined.Settings,
+                    contentDescription = null,
+                    tint = colors.ink,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .graphicsLayer { alpha = 1f - progress() },
+                )
+                Icon(
+                    imageVector = Icons.Outlined.Settings,
+                    contentDescription = null,
+                    tint = colors.reportTicketInk,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .graphicsLayer { alpha = progress() },
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Outlined.Settings,
+                    contentDescription = null,
+                    tint = colors.ink,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
             if (hasUpdateAvailable) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(top = 9.dp, end = 9.dp)
-                        .size(6.dp)
+                        .size(7.dp)
                         .clip(CircleShape)
-                        .background(colors.actionFill)
+                        .background(colors.reportTicket)
+                        .border(1.dp, colors.surface, CircleShape)
                         .testTag("home_update_badge"),
                 )
             }
         }
+    }
+}
+
+/** 启动时检查到新版本后，压在凭证报告上方的黄色提醒条。 */
+@Composable
+internal fun HomeUpdateBanner(
+    version: String?,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MyTokenThemeTokens.colors
+    val shape = RoundedCornerShape(16.dp)
+    val title = version
+        ?.takeIf { it.isNotBlank() }
+        ?.let { "发现新版本 $it" }
+        ?: "发现新版本"
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(colors.surface)
+            .border(1.dp, colors.reportTicket, shape)
+            .clickable(role = Role.Button, onClick = onOpenSettings)
+            .semantics { contentDescription = "有新版本可用，前往设置查看并更新" }
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .testTag("home_update_banner"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(colors.reportTicket),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.SystemUpdate,
+                contentDescription = null,
+                tint = colors.reportTicketInk,
+                modifier = Modifier.size(19.dp),
+            )
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = title,
+                style = MyTokenType.label,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.ink,
+                maxLines = 1,
+            )
+            Text(
+                text = "前往设置查看更新内容并安装",
+                style = MyTokenType.caption,
+                color = colors.muted,
+                maxLines = 1,
+            )
+        }
+        Text(
+            text = "去更新",
+            style = MyTokenType.caption,
+            fontWeight = FontWeight.SemiBold,
+            color = colors.actionText,
+            maxLines = 1,
+        )
     }
 }
 
@@ -569,7 +668,7 @@ private fun SelectedCheck(modifier: Modifier = Modifier) {
     Icon(
         imageVector = Icons.Filled.Check,
         contentDescription = null,
-        tint = MyTokenThemeTokens.colors.actionFill,
+        tint = MyTokenThemeTokens.colors.actionText,
         modifier = modifier.size(14.dp),
     )
 }
@@ -663,15 +762,10 @@ private fun RowScope.DensityIconOption(
             .testTag(testTag),
         contentAlignment = Alignment.Center,
     ) {
-        // 选中态在落页时切换；用短过渡代替瞬时反色，避免整个切换控件闪一下。
-        val tint by animateColorAsState(
-            targetValue = if (selected) colors.canvas else colors.muted,
-            animationSpec = tween(durationMillis = 180),
-            label = "density-glyph-tint",
-        )
+        // 分页过程中滑块已跟手；图标直接使用当前选中态，禁止加载动画。
         DensityGlyph(
             compact = compact,
-            tint = tint,
+            tint = if (selected) colors.canvas else colors.muted,
             emphasized = selected,
         )
     }

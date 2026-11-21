@@ -2145,7 +2145,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun 从页面顶部下拉在报告上方显示黄色刷新指示器并触发刷新() {
+    fun 从页面顶部下拉在报告上方显示刷新指示器并触发刷新() {
         val cards = (1..3).map { index ->
             card(credential("下拉 $index"), metrics = listOf(progress(20.0, 100.0)))
         }
@@ -2225,6 +2225,87 @@ class HomeScreenTest {
         }
         composeRule.waitForIdle()
         assertEquals(0, refreshCalls)
+    }
+
+    @Test
+    fun 同一次手势上滑再回拉不会触发刷新() {
+        val cards = (1..3).map { index ->
+            card(credential("回拉 $index"), metrics = listOf(progress(20.0, 100.0)))
+        }
+        var refreshCalls = 0
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = cards,
+                        groups = emptyList(),
+                        credentialCount = cards.size,
+                    ),
+                    onRefreshAll = { refreshCalls += 1 },
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("home_health_report").performTouchInput {
+            down(Offset(width / 2f, height / 2f))
+            moveBy(Offset(0f, -180f))
+            moveBy(Offset(0f, 260f))
+            moveBy(Offset(0f, 260f))
+            moveBy(Offset(0f, 260f))
+            up()
+        }
+        composeRule.waitForIdle()
+        assertEquals(0, refreshCalls)
+    }
+
+    @Test
+    fun 非顶部开始的手势回到顶部后不会顺带触发刷新() {
+        val cards = (1..12).map { index ->
+            card(credential("回顶 $index"), metrics = listOf(progress(20.0, 100.0)))
+        }
+        var refreshCalls = 0
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = cards,
+                        groups = emptyList(),
+                        credentialCount = cards.size,
+                    ),
+                    onRefreshAll = { refreshCalls += 1 },
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("home_list_full").performScrollToIndex(4)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("home_list_full").performTouchInput {
+            swipeDown(startY = height * 0.15f, endY = height * 0.92f, durationMillis = 90)
+        }
+        composeRule.waitForIdle()
+        // 回到顶部后必须重新起手下拉，而不是沿用刚才从列表中部开始的手势。
+        composeRule.onNodeWithTag("home_list_full").performScrollToIndex(0)
+        composeRule.waitForIdle()
+        assertEquals(0, refreshCalls)
+
+        composeRule.onNodeWithTag("home_list_full").performTouchInput {
+            down(Offset(width / 2f, 20f))
+            moveTo(Offset(width / 2f, 460f), delayMillis = 220)
+            up()
+        }
+        composeRule.waitUntil(5_000) { refreshCalls == 1 }
     }
 
     @Test
@@ -2601,6 +2682,57 @@ class HomeScreenTest {
     }
 
     @Test
+    fun 上滑收起报告时分页区保持固定不重排() {
+        val cards = (1..16).map { index ->
+            card(credential("固定分页 $index"), metrics = listOf(progress(20.0 + index, 100.0)))
+        }
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = cards,
+                        groups = emptyList(),
+                        credentialCount = cards.size,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        fun pagerHeight(): Float = composeRule.onNodeWithTag("home_pager")
+            .getUnclippedBoundsInRoot()
+            .let { it.bottom.value - it.top.value }
+
+        val before = pagerHeight()
+        composeRule.onNodeWithTag("home_list_full").performTouchInput {
+            swipeUp(startY = height * 0.82f, endY = height * 0.12f, durationMillis = 80)
+        }
+        composeRule.waitForIdle()
+        val after = pagerHeight()
+        assertEquals(
+            "报告收起时只平移内容，分页区高度不能变化而触发整块重排",
+            before,
+            after,
+            0.5f,
+        )
+        val toolbar = composeRule.onNodeWithTag("home_provider_toolbar")
+            .getUnclippedBoundsInRoot()
+        val navBottom = composeRule.onNodeWithTag("home_toolbar")
+            .getUnclippedBoundsInRoot()
+            .bottom
+        assertTrue(
+            "快速上滑后供应商工具条必须完全离开视口，实际底部 ${toolbar.bottom.value}",
+            toolbar.bottom.value <= navBottom.value + 2f,
+        )
+    }
+
+    @Test
     fun 在报告上拖拽也能收起并重新展开头部() {
         val cards = (1..10).map { index ->
             card(credential("报告拖拽 $index"), metrics = listOf(progress(20.0, 100.0)))
@@ -2913,6 +3045,7 @@ class HomeScreenTest {
                 .fetchSemanticsNodes()
                 .isNotEmpty()
         }
+        composeRule.waitForIdle()
         activeNode("credential_card_${deepSeek.credential.id}").assertIsDisplayed()
     }
 
@@ -2984,6 +3117,7 @@ class HomeScreenTest {
                     onImportFromMac = {},
                     onAddManually = {},
                     hasUpdateAvailable = true,
+                    updateVersion = "6.1.0",
                 )
             }
         }
@@ -2993,7 +3127,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun 有可用更新时只显示设置提示点点击进入设置() {
+    fun 有可用更新时报告上方显示黄色更新提示条并可进设置() {
         var openedSettings = 0
         composeRule.setContent {
             MaterialTheme {
@@ -3011,18 +3145,31 @@ class HomeScreenTest {
                     onAddManually = {},
                     onOpenSettings = { openedSettings++ },
                     hasUpdateAvailable = true,
+                    updateVersion = "6.1.0",
                 )
             }
         }
 
         composeRule.onNodeWithTag("home_update_badge", useUnmergedTree = true).assertExists()
-        composeRule.onNodeWithTag("home_update_banner").assertDoesNotExist()
-        composeRule.onNodeWithTag("home_open_settings").performClick()
+        composeRule.onNodeWithTag("home_update_banner").assertIsDisplayed()
+        composeRule.onNodeWithText("发现新版本 6.1.0", useUnmergedTree = true).assertIsDisplayed()
+        val banner = composeRule.onNodeWithTag("home_update_banner")
+            .getUnclippedBoundsInRoot()
+        val report = composeRule.onNodeWithTag("home_health_report")
+            .getUnclippedBoundsInRoot()
+        assertTrue(
+            "更新提示条应位于凭证报告上方，banner.bottom=${banner.bottom.value} report.top=${report.top.value}",
+            banner.bottom.value <= report.top.value + 1f,
+        )
+
+        composeRule.onNodeWithTag("home_update_banner").performClick()
         assertEquals(1, openedSettings)
+        composeRule.onNodeWithTag("home_open_settings").performClick()
+        assertEquals(2, openedSettings)
     }
 
     @Test
-    fun 无可用更新时不显示更新提示点() {
+    fun 无可用更新时不显示更新提示条与提示点() {
         composeRule.setContent {
             MaterialTheme {
                 HomeScreen(

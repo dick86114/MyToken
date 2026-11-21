@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -34,7 +33,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -296,23 +294,15 @@ internal fun HomeHealthReport(
                     .testTag("report_refresh"),
                 contentAlignment = Alignment.Center,
             ) {
-                Box(
+                // 透明图标直接落在报告票面上，不再套黄色圆形底。
+                ReportRefreshGlyph(
+                    tint = colors.reportTicketInk,
                     modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(colors.reportTicket)
-                        .testTag("report_refresh_circle"),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    ReportRefreshGlyph(
-                        tint = colors.reportTicketInk,
-                        modifier = Modifier
-                            .size(18.dp)
-                            .graphicsLayer {
-                                rotationZ = if (isRefreshing && motionEnabled) spin else 0f
-                            },
-                    )
-                }
+                        .size(18.dp)
+                        .graphicsLayer {
+                            rotationZ = if (isRefreshing && motionEnabled) spin else 0f
+                        },
+                )
             }
         }
     }

@@ -64,6 +64,20 @@ class MyTokenComponentsTest {
     }
 
     @Test
+    fun primaryButtonUsesDarkInkOnAmberFill() {
+        val source = File(System.getProperty("user.dir"))
+            .walkTopDown()
+            .first { it.name == "Components.kt" }
+            .readText()
+
+        assertTrue(
+            source.contains(
+                "MyTokenButtonTone.Primary -> ButtonToneColors(colors.actionFill, colors.reportTicketInk, colors.actionFill)",
+            ),
+        )
+    }
+
+    @Test
     fun surfaceUsesSolidBackgroundAndHairline() {
         val source = File(System.getProperty("user.dir"))
             .walkTopDown()

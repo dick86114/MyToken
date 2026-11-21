@@ -18,8 +18,9 @@ class MyTokenTokensTest {
         assertEquals(Color(0xFFE5E7EB), MyTokenLightColors.line)
         assertEquals(Color(0xFF17181A), MyTokenLightColors.ink)
         assertEquals(Color(0xFF6B7076), MyTokenLightColors.muted)
-        assertEquals(Color(0xFF2F6BFF), MyTokenLightColors.actionFill)
-        assertEquals(Color(0xFF1F5AE0), MyTokenLightColors.actionText)
+        // 交互强调色统一为报告票面黄，不再保留蓝色动作色。
+        assertEquals(Color(0xFFF3CB73), MyTokenLightColors.actionFill)
+        assertEquals(Color(0xFF625126), MyTokenLightColors.actionText)
         assertEquals(Color(0xFFFFFFFF), MyTokenLightColors.onAction)
         assertEquals(Color(0xFF30C48D), MyTokenLightColors.positiveFill)
         assertEquals(Color(0xFF14805A), MyTokenLightColors.positiveText)
@@ -35,9 +36,10 @@ class MyTokenTokensTest {
     }
 
     @Test
-    fun `dark onAction is dark ink not white`() {
+    fun `dark action tokens stay on the amber ticket`() {
         assertEquals(Color(0xFF061326), MyTokenDarkColors.onAction)
-        assertEquals(Color(0xFF7AA2FF), MyTokenDarkColors.actionFill)
+        assertEquals(Color(0xFFF3CB73), MyTokenDarkColors.actionFill)
+        assertEquals(Color(0xFFF3CB73), MyTokenDarkColors.actionText)
         assertEquals(Color(0xFF16181C), MyTokenDarkColors.surface)
         assertEquals(Color(0xFF0D0F12), MyTokenDarkColors.canvas)
         assertEquals(Color(0xFF1D2025), MyTokenDarkColors.subtle)

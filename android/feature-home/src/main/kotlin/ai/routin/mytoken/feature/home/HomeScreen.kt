@@ -24,6 +24,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.ScrollableState
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -36,6 +37,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -50,7 +52,6 @@ import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.items as staggeredItems
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.CircularProgressIndicator
@@ -74,6 +75,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -83,7 +85,6 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -93,7 +94,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import java.util.UUID
 import kotlin.math.min
@@ -119,6 +120,7 @@ fun HomeScreen(
     onManageCredentials: () -> Unit = onOpenCredentials,
     onOpenSettings: () -> Unit = {},
     hasUpdateAvailable: Boolean = false,
+    updateVersion: String? = null,
     layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
     usageCardDensity: UsageCardDensity = UsageCardDensity.FULL,
     onToggleUsageCardDensity: () -> Unit = {},
@@ -170,26 +172,33 @@ fun HomeScreen(
     val pullMaxPx = with(density) { 96.dp.toPx() }
     val pullHoldPx = with(density) { 56.dp.toPx() }
     val chromeVisible = !state.isLoading && allCards.isNotEmpty()
-    // 供应商工具条不再固顶：报告与工具条一起完全收起，只留下固定导航。
-    val latestMaxCollapsePx by rememberUpdatedState(headerHeightPx.toFloat())
     val latestRefreshing by rememberUpdatedState(state.isRefreshingAll)
     val latestRefreshAll by rememberUpdatedState(onRefreshAll)
-    // 只响应用户手势：报告定位等程序化滚动应保持报告可见，不被折叠逻辑截走。
-    val collapseConnection = remember {
+    // 头部折叠只改绘制位移，不再改变分页区高度；列表仍按原生滚动手感走。
+    val pullConnection = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(
                 available: Offset,
                 source: NestedScrollSource,
             ): Offset {
-                if (source != NestedScrollSource.UserInput || available.y >= 0f) {
+                if (source != NestedScrollSource.UserInput) return Offset.Zero
+                if (available.y < 0f) {
+                    // 手势一旦向上滚动就不再允许它在回顶后顺带触发刷新。
+                    pullArmed = false
+                    val current = collapsedPx.coerceIn(0f, headerHeightPx.toFloat())
+                    val consume = min(-available.y, headerHeightPx - current)
+                    if (consume <= 0f) return Offset.Zero
+                    collapsedPx = current + consume
+                    return Offset(0f, -consume)
+                }
+                // 报告完全展开、列表也在顶部时先截住下拉增量做刷新。
+                if (!pullArmed || latestRefreshing || collapsedPx > 0f) {
                     return Offset.Zero
                 }
-                val current = collapsedPx.coerceIn(0f, latestMaxCollapsePx)
-                val remaining = latestMaxCollapsePx - current
-                val consume = min(-available.y, remaining)
-                if (consume <= 0f) return Offset.Zero
-                collapsedPx = current + consume
-                return Offset(0f, -consume)
+                val remaining = (pullMaxPx - pullOffsetPx).coerceAtLeast(0f)
+                if (remaining <= 0f) return Offset.Zero
+                pullOffsetPx += min(available.y * 0.55f, remaining)
+                return Offset(0f, available.y)
             }
 
             override fun onPostScroll(
@@ -200,29 +209,26 @@ fun HomeScreen(
                 if (source != NestedScrollSource.UserInput || available.y <= 0f) {
                     return Offset.Zero
                 }
-                val current = collapsedPx.coerceIn(0f, latestMaxCollapsePx)
+                // 列表先滚回顶部，剩余下拉距离再展开报告。
+                val current = collapsedPx.coerceIn(0f, headerHeightPx.toFloat())
+                if (current <= 0f) return Offset.Zero
                 val expand = min(available.y, current)
-                if (expand > 0f) {
-                    collapsedPx = current - expand
-                    return Offset(0f, expand)
-                }
-                // 报告已完全展开后，只有从顶部开始的手势才进入下拉刷新；
-                // 从列表底部一路滑到顶部的手势不会顺带触发刷新。
-                if (pullArmed && !latestRefreshing) {
-                    val remaining = (pullMaxPx - pullOffsetPx).coerceAtLeast(0f)
-                    if (remaining > 0f) {
-                        pullOffsetPx += min(available.y * 0.55f, remaining)
-                        return Offset(0f, available.y)
-                    }
-                }
-                return Offset.Zero
+                collapsedPx = current - expand
+                return Offset(0f, expand)
             }
         }
     }
     LaunchedEffect(chromeVisible) {
         if (!chromeVisible) {
-            collapsedPx = 0f
             headerHeightPx = 0
+            collapsedPx = 0f
+        }
+    }
+    // 报告条目变化会改变头部高度；收起位移不能超过新的头部高度，
+    // 否则分页内容会被推到导航上方。
+    LaunchedEffect(headerHeightPx) {
+        if (collapsedPx > headerHeightPx) {
+            collapsedPx = headerHeightPx.toFloat()
         }
     }
 
@@ -234,6 +240,30 @@ fun HomeScreen(
     )
     val latestDensity by rememberUpdatedState(usageCardDensity)
     val latestToggleDensity by rememberUpdatedState(onToggleUsageCardDensity)
+
+    fun activeScrollMode(): HomeScrollMode {
+        val pageDensity = if (pagerState.currentPage == 0) {
+            UsageCardDensity.COMPACT
+        } else {
+            UsageCardDensity.FULL
+        }
+        return homeScrollMode(pageDensity, screenWidthDp)
+    }
+
+    fun activeScrollableState(): ScrollableState = when (activeScrollMode()) {
+        HomeScrollMode.CompactGrid -> homeScrollStates.compact
+        HomeScrollMode.FullWideGrid -> homeScrollStates.fullWide
+        HomeScrollMode.FullList -> homeScrollStates.full
+    }
+
+    // 头部与分页内容共用同一个收起位移；读取只发生在布局/绘制阶段，
+    // 滚动时不会触发整页重组，也不会改变分页区高度。
+    val collapseProgressState = remember {
+        derivedStateOf {
+            if (headerHeightPx <= 0) 0f else (collapsedPx / headerHeightPx).coerceIn(0f, 1f)
+        }
+    }
+    val collapseProgress: () -> Float = { collapseProgressState.value }
 
     // 手势拖动由 Pager 自然跟手；只有真正停稳后才把落点页同步回持久化的模式。
     LaunchedEffect(pagerState) {
@@ -255,25 +285,18 @@ fun HomeScreen(
         }
     }
 
-    fun activePageAtTop(): Boolean {
-        val pageDensity = if (pagerState.currentPage == 0) {
-            UsageCardDensity.COMPACT
-        } else {
-            UsageCardDensity.FULL
-        }
-        return when (homeScrollMode(pageDensity, screenWidthDp)) {
-            HomeScrollMode.CompactGrid ->
-                homeScrollStates.compact.firstVisibleItemIndex == 0 &&
-                    homeScrollStates.compact.firstVisibleItemScrollOffset == 0
+    fun activePageAtTop(): Boolean = when (activeScrollMode()) {
+        HomeScrollMode.CompactGrid ->
+            homeScrollStates.compact.firstVisibleItemIndex == 0 &&
+                homeScrollStates.compact.firstVisibleItemScrollOffset == 0
 
-            HomeScrollMode.FullWideGrid ->
-                homeScrollStates.fullWide.firstVisibleItemIndex == 0 &&
-                    homeScrollStates.fullWide.firstVisibleItemScrollOffset == 0
+        HomeScrollMode.FullWideGrid ->
+            homeScrollStates.fullWide.firstVisibleItemIndex == 0 &&
+                homeScrollStates.fullWide.firstVisibleItemScrollOffset == 0
 
-            HomeScrollMode.FullList ->
-                homeScrollStates.full.firstVisibleItemIndex == 0 &&
-                    homeScrollStates.full.firstVisibleItemScrollOffset == 0
-        }
+        HomeScrollMode.FullList ->
+            homeScrollStates.full.firstVisibleItemIndex == 0 &&
+                homeScrollStates.full.firstVisibleItemScrollOffset == 0
     }
 
     suspend fun animatePullTo(target: Float) {
@@ -291,8 +314,9 @@ fun HomeScreen(
         }
     }
 
-    fun settlePull() {
-        val shouldRefresh = pullOffsetPx >= pullThresholdPx && !latestRefreshing
+    fun settlePull(allowRefresh: Boolean) {
+        val shouldRefresh =
+            allowRefresh && pullOffsetPx >= pullThresholdPx && !latestRefreshing
         pullSettleJob?.cancel()
         pullSettleJob = scope.launch {
             if (!shouldRefresh) {
@@ -322,14 +346,14 @@ fun HomeScreen(
         awaitEachGesture {
             awaitFirstDown(requireUnconsumed = false)
             if (!pullTriggered) pullSettleJob?.cancel()
-            pullArmed = !latestRefreshing && activePageAtTop()
+            pullArmed = !latestRefreshing && collapsedPx <= 0f && activePageAtTop()
             do {
                 val event = awaitPointerEvent()
             } while (event.changes.any { it.pressed })
-            if (pullArmed) {
-                pullArmed = false
-                settlePull()
-            }
+            val shouldSettle = pullArmed || pullOffsetPx > 0f
+            val allowRefresh = pullArmed
+            pullArmed = false
+            if (shouldSettle) settlePull(allowRefresh)
         }
     }
 
@@ -337,13 +361,17 @@ fun HomeScreen(
         val index = visibleCards.indexOfFirst { it.credential.id == id }
         if (index < 0) return
         scope.launch {
+            // 定位会把内容滚上来，报告同步收起，分页区因此恢复完整高度；
+            // 这样最后一张卡片也能进入可视区域，而不是被覆盖层压到屏幕下方。
+            if (headerHeightPx > 0) {
+                collapsedPx = headerHeightPx.toFloat()
+            }
             locateCard(
                 states = homeScrollStates,
                 mode = homeScrollMode(usageCardDensity, screenWidthDp),
                 index = index,
-                // 顶部导航 + 报告 + 筛选工具条都在分页区上方；补偿它们总高度的一半，
-                // 卡片中心才会落在整块屏幕（而非分页区）的中心。
-                centerBiasPx = (topNavHeightPx + headerHeightPx) / 2f,
+                // 分页区从固定导航下方开始，补偿导航高度的一半即可居中。
+                centerBiasPx = topNavHeightPx / 2f,
                 durationMillis = MyTokenMotion.locateDurationMillis(motionEnabled),
             )
             highlightedCredentialId = id
@@ -419,7 +447,6 @@ fun HomeScreen(
                         state = homeScrollStates.full,
                         modifier = Modifier
                             .fillMaxSize()
-                            .nestedScroll(collapseConnection)
                             .testTag(pageTag),
                         contentPadding = contentPadding,
                         verticalArrangement = Arrangement.spacedBy(spacing),
@@ -439,7 +466,6 @@ fun HomeScreen(
                         columns = GridCells.Fixed(pageColumns),
                         modifier = Modifier
                             .fillMaxSize()
-                            .nestedScroll(collapseConnection)
                             .testTag(pageTag),
                         contentPadding = contentPadding,
                         horizontalArrangement = Arrangement.spacedBy(spacing),
@@ -465,7 +491,6 @@ fun HomeScreen(
                         state = homeScrollStates.compact,
                         modifier = Modifier
                             .fillMaxSize()
-                            .nestedScroll(collapseConnection)
                             .testTag(pageTag),
                         contentPadding = contentPadding,
                         verticalItemSpacing = spacing,
@@ -503,11 +528,6 @@ fun HomeScreen(
         }
     }
 
-    val navCollapseProgress = if (headerHeightPx > 0) {
-        (collapsedPx / headerHeightPx).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
     Scaffold { padding ->
         Box(
             modifier = Modifier
@@ -520,9 +540,9 @@ fun HomeScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(60.dp)
-                    .background(
-                        lerp(colors.canvas, colors.reportTicket, navCollapseProgress),
-                    ),
+                    .drawBehind {
+                        drawRect(lerp(colors.canvas, colors.reportTicket, collapseProgress()))
+                    },
             )
             MyTokenAdaptiveContent(
                 maxWidth = 1440.dp,
@@ -535,7 +555,7 @@ fun HomeScreen(
                         headlineCount = navHeadlineCount,
                         summaryTail = navSummaryTail,
                         alertProviders = navAlertProviders,
-                        collapseProgress = navCollapseProgress,
+                        collapseProgress = collapseProgress,
                         onOpenCredentials = onOpenCredentials,
                         onOpenSettings = onOpenSettings,
                         hasUpdateAvailable = hasUpdateAvailable,
@@ -544,148 +564,160 @@ fun HomeScreen(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
+                            .clipToBounds()
+                            .nestedScroll(pullConnection)
                             .then(pullGestureModifier),
                     ) {
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            if (pullOffsetPx > 0.5f) {
-                                Spacer(
-                                    modifier = Modifier.height(
-                                        with(density) { pullOffsetPx.toDp() },
-                                    ),
-                                )
+                        HorizontalPager(
+                            state = pagerState,
+                            // 两种密度都提前组合并测量，首次滑动不会像“重新加载”一页。
+                            beyondViewportPageCount = 1,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    translationY = pullOffsetPx + headerHeightPx - collapsedPx
+                                }
+                                .testTag("home_pager"),
+                            key = { page -> page },
+                        ) { page ->
+                            val pageDensity = if (page == 0) {
+                                UsageCardDensity.COMPACT
+                            } else {
+                                UsageCardDensity.FULL
                             }
-                            if (chromeVisible) {
-                                // 报告和供应商工具条一起完全收起，固定导航负责展示摘要。
-                                Layout(
-                                    content = {
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .onSizeChanged { headerHeightPx = it.height },
-                                        ) {
-                                            HomeHealthReport(
-                                                cards = allCards,
-                                                syncText = state.lastUpdatedText ?: "刚刚同步",
-                                                isRefreshing = state.isRefreshingAll,
-                                                onRefresh = onRefreshAll,
-                                                onLocate = ::requestLocate,
-                                            )
-                                            HomeProviderToolbar(
-                                                selectedProvider = selectedProvider,
-                                                providers = visibleProviders,
-                                                counts = providerCounts,
-                                                allTotal = allCards.size,
-                                                onSelect = {
-                                                    pendingLocateId = null
-                                                    selectedProvider = it
-                                                },
-                                                density = usageCardDensity,
-                                                // 点击只驱动分页动画；落页后再持久化模式，
-                                                // 避免选中态先跳变造成整块闪烁。
-                                                onToggleDensity = {
-                                                    val targetPage =
-                                                        if (pagerState.currentPage == 0) 1 else 0
-                                                    scope.launch {
-                                                        if (motionEnabled) {
-                                                            pagerState.animateScrollToPage(targetPage)
-                                                        } else {
-                                                            pagerState.scrollToPage(targetPage)
-                                                        }
-                                                    }
-                                                },
-                                                densityProgress = {
-                                                    (pagerState.currentPage + pagerState.currentPageOffsetFraction)
-                                                        .coerceIn(0f, 1f)
-                                                },
-                                            )
-                                        }
-                                    },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clipToBounds()
-                                        // 报告本身不可滚动：在头部直接上/下拖也能收起或展开，
-                                        // 与在卡片列表上的纵向手势保持一致。
-                                        .pointerInput(Unit) {
-                                            detectVerticalDragGestures { change, dragAmount ->
-                                                val max = latestMaxCollapsePx
-                                                if (max <= 0f) return@detectVerticalDragGestures
-                                                val current = collapsedPx.coerceIn(0f, max)
-                                                if (dragAmount < 0f) {
-                                                    val delta = min(-dragAmount, max - current)
-                                                    if (delta != 0f) {
-                                                        collapsedPx = current + delta
-                                                        change.consume()
-                                                    }
-                                                } else if (current > 0f) {
-                                                    val delta = min(dragAmount, current)
-                                                    if (delta != 0f) {
-                                                        collapsedPx = current - delta
-                                                        change.consume()
-                                                    }
-                                                } else if (pullArmed && !latestRefreshing && !pullTriggered) {
-                                                    val remaining = (pullMaxPx - pullOffsetPx).coerceAtLeast(0f)
-                                                    if (remaining > 0f) {
-                                                        pullOffsetPx += min(dragAmount * 0.55f, remaining)
-                                                        change.consume()
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        .testTag("home_collapsing_header"),
-                                ) { measurables, constraints ->
-                                    val content = measurables.first().measure(
-                                        constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity),
+                            // 两页都提前组合；静止时只有当前页进入无障碍树和测试语义树。
+                            val pageActive = pagerState.isScrollInProgress || pagerState.settledPage == page
+                            val pageSemantics = if (pageActive) {
+                                Modifier.testTag("home_page_active")
+                            } else {
+                                Modifier.clearAndSetSemantics { }
+                            }
+                            Box(modifier = Modifier.fillMaxSize().then(pageSemantics)) {
+                                when {
+                                    state.isLoading -> Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        CircularProgressIndicator()
+                                    }
+
+                                    allCards.isEmpty() -> EmptyState(
+                                        modifier = Modifier.fillMaxSize(),
+                                        onImportFromMac = onImportFromMac,
+                                        onAddManually = onAddManually,
                                     )
-                                    val maxCollapse = content.height.toFloat()
-                                    val collapse = collapsedPx.coerceIn(0f, maxCollapse).roundToInt()
-                                    layout(constraints.maxWidth, (content.height - collapse).coerceAtLeast(0)) {
-                                        content.place(0, -collapse)
-                                    }
-                                }
-                            }
 
-                            HorizontalPager(
-                                state = pagerState,
-                                // 两种密度都提前组合并测量，首次滑动不会像“重新加载”一页。
-                                beyondViewportPageCount = 1,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxWidth()
-                                    .testTag("home_pager"),
-                                key = { page -> page },
-                            ) { page ->
-                                val pageDensity = if (page == 0) {
-                                    UsageCardDensity.COMPACT
-                                } else {
-                                    UsageCardDensity.FULL
-                                }
-                                // 两页都提前组合；静止时只有当前页进入无障碍树和测试语义树。
-                                val pageActive = pagerState.isScrollInProgress || pagerState.settledPage == page
-                                val pageSemantics = if (pageActive) {
-                                    Modifier.testTag("home_page_active")
-                                } else {
-                                    Modifier.clearAndSetSemantics { }
-                                }
-                                Box(modifier = Modifier.fillMaxSize().then(pageSemantics)) {
-                                    when {
-                                        state.isLoading -> Box(
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            CircularProgressIndicator()
-                                        }
-
-                                        allCards.isEmpty() -> EmptyState(
-                                            modifier = Modifier.fillMaxSize(),
-                                            onImportFromMac = onImportFromMac,
-                                            onAddManually = onAddManually,
-                                        )
-
-                                        else -> modePage(pageDensity = pageDensity)
-                                    }
+                                    else -> modePage(pageDensity = pageDensity)
                                 }
                             }
                         }
+
+                        if (chromeVisible) {
+                            // 报告和工具条是覆盖层：只做位移动画，不改变分页区高度。
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .offset {
+                                        IntOffset(
+                                            0,
+                                            (
+                                                pullOffsetPx - collapsedPx
+                                                ).roundToInt(),
+                                        )
+                                    }
+                                    .onSizeChanged { headerHeightPx = it.height }
+                                    // 报告本身不可滚动：在头部直接上/下拖也驱动当前列表滚动，
+                                    // 与在卡片列表上的纵向手势保持一致。
+                                    .pointerInput(Unit) {
+                                        detectVerticalDragGestures { change, dragAmount ->
+                                            val max = headerHeightPx.toFloat()
+                                            if (dragAmount < 0f) {
+                                                // 同一次手势只要向上滚过，就要求重新起手才能下拉刷新。
+                                                pullArmed = false
+                                                val current = collapsedPx.coerceIn(0f, max)
+                                                val collapse = min(-dragAmount, max - current)
+                                                if (collapse > 0f) {
+                                                    collapsedPx = current + collapse
+                                                }
+                                                val leftover = -dragAmount - collapse
+                                                if (leftover > 0f) {
+                                                    // 报告收起后剩余距离继续驱动列表滚动。
+                                                    activeScrollableState().dispatchRawDelta(leftover)
+                                                }
+                                            } else if (collapsedPx > 0f) {
+                                                collapsedPx =
+                                                    (collapsedPx - min(dragAmount, collapsedPx))
+                                                        .coerceAtLeast(0f)
+                                            } else if (activePageAtTop()) {
+                                                if (
+                                                    pullArmed &&
+                                                    !latestRefreshing &&
+                                                    !pullTriggered
+                                                ) {
+                                                    val remaining = (
+                                                        pullMaxPx - pullOffsetPx
+                                                        ).coerceAtLeast(0f)
+                                                    if (remaining > 0f) {
+                                                        pullOffsetPx += min(
+                                                            dragAmount * 0.55f,
+                                                            remaining,
+                                                        )
+                                                    }
+                                                }
+                                            } else {
+                                                // dispatchRawDelta 正值向列表尾部滚动，与手势方向相反。
+                                                activeScrollableState().dispatchRawDelta(-dragAmount)
+                                            }
+                                            change.consume()
+                                        }
+                                    }
+                                    .testTag("home_collapsing_header"),
+                            ) {
+                                if (hasUpdateAvailable) {
+                                    HomeUpdateBanner(
+                                        version = updateVersion,
+                                        onOpenSettings = onOpenSettings,
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                }
+                                HomeHealthReport(
+                                    cards = allCards,
+                                    syncText = state.lastUpdatedText ?: "刚刚同步",
+                                    isRefreshing = state.isRefreshingAll,
+                                    onRefresh = onRefreshAll,
+                                    onLocate = ::requestLocate,
+                                )
+                                HomeProviderToolbar(
+                                    selectedProvider = selectedProvider,
+                                    providers = visibleProviders,
+                                    counts = providerCounts,
+                                    allTotal = allCards.size,
+                                    onSelect = {
+                                        pendingLocateId = null
+                                        selectedProvider = it
+                                    },
+                                    density = usageCardDensity,
+                                    // 点击只驱动分页动画；落页后再持久化模式，
+                                    // 避免选中态先跳变造成整块闪烁。
+                                    onToggleDensity = {
+                                        val targetPage =
+                                            if (pagerState.currentPage == 0) 1 else 0
+                                        scope.launch {
+                                            if (motionEnabled) {
+                                                pagerState.animateScrollToPage(targetPage)
+                                            } else {
+                                                pagerState.scrollToPage(targetPage)
+                                            }
+                                        }
+                                    },
+                                    densityProgress = {
+                                        (pagerState.currentPage + pagerState.currentPageOffsetFraction)
+                                            .coerceIn(0f, 1f)
+                                    },
+                                )
+                            }
+                        }
+
                         if (pullOffsetPx > 0.5f || pullTriggered) {
                             HomePullIndicator(
                                 offsetPx = pullOffsetPx,
@@ -704,7 +736,7 @@ fun HomeScreen(
     }
 }
 
-/** 下拉刷新指示器：出现在凭证报告上方，使用报告票据的黄色。 */
+/** 下拉刷新指示器：透明图标直接出现在报告上方，不铺整行底色。 */
 @Composable
 private fun HomePullIndicator(
     offsetPx: Float,
@@ -732,8 +764,6 @@ private fun HomePullIndicator(
                 scaleX = scale
                 scaleY = scale
             }
-            .clip(CircleShape)
-            .background(colors.reportTicket)
             .semantics {
                 contentDescription = if (refreshing) {
                     "正在刷新全部凭证"
@@ -745,7 +775,7 @@ private fun HomePullIndicator(
         contentAlignment = Alignment.Center,
     ) {
         ReportRefreshGlyph(
-            tint = colors.reportTicketInk,
+            tint = colors.actionText,
             modifier = Modifier
                 .size(20.dp)
                 .graphicsLayer { rotationZ = rotation },

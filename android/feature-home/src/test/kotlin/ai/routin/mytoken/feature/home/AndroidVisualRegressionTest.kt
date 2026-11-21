@@ -59,7 +59,7 @@ class AndroidVisualRegressionTest {
     }
 
     @Test
-    fun 方案A主题锁定品牌蓝与状态色() {
+    fun 方案A主题锁定报告黄与状态色() {
         var lightPrimary = Color.Unspecified
         var darkPrimary = Color.Unspecified
         var lightPositive = Color.Unspecified
@@ -78,11 +78,11 @@ class AndroidVisualRegressionTest {
             }
         }
 
-        assertEquals(0xFF2F6BFF.toInt(), lightPrimary.toArgb())
-        assertEquals(0xFF7AA2FF.toInt(), darkPrimary.toArgb())
+        assertEquals(0xFFF3CB73.toInt(), lightPrimary.toArgb())
+        assertEquals(0xFFF3CB73.toInt(), darkPrimary.toArgb())
         assertEquals(0xFF30C48D.toInt(), lightPositive.toArgb())
         assertEquals(0xFFFF6369.toInt(), darkDanger.toArgb())
-        assertEquals(0xFF061326.toInt(), darkOnPrimary.toArgb())
+        assertEquals(0xFF17181A.toInt(), darkOnPrimary.toArgb())
     }
 
     @Test

@@ -10,6 +10,7 @@ import ai.routin.mytoken.feature.credentials.pruneCredential
 import ai.routin.mytoken.feature.home.HomeScreen
 import ai.routin.mytoken.feature.home.HomeViewModel
 import ai.routin.mytoken.feature.home.CredentialDetailScreen
+import ai.routin.mytoken.feature.settings.AppUpdateUiState
 import ai.routin.mytoken.feature.settings.SettingsScreen
 import ai.routin.mytoken.feature.settings.SettingsViewModel
 import ai.routin.mytoken.feature.transfer.ImportConflictMode
@@ -199,6 +200,12 @@ fun MyTokenApp(
     val settingsState by settingsViewModel.state.collectAsStateWithLifecycle()
     val updateState by settingsViewModel.updateState.collectAsStateWithLifecycle()
     val releaseHistoryState by settingsViewModel.releaseHistoryState.collectAsStateWithLifecycle()
+    val pendingUpdateVersion = when (val update = updateState) {
+        is AppUpdateUiState.Available -> update.version
+        is AppUpdateUiState.NeedsInstallPermission -> update.version
+        is AppUpdateUiState.ReadyToInstall -> update.version
+        else -> null
+    }
 
     LaunchedEffect(settingsState.isLoading) {
         if (!settingsState.isLoading && settingsState.refresh.openAppRefresh) {
@@ -328,9 +335,8 @@ fun MyTokenApp(
                     onOpenCredentials = { drawerSide = MyTokenEdgeDrawerSide.Start },
                     onManageCredentials = { homeSheet = HomeCredentialSheet.Manage },
                     onOpenSettings = { drawerSide = MyTokenEdgeDrawerSide.End },
-                    hasUpdateAvailable = updateState is ai.routin.mytoken.feature.settings.AppUpdateUiState.Available ||
-                        updateState is ai.routin.mytoken.feature.settings.AppUpdateUiState.NeedsInstallPermission ||
-                        updateState is ai.routin.mytoken.feature.settings.AppUpdateUiState.ReadyToInstall,
+                    hasUpdateAvailable = pendingUpdateVersion != null,
+                    updateVersion = pendingUpdateVersion,
                     homeScrollStates = homeScrollStates,
                 )            }
         }

@@ -56,9 +56,6 @@ class CredentialUsageSurfaceStyleTest {
         assertTrue(report.contains(".background(colors.reportTicket, ReportTicketShape)"))
         assertFalse(report.contains("reportTicketNormal"))
         assertFalse(report.contains("reportDialTrackNormal"))
-        // 刷新按钮与下拉指示器共用票面黄。
-        assertTrue(report.contains(".background(colors.reportTicket)"))
-        assertTrue(sourceText("HomeScreen.kt").contains(".background(colors.reportTicket)"))
     }
 
     @Test
@@ -74,6 +71,28 @@ class CredentialUsageSurfaceStyleTest {
         assertTrue(glyph.contains("M20 7v5h-5"))
         assertTrue(glyph.contains("tint: Color"))
         assertTrue(report.contains("tint = colors.reportTicketInk"))
+        // 报告右下角只保留透明图标，不再有黄色圆形底。
+        assertFalse(report.contains("report_refresh_circle"))
+    }
+
+    @Test
+    fun `下拉刷新指示器不再有整行底色承托`() {
+        val home = sourceText("HomeScreen.kt")
+        val pullBody = home
+            .substringAfter("private fun HomePullIndicator")
+            .substringBefore("@Composable\nprivate fun CredentialEndActions")
+
+        assertTrue(pullBody.contains("ReportRefreshGlyph"))
+        assertFalse("下拉指示器本身不应铺整行或圆形底色", pullBody.contains(".background("))
+        assertFalse(pullBody.contains(".fillMaxWidth()"))
+    }
+
+    @Test
+    fun `密度切换组件不做加载动画`() {
+        val chrome = sourceText("HomeChrome.kt")
+
+        assertFalse("分页过程中切换组件不应播放颜色加载动画", chrome.contains("animateColorAsState"))
+        assertTrue(chrome.contains("tint = if (selected) colors.canvas else colors.muted"))
     }
 
     private fun sourceText(name: String): String {
