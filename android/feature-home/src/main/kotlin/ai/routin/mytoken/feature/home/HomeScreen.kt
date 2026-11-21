@@ -77,7 +77,6 @@ fun HomeScreen(
     onOpenCredentials: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     hasUpdateAvailable: Boolean = false,
-    updateVersion: String? = null,
     layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
     usageCardDensity: UsageCardDensity = UsageCardDensity.FULL,
     onToggleUsageCardDensity: () -> Unit = {},
@@ -99,22 +98,13 @@ fun HomeScreen(
             ?.let { provider -> allCards.filter { it.credential.providerId == provider } }
             ?: allCards
     }
-    val healthEntries = remember(visibleCards) {
-        visibleCards.map { card ->
-            HealthRulerEntry(
-                credentialId = card.credential.id,
-                name = card.credential.name,
-                tone = homeHealthTone(card),
-            )
-        }
-    }
-    val attentionCount = healthEntries.count { it.tone != HomeHealthTone.Normal }
 
     val motionEnabled = rememberMyTokenMotionEnabled()
     val scope = rememberCoroutineScope()
     var highlightedCredentialId by remember { mutableStateOf<UUID?>(null) }
     var flashTick by remember { mutableIntStateOf(0) }
     var headerHeightPx by remember { mutableIntStateOf(0) }
+    var pendingLocateId by remember { mutableStateOf<UUID?>(null) }
 
     val fontScale = LocalDensity.current.fontScale
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
@@ -145,6 +135,45 @@ fun HomeScreen(
         }
     }
 
+    fun locateNow(id: UUID) {
+        val index = visibleCards.indexOfFirst { it.credential.id == id }
+        if (index < 0) return
+        scope.launch {
+            locateCard(
+                states = homeScrollStates,
+                mode = homeScrollMode(usageCardDensity, screenWidthDp),
+                index = index,
+                // 报告与筛选工具条固定在分页区上方，补偿它们高度的一半。
+                centerBiasPx = headerHeightPx / 2f,
+                durationMillis = MyTokenMotion.locateDurationMillis(motionEnabled),
+            )
+            highlightedCredentialId = id
+            flashTick += 1
+            delay(1_000)
+            if (highlightedCredentialId == id) {
+                highlightedCredentialId = null
+            }
+        }
+    }
+
+    fun requestLocate(id: UUID) {
+        if (visibleCards.any { it.credential.id == id }) {
+            locateNow(id)
+        } else {
+            // 报告口径是全部凭证；定位被筛选隐藏的卡片时先清除筛选。
+            selectedProvider = null
+            pendingLocateId = id
+        }
+    }
+
+    LaunchedEffect(pendingLocateId, selectedProvider) {
+        val id = pendingLocateId ?: return@LaunchedEffect
+        if (selectedProvider == null && visibleCards.any { it.credential.id == id }) {
+            pendingLocateId = null
+            locateNow(id)
+        }
+    }
+
     @Composable
     fun cardItem(card: CredentialCardUi, density: UsageCardDensity) {
         val isHighlighted = highlightedCredentialId == card.credential.id
@@ -165,10 +194,6 @@ fun HomeScreen(
         val pageMode = homeScrollMode(pageDensity, screenWidthDp)
         val pageColumns = homeGridColumns(pageMode, screenWidthDp, fontScale)
         val pageTag = homeGridTag(pageMode, pageColumns)
-        var pageHeaderHeightPx by remember { mutableIntStateOf(0) }
-        // 定位时把卡片中心抬到整屏中心：滚动视口从工具条与页内状态区下方开始，
-        // 需要补偿这两段固定内容高度的一半；提示条和状态行高度会变化，这里实测。
-        val centerBiasPx = (headerHeightPx + pageHeaderHeightPx) / 2f
         val isScrolled by remember(pageMode) {
             derivedStateOf {
                 when (pageMode) {
@@ -187,131 +212,82 @@ fun HomeScreen(
             }
         }
 
-        Column(modifier = Modifier.fillMaxSize()) {
-            Column(
+        Box(modifier = Modifier.fillMaxSize()) {
+            val contentPadding = PaddingValues(top = 2.dp, bottom = 24.dp)
+            val spacing = if (pageDensity.isCompact()) 8.dp else 12.dp
+            PullToRefreshBox(
+                isRefreshing = state.isRefreshingAll,
+                onRefresh = onRefreshAll,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .onSizeChanged { pageHeaderHeightPx = it.height }
-                    .testTag("health_summary"),
+                    .fillMaxSize()
+                    .testTag("home_pull_refresh"),
             ) {
-                HomeStatusRow(
-                    total = visibleCards.size,
-                    allTotal = allCards.size,
-                    attention = attentionCount,
-                    syncText = state.lastUpdatedText ?: "刚刚同步",
-                    selectedProvider = selectedProvider,
-                    providers = visibleProviders,
-                    counts = providerCounts,
-                    onSelect = { selectedProvider = it },
-                )
-                HealthRuler(
-                    entries = healthEntries,
-                    onLocate = { id ->
-                        val index = visibleCards.indexOfFirst { it.credential.id == id }
-                        if (index >= 0) {
-                            scope.launch {
-                                locateCard(
-                                    states = homeScrollStates,
-                                    mode = pageMode,
-                                    index = index,
-                                    centerBiasPx = centerBiasPx,
-                                    durationMillis = MyTokenMotion.locateDurationMillis(motionEnabled),
-                                )
-                                highlightedCredentialId = id
-                                flashTick += 1
-                                delay(1_000)
-                                if (highlightedCredentialId == id) {
-                                    highlightedCredentialId = null
-                                }
-                            }
-                        }
-                    },
-                    modifier = Modifier.padding(top = 1.dp, bottom = 6.dp),
-                )
-            }
+                when (pageMode) {
+                    HomeScrollMode.FullList -> LazyColumn(
+                        state = homeScrollStates.full,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag(pageTag),
+                        contentPadding = contentPadding,
+                        verticalArrangement = Arrangement.spacedBy(spacing),
+                    ) {
+                        items(
+                            items = visibleCards,
+                            key = { it.credential.id },
+                            contentType = { "credential-usage-card" },
+                        ) { card -> cardItem(card, pageDensity) }
+                    }
 
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-            ) {
-                // 健康标尺已留出 6dp；卡片紧跟标尺，避免顶部空隙过大。
-                val contentPadding = PaddingValues(top = 0.dp, bottom = 24.dp)
-                val spacing = if (pageDensity.isCompact()) 8.dp else 12.dp
-                PullToRefreshBox(
-                    isRefreshing = state.isRefreshingAll,
-                    onRefresh = onRefreshAll,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .testTag("home_pull_refresh"),
-                ) {
-                    when (pageMode) {
-                        HomeScrollMode.FullList -> LazyColumn(
-                            state = homeScrollStates.full,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .testTag(pageTag),
-                            contentPadding = contentPadding,
-                            verticalArrangement = Arrangement.spacedBy(spacing),
-                        ) {
-                            items(
-                                items = visibleCards,
-                                key = { it.credential.id },
-                                contentType = { "credential-usage-card" },
-                            ) { card -> cardItem(card, pageDensity) }
-                        }
+                    HomeScrollMode.FullWideGrid -> LazyVerticalGrid(
+                        state = homeScrollStates.fullWide,
+                        columns = GridCells.Fixed(pageColumns),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag(pageTag),
+                        contentPadding = contentPadding,
+                        horizontalArrangement = Arrangement.spacedBy(spacing),
+                        verticalArrangement = Arrangement.spacedBy(spacing),
+                    ) {
+                        gridItems(
+                            items = visibleCards,
+                            key = { it.credential.id },
+                            contentType = { "credential-usage-card" },
+                        ) { card -> cardItem(card, pageDensity) }
+                    }
 
-                        HomeScrollMode.FullWideGrid -> LazyVerticalGrid(
-                            state = homeScrollStates.fullWide,
-                            columns = GridCells.Fixed(pageColumns),
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .testTag(pageTag),
-                            contentPadding = contentPadding,
-                            horizontalArrangement = Arrangement.spacedBy(spacing),
-                            verticalArrangement = Arrangement.spacedBy(spacing),
-                        ) {
-                            gridItems(
-                                items = visibleCards,
-                                key = { it.credential.id },
-                                contentType = { "credential-usage-card" },
-                            ) { card -> cardItem(card, pageDensity) }
-                        }
-
-                        // 简洁卡高度随内容自适应，用瀑布流避免相邻列因行数不同而对不齐。
-                        HomeScrollMode.CompactGrid -> LazyVerticalStaggeredGrid(
-                            columns = StaggeredGridCells.Fixed(pageColumns),
-                            state = homeScrollStates.compact,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .testTag(pageTag),
-                            contentPadding = contentPadding,
-                            verticalItemSpacing = spacing,
-                            horizontalArrangement = Arrangement.spacedBy(spacing),
-                        ) {
-                            staggeredItems(
-                                items = visibleCards,
-                                key = { it.credential.id },
-                                contentType = { "credential-usage-card" },
-                            ) { card -> cardItem(card, pageDensity) }
-                        }
+                    // 简洁卡高度随内容自适应，用瀑布流避免相邻列因行数不同而对不齐。
+                    HomeScrollMode.CompactGrid -> LazyVerticalStaggeredGrid(
+                        columns = StaggeredGridCells.Fixed(pageColumns),
+                        state = homeScrollStates.compact,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag(pageTag),
+                        contentPadding = contentPadding,
+                        verticalItemSpacing = spacing,
+                        horizontalArrangement = Arrangement.spacedBy(spacing),
+                    ) {
+                        staggeredItems(
+                            items = visibleCards,
+                            key = { it.credential.id },
+                            contentType = { "credential-usage-card" },
+                        ) { card -> cardItem(card, pageDensity) }
                     }
                 }
+            }
 
-                if (isScrolled) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .fillMaxWidth()
-                            .height(12.dp)
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(colors.line, Color.Transparent),
-                                ),
-                            )
-                            .testTag("home_scroll_edge"),
-                    )
-                }
+            if (isScrolled) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .height(12.dp)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(colors.line, Color.Transparent),
+                            ),
+                        )
+                        .testTag("home_scroll_edge"),
+                )
             }
         }
     }
@@ -333,18 +309,34 @@ fun HomeScreen(
                 ) {
                     HomeToolbar(
                         credentialCount = state.cards.size,
-                        density = usageCardDensity,
-                        onToggleDensity = onToggleUsageCardDensity,
                         onOpenCredentials = onOpenCredentials,
                         onOpenSettings = onOpenSettings,
                         hasUpdateAvailable = hasUpdateAvailable,
                     )
-                    if (hasUpdateAvailable) {
-                        HomeUpdateBanner(
-                            version = updateVersion,
-                            onOpenSettings = onOpenSettings,
+                    if (!state.isLoading && allCards.isNotEmpty()) {
+                        HomeHealthReport(
+                            cards = allCards,
+                            syncText = state.lastUpdatedText ?: "刚刚同步",
+                            isRefreshing = state.isRefreshingAll,
+                            onRefresh = onRefreshAll,
+                            onLocate = ::requestLocate,
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        HomeProviderToolbar(
+                            selectedProvider = selectedProvider,
+                            providers = visibleProviders,
+                            counts = providerCounts,
+                            allTotal = allCards.size,
+                            onSelect = {
+                                pendingLocateId = null
+                                selectedProvider = it
+                            },
+                            density = usageCardDensity,
+                            onToggleDensity = onToggleUsageCardDensity,
+                            densityProgress = {
+                                (pagerState.currentPage + pagerState.currentPageOffsetFraction)
+                                    .coerceIn(0f, 1f)
+                            },
+                        )
                     }
                 }
 

@@ -22,9 +22,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.test.assertContentDescriptionContains
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -590,11 +593,11 @@ class HomeScreenTest {
             }
         }
 
-        // 设计稿尺寸：筛选 pill 34dp、健康标尺 20dp；其余仍按 48dp 触控。
+        // 顶部导航、供应商筛选与报告刷新都保持 48dp 触控。
         mapOf(
             "credential_refresh_${credential.id}" to 48.dp,
-            "provider_filter_menu" to 34.dp,
-            "health_segment_0" to 20.dp,
+            "provider_filter_menu" to 48.dp,
+            "report_refresh" to 48.dp,
             "home_open_credentials" to 48.dp,
             "home_open_settings" to 48.dp,
         ).forEach { (tag, minSize) ->
@@ -892,7 +895,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun 健康标尺与卡片区域之间保持紧凑间距() {
+    fun 报告与工具条之后紧跟卡片区域() {
         val credential = credential("间距")
         val usage = card(credential, metrics = listOf(progress(42.0, 100.0)))
         composeRule.setContent {
@@ -914,14 +917,22 @@ class HomeScreenTest {
             }
         }
 
-        val rulerBottom = composeRule.onNodeWithTag("health_segment_0")
+        val reportBottom = composeRule.onNodeWithTag("home_health_report")
+            .getUnclippedBoundsInRoot()
+            .bottom
+        val toolbarTop = composeRule.onNodeWithTag("home_provider_toolbar")
+            .getUnclippedBoundsInRoot()
+            .top
+        assertEquals("报告与供应商工具条之间不留空隙", reportBottom.value, toolbarTop.value, 1f)
+
+        val toolbarBottom = composeRule.onNodeWithTag("home_provider_toolbar")
             .getUnclippedBoundsInRoot()
             .bottom
         val cardTop = composeRule.onNodeWithTag("credential_card_${credential.id}")
             .getUnclippedBoundsInRoot()
             .top
-        val gap = cardTop.value - rulerBottom.value
-        assertTrue("健康标尺与首张卡片间距应缩小到 8dp 内，实际 ${gap}dp", gap <= 8f)
+        val gap = cardTop.value - toolbarBottom.value
+        assertTrue("工具条与首张卡片间距应保持在 8dp 内，实际 ${gap}dp", gap <= 8f)
     }
 
     @Test
@@ -1130,7 +1141,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun 首页顶部使用单行工具条且账户健康保持紧凑() {
+    fun 首页顶部使用品牌导航与琥珀报告() {
         val cards = (1..7).map { index ->
             card(credential("健康 $index"), metrics = listOf(progress(20.0 + index, 100.0)))
         }
@@ -1154,29 +1165,31 @@ class HomeScreenTest {
         }
 
         composeRule.onNodeWithText("账户用量").assertDoesNotExist()
-        composeRule.onNodeWithTag("home_wordmark").assertDoesNotExist()
-        composeRule.onNodeWithTag("usage_density_toggle").assertIsDisplayed()
+        composeRule.onNodeWithTag("home_wordmark", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("home_brand", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("home_toolbar").assertIsDisplayed()
+        composeRule.onNodeWithTag("home_health_report").assertIsDisplayed()
+        composeRule.onNodeWithTag("home_provider_toolbar").assertIsDisplayed()
+
+        val toolbarBounds = composeRule.onNodeWithTag("home_toolbar")
+            .getUnclippedBoundsInRoot()
+        val toolbarHeight = (toolbarBounds.bottom - toolbarBounds.top).value
+        assertTrue("顶部导航应为 60dp，实际 $toolbarHeight", toolbarHeight in 58f..64f)
+
+        val reportBounds = composeRule.onNodeWithTag("home_health_report")
+            .getUnclippedBoundsInRoot()
+        val reportHeight = (reportBounds.bottom - reportBounds.top).value
+        assertTrue("无风险项时报告应保持紧凑，实际 $reportHeight", reportHeight < 260f)
+
         val rootBounds = composeRule.onRoot().getUnclippedBoundsInRoot()
         val toggleBounds = composeRule.onNodeWithTag("usage_density_toggle")
             .getUnclippedBoundsInRoot()
-        assertEquals(
-            ((rootBounds.left + rootBounds.right) / 2f).value,
-            ((toggleBounds.left + toggleBounds.right) / 2f).value,
-            1f,
-        )
-        val toolbarBounds = composeRule.onNodeWithTag("home_toolbar")
-            .getUnclippedBoundsInRoot()
         assertTrue(
-            "首页工具条应保持单行高度，实际高度 ${toolbarBounds.bottom - toolbarBounds.top}",
-            (toolbarBounds.bottom - toolbarBounds.top).value < 50f,
+            "密度滑块应位于供应商工具条右侧",
+            (toggleBounds.left + toggleBounds.right) / 2f >
+                (rootBounds.left + rootBounds.right) / 2f,
         )
-        val healthBounds = composeRule.onNodeWithTag("health_summary")
-            .getUnclippedBoundsInRoot()
-        val healthHeight = healthBounds.bottom - healthBounds.top
-        assertTrue(
-            "账户健康应压缩为单行摘要 + 状态条，实际高度 $healthHeight",
-            healthHeight.value < 100f,
-        )
+        assertEquals("密度滑块宽度按设计稿 104dp", 104f, toggleBounds.right.value - toggleBounds.left.value, 1.5f)
     }
 
     @Test
@@ -2145,7 +2158,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun 点击账户健康短条会定位到对应凭证卡片() {
+    fun 点击报告风险项会定位到对应凭证卡片() {
         val cards = (1..5).map { index ->
             val item = credential("健康定位 $index")
             card(item, metrics = listOf(progress(index * 10.0, 100.0)))
@@ -2168,7 +2181,7 @@ class HomeScreenTest {
             }
         }
 
-        composeRule.onNodeWithTag("health_segment_4").performClick()
+        composeRule.onNodeWithTag("health_finding_${cards[4].credential.id}").performSemanticsAction(SemanticsActions.OnClick)
         composeRule.waitUntil(5_000) {
             composeRule.onAllNodesWithTag("credential_card_${cards[4].credential.id}")
                 .fetchSemanticsNodes()
@@ -2179,10 +2192,11 @@ class HomeScreenTest {
     }
 
     @Test
-    fun 简洁模式健康短条可定位到瀑布流中的凭证卡片() {
+    fun 简洁模式报告风险项可定位到瀑布流中的凭证卡片() {
         val cards = (1..20).map { index ->
             val item = credential("瀑布定位 $index")
-            card(item, metrics = listOf(progress(index.toDouble(), 100.0)))
+            val used = if (index == 20) 90.0 else 10.0 + index
+            card(item, metrics = listOf(progress(used, 100.0)))
         }
         composeRule.setContent {
             MyTokenTheme {
@@ -2203,7 +2217,7 @@ class HomeScreenTest {
             }
         }
 
-        composeRule.onNodeWithTag("health_segment_19").performClick()
+        composeRule.onNodeWithTag("health_finding_${cards[19].credential.id}").performSemanticsAction(SemanticsActions.OnClick)
         composeRule.waitUntil(5_000) {
             composeRule.onAllNodesWithTag("credential_card_${cards[19].credential.id}")
                 .fetchSemanticsNodes()
@@ -2214,10 +2228,11 @@ class HomeScreenTest {
     }
 
     @Test
-    fun 点击账户健康短条会把中间凭证卡片定位到屏幕中心() {
+    fun 点击报告风险项会把中间凭证卡片定位到屏幕中心() {
         val cards = (1..7).map { index ->
             val item = credential("健康居中 $index")
-            card(item, metrics = listOf(progress(index * 10.0, 100.0)))
+            val used = if (index == 4) 90.0 else index * 10.0
+            card(item, metrics = listOf(progress(used, 100.0)))
         }
         composeRule.setContent {
             MaterialTheme {
@@ -2234,13 +2249,11 @@ class HomeScreenTest {
                     onImportFromMac = {},
                     onAddManually = {},
                     usageCardDensity = UsageCardDensity.FULL,
-                    hasUpdateAvailable = true,
-                    updateVersion = "6.1.0",
                 )
             }
         }
 
-        composeRule.onNodeWithTag("health_segment_3").performClick()
+        composeRule.onNodeWithTag("health_finding_${cards[3].credential.id}").performSemanticsAction(SemanticsActions.OnClick)
         composeRule.waitUntil(5_000) {
             composeRule.onAllNodesWithTag("credential_card_${cards[3].credential.id}")
                 .fetchSemanticsNodes()
@@ -2357,6 +2370,257 @@ class HomeScreenTest {
     }
 
     @Test
+    fun 报告风险项点击回调携带凭证() {
+        val warning = card(credential("风险"), metrics = listOf(progress(90.0, 100.0)))
+        var clicked: UUID? = null
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeHealthReport(
+                    cards = listOf(warning),
+                    syncText = "刚刚同步",
+                    isRefreshing = false,
+                    onRefresh = {},
+                    onLocate = { clicked = it },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("health_finding_${warning.credential.id}").performClick()
+        assertEquals(warning.credential.id, clicked)
+    }
+
+    @Test
+    fun 顶部展示产品品牌入口与琥珀报告() {
+        val cards = listOf(
+            card(credential("正常账号"), metrics = listOf(progress(20.0, 100.0))),
+            card(credential("接近上限"), metrics = listOf(progress(60.0, 100.0))),
+            card(credential("超限账号"), metrics = listOf(progress(90.0, 100.0))),
+        )
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = cards,
+                        groups = emptyList(),
+                        credentialCount = cards.size,
+                        lastUpdatedText = "刚刚同步",
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("home_wordmark", useUnmergedTree = true).assertTextEquals("MyToken")
+        composeRule.onNodeWithTag("home_health_report").assertIsDisplayed()
+        composeRule.onNodeWithTag("report_attention_count").assertTextEquals("2")
+        composeRule.onNodeWithTag("report_tail").assertTextEquals("接近上限")
+        composeRule.onNodeWithTag("report_dial")
+            .assertContentDescriptionContains("3 个凭证，1 个正常，2 个需注意")
+        composeRule.onNodeWithTag("health_finding_${cards[1].credential.id}").assertExists()
+        composeRule.onNodeWithTag("health_finding_${cards[2].credential.id}").assertExists()
+        composeRule.onNodeWithTag("health_finding_${cards[0].credential.id}").assertDoesNotExist()
+        composeRule.onNodeWithText("最近同步", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun 报告为空时给出正常说明() {
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = listOf(card(credential("全部正常"), metrics = listOf(progress(20.0, 100.0)))),
+                        groups = emptyList(),
+                        credentialCount = 1,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("report_tail").assertTextEquals("用量正常")
+        composeRule.onNodeWithText("全部凭证的当前用量正常。", substring = true)
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun 报告刷新按钮触发全部刷新() {
+        var refreshCount = 0
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = listOf(card(credential("刷新"), metrics = listOf(progress(20.0, 100.0)))),
+                        groups = emptyList(),
+                        credentialCount = 1,
+                    ),
+                    onRefreshAll = { refreshCount += 1 },
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("report_refresh").performClick()
+        assertEquals(1, refreshCount)
+    }
+
+    @Test
+    fun 供应商筛选只影响下方卡片不影响报告() {
+        val routin = card(
+            credential("Routin 账户", ProviderId.Routin),
+            metrics = listOf(progress(20.0, 100.0)),
+        )
+        val deepSeek = card(
+            credential("DeepSeek 告警", ProviderId.DeepSeek),
+            metrics = listOf(progress(90.0, 100.0)),
+        )
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = listOf(routin, deepSeek),
+                        groups = listOf(
+                            group(ProviderId.Routin, listOf(routin)),
+                            group(ProviderId.DeepSeek, listOf(deepSeek)),
+                        ),
+                        credentialCount = 2,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("provider_filter_menu").performClick()
+        composeRule.onNodeWithTag("provider_filter_item_routin").performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("credential_card_${routin.credential.id}").assertExists()
+        composeRule.onNodeWithTag("credential_card_${deepSeek.credential.id}").assertDoesNotExist()
+        // 报告始终展示全部凭证，不受下方筛选影响。
+        composeRule.onNodeWithTag("health_finding_${deepSeek.credential.id}").assertExists()
+        composeRule.onNodeWithTag("report_attention_count").assertTextEquals("1")
+    }
+
+    @Test
+    fun 点击报告风险项会清除筛选并定位到对应卡片() {
+        val routinCards = (1..4).map { index ->
+            card(
+                credential("Routin $index", ProviderId.Routin),
+                metrics = listOf(progress(10.0 + index, 100.0)),
+            )
+        }
+        val deepSeek = card(
+            credential("DeepSeek 告警", ProviderId.DeepSeek),
+            metrics = listOf(progress(90.0, 100.0)),
+        )
+        val cards = routinCards + deepSeek
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = cards,
+                        groups = listOf(
+                            group(ProviderId.Routin, routinCards),
+                            group(ProviderId.DeepSeek, listOf(deepSeek)),
+                        ),
+                        credentialCount = cards.size,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("provider_filter_menu").performClick()
+        composeRule.onNodeWithTag("provider_filter_item_routin").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("credential_card_${deepSeek.credential.id}").assertDoesNotExist()
+
+        composeRule.onNodeWithTag("health_finding_${deepSeek.credential.id}").performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("provider_filter_menu").assertIsNotSelected()
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithTag("credential_card_${deepSeek.credential.id}")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeRule.onNodeWithTag("credential_card_${deepSeek.credential.id}").assertIsDisplayed()
+    }
+
+    @Test
+    fun 密度滑块随分页手势移动() {
+        var density by mutableStateOf(UsageCardDensity.COMPACT)
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = listOf(card(credential("滑块"), metrics = listOf(progress(20.0, 100.0)))),
+                        groups = emptyList(),
+                        credentialCount = 1,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    usageCardDensity = density,
+                    onToggleUsageCardDensity = {
+                        density = if (density == UsageCardDensity.COMPACT) {
+                            UsageCardDensity.FULL
+                        } else {
+                            UsageCardDensity.COMPACT
+                        }
+                    },
+                )
+            }
+        }
+
+        fun thumbLeft(): Float = composeRule
+            .onNodeWithTag("usage_density_thumb", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+            .left
+            .value
+
+        val start = thumbLeft()
+        composeRule.onNodeWithTag("home_pager").performTouchInput {
+            down(Offset(width * 0.8f, height * 0.5f))
+            moveTo(Offset(width * 0.45f, height * 0.5f), delayMillis = 150)
+        }
+        composeRule.waitForIdle()
+        val mid = thumbLeft()
+        assertTrue("滑块应跟随分页进度右移，start=$start mid=$mid", mid > start + 10f)
+
+        composeRule.onNodeWithTag("home_pager").performTouchInput {
+            moveTo(Offset(width * 0.15f, height * 0.5f), delayMillis = 100)
+            up()
+        }
+        composeRule.waitUntil(5_000) { density == UsageCardDensity.FULL }
+    }
+
+    @Test
     fun 有可用更新时设置入口显示提示点() {
         composeRule.setContent {
             MaterialTheme {
@@ -2382,14 +2646,14 @@ class HomeScreenTest {
     }
 
     @Test
-    fun 有可用更新时首页顶部显示更新提醒条() {
+    fun 有可用更新时只显示设置提示点点击进入设置() {
         var openedSettings = 0
         composeRule.setContent {
             MaterialTheme {
                 HomeScreen(
                     state = HomeUiState(
                         isLoading = false,
-                        cards = listOf(card(credential("更新横幅"))),
+                        cards = listOf(card(credential("更新提示"))),
                         groups = emptyList(),
                         credentialCount = 1,
                     ),
@@ -2400,21 +2664,18 @@ class HomeScreenTest {
                     onAddManually = {},
                     onOpenSettings = { openedSettings++ },
                     hasUpdateAvailable = true,
-                    updateVersion = "6.1.0",
                 )
             }
         }
 
-        composeRule.onNodeWithTag("home_update_banner").assertIsDisplayed()
-        composeRule.onNodeWithTag("home_update_banner_icon", useUnmergedTree = true)
-            .assertExists()
-        composeRule.onNodeWithText("新版本 6.1.0 可用").assertIsDisplayed()
-        composeRule.onNodeWithTag("home_update_banner").performClick()
+        composeRule.onNodeWithTag("home_update_badge", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag("home_update_banner").assertDoesNotExist()
+        composeRule.onNodeWithTag("home_open_settings").performClick()
         assertEquals(1, openedSettings)
     }
 
     @Test
-    fun 无可用更新时不显示更新提醒条() {
+    fun 无可用更新时不显示更新提示点() {
         composeRule.setContent {
             MaterialTheme {
                 HomeScreen(
@@ -2435,40 +2696,8 @@ class HomeScreenTest {
         }
 
         composeRule.onNodeWithTag("home_update_banner").assertDoesNotExist()
-    }
-
-    @Test
-    fun 状态行显示需注意数量() {
-        val cards = listOf(
-            card(credential("正常账号"), metrics = listOf(progress(20.0, 100.0))),
-            card(credential("告警账号"), metrics = listOf(progress(60.0, 100.0))),
-            card(credential("超限账号"), metrics = listOf(progress(90.0, 100.0))),
-        )
-        composeRule.setContent {
-            MyTokenTheme {
-                HomeScreen(
-                    state = HomeUiState(
-                        isLoading = false,
-                        cards = cards,
-                        groups = emptyList(),
-                        credentialCount = cards.size,
-                        lastUpdatedText = "刚刚同步",
-                    ),
-                    onRefreshAll = {},
-                    onRefreshCredential = {},
-                    onOpenCredential = {},
-                    onImportFromMac = {},
-                    onAddManually = {},
-                    usageCardDensity = UsageCardDensity.COMPACT,
-                )
-            }
-        }
-
-        composeRule.onNodeWithTag("home_status_row").assertIsDisplayed()
-        composeRule.onNodeWithText("2 个需注意", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("查看账户健康 说明").assertDoesNotExist()
-        composeRule.onNodeWithTag("health_segment_0").assertExists()
-        composeRule.onNodeWithTag("health_segment_2").assertExists()
+        composeRule.onNodeWithTag("home_update_badge", useUnmergedTree = true)
+            .assertDoesNotExist()
     }
 
     @Test

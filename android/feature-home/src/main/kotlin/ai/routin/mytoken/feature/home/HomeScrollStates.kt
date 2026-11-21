@@ -67,7 +67,7 @@ internal fun homeGridTag(mode: HomeScrollMode, columns: Int): String = when (mod
     else -> "home_grid_${columns}_columns"
 }
 
-/** 健康标尺定位：滚动到目标卡片并把卡片中心对准屏幕中心（含固定头部偏移）。 */
+/** 报告风险项定位：滚动到目标卡片并把卡片中心对准屏幕中心（含固定头部偏移）。 */
 internal suspend fun locateCard(
     states: HomeScrollStates,
     mode: HomeScrollMode,

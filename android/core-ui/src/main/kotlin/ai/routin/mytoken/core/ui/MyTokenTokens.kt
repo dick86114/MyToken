@@ -36,6 +36,16 @@ data class MyTokenColors(
     val cat3: Color,
     val track: Color,
     val statusDotNormal: Color,
+    // 首页琥珀报告：正文区随主题反相，票据主区固定为琥珀纸色。
+    val reportSurface: Color,
+    val reportInk: Color,
+    val reportMuted: Color,
+    val reportLine: Color,
+    val reportAccent: Color,
+    val reportTicket: Color,
+    val reportTicketInk: Color,
+    val reportTicketMuted: Color,
+    val reportDialTrack: Color,
 )
 
 internal val MyTokenLightColors = MyTokenColors(
@@ -59,6 +69,15 @@ internal val MyTokenLightColors = MyTokenColors(
     cat3 = Color(0xFFC9CDD3),
     track = Color(0xFFE9EBEE),
     statusDotNormal = Color(0xFFA3A9B0),
+    reportSurface = Color(0xFF17181A),
+    reportInk = Color(0xFFF5F6F7),
+    reportMuted = Color(0xFFB6BCC4),
+    reportLine = Color(0xFF4A4F56),
+    reportAccent = Color(0xFFFFCE70),
+    reportTicket = Color(0xFFF3CB73),
+    reportTicketInk = Color(0xFF17181A),
+    reportTicketMuted = Color(0xFF625126),
+    reportDialTrack = Color(0xFFB4A071),
 )
 
 internal val MyTokenDarkColors = MyTokenColors(
@@ -82,6 +101,15 @@ internal val MyTokenDarkColors = MyTokenColors(
     cat3 = Color(0xFF4A4F56),
     track = Color(0xFF2A2E34),
     statusDotNormal = Color(0xFF6B7076),
+    reportSurface = Color(0xFFF5F6F7),
+    reportInk = Color(0xFF17181A),
+    reportMuted = Color(0xFF696D73),
+    reportLine = Color(0xFFD2D6DC),
+    reportAccent = Color(0xFF9A5B00),
+    reportTicket = Color(0xFFF3CB73),
+    reportTicketInk = Color(0xFF17181A),
+    reportTicketMuted = Color(0xFF625126),
+    reportDialTrack = Color(0xFFB4A071),
 )
 
 internal val LocalMyTokenColors: ProvidableCompositionLocal<MyTokenColors> =

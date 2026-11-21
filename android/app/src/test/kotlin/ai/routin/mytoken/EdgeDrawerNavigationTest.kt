@@ -1,10 +1,7 @@
 package ai.routin.mytoken
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
-import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -104,35 +101,21 @@ class EdgeDrawerNavigationTest {
     }
 
     @Test
-    fun 主页左滑切到完整模式且不打开抽屉() {
+    fun 主页左滑不会打开抽屉() {
         composeRule.waitForIdle()
-        selectDensity(compact = true)
 
         swipeAcrossHome(left = true)
 
-        composeRule.waitUntil(5_000) {
-            composeRule.onAllNodes(hasTestTag("usage_density_option_full") and isSelected())
-                .fetchSemanticsNodes()
-                .isNotEmpty()
-        }
-        composeRule.onNodeWithTag("usage_density_option_full").assertIsSelected()
         composeRule.onAllNodesWithTag("edge_drawer_start").fetchSemanticsNodes().isEmpty()
         composeRule.onAllNodesWithTag("edge_drawer_end").fetchSemanticsNodes().isEmpty()
     }
 
     @Test
-    fun 主页右滑切回简洁模式且不打开抽屉() {
+    fun 主页右滑不会打开抽屉() {
         composeRule.waitForIdle()
-        selectDensity(compact = false)
 
         swipeAcrossHome(left = false)
 
-        composeRule.waitUntil(5_000) {
-            composeRule.onAllNodes(hasTestTag("usage_density_option_compact") and isSelected())
-                .fetchSemanticsNodes()
-                .isNotEmpty()
-        }
-        composeRule.onNodeWithTag("usage_density_option_compact").assertIsSelected()
         composeRule.onAllNodesWithTag("edge_drawer_start").fetchSemanticsNodes().isEmpty()
         composeRule.onAllNodesWithTag("edge_drawer_end").fetchSemanticsNodes().isEmpty()
     }
@@ -164,16 +147,6 @@ class EdgeDrawerNavigationTest {
                 .isNotEmpty()
         }
         composeRule.onNodeWithTag("edge_drawer_end").assertIsDisplayed()
-    }
-
-    private fun selectDensity(compact: Boolean) {
-        val tag = if (compact) "usage_density_option_compact" else "usage_density_option_full"
-        composeRule.onNodeWithTag(tag).performClick()
-        composeRule.waitUntil(5_000) {
-            composeRule.onAllNodes(hasTestTag(tag) and isSelected())
-                .fetchSemanticsNodes()
-                .isNotEmpty()
-        }
     }
 
     private fun swipeAcrossHome(left: Boolean) {

@@ -16,6 +16,7 @@ import ai.routin.mytoken.domain.usage.RefreshStatus
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -158,8 +159,8 @@ class HomeScreenAdaptiveTest {
             }
         }
 
-        composeRule.onNodeWithTag("home_status_row").assertIsDisplayed()
-        composeRule.onNodeWithText("2 个需注意", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("home_provider_toolbar").assertIsDisplayed()
+        composeRule.onNodeWithTag("report_attention_count").assertTextEquals("2")
         composeRule.onNodeWithTag("provider_filter_menu").performClick()
         composeRule.onNodeWithTag("provider_filter_item_deepseek").assertExists()
     }
