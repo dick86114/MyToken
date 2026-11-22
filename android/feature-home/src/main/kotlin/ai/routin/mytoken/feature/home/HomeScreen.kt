@@ -203,11 +203,34 @@ fun HomeScreen(
         return homeScrollMode(pageDensity, screenWidthDp)
     }
 
-    fun activePageAtTop(): Boolean = when (activeScrollMode()) {
-        // 第一张卡片一露头就允许展开报告，避免继续下拉时卡片先滑到屏幕中间。
-        HomeScrollMode.CompactGrid -> homeScrollStates.compact.firstVisibleItemIndex == 0
-        HomeScrollMode.FullWideGrid -> homeScrollStates.fullWide.firstVisibleItemIndex == 0
-        HomeScrollMode.FullList -> homeScrollStates.full.firstVisibleItemIndex == 0
+    /** 第一张卡片完整露出（在报告下沿以下）后，报告才开始跟随下拉。 */
+    fun activePageFirstCardFullyVisible(): Boolean {
+        val visibleHeaderBottom = (headerHeightPx - collapsedPx).coerceAtLeast(0f)
+        return when (activeScrollMode()) {
+            HomeScrollMode.CompactGrid -> {
+                val info = homeScrollStates.compact.layoutInfo
+                info.visibleItemsInfo.firstOrNull { it.index == 0 }
+                    ?.let { it.offset.y + info.beforeContentPadding >= visibleHeaderBottom } ?: false
+            }
+
+            HomeScrollMode.FullWideGrid -> {
+                val info = homeScrollStates.fullWide.layoutInfo
+                info.visibleItemsInfo.firstOrNull { it.index == 0 }
+                    ?.let { it.offset.y + info.beforeContentPadding >= visibleHeaderBottom } ?: false
+            }
+
+            HomeScrollMode.FullList -> {
+                val info = homeScrollStates.full.layoutInfo
+                info.visibleItemsInfo.firstOrNull { it.index == 0 }
+                    ?.let { it.offset + info.beforeContentPadding >= visibleHeaderBottom } ?: false
+            }
+        }
+    }
+
+    fun activePageCanScrollBackward(): Boolean = when (activeScrollMode()) {
+        HomeScrollMode.CompactGrid -> homeScrollStates.compact.canScrollBackward
+        HomeScrollMode.FullWideGrid -> homeScrollStates.fullWide.canScrollBackward
+        HomeScrollMode.FullList -> homeScrollStates.full.canScrollBackward
     }
 
     // 列表原生滚动；头部在 onPostScroll 里同步跟随，不再拦截 fling。
@@ -222,13 +245,6 @@ fun HomeScreen(
                     pullArmed = false
                     dismissPullIndicator()
                     return Offset.Zero
-                }
-                if (collapsedPx > 0f && activePageAtTop()) {
-                    // 列表已在顶部：下拉位移先用于展开报告，并消费掉这部分
-                    // 位移，避免列表再叠加一层灰色 overscroll 拉伸。
-                    val expand = min(available.y, collapsedPx)
-                    collapsedPx -= expand
-                    return Offset(0f, expand)
                 }
                 if (!pullArmed || latestRefreshing || collapsedPx > 0f) {
                     return Offset.Zero
@@ -245,16 +261,24 @@ fun HomeScreen(
                 source: NestedScrollSource,
             ): Offset {
                 val max = headerHeightPx.toFloat()
-                if (max > 0f && consumed.y < 0f) {
-                    // 上滑时头部跟随卡片收起。
-                    collapsedPx = (collapsedPx - consumed.y).coerceIn(0f, max)
-                    return Offset.Zero
-                }
-                if (collapsedPx > 0f && available.y > 0f && activePageAtTop()) {
-                    // 卡片刚好回到顶部的同一次手势：剩余位移继续展开报告。
-                    val expand = min(available.y, collapsedPx)
-                    collapsedPx -= expand
-                    return Offset(0f, expand)
+                if (max > 0f) {
+                    if (consumed.y < 0f) {
+                        // 上滑时头部跟随卡片收起。
+                        collapsedPx = (collapsedPx - consumed.y).coerceIn(0f, max)
+                        return Offset.Zero
+                    }
+                    if (consumed.y > 0f && activePageFirstCardFullyVisible()) {
+                        // 第一张卡片完整露出后，列表下移多少，报告就展开多少，
+                        // 两块区域一起向下移动，不再出现报告盖住卡片。
+                        collapsedPx = (collapsedPx - consumed.y).coerceIn(0f, max)
+                        return Offset.Zero
+                    }
+                    if (collapsedPx > 0f && available.y > 0f && !activePageCanScrollBackward()) {
+                        // 列表已在顶部但头部仍有收起量：用剩余下拉补齐报告。
+                        val expand = min(available.y, collapsedPx)
+                        collapsedPx -= expand
+                        return Offset(0f, expand)
+                    }
                 }
                 return Offset.Zero
             }
@@ -395,7 +419,8 @@ fun HomeScreen(
         awaitEachGesture {
             awaitFirstDown(requireUnconsumed = false)
             if (!pullTriggered) pullSettleJob?.cancel()
-            pullArmed = !latestRefreshing && collapsedPx <= 0f && activePageAtTop()
+            pullArmed = !latestRefreshing && collapsedPx <= 0f &&
+                !activePageCanScrollBackward()
             do {
                 val event = awaitPointerEvent()
             } while (event.changes.any { it.pressed })
@@ -735,8 +760,11 @@ fun HomeScreen(
                                                 val consumed = activeScrollableState().dispatchRawDelta(-dragAmount)
                                                 collapsedPx = (collapsedPx + consumed)
                                                     .coerceIn(0f, headerHeightPx.toFloat())
-                                            } else if (activePageAtTop()) {
-                                                if (
+                                            } else if (!activePageCanScrollBackward()) {
+                                                if (collapsedPx > 0f) {
+                                                    collapsedPx = (collapsedPx - dragAmount)
+                                                        .coerceIn(0f, headerHeightPx.toFloat())
+                                                } else if (
                                                     pullArmed &&
                                                     !latestRefreshing &&
                                                     !pullTriggered
@@ -753,8 +781,10 @@ fun HomeScreen(
                                                 }
                                             } else {
                                                 val consumed = activeScrollableState().dispatchRawDelta(-dragAmount)
-                                                collapsedPx = (collapsedPx + consumed)
-                                                    .coerceIn(0f, headerHeightPx.toFloat())
+                                                if (activePageFirstCardFullyVisible()) {
+                                                    collapsedPx = (collapsedPx + consumed)
+                                                        .coerceIn(0f, headerHeightPx.toFloat())
+                                                }
                                             }
                                             change.consume()
                                         }

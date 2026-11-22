@@ -3008,10 +3008,10 @@ class HomeScreenTest {
             .assertIsDisplayed()
         composeRule.onNodeWithTag("home_open_settings").assertIsDisplayed()
 
-        repeat(2) {
+        repeat(5) {
             composeRule.onNodeWithTag("home_list_full").performTouchInput {
                 // 从卡片区起手；报告展开后屏幕顶部属于头部覆盖层。
-                swipeDown(startY = height * 0.45f, endY = height * 0.9f, durationMillis = 300)
+                swipeDown(startY = height * 0.5f, endY = height * 0.9f, durationMillis = 500)
             }
             composeRule.waitForIdle()
         }
@@ -3133,7 +3133,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun 下滑到卡片顶部时报告在同一次手势内跟随展开() {
+    fun 第一张卡片完整可见后报告跟随展开() {
         val cards = (1..8).map { index ->
             card(credential("跟随 $index"), metrics = listOf(progress(90.0, 100.0)))
         }
@@ -3164,11 +3164,17 @@ class HomeScreenTest {
         }
         composeRule.waitForIdle()
 
-        // 一次快速回滑：卡片靠惯性回到顶部后，报告应紧接着在同一次手势里跟下来。
+        // 卡片回到顶部并完整露出后，继续下拉应让报告和卡片一起下移。
         composeRule.onNodeWithTag("home_list_full").performTouchInput {
             swipeDown(startY = height * 0.35f, endY = height * 0.75f, durationMillis = 60)
         }
         composeRule.waitForIdle()
+        repeat(2) {
+            composeRule.onNodeWithTag("home_list_full").performTouchInput {
+                swipeDown(startY = height * 0.5f, endY = height * 0.9f, durationMillis = 500)
+            }
+            composeRule.waitForIdle()
+        }
 
         val report = composeRule.onNodeWithTag("home_health_report")
             .getUnclippedBoundsInRoot()

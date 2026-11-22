@@ -80,19 +80,23 @@ class CredentialUsageSurfaceStyleTest {
     }
 
     @Test
-    fun `列表到顶后立即跟随下拉展开报告`() {
+    fun `第一张卡片完整可见后报告与卡片一起下移`() {
         val home = sourceText("HomeScreen.kt")
         assertTrue(
-            "第一张卡片可见时即允许展开报告",
-            home.contains("homeScrollStates.full.firstVisibleItemIndex == 0"),
+            "需要判断第一张卡片是否完整可见",
+            home.contains("fun activePageFirstCardFullyVisible"),
         )
         assertTrue(
-            "简洁网格同样以第一张卡片可见为准",
-            home.contains("homeScrollStates.compact.firstVisibleItemIndex == 0"),
+            "卡片完整可见后，下拉消耗多少报告就展开多少",
+            home.contains("consumed.y > 0f && activePageFirstCardFullyVisible()"),
+        )
+        assertTrue(
+            "报告展开量与卡片下移量同步",
+            home.contains("collapsedPx - consumed.y"),
         )
         assertFalse(
-            "不再等列表完全回顶才开始展开",
-            home.contains("firstVisibleItemScrollOffset == 0"),
+            "不再用 firstVisibleItemIndex 提前拦截下拉",
+            home.contains("firstVisibleItemIndex == 0"),
         )
     }
 
