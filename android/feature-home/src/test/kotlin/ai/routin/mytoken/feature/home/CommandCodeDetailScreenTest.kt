@@ -14,6 +14,7 @@ import ai.routin.mytoken.domain.usage.RefreshStatus
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
@@ -85,9 +86,9 @@ class CommandCodeDetailScreenTest {
         }
 
         listOf("5 小时", "周", "月", "购买剩余", "赠送剩余", "累计请求").forEach { label ->
-            composeRule.onNodeWithText(label).assertIsDisplayed()
+            composeRule.onNodeWithText(label).performScrollTo().assertIsDisplayed()
         }
-        listOf("套餐状态", "订阅与周期", "账户与模型").forEach { label ->
+        listOf("全部窗口", "套餐与订阅", "账户与模型", "配置").forEach { label ->
             composeRule.onNodeWithText(label).performScrollTo().assertIsDisplayed()
         }
         listOf("有效", "周期订阅", "claude-sonnet-5").forEach { value ->
@@ -95,7 +96,7 @@ class CommandCodeDetailScreenTest {
         }
         composeRule.onNodeWithText("官网地址").performScrollTo().assertIsDisplayed()
         val urlLayoutResults = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
-        composeRule.onNodeWithText("https://commandcode.ai/", useUnmergedTree = true)
+        composeRule.onNodeWithTag("detail_website_url", useUnmergedTree = true)
             .performScrollTo()
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
                 action(urlLayoutResults)

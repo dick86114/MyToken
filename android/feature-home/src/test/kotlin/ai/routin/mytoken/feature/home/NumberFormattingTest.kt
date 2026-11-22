@@ -28,6 +28,16 @@ class NumberFormattingTest {
     }
 
     @Test
+    fun balanceAmountSplitsCurrencyMarkFromNumber() {
+        assertEquals(BalanceAmountParts("¥", "12.36", ""), splitBalanceAmount("¥12.36"))
+        assertEquals(BalanceAmountParts("$", "0.00", ""), splitBalanceAmount("$0.00"))
+        assertEquals(BalanceAmountParts("€", "7.20", ""), splitBalanceAmount("€7.20"))
+        assertEquals(BalanceAmountParts("", "9,000.00", "USD"), splitBalanceAmount("9,000.00 USD"))
+        assertEquals(BalanceAmountParts("", "9,000.00", ""), splitBalanceAmount("9,000.00"))
+        assertEquals(BalanceAmountParts("", "-", ""), splitBalanceAmount("-"))
+    }
+
+    @Test
     fun currencyCodesUseLeadingSymbols() {
         assertEquals("¥12.36", formatCurrency(BigDecimal("12.36"), "CNY"))
         assertEquals("$0.00", formatCurrency(BigDecimal("0"), "USD"))

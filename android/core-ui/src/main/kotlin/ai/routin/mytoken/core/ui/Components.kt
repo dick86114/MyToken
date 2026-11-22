@@ -1,115 +1,110 @@
 package ai.routin.mytoken.core.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.ripple
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 /**
- * 玻璃控件统一设计规则：
- * - 普通按钮和内层控件 10dp 圆角，卡片和窗口壳 14dp 圆角；
- * - 全局唯一强调色 = 主题 primary，破坏性操作 = 主题 error；
- * - 明暗两套主题都按底色亮度自动切换，文字对比度满足 WCAG AA。
+ * MyToken 基础控件。
+ *
+ * 材质规则（设计文档 §6.2）：实色表面 + 1px hairline；只有浮层允许阴影。
+ * 颜色只来自 [MyTokenThemeTokens]，业务代码不再拼 alpha 或自带色值。
  */
 
 /** 按钮的语义色调。 */
-enum class GlassButtonTone { Primary, Neutral, Destructive }
+enum class MyTokenButtonTone { Primary, Neutral, Destructive }
 
-private data class GlassToneColors(
+private data class ButtonToneColors(
     val base: Color,
     val content: Color,
     val container: Color,
-) {
-    companion object {
-        @Composable
-        fun of(tone: GlassButtonTone): GlassToneColors {
-            val scheme = MaterialTheme.colorScheme
-            return when (tone) {
-                GlassButtonTone.Primary -> GlassToneColors(scheme.primary, scheme.onPrimary, scheme.primary)
-                GlassButtonTone.Neutral -> GlassToneColors(scheme.onSurface, scheme.onSurface, scheme.surfaceVariant)
-                GlassButtonTone.Destructive -> GlassToneColors(scheme.error, scheme.error, scheme.error.copy(alpha = 0.12f))
-            }
-        }
+)
+
+@Composable
+private fun buttonToneColors(tone: MyTokenButtonTone): ButtonToneColors {
+    val colors = MyTokenThemeTokens.colors
+    return when (tone) {
+        // 黄色主按钮统一使用深墨字，避免白字在票面黄上失去对比。
+        MyTokenButtonTone.Primary -> ButtonToneColors(colors.actionFill, colors.reportTicketInk, colors.actionFill)
+        MyTokenButtonTone.Neutral -> ButtonToneColors(colors.ink, colors.ink, colors.subtle)
+        MyTokenButtonTone.Destructive -> ButtonToneColors(colors.criticalFill, colors.onAction, colors.criticalFill)
     }
 }
 
+/** 实色按钮：12dp 圆角、48dp 触控高度；Primary 只给当前区块的主操作。 */
 @Composable
-private fun isDarkTheme(): Boolean = MaterialTheme.colorScheme.background.luminance() < 0.5f
-
-/**
- * 方案 A 按钮：实色底、12dp 圆角。
- * [GlassButtonTone.Primary] 只给当前区块的主操作，避免一屏多个强强调。
- */
-@Composable
-fun GlassButton(
+fun MyTokenButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    tone: GlassButtonTone = GlassButtonTone.Neutral,
+    tone: MyTokenButtonTone = MyTokenButtonTone.Neutral,
     enabled: Boolean = true,
     icon: ImageVector? = null,
 ) {
-    val toneColors = GlassToneColors.of(tone)
-    val shape = RoundedCornerShape(MyTokenVisualPolicy.buttonRadiusDp)
+    val toneColors = buttonToneColors(tone)
+    val shape = RoundedCornerShape(MyTokenRadius.inner)
     val contentAlpha = if (enabled) 1f else 0.45f
     val interactionSource = remember { MutableInteractionSource() }
     Box(
         modifier = modifier
+            .defaultMinSize(minHeight = MyTokenSize.touch)
+            .myTokenPressScale(interactionSource, pressedScale = 0.97f)
             .clip(shape)
             .background(toneColors.container)
             .clickable(
                 interactionSource = interactionSource,
-                indication = ripple(color = toneColors.base),
+                indication = null,
                 enabled = enabled,
                 onClick = onClick,
             )
-            .padding(horizontal = 20.dp, vertical = 11.dp),
+            .padding(horizontal = 20.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
         Row(
@@ -126,97 +121,95 @@ fun GlassButton(
             }
             Text(
                 text = text,
-                style = MaterialTheme.typography.labelLarge,
+                style = MyTokenType.label,
                 fontWeight = FontWeight.SemiBold,
                 color = toneColors.content.copy(alpha = contentAlpha),
+                maxLines = 1,
             )
         }
     }
 }
 
 /**
- * 液态玻璃开关：胶囊轨道 + 滑动圆点，选中态使用主题强调色。
+ * 开关：46×28 视觉轨道，外层 48×48 触控盒。
  * 无障碍语义与 Material Switch 一致（Role.Switch + contentDescription）。
  */
 @Composable
-fun GlassSwitch(
+fun MyTokenSwitch(
     checked: Boolean,
     onCheckedChange: ((Boolean) -> Unit)?,
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
 ) {
-    val dark = isDarkTheme()
-    val primary = MaterialTheme.colorScheme.primary
-    val onSurface = MaterialTheme.colorScheme.onSurface
+    val colors = MyTokenThemeTokens.colors
+    val darkTheme = LocalMyTokenDarkTheme.current
+    // 开关统一使用报告票面黄；浅色主题用白色滑块，深色主题保持黑滑块。
+    val thumbColor = if (darkTheme) colors.reportTicketInk else colors.surface
     val trackColor by animateColorAsState(
-        targetValue = if (checked) {
-            primary
-        } else {
-            onSurface.copy(alpha = if (dark) 0.22f else 0.13f)
-        },
+        targetValue = if (checked) colors.reportTicket else colors.track,
         animationSpec = spring(dampingRatio = 1f, stiffness = 700f),
-        label = "glassSwitchTrack",
-    )
-    val thumbColor by animateColorAsState(
-        targetValue = if (checked) Color.White else Color.White.copy(alpha = if (dark) 0.88f else 0.98f),
-        label = "glassSwitchThumb",
+        label = "myTokenSwitchTrack",
     )
     val thumbOffset by animateDpAsState(
         targetValue = if (checked) 20.dp else 3.dp,
         animationSpec = spring(dampingRatio = 1f, stiffness = 700f),
-        label = "glassSwitchThumbOffset",
+        label = "myTokenSwitchThumbOffset",
     )
-    val trackWidth = 46.dp
-    val trackHeight = 28.dp
     Box(
         modifier = modifier
-            .width(trackWidth)
-            .height(trackHeight)
-            .clip(RoundedCornerShape(100))
-            .background(trackColor)
+            .size(MyTokenSize.touch)
             .toggleable(
                 value = checked,
                 role = Role.Switch,
                 onValueChange = { onCheckedChange?.invoke(it) },
             )
             .semantics { contentDescription?.let { this.contentDescription = it } },
+        contentAlignment = Alignment.Center,
     ) {
         Box(
             modifier = Modifier
-                .padding(top = 2.5.dp)
-                .padding(start = thumbOffset)
-                .requiredSize(23.dp)
-                .clip(RoundedCornerShape(100))
-                .background(thumbColor),
-        )
+                .width(MyTokenSize.switchWidth)
+                .height(MyTokenSize.switchHeight)
+                .clip(RoundedCornerShape(MyTokenRadius.pill))
+                .background(trackColor),
+        ) {
+            Box(
+                modifier = Modifier
+                    .padding(top = 2.5.dp)
+                    .padding(start = thumbOffset)
+                    .requiredSize(23.dp)
+                    .clip(RoundedCornerShape(MyTokenRadius.pill))
+                    .background(thumbColor),
+            )
+        }
     }
 }
 
-/** 与整体玻璃语言统一的 FilterChip 配色：选中态用强调色而不是默认的绿系 secondaryContainer。 */
+/** 筛选 chip：未选中 subtle，选中 ink；不使用强调色底。 */
 @Composable
-fun glassFilterChipColors(selected: Boolean) = FilterChipDefaults.filterChipColors(
-    containerColor = Color.Transparent,
-    labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = if (isDarkTheme()) 0.26f else 0.14f),
-    selectedLabelColor = MaterialTheme.colorScheme.primary,
+fun myTokenFilterChipColors(selected: Boolean) = FilterChipDefaults.filterChipColors(
+    containerColor = MyTokenThemeTokens.colors.subtle,
+    labelColor = MyTokenThemeTokens.colors.muted,
+    selectedContainerColor = MyTokenThemeTokens.colors.ink,
+    selectedLabelColor = MyTokenThemeTokens.colors.surface,
 )
 
 @Composable
-fun glassFilterChipBorder(selected: Boolean) = FilterChipDefaults.filterChipBorder(
+fun myTokenFilterChipBorder(selected: Boolean) = FilterChipDefaults.filterChipBorder(
     enabled = true,
     selected = selected,
-    borderColor = Color.Transparent,
+    borderColor = MyTokenThemeTokens.colors.line,
     selectedBorderColor = Color.Transparent,
-    borderWidth = 0.dp,
+    borderWidth = 1.dp,
     selectedBorderWidth = 0.dp,
 )
 
 /**
- * 液态玻璃输入框：玻璃容器 + 透明输入底；聚焦时显示强调色描边。
+ * 输入框：标签在框上方，48dp 高度，subtle 底 + 1px 描边。
  * 保留 Material OutlinedTextField 的完整编辑行为（密钥遮罩、trailing 图标、testTag）。
  */
 @Composable
-fun GlassTextField(
+fun MyTokenTextField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
@@ -227,154 +220,374 @@ fun GlassTextField(
     trailingIcon: @Composable (() -> Unit)? = null,
     supportingText: String? = null,
 ) {
-    LiquidGlassSurface(
-        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Control,
-        shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
-    ) {
+    val colors = MyTokenThemeTokens.colors
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            style = MyTokenType.label,
+            color = colors.muted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-            label = { Text(text = label) },
             singleLine = singleLine,
             visualTransformation = visualTransformation,
             trailingIcon = trailingIcon,
-            supportingText = supportingText?.let { text ->
-                {
-                    Text(
-                        text = text,
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                }
-            },
-            shape = RoundedCornerShape(MyTokenVisualPolicy.buttonRadiusDp),
+            shape = RoundedCornerShape(MyTokenRadius.inner),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
-                unfocusedBorderColor = Color.Transparent,
-                disabledBorderColor = Color.Transparent,
-                cursorColor = MaterialTheme.colorScheme.primary,
-                focusedLabelColor = MaterialTheme.colorScheme.primary,
-                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                focusedContainerColor = colors.subtle,
+                unfocusedContainerColor = colors.subtle,
+                focusedBorderColor = colors.actionFill,
+                unfocusedBorderColor = colors.line,
+                disabledBorderColor = colors.line,
+                cursorColor = colors.actionFill,
+                focusedLabelColor = colors.actionText,
+                unfocusedLabelColor = colors.muted,
             ),
             // modifier（含 testTag）落在输入框本体上，语义（RequestFocus 等）才能被测试命中。
             modifier = modifier
                 .fillMaxWidth()
-                .padding(start = contentPadding, end = contentPadding),
+                .heightIn(min = MyTokenSize.touch)
+                .padding(horizontal = contentPadding),
         )
+        if (supportingText != null) {
+            Text(
+                text = supportingText,
+                modifier = Modifier.padding(top = 4.dp),
+                style = MyTokenType.caption,
+                color = colors.muted,
+            )
+        }
     }
 }
 
-/** Compose 材质实现：使用色调、圆角和层级表达表面，不依赖装饰性描边。 */
+/** 实色表面：卡片/输入框用 surface/subtle + hairline；Modal 才投影。 */
 @Composable
-fun LiquidGlassSurface(
+fun MyTokenSurface(
     modifier: Modifier = Modifier,
     surfaceRole: MyTokenVisualPolicy.SurfaceRole = MyTokenVisualPolicy.SurfaceRole.Control,
-    shape: RoundedCornerShape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
+    shape: RoundedCornerShape = RoundedCornerShape(MyTokenRadius.card),
     contentAlignment: Alignment = Alignment.TopStart,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val material = MyTokenVisualPolicy.materialFor(surfaceRole)
-    val solidBase = when (surfaceRole) {
-        MyTokenVisualPolicy.SurfaceRole.Metric -> MaterialTheme.colorScheme.surfaceVariant
-        MyTokenVisualPolicy.SurfaceRole.Card -> MaterialTheme.colorScheme.surfaceVariant
-        else -> MaterialTheme.colorScheme.surface
+    val colors = MyTokenThemeTokens.colors
+    val background = when (surfaceRole) {
+        MyTokenVisualPolicy.SurfaceRole.Window,
+        MyTokenVisualPolicy.SurfaceRole.Card,
+        MyTokenVisualPolicy.SurfaceRole.Modal,
+        -> colors.surface
+
+        MyTokenVisualPolicy.SurfaceRole.Control,
+        MyTokenVisualPolicy.SurfaceRole.Metric,
+        -> colors.subtle
     }
-    val backgroundBrush = remember(isDark, material, solidBase) {
-        if (material == MyTokenVisualPolicy.Material.WindowGlass) {
-            Brush.verticalGradient(
-                listOf(
-                    (if (isDark) MyTokenPalette.darkCanvas else MyTokenPalette.lightCanvas)
-                        .copy(alpha = if (isDark) 0.88f else 0.78f),
-                    (if (isDark) MyTokenPalette.darkSurface else MyTokenPalette.lightSurface)
-                        .copy(alpha = if (isDark) 0.72f else 0.64f),
-                ),
-            )
-        } else {
-            null
-        }
-    }
-    Box(
-        modifier = modifier
-            .clip(shape)
-            .then(
-                if (backgroundBrush != null) {
-                    Modifier.background(brush = backgroundBrush)
-                } else {
-                    Modifier.background(solidBase)
-                },
-            ),
-        contentAlignment = contentAlignment,
-    ) {
+    val resolved = modifier
+        .then(
+            if (MyTokenVisualPolicy.allowsShadow(surfaceRole)) {
+                Modifier.shadow(elevation = 24.dp, shape = shape)
+            } else {
+                Modifier
+            },
+        )
+        .clip(shape)
+        .background(background)
+        .then(
+            if (surfaceRole == MyTokenVisualPolicy.SurfaceRole.Window) {
+                Modifier
+            } else {
+                Modifier.border(1.dp, colors.line, shape)
+            },
+        )
+    Box(modifier = resolved, contentAlignment = contentAlignment) {
         content()
     }
 }
 
+/** 分节卡片：surface + hairline + 20dp 圆角，无阴影、无内部分割线。 */
+@Composable
+fun MyTokenSection(
+    title: String,
+    modifier: Modifier = Modifier,
+    action: (@Composable () -> Unit)? = null,
+    contentPadding: Dp = MyTokenSpacing.cardFull,
+    contentSpacing: Dp = MyTokenSpacing.md,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val colors = MyTokenThemeTokens.colors
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 2.dp, end = 2.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = title,
+                modifier = Modifier.weight(1f),
+                style = MyTokenType.sectionLabel,
+                color = colors.muted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            action?.invoke()
+        }
+        MyTokenSurface(
+            modifier = Modifier.fillMaxWidth(),
+            surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(contentPadding),
+                verticalArrangement = Arrangement.spacedBy(contentSpacing),
+            ) {
+                content()
+            }
+        }
+    }
+}
+
+/** 兼容壳：旧设置页仍按 SectionCard 组织内容。 */
 @Composable
 fun SectionCard(
     title: String,
     modifier: Modifier = Modifier,
     supportingText: String? = null,
+    contentPadding: Dp = MyTokenSpacing.cardFull,
+    contentSpacing: Dp = MyTokenSpacing.md,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    MyTokenSection(
+        title = title,
+        modifier = modifier,
+        contentPadding = contentPadding,
+        contentSpacing = contentSpacing,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Column {
-                Text(
-                    text = title,
-                    style = MyTokenType.sectionTitle,
-                )
-                if (supportingText != null) {
-                    Text(
-                        text = supportingText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 2.dp),
-                    )
-                }
-            }
-            content()
+        if (supportingText != null) {
+            Text(
+                text = supportingText,
+                style = MyTokenType.caption,
+                color = MyTokenThemeTokens.colors.muted,
+            )
         }
+        content()
     }
 }
 
+/** 通用行：图标 + 标题/说明 + 值 + 尾部插槽；可点击时最小 48dp。 */
 @Composable
-fun SettingRow(
+fun MyTokenRow(
+    icon: ImageVector?,
     title: String,
     supportingText: String? = null,
-    trailing: @Composable () -> Unit,
+    value: String? = null,
+    trailing: (@Composable () -> Unit)? = null,
+    onClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+    iconPlate: Boolean = false,
+    iconContent: (@Composable () -> Unit)? = null,
+    iconTint: Color = MyTokenThemeTokens.colors.muted,
+    iconSize: Dp? = null,
 ) {
+    val colors = MyTokenThemeTokens.colors
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = if (onClick != null) MyTokenSize.touch else MyTokenSize.settingsRowMin)
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(role = Role.Button, onClick = onClick)
+                } else {
+                    Modifier
+                },
+            )
+            .padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(MyTokenSpacing.md),
     ) {
+        val iconSlot: (@Composable () -> Unit)? = when {
+            icon != null -> {
+                {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = iconTint,
+                        modifier = Modifier.size(
+                            iconSize ?: if (iconPlate) 15.dp else 18.dp,
+                        ),
+                    )
+                }
+            }
+            else -> iconContent
+        }
+        iconSlot?.let { slot ->
+            if (iconPlate) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .background(colors.subtle, RoundedCornerShape(8.dp))
+                        .border(1.dp, colors.line, RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    slot()
+                }
+            } else {
+                slot()
+            }
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MyTokenType.body,
+                fontWeight = FontWeight(550),
+                color = colors.ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             if (supportingText != null) {
                 Text(
                     text = supportingText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 1.dp),
+                    style = MyTokenType.caption,
+                    color = colors.muted,
+                    maxLines = 2,
                 )
             }
         }
-        trailing()
+        if (value != null) {
+            Text(
+                text = value,
+                style = MyTokenType.caption,
+                fontWeight = FontWeight(550),
+                color = colors.muted,
+                maxLines = 1,
+            )
+        }
+        trailing?.invoke()
+    }
+}
+
+/** 兼容壳：旧设置页的 SettingRow。 */
+@Composable
+fun SettingRow(
+    title: String,
+    supportingText: String? = null,
+    icon: ImageVector? = null,
+    iconContent: (@Composable () -> Unit)? = null,
+    trailing: @Composable () -> Unit,
+    iconTint: Color = MyTokenThemeTokens.colors.muted,
+    iconSize: Dp? = null,
+) {
+    MyTokenRow(
+        icon = icon,
+        title = title,
+        supportingText = supportingText,
+        trailing = trailing,
+        iconContent = iconContent,
+        iconTint = iconTint,
+        iconSize = iconSize,
+    )
+}
+
+/** 三段/多段选择器：subtle 轨道 + surface 选中块。 */
+@Composable
+fun MyTokenSegmented(
+    options: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MyTokenThemeTokens.colors
+    val shape = RoundedCornerShape(MyTokenRadius.inner)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .clip(shape)
+            .background(colors.subtle)
+            .border(1.dp, colors.line, shape)
+            .padding(4.dp)
+            .selectableGroup(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        options.forEachIndexed { index, label ->
+            val selected = index == selectedIndex
+            val itemShape = RoundedCornerShape(9.dp)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(itemShape)
+                    .then(
+                        if (selected) {
+                            Modifier
+                                .background(colors.surface)
+                                .border(1.dp, colors.line, itemShape)
+                        } else {
+                            Modifier
+                        },
+                    )
+                    .selectable(
+                        selected = selected,
+                        role = Role.RadioButton,
+                        onClick = { onSelect(index) },
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = label,
+                    style = MyTokenType.label,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    color = if (selected) colors.actionText else colors.muted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/** 状态 = 圆点 + 文字；正常状态保持中性。 */
+enum class MyTokenStatusTone { Neutral, Positive, Warning, Critical }
+
+@Composable
+fun MyTokenStatus(
+    text: String,
+    tone: MyTokenStatusTone,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MyTokenThemeTokens.colors
+    val dot = when (tone) {
+        MyTokenStatusTone.Neutral -> colors.statusDotNormal
+        MyTokenStatusTone.Positive -> colors.positiveFill
+        MyTokenStatusTone.Warning -> colors.warningFill
+        MyTokenStatusTone.Critical -> colors.criticalFill
+    }
+    val content = when (tone) {
+        MyTokenStatusTone.Neutral -> colors.muted
+        MyTokenStatusTone.Positive -> colors.positiveText
+        MyTokenStatusTone.Warning -> colors.warningText
+        MyTokenStatusTone.Critical -> colors.criticalText
+    }
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(MyTokenSpacing.xs),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(dot),
+        )
+        Text(
+            text = text,
+            style = MyTokenType.caption,
+            color = content,
+            maxLines = 1,
+        )
     }
 }

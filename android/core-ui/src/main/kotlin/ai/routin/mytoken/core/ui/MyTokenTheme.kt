@@ -1,62 +1,93 @@
 package ai.routin.mytoken.core.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.IndicationNodeFactory
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.LocalOverscrollConfiguration
+import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.node.DelegatableNode
+import androidx.compose.ui.node.DrawModifierNode
 
 private val LightColors = lightColorScheme(
-    primary = MyTokenPalette.brandLight,
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFDCEAFF),
-    onPrimaryContainer = Color(0xFF102A4C),
-    secondary = MyTokenPalette.positiveLight,
-    onSecondary = Color.White,
-    secondaryContainer = Color(0xFFDDF2E9),
-    onSecondaryContainer = Color(0xFF123B2E),
-    tertiary = MyTokenPalette.warning,
-    onTertiary = Color.White,
-    tertiaryContainer = Color(0xFFF5E8CF),
-    onTertiaryContainer = Color(0xFF3A2A0F),
-    background = MyTokenPalette.lightCanvas,
-    onBackground = MyTokenPalette.lightText,
-    surface = MyTokenPalette.lightSurface,
-    onSurface = MyTokenPalette.lightText,
-    surfaceVariant = MyTokenPalette.lightElevated,
-    onSurfaceVariant = MyTokenPalette.lightMutedText,
-    outlineVariant = Color(0x1420252B),
-    error = MyTokenPalette.critical,
-    onError = Color.White,
+    primary = MyTokenLightColors.actionFill,
+    onPrimary = MyTokenLightColors.reportTicketInk,
+    primaryContainer = MyTokenLightColors.subtle,
+    onPrimaryContainer = MyTokenLightColors.actionText,
+    secondary = MyTokenLightColors.positiveFill,
+    onSecondary = MyTokenLightColors.onAction,
+    secondaryContainer = MyTokenLightColors.subtle,
+    onSecondaryContainer = MyTokenLightColors.positiveText,
+    tertiary = MyTokenLightColors.warningFill,
+    onTertiary = MyTokenLightColors.onAction,
+    tertiaryContainer = MyTokenLightColors.subtle,
+    onTertiaryContainer = MyTokenLightColors.warningText,
+    background = MyTokenLightColors.canvas,
+    onBackground = MyTokenLightColors.ink,
+    surface = MyTokenLightColors.surface,
+    onSurface = MyTokenLightColors.ink,
+    surfaceVariant = MyTokenLightColors.subtle,
+    onSurfaceVariant = MyTokenLightColors.muted,
+    outline = MyTokenLightColors.line,
+    outlineVariant = MyTokenLightColors.line,
+    error = MyTokenLightColors.criticalFill,
+    onError = MyTokenLightColors.onAction,
+    errorContainer = MyTokenLightColors.subtle,
+    onErrorContainer = MyTokenLightColors.criticalText,
 )
 
 private val DarkColors = darkColorScheme(
-    primary = MyTokenPalette.brandDark,
-    onPrimary = Color(0xFF071B2F),
-    primaryContainer = Color(0xFF203B5C),
-    onPrimaryContainer = Color(0xFFDCEAFF),
-    secondary = MyTokenPalette.positiveDark,
-    onSecondary = Color(0xFF06271C),
-    secondaryContainer = Color(0xFF174434),
-    onSecondaryContainer = Color(0xFFDDF2E9),
-    tertiary = MyTokenPalette.warning,
-    onTertiary = Color(0xFF241705),
-    tertiaryContainer = Color(0xFF4B3517),
-    onTertiaryContainer = Color(0xFFF5E8CF),
-    background = MyTokenPalette.darkCanvas,
-    onBackground = MyTokenPalette.darkText,
-    surface = MyTokenPalette.darkSurface,
-    onSurface = MyTokenPalette.darkText,
-    surfaceVariant = MyTokenPalette.darkElevated,
-    onSurfaceVariant = MyTokenPalette.darkMutedText,
-    outlineVariant = Color(0x1FFFFFFF),
-    error = MyTokenPalette.critical,
-    onError = Color.White,
+    primary = MyTokenDarkColors.actionFill,
+    onPrimary = MyTokenDarkColors.reportTicketInk,
+    primaryContainer = MyTokenDarkColors.subtle,
+    onPrimaryContainer = MyTokenDarkColors.actionText,
+    secondary = MyTokenDarkColors.positiveFill,
+    onSecondary = MyTokenDarkColors.onAction,
+    secondaryContainer = MyTokenDarkColors.subtle,
+    onSecondaryContainer = MyTokenDarkColors.positiveText,
+    tertiary = MyTokenDarkColors.warningFill,
+    onTertiary = MyTokenDarkColors.onAction,
+    tertiaryContainer = MyTokenDarkColors.subtle,
+    onTertiaryContainer = MyTokenDarkColors.warningText,
+    background = MyTokenDarkColors.canvas,
+    onBackground = MyTokenDarkColors.ink,
+    surface = MyTokenDarkColors.surface,
+    onSurface = MyTokenDarkColors.ink,
+    surfaceVariant = MyTokenDarkColors.subtle,
+    onSurfaceVariant = MyTokenDarkColors.muted,
+    outline = MyTokenDarkColors.line,
+    outlineVariant = MyTokenDarkColors.line,
+    error = MyTokenDarkColors.criticalFill,
+    onError = MyTokenDarkColors.onAction,
+    errorContainer = MyTokenDarkColors.subtle,
+    onErrorContainer = MyTokenDarkColors.criticalText,
 )
+
+/** 当前外观是否为深色；用于挑选需要反色的品牌资源。 */
+internal val LocalMyTokenDarkTheme = staticCompositionLocalOf { false }
+
+/** 全局空交互层：点击、长按都不再叠加灰色 ripple/阴影。 */
+private class NoIndicationNode : Modifier.Node(), DrawModifierNode {
+    override fun ContentDrawScope.draw() {
+        drawContent()
+    }
+}
+
+private object NoIndication : IndicationNodeFactory {
+    override fun create(interactionSource: InteractionSource): DelegatableNode = NoIndicationNode()
+
+    override fun equals(other: Any?): Boolean = other === this
+
+    override fun hashCode(): Int = -1
+}
 
 /** 固定使用 MyToken 的跨端品牌层级，避免动态取色破坏供应商语义色。 */
 @OptIn(ExperimentalFoundationApi::class)
@@ -65,12 +96,18 @@ fun MyTokenTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
+    val tokens = if (darkTheme) MyTokenDarkColors else MyTokenLightColors
     MaterialTheme(
         colorScheme = if (darkTheme) DarkColors else LightColors,
         typography = MyTokenTypography,
     ) {
         // OriginOS 等机型上系统拉伸 overscroll 会额外走一层 RenderEffect，滑动容易掉帧。
-        CompositionLocalProvider(LocalOverscrollConfiguration provides null) {
+        CompositionLocalProvider(
+            LocalMyTokenColors provides tokens,
+            LocalMyTokenDarkTheme provides darkTheme,
+            LocalIndication provides NoIndication,
+            LocalOverscrollConfiguration provides null,
+        ) {
             content()
         }
     }

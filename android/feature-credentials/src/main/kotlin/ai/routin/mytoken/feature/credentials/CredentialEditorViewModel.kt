@@ -240,11 +240,12 @@ class CredentialEditorViewModel(
         )
     }
 
-    private fun defaultKind(providerId: ProviderId): CredentialKind = when (providerId) {
-        ProviderId.Routin, ProviderId.NewAPI, ProviderId.CommandCode, ProviderId.OpenCode ->
-            CredentialKind.BearerApiKey
-        ProviderId.DeepSeek, ProviderId.Glm -> CredentialKind.ApiKey
-        ProviderId.Volcengine -> CredentialKind.AccessKeyPair
-        ProviderId.Xiaomi -> CredentialKind.BearerApiKey
-    }
+}
+
+/** 各供应商默认凭证类型，编辑页与 ViewModel 共用一份。 */
+internal fun defaultKind(providerId: ProviderId): CredentialKind = when (providerId) {
+    ProviderId.Routin, ProviderId.NewAPI, ProviderId.CommandCode, ProviderId.OpenCode,
+    ProviderId.Xiaomi -> CredentialKind.BearerApiKey
+    ProviderId.DeepSeek, ProviderId.Glm -> CredentialKind.ApiKey
+    ProviderId.Volcengine -> CredentialKind.AccessKeyPair
 }

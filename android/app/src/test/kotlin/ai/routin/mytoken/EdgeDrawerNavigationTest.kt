@@ -1,6 +1,7 @@
 package ai.routin.mytoken
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -10,6 +11,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -61,61 +63,76 @@ class EdgeDrawerNavigationTest {
     }
 
     @Test
-    fun 主页中部右滑可以打开凭证抽屉() {
+    fun 抽屉手柄竖条居中于面板边框与页边距之间() {
         composeRule.waitForIdle()
 
-        composeRule.onRoot().performTouchInput {
-            val y = height / 2f
-            down(Offset(width * 0.42f, y))
-            moveTo(Offset(width * 0.88f, y), delayMillis = 180)
-            up()
-        }
+        composeRule.onNodeWithTag("home_open_credentials").performClick()
+        composeRule.waitForIdle()
+        val startDrawer = composeRule.onNodeWithTag("edge_drawer_start").getUnclippedBoundsInRoot()
+        val startBar = composeRule
+            .onNodeWithTag("edge_drawer_handle_bar_start", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val startCenter = (startBar.left.value + startBar.right.value) / 2f
+        assertEquals(
+            "左侧抽屉手柄应在 16dp 页边距中居中",
+            8f,
+            startDrawer.right.value - startCenter,
+            1f,
+        )
 
-        composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithTag("edge_drawer_start").fetchSemanticsNodes().isNotEmpty()
+        composeRule.onNodeWithTag("edge_drawer_scrim_start")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitUntil(3_000) {
+            composeRule.onAllNodesWithTag("edge_drawer_start").fetchSemanticsNodes().isEmpty()
         }
-        composeRule.onNodeWithTag("edge_drawer_start").assertIsDisplayed()
+        composeRule.onNodeWithTag("home_open_settings").performClick()
+        composeRule.waitForIdle()
+        val endDrawer = composeRule.onNodeWithTag("edge_drawer_end").getUnclippedBoundsInRoot()
+        val endBar = composeRule
+            .onNodeWithTag("edge_drawer_handle_bar_end", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val endCenter = (endBar.left.value + endBar.right.value) / 2f
+        assertEquals(
+            "右侧抽屉手柄应在 16dp 页边距中居中",
+            8f,
+            endCenter - endDrawer.left.value,
+            1f,
+        )
     }
 
     @Test
-    fun 主页中部左滑可以打开设置抽屉() {
+    fun 主页左滑不会打开抽屉() {
         composeRule.waitForIdle()
 
-        composeRule.onRoot().performTouchInput {
-            val y = height / 2f
-            down(Offset(width * 0.58f, y))
-            moveTo(Offset(width * 0.12f, y), delayMillis = 180)
-            up()
-        }
+        swipeAcrossHome(left = true)
 
-        composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithTag("edge_drawer_end").fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.onNodeWithTag("edge_drawer_end").assertIsDisplayed()
+        composeRule.onAllNodesWithTag("edge_drawer_start").fetchSemanticsNodes().isEmpty()
+        composeRule.onAllNodesWithTag("edge_drawer_end").fetchSemanticsNodes().isEmpty()
     }
 
     @Test
-    fun 抽屉反复开合后首页仍然可以点击() {
+    fun 主页右滑不会打开抽屉() {
+        composeRule.waitForIdle()
+
+        swipeAcrossHome(left = false)
+
+        composeRule.onAllNodesWithTag("edge_drawer_start").fetchSemanticsNodes().isEmpty()
+        composeRule.onAllNodesWithTag("edge_drawer_end").fetchSemanticsNodes().isEmpty()
+    }
+
+    @Test
+    fun 按钮反复开合抽屉后首页仍然可以点击() {
         composeRule.waitForIdle()
 
         repeat(3) {
-            composeRule.onRoot().performTouchInput {
-                val y = height / 2f
-                down(Offset(width * 0.42f, y))
-                moveTo(Offset(width * 0.88f, y), delayMillis = 140)
-                up()
-            }
+            composeRule.onNodeWithTag("home_open_credentials").performClick()
             composeRule.waitUntil(5_000) {
                 composeRule.onAllNodesWithTag("edge_drawer_start")
                     .fetchSemanticsNodes()
                     .isNotEmpty()
             }
-            composeRule.onNodeWithTag("edge_drawer_start").performTouchInput {
-                val y = height / 2f
-                down(Offset(width * 0.82f, y))
-                moveTo(Offset(width * 0.08f, y), delayMillis = 140)
-                up()
-            }
+            composeRule.onNodeWithTag("edge_drawer_scrim_start")
+                .performSemanticsAction(SemanticsActions.OnClick)
             composeRule.waitUntil(5_000) {
                 composeRule.onAllNodesWithTag("edge_drawer_start")
                     .fetchSemanticsNodes()
@@ -130,5 +147,19 @@ class EdgeDrawerNavigationTest {
                 .isNotEmpty()
         }
         composeRule.onNodeWithTag("edge_drawer_end").assertIsDisplayed()
+    }
+
+    private fun swipeAcrossHome(left: Boolean) {
+        composeRule.onNodeWithTag("home_pager").performTouchInput {
+            val y = height * 0.4f
+            if (left) {
+                down(Offset(width * 0.8f, y))
+                moveTo(Offset(width * 0.2f, y), delayMillis = 180)
+            } else {
+                down(Offset(width * 0.2f, y))
+                moveTo(Offset(width * 0.8f, y), delayMillis = 180)
+            }
+            up()
+        }
     }
 }

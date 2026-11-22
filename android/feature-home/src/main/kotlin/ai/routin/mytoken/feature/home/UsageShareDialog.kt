@@ -1,33 +1,49 @@
 package ai.routin.mytoken.feature.home
 
-import androidx.compose.foundation.layout.Arrangement
+import android.widget.Toast
+import ai.routin.mytoken.core.ui.MyTokenLayoutMode
+import ai.routin.mytoken.core.ui.MyTokenSurface
+import ai.routin.mytoken.core.ui.MyTokenTextField
+import ai.routin.mytoken.core.ui.MyTokenThemeTokens
+import ai.routin.mytoken.core.ui.MyTokenType
+import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.FlowRowOverflow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ConfirmationNumber
-import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.ConfirmationNumber
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.SaveAlt
-import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.automirrored.outlined.Forward
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,19 +57,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import ai.routin.mytoken.core.ui.GlassButton
-import ai.routin.mytoken.core.ui.GlassButtonTone
-import ai.routin.mytoken.core.ui.GlassSwitch
-import ai.routin.mytoken.core.ui.GlassTextField
-import ai.routin.mytoken.core.ui.LiquidGlassSurface
-import ai.routin.mytoken.core.ui.MyTokenLayoutMode
-import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
-import ai.routin.mytoken.core.ui.glassFilterChipBorder
-import ai.routin.mytoken.core.ui.glassFilterChipColors
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -64,6 +75,7 @@ internal fun UsageShareDialog(
     layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
 ) {
     val context = LocalContext.current
+    val colors = MyTokenThemeTokens.colors
     val content = remember(card) { UsageShareContentBuilder.build(card) }
     LaunchedEffect(content) {
         if (content == null) onDismiss()
@@ -71,124 +83,68 @@ internal fun UsageShareDialog(
     content ?: return
 
     var draft by remember(content) { mutableStateOf(UsageShareContentBuilder.makeDraft(content)) }
-    var actionStatus by remember { mutableStateOf<String?>(null) }
+    var fieldsExpanded by remember(content) { mutableStateOf(false) }
     var isExporting by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val rendered = remember(draft) { UsageShareContentBuilder.render(content, draft) }
     val currentRendered by rememberUpdatedState(rendered)
 
-    val exportActions: @Composable ColumnScope.() -> Unit = {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("share_actions_row"),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            GlassButton(
-                text = "复制",
-                icon = Icons.Outlined.ContentCopy,
-                tone = GlassButtonTone.Primary,
-                enabled = !isExporting,
-                onClick = {
-                    scope.launch {
-                        isExporting = true
-                        actionStatus = exportUsageShareImage(context, currentRendered, UsageShareAction.Copy)
-                        isExporting = false
-                    }
-                },
-                modifier = Modifier.weight(1f),
-            )
-            GlassButton(
-                text = "保存",
-                icon = Icons.Outlined.SaveAlt,
-                enabled = !isExporting,
-                onClick = {
-                    scope.launch {
-                        isExporting = true
-                        actionStatus = exportUsageShareImage(context, currentRendered, UsageShareAction.Save)
-                        isExporting = false
-                    }
-                },
-                modifier = Modifier.weight(1f),
-            )
-            GlassButton(
-                text = "更多",
-                icon = Icons.Outlined.Share,
-                enabled = !isExporting,
-                onClick = {
-                    scope.launch {
-                        isExporting = true
-                        exportUsageShareImage(context, currentRendered, UsageShareAction.Share)
-                        isExporting = false
-                    }
-                },
-                modifier = Modifier.weight(1f),
-            )
+    val runExport: (UsageShareAction) -> Unit = { action ->
+        scope.launch {
+            if (isExporting) return@launch
+            isExporting = true
+            val message = exportUsageShareImage(context, currentRendered, action)
+            isExporting = false
+            message?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
         }
     }
 
-    val statusText: @Composable ColumnScope.() -> Unit = {
+    val header: @Composable () -> Unit = {
+        ShareHeader(isExporting = isExporting, onAction = runExport)
+    }
+
+    val privacyNote: @Composable () -> Unit = {
         Text(
-            text = actionStatus ?: "数字完全来自本地快照，真实用量不可篡改",
-            style = MaterialTheme.typography.bodySmall,
-            color = if (actionStatus == null) {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-                MaterialTheme.colorScheme.primary
-            },
+            text = "数字完全来自本地快照，真实用量不可篡改",
+            style = MyTokenType.caption,
+            color = colors.muted,
         )
     }
 
     val editorControls: @Composable ColumnScope.() -> Unit = {
-        ShareControlSection(
-            title = "模板风格",
-            supportingText = draft.template.previewTag,
-        ) {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+        ShareControlSection(title = "模板风格") {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 UsageShareTemplate.entries.forEach { template ->
-                    FilterChip(
+                    ShareTemplateOption(
+                        template = template,
                         selected = draft.template == template,
                         onClick = { draft = draft.copy(template = template) },
-                        label = { Text(text = template.title) },
-                        leadingIcon = if (template == UsageShareTemplate.Ticket || template == UsageShareTemplate.TicketLight) {
-                            {
-                                Icon(
-                                    imageVector = if (template == UsageShareTemplate.Ticket) {
-                                        Icons.Filled.ConfirmationNumber
-                                    } else {
-                                        Icons.Outlined.ConfirmationNumber
-                                    },
-                                    contentDescription = null,
-                                )
-                            }
-                        } else {
-                            null
-                        },
-                        colors = glassFilterChipColors(selected = draft.template == template),
-                        border = glassFilterChipBorder(selected = draft.template == template),
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("share_template_${template.name}"),
                     )
                 }
             }
         }
 
-        GlassTextField(
+        MyTokenTextField(
             value = draft.displayName,
             onValueChange = { draft = draft.copy(displayName = it) },
             label = "显示名称",
             supportingText = "仅用于本次图片展示",
             contentPadding = 8.dp,
         )
-        GlassTextField(
+        MyTokenTextField(
             value = draft.subtitle,
             onValueChange = { draft = draft.copy(subtitle = it) },
             label = "套餐文案",
             supportingText = "可补充团队说明",
             contentPadding = 8.dp,
         )
-        GlassTextField(
+        MyTokenTextField(
             value = draft.note,
             onValueChange = { draft = draft.copy(note = it) },
             label = "卡片附注说明（可选）",
@@ -197,42 +153,63 @@ internal fun UsageShareDialog(
         )
 
         ShareControlSection(
-            title = "展示字段开关",
-            supportingText = "按票面顺序排列，隐藏即不导出",
+            title = "展示字段",
             action = {
                 TextButton(onClick = { draft = draft.showAll() }) {
                     Text(text = "全部显示")
                 }
             },
         ) {
-            visibleToggles(content).forEach { item ->
-                ShareToggleRow(
-                    title = item.title,
-                    checked = item.isChecked(draft),
-                    onToggle = { draft = item.toggle(draft) },
+            val toggles = visibleToggles(content)
+            val collapsible = toggles.size > 4
+            FlowRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("share_field_flow"),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                maxLines = if (fieldsExpanded || !collapsible) Int.MAX_VALUE else 1,
+                overflow = if (fieldsExpanded || !collapsible) {
+                    FlowRowOverflow.Clip
+                } else {
+                    FlowRowOverflow.expandIndicator {
+                        ShareFieldMoreChip(
+                            testTag = "share_field_more",
+                            onClick = { fieldsExpanded = true },
+                        )
+                    }
+                },
+            ) {
+                toggles.forEachIndexed { index, item ->
+                    ShareToggleChip(
+                        title = item.title,
+                        checked = item.isChecked(draft),
+                        testTag = "share_field_chip_$index",
+                        onToggle = { draft = item.toggle(draft) },
+                    )
+                }
+            }
+            if (fieldsExpanded && collapsible) {
+                Text(
+                    text = "收起",
+                    style = MyTokenType.caption,
+                    color = colors.muted,
+                    modifier = Modifier
+                        .testTag("share_field_collapse")
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable(role = Role.Button) { fieldsExpanded = false }
+                        .padding(horizontal = 6.dp, vertical = 4.dp),
                 )
             }
         }
     }
 
     val preview: @Composable ColumnScope.() -> Unit = {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "实时导出预览",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = draft.template.previewTag,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
+        Text(
+            text = "实时导出预览",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         UsageShareCardPreview(
             card = rendered,
             modifier = Modifier
@@ -242,7 +219,11 @@ internal fun UsageShareDialog(
         )
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = colors.canvas,
+        contentColor = colors.ink,
+    ) {
         if (layoutMode == MyTokenLayoutMode.Compact) {
             Column(
                 modifier = Modifier
@@ -252,15 +233,10 @@ internal fun UsageShareDialog(
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Text(
-                    text = "分享用量",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                header()
                 preview()
                 editorControls()
-                exportActions()
-                statusText()
+                privacyNote()
                 Text(
                     text = " ",
                     style = MaterialTheme.typography.labelSmall,
@@ -273,13 +249,9 @@ internal fun UsageShareDialog(
                     .fillMaxWidth()
                     .fillMaxHeight()
                     .padding(horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(
-                    text = "分享用量",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                header()
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -305,8 +277,7 @@ internal fun UsageShareDialog(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         editorControls()
-                        exportActions()
-                        statusText()
+                        privacyNote()
                     }
                 }
             }
@@ -315,13 +286,118 @@ internal fun UsageShareDialog(
 }
 
 @Composable
+private fun ShareHeader(
+    isExporting: Boolean,
+    onAction: (UsageShareAction) -> Unit,
+) {
+    val colors = MyTokenThemeTokens.colors
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "分享用量",
+            style = MyTokenType.section,
+            color = colors.ink,
+            modifier = Modifier.weight(1f),
+        )
+        Row(modifier = Modifier.testTag("share_actions_row")) {
+            ShareActionButton(
+                icon = Icons.Outlined.ContentCopy,
+                description = "复制分享图",
+                testTag = "share_action_copy",
+                enabled = !isExporting,
+                onClick = { onAction(UsageShareAction.Copy) },
+            )
+            ShareActionButton(
+                icon = Icons.Outlined.SaveAlt,
+                description = "保存分享图",
+                testTag = "share_action_save",
+                enabled = !isExporting,
+                onClick = { onAction(UsageShareAction.Save) },
+            )
+            ShareActionButton(
+                icon = Icons.AutoMirrored.Outlined.Forward,
+                description = "分享用量",
+                testTag = "share_action_share",
+                enabled = !isExporting,
+                onClick = { onAction(UsageShareAction.Share) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ShareActionButton(
+    icon: ImageVector,
+    description: String,
+    testTag: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val colors = MyTokenThemeTokens.colors
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.testTag(testTag),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = description,
+            tint = if (enabled) colors.ink else colors.muted,
+        )
+    }
+}
+
+@Composable
+private fun ShareTemplateOption(
+    template: UsageShareTemplate,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MyTokenThemeTokens.colors
+    val shape = RoundedCornerShape(10.dp)
+    Column(
+        modifier = modifier
+            .clip(shape)
+            .background(if (selected) colors.subtle else Color.Transparent)
+            .border(1.dp, if (selected) colors.actionFill else colors.line, shape)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(vertical = 7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Icon(
+            imageVector = templateIcon(template),
+            contentDescription = null,
+            tint = if (selected) colors.actionText else colors.muted,
+            modifier = Modifier.size(17.dp),
+        )
+        Text(
+            text = template.title,
+            style = MyTokenType.caption,
+            color = if (selected) colors.ink else colors.muted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+private fun templateIcon(template: UsageShareTemplate): ImageVector = when (template) {
+    UsageShareTemplate.TicketLight -> Icons.Outlined.ConfirmationNumber
+    UsageShareTemplate.Ticket -> Icons.Filled.ConfirmationNumber
+    UsageShareTemplate.Light -> Icons.Outlined.LightMode
+    UsageShareTemplate.Dark -> Icons.Outlined.DarkMode
+}
+
+@Composable
 private fun ShareControlSection(
     title: String,
-    supportingText: String? = null,
     action: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    LiquidGlassSurface(
+    MyTokenSurface(
         surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
         shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
     ) {
@@ -336,20 +412,12 @@ private fun ShareControlSection(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    if (supportingText != null) {
-                        Text(
-                            text = supportingText,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
                 action?.invoke()
             }
             content()
@@ -364,30 +432,48 @@ internal data class ShareToggle(
 )
 
 @Composable
-private fun ShareToggleRow(
+private fun ShareToggleChip(
     title: String,
     checked: Boolean,
+    testTag: String,
     onToggle: () -> Unit,
 ) {
-    Row(
+    val colors = MyTokenThemeTokens.colors
+    val shape = RoundedCornerShape(8.dp)
+    Text(
+        text = title,
+        style = MyTokenType.caption,
+        color = if (checked) colors.ink else colors.muted,
+        maxLines = 1,
         modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(MyTokenVisualPolicy.innerRadiusDp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
-            .clickable(onClick = onToggle)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .testTag(testTag)
+            .clip(shape)
+            .background(if (checked) colors.subtle else Color.Transparent)
+            .border(1.dp, colors.line, shape)
+            .toggleable(
+                value = checked,
+                role = Role.Checkbox,
+                onValueChange = { onToggle() },
+            )
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+    )
+}
+
+@Composable
+private fun ShareFieldMoreChip(testTag: String, onClick: () -> Unit) {
+    val colors = MyTokenThemeTokens.colors
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(8.dp),
+        color = colors.subtle,
+        border = BorderStroke(1.dp, colors.line),
+        modifier = Modifier.testTag(testTag),
     ) {
         Text(
-            text = title,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        GlassSwitch(
-            checked = checked,
-            onCheckedChange = null,
-            contentDescription = title,
+            text = "更多",
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            style = MyTokenType.caption,
+            color = colors.actionText,
         )
     }
 }

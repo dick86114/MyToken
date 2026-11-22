@@ -2,7 +2,8 @@ package ai.routin.mytoken.feature.home
 
 import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
-import ai.routin.mytoken.core.ui.MyTokenPalette
+import ai.routin.mytoken.core.ui.MyTokenRadius
+import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
 import androidx.compose.foundation.BorderStroke
@@ -11,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
@@ -22,9 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -33,17 +33,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.math.RoundingMode
@@ -55,8 +61,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.max
 
-internal data class MetricTone(val color: Color)
-
 internal fun statusColor(metric: UsageMetric, percent: Double?, colors: StatusColors): Color =
     when (metric.healthState) {
         UsageMetricHealthState.Normal -> when (metric.presentation) {
@@ -66,7 +70,7 @@ internal fun statusColor(metric: UsageMetric, percent: Double?, colors: StatusCo
         }
         UsageMetricHealthState.Warning -> colors.warning
         UsageMetricHealthState.Critical, UsageMetricHealthState.Unavailable -> colors.critical
-        UsageMetricHealthState.Stale, UsageMetricHealthState.Unknown -> if (percent == null) colors.neutral else colors.secondaryFallback()
+        UsageMetricHealthState.Stale, UsageMetricHealthState.Unknown -> if (percent == null) colors.neutral else colors.brand
     }
 
 /** 百分比驱动变色：和 macOS UsageMetricPresentation.color(for:) 保持一致。 */
@@ -76,8 +80,6 @@ internal fun progressColor(percent: Double?, colors: StatusColors): Color = when
     percent >= 50 -> colors.warning
     else -> colors.brand
 }
-
-private fun StatusColors.secondaryFallback(): Color = neutral
 
 internal fun formatDecimal(value: BigDecimal?): String {
     if (value == null) return "-"
@@ -129,6 +131,7 @@ private val shortResetFormatter = DateTimeFormatter.ofPattern("MM-dd HH:mm")
 private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 private val subscriptionFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 private val resetCardFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+private val resetCardCompactFormatter = DateTimeFormatter.ofPattern("MM-dd HH:mm")
 
 internal fun formatResetTime(instant: Instant): String {
     val zone = ZoneId.systemDefault()
@@ -178,10 +181,29 @@ internal fun RemainingDurationText(end: Instant, colors: StatusColors, modifier:
     val highlight = end.isAfter(now) && Duration.between(now, end).toMinutes() < 60
     Text(
         text = "剩余 ${formatRemainingDuration(end, now)}",
-        style = MaterialTheme.typography.labelSmall,
-        color = if (highlight) colors.positive else MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MyTokenType.caption,
+        color = if (highlight) colors.positive else MyTokenThemeTokens.colors.muted,
         modifier = modifier,
     )
+}
+
+private val shortExpiryFormatter = DateTimeFormatter.ofPattern("MM-dd")
+
+internal fun formatShortExpiry(instant: Instant): String =
+    shortExpiryFormatter.format(instant.atZone(ZoneId.systemDefault()))
+
+/** 简洁页脚的紧凑倒计时：2h40m / 3d2h / 45m。 */
+internal fun formatCompactCountdown(end: Instant, now: Instant = Instant.now()): String {
+    if (!end.isAfter(now)) return "已结束"
+    val totalMinutes = max(1L, Duration.between(now, end).toMinutes())
+    val days = totalMinutes / (24 * 60)
+    val hours = (totalMinutes % (24 * 60)) / 60
+    val minutes = totalMinutes % 60
+    return when {
+        days > 0 -> "${days}d${hours}h"
+        hours > 0 -> "${hours}h${minutes}m"
+        else -> "${minutes}m"
+    }
 }
 
 internal fun formatSubscriptionTime(instant: Instant?): String {
@@ -191,6 +213,10 @@ internal fun formatSubscriptionTime(instant: Instant?): String {
 
 internal fun formatResetCardExpiry(instant: Instant): String =
     resetCardFormatter.format(instant.atZone(ZoneId.systemDefault()))
+
+/** 详情页日期 chip 的紧凑格式：MM-dd HH:mm。 */
+internal fun formatResetCardCompact(instant: Instant): String =
+    resetCardCompactFormatter.format(instant.atZone(ZoneId.systemDefault()))
 
 internal fun formatCommandCodeAmount(value: BigDecimal?): String =
     value?.setScale(2, java.math.RoundingMode.HALF_UP)?.toPlainString() ?: "-"
@@ -225,10 +251,11 @@ internal fun UsageProgressBar(
     percent: Double?,
     color: Color,
     modifier: Modifier = Modifier,
+    height: Dp = 4.dp,
 ) {
     val fraction = ((percent ?: 0.0).coerceIn(0.0, 100.0) / 100.0).toFloat()
-    val track = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-    Canvas(modifier = modifier.fillMaxWidth().height(6.dp)) {
+    val track = MyTokenThemeTokens.colors.track
+    Canvas(modifier = modifier.fillMaxWidth().height(height)) {
         val radius = CornerRadius(size.height / 2f, size.height / 2f)
         drawRoundRect(color = track, cornerRadius = radius)
         if (fraction > 0f) {
@@ -250,7 +277,7 @@ fun UsageMetricGrid(
     val colors = statusColors()
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         metrics.chunked(columns).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                 row.forEach { metric ->
                     MetricCell(metric, colors, Modifier.weight(1f))
                 }
@@ -274,101 +301,78 @@ internal fun ResetCardsBadge(
     val cards = metric.resetCards
     if (cards.isEmpty()) return
     var expanded by remember(metric.id, cards) { mutableStateOf(false) }
+    val colors = MyTokenThemeTokens.colors
     val text = "${cards.size} 张重置卡"
-    val iconFill = MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)
-    val iconAccent = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f)
-    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val detail = style == ResetCardsBadgeStyle.Detail
+    val chipShape = RoundedCornerShape(5.dp)
 
-    Row(
+    // 设计稿 chip：浅底 hairline + 叠卡图标。击区保持 24dp 行高，不撑开标签行。
+    Box(
         modifier = modifier
+            .height(24.dp)
+            .clip(RoundedCornerShape(6.dp))
             .clickable { expanded = !expanded }
-            .semantics { contentDescription = text }
-            .background(
-                MaterialTheme.colorScheme.onSurface.copy(alpha = if (expanded) 0.10f else 0.05f),
-                CircleShape,
-            )
-            .border(
-                1.dp,
-                MaterialTheme.colorScheme.onSurface.copy(alpha = if (expanded) 0.12f else 0.06f),
-                CircleShape,
-            )
-            .padding(
-                horizontal = if (style == ResetCardsBadgeStyle.Detail) 7.dp else 5.dp,
-                vertical = if (style == ResetCardsBadgeStyle.Detail) 2.dp else 1.dp,
-            ),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
+            .semantics { contentDescription = text },
+        contentAlignment = Alignment.Center,
     ) {
-        Canvas(modifier = Modifier.size(width = 12.dp, height = 9.dp)) {
-            drawRoundRect(
-                color = iconFill,
-                cornerRadius = CornerRadius(2.5.dp.toPx(), 2.5.dp.toPx()),
+        Row(
+            modifier = Modifier
+                .height(if (detail) 19.dp else 17.dp)
+                .clip(chipShape)
+                .background(colors.subtle)
+                .border(1.dp, colors.line, chipShape)
+                .testTag("reset_chip")
+                .padding(horizontal = if (detail) 6.dp else 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(if (detail) 4.dp else 3.dp),
+        ) {
+            ResetCardsGlyph(
+                color = colors.muted,
+                modifier = Modifier.size(width = 9.dp, height = 8.dp),
             )
-            drawRoundRect(
-                color = iconAccent,
-                topLeft = Offset(2.dp.toPx(), 3.8.dp.toPx()),
-                size = Size(8.dp.toPx(), 1.4.dp.toPx()),
-                cornerRadius = CornerRadius(0.7.dp.toPx(), 0.7.dp.toPx()),
+            Text(
+                text = if (detail) "× ${cards.size}" else cards.size.toString(),
+                style = MyTokenType.micro,
+                fontWeight = FontWeight(650),
+                color = colors.muted,
             )
         }
-        Text(
-            text = if (style == ResetCardsBadgeStyle.Detail) text else cards.size.toString(),
-            style = if (style == ResetCardsBadgeStyle.Detail) {
-                MaterialTheme.typography.labelSmall
-            } else {
-                MyTokenType.badge.copy(fontSize = 9.5.sp, lineHeight = 12.sp)
-            },
-            fontWeight = FontWeight.SemiBold,
-            color = if (style == ResetCardsBadgeStyle.Detail) {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
-            },
-        )
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
             modifier = Modifier.width(210.dp),
-            shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
-            containerColor = resetCardsMenuContainer(isDark),
+            shape = RoundedCornerShape(MyTokenRadius.inner),
+            containerColor = resetCardsMenuContainer(),
             tonalElevation = 0.dp,
             shadowElevation = 12.dp,
-            border = BorderStroke(1.dp, resetCardsMenuBorder(isDark)),
+            border = BorderStroke(1.dp, resetCardsMenuBorder()),
         ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(all = 12.dp)) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(all = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 Text(
                     text = "重置卡到期时间",
-                    style = MyTokenType.metricValue,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 8.dp),
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    style = MyTokenType.label,
+                    color = colors.muted,
                 )
                 cards.forEachIndexed { index, card ->
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
                             text = (index + 1).toString(),
-                            style = TextStyle(
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                fontFamily = FontFamily.Monospace,
-                            ),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MyTokenType.micro.copy(fontFamily = FontFamily.Monospace),
+                            color = colors.muted,
                             modifier = Modifier.width(14.dp),
                             textAlign = TextAlign.End,
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = formatResetCardExpiry(card.expiresAt),
-                            style = TextStyle(
-                                fontSize = 12.sp,
-                                fontFamily = FontFamily.Monospace,
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface,
+                            style = MyTokenType.micro.copy(fontFamily = FontFamily.Monospace),
+                            color = colors.ink,
                         )
                     }
                 }
@@ -377,18 +381,39 @@ internal fun ResetCardsBadge(
     }
 }
 
-/** macOS popover 使用中性弹层；Android 以高不透明中性色近似玻璃弹层。 */
-private fun resetCardsMenuContainer(isDark: Boolean): Color = if (isDark) {
-    MyTokenPalette.darkSurface.copy(alpha = 0.96f)
-} else {
-    Color.White.copy(alpha = 0.96f)
+/** 小票据图标：票据轮廓 + 虚线撕口，用于重置卡数量。 */
+@Composable
+internal fun ResetCardsGlyph(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val stroke = 1.dp.toPx()
+        val w = size.width
+        val h = size.height
+        val inset = stroke / 2f
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(inset, h * 0.16f),
+            size = Size(w - inset * 2f, h * 0.72f),
+            cornerRadius = CornerRadius(w * 0.10f, w * 0.10f),
+            style = Stroke(width = stroke),
+        )
+        drawLine(
+            color = color,
+            start = Offset(w * 0.36f, h * 0.24f),
+            end = Offset(w * 0.36f, h * 0.80f),
+            strokeWidth = stroke,
+            pathEffect = PathEffect.dashPathEffect(
+                floatArrayOf(w * 0.08f, w * 0.08f),
+            ),
+        )
+    }
 }
 
-private fun resetCardsMenuBorder(isDark: Boolean): Color = if (isDark) {
-    Color.White.copy(alpha = 0.14f)
-} else {
-    Color.Black.copy(alpha = 0.08f)
-}
+/** 浮层使用实色表面 + hairline，由 Surface 统一投影。 */
+@Composable
+private fun resetCardsMenuContainer(): Color = MyTokenThemeTokens.colors.surface
+
+@Composable
+private fun resetCardsMenuBorder(): Color = MyTokenThemeTokens.colors.line
 
 
 @Composable
@@ -404,9 +429,9 @@ internal fun XiaomiAPIMetrics(metrics: List<UsageMetric>, modifier: Modifier = M
             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(
                     text = "Token",
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MyTokenType.caption,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MyTokenThemeTokens.colors.muted,
                 )
                 XiaomiMetricRows(tokenOrder, byID, columns)
             }
@@ -438,8 +463,8 @@ private fun XiaomiMetricCell(metric: UsageMetric?, modifier: Modifier = Modifier
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Text(
             text = metric?.label ?: "-",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MyTokenType.caption,
+            color = MyTokenThemeTokens.colors.muted,
         )
         Text(
             text = when {
@@ -447,12 +472,12 @@ private fun XiaomiMetricCell(metric: UsageMetric?, modifier: Modifier = Modifier
                 metric.unit == ai.routin.mytoken.domain.model.UsageMetricUnit.Currency -> formatCurrency(metric.value, metric.currencyCode)
                 else -> formatGrouped(metric.value)
             },
-            style = MaterialTheme.typography.titleSmall,
+            style = MyTokenType.numericValue,
             fontWeight = FontWeight.SemiBold,
             color = if (metric?.presentation == ai.routin.mytoken.domain.model.UsageMetricPresentation.Balance) {
                 statusColor(metric, null, colors)
             } else {
-                MaterialTheme.colorScheme.onSurface
+                MyTokenThemeTokens.colors.ink
             },
         )
     }
@@ -474,8 +499,8 @@ private fun ProgressCell(metric: UsageMetric, colors: StatusColors, modifier: Mo
     val color = progressColor(percent, colors)
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(metric.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-            Text(formatPercent(percent), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = color)
+            Text(metric.label, style = MyTokenType.label, color = MyTokenThemeTokens.colors.muted, modifier = Modifier.weight(1f))
+            Text(formatPercent(percent), style = MyTokenType.numericValue, fontWeight = FontWeight.SemiBold, color = color)
         }
         UsageProgressBar(percent = percent, color = color)
         MetricText("已用 ${formatAmount(metric.used, metric)} / ${formatAmount(metric.limit, metric)}")
@@ -497,8 +522,8 @@ private fun BalanceCell(metric: UsageMetric, colors: StatusColors, modifier: Mod
         else -> metric.label
     }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Text(formatAmount(metric.value, metric), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = statusColor(metric, null, colors))
-        Text(caption, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(formatAmount(metric.value, metric), style = MyTokenType.numericValue, fontWeight = FontWeight.SemiBold, color = statusColor(metric, null, colors))
+        Text(caption, style = MyTokenType.caption, color = MyTokenThemeTokens.colors.muted)
     }
 }
 
@@ -507,16 +532,16 @@ private fun StatusCell(metric: UsageMetric, colors: StatusColors, modifier: Modi
     val available = metric.healthState != UsageMetricHealthState.Unavailable
     val caption = if (metric.id == "availability") "账户状态" else metric.label
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Text(if (available) "可用" else "不可用", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = statusColor(metric, null, colors))
-        Text(caption, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(if (available) "可用" else "不可用", style = MyTokenType.numericValue, fontWeight = FontWeight.SemiBold, color = statusColor(metric, null, colors))
+        Text(caption, style = MyTokenType.caption, color = MyTokenThemeTokens.colors.muted)
     }
 }
 
 @Composable
 private fun ValueCell(metric: UsageMetric, colors: StatusColors, modifier: Modifier = Modifier) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Text(formatAmount(metric.value, metric), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-        Text(metric.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(formatAmount(metric.value, metric), style = MyTokenType.numericValue, fontWeight = FontWeight.SemiBold, color = MyTokenThemeTokens.colors.ink)
+        Text(metric.label, style = MyTokenType.caption, color = MyTokenThemeTokens.colors.muted)
     }
 }
 
@@ -534,18 +559,18 @@ internal fun GLMMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modifie
     ).mapNotNull { id -> metrics.firstOrNull { it.id == id } }
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         progress.chunked(columns).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                 row.forEach { metric ->
                     val percent = progressPercent(metric)
                     val color = progressColor(percent, colors)
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(metric.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                            Text(formatPercent(percent), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = color)
+                            Text(metric.label, style = MyTokenType.label, color = MyTokenThemeTokens.colors.muted, modifier = Modifier.weight(1f))
+                            Text(formatPercent(percent), style = MyTokenType.numericValue, fontWeight = FontWeight.SemiBold, color = color)
                         }
                         UsageProgressBar(percent = percent, color = color)
                         metric.windowEnd?.let {
-                            Text("重置 ${formatResetTime(it)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("重置 ${formatResetTime(it)}", style = MyTokenType.caption, color = MyTokenThemeTokens.colors.muted)
                             RemainingDurationText(it, colors)
                         }
                         if (metric.resetCards.isNotEmpty()) {
@@ -557,11 +582,11 @@ internal fun GLMMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modifie
             }
         }
         calls.chunked(columns).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                 row.forEach { metric ->
                     Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                        Text(metric.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                        Text("${formatCompact(metric.value)} 次", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                        Text(metric.label, style = MyTokenType.label, color = MyTokenThemeTokens.colors.muted, modifier = Modifier.weight(1f))
+                        Text("${formatCompact(metric.value)} 次", style = MyTokenType.numericValue, fontWeight = FontWeight.SemiBold)
                     }
                 }
                 repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
@@ -570,11 +595,11 @@ internal fun GLMMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modifie
         if (activity.isNotEmpty()) {
             Text(
                 text = "活跃度",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MyTokenType.caption,
+                color = MyTokenThemeTokens.colors.muted,
             )
             activity.chunked(columns).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                     row.forEach { metric ->
                         GLMActivityMetric(metric, Modifier.weight(1f))
                     }
@@ -590,13 +615,13 @@ private fun GLMActivityMetric(metric: UsageMetric, modifier: Modifier = Modifier
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Text(
             text = glmActivityText(metric),
-            style = MaterialTheme.typography.titleSmall,
+            style = MyTokenType.numericValue,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
             text = metric.label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MyTokenType.caption,
+            color = MyTokenThemeTokens.colors.muted,
         )
     }
 }
@@ -608,7 +633,7 @@ private fun glmActivityText(metric: UsageMetric): String = when (metric.id) {
     else -> formatDecimal(metric.value)
 }
 
-private fun formatUsageDuration(milliseconds: BigDecimal?): String {
+internal fun formatUsageDuration(milliseconds: BigDecimal?): String {
     if (milliseconds == null) return "-"
     val totalMinutes = milliseconds.divide(BigDecimal(60_000), 0, RoundingMode.DOWN).toLong()
     val days = totalMinutes / (24 * 60)
@@ -628,7 +653,7 @@ internal fun VolcengineMetrics(metrics: List<UsageMetric>, modifier: Modifier = 
     val rowItems = metrics.take(columns)
     val monthly = metrics.firstOrNull { it.id == "monthly" }
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
             rowItems.forEach { ProgressCell(it, colors, Modifier.weight(1f)) }
             repeat(columns - rowItems.size) { Spacer(Modifier.weight(1f)) }
         }
@@ -637,11 +662,11 @@ internal fun VolcengineMetrics(metrics: List<UsageMetric>, modifier: Modifier = 
             val color = progressColor(percent, colors)
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(it.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                    Text(formatPercent(percent), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = color)
+                    Text(it.label, style = MyTokenType.label, color = MyTokenThemeTokens.colors.muted, modifier = Modifier.weight(1f))
+                    Text(formatPercent(percent), style = MyTokenType.numericValue, fontWeight = FontWeight.SemiBold, color = color)
                 }
                 UsageProgressBar(percent = percent, color = color)
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         MetricText("已用 ${formatAmount(it.used, it)} / ${formatAmount(it.limit, it)}")
                         it.windowEnd?.let { end -> MetricText("重置 ${formatResetTime(end)}") }
@@ -672,8 +697,8 @@ internal fun NewAPIMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modi
             val color = progressColor(percent, colors)
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(it.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                    Text(formatPercent(percent), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = color)
+                    Text(it.label, style = MyTokenType.label, color = MyTokenThemeTokens.colors.muted, modifier = Modifier.weight(1f))
+                    Text(formatPercent(percent), style = MyTokenType.numericValue, fontWeight = FontWeight.SemiBold, color = color)
                 }
                 UsageProgressBar(percent = percent, color = color)
                 Row {
@@ -685,8 +710,8 @@ internal fun NewAPIMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modi
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row {
-                Text("Token 消耗", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                Text("单位 Token", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Token 消耗", style = MyTokenType.label, color = MyTokenThemeTokens.colors.muted, modifier = Modifier.weight(1f))
+                Text("单位 Token", style = MyTokenType.caption, color = MyTokenThemeTokens.colors.muted)
             }
             tokens.chunked(columns).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -697,16 +722,16 @@ internal fun NewAPIMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modi
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("请求活动", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("请求活动", style = MyTokenType.label, color = MyTokenThemeTokens.colors.muted)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 activities.forEach { (label, metric, detail) ->
                     Column(
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                        Text(formatCompact(metric?.value), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                        Text(detail, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                        Text(label, style = MyTokenType.caption, color = MyTokenThemeTokens.colors.muted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                        Text(formatCompact(metric?.value), style = MyTokenType.numericValue, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                        Text(detail, style = MyTokenType.caption, color = MyTokenThemeTokens.colors.muted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                     }
                 }
             }
@@ -721,9 +746,9 @@ private fun TokenCell(metric: UsageMetric, cost: UsageMetric?, modifier: Modifie
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Text(metric.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-        Text(formatGrouped(metric.value), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-        Text("≈ ${formatCurrency(cost?.value, cost?.currencyCode)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+        Text(metric.label, style = MyTokenType.caption, color = MyTokenThemeTokens.colors.muted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+        Text(formatGrouped(metric.value), style = MyTokenType.numericValue, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+        Text("≈ ${formatCurrency(cost?.value, cost?.currencyCode)}", style = MyTokenType.caption, color = MyTokenThemeTokens.colors.muted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
     }
 }
 
@@ -734,7 +759,7 @@ private fun formatAmount(value: BigDecimal?, metric: UsageMetric): String = when
 
 @Composable
 private fun MetricText(text: String, modifier: Modifier = Modifier) {
-    Text(text, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = modifier)
+    Text(text, style = MyTokenType.caption, color = MyTokenThemeTokens.colors.muted, modifier = modifier)
 }
 
 @Composable
@@ -747,12 +772,12 @@ internal fun CommandCodeMetrics(
     val byId = metrics.associateBy(UsageMetric::id)
     val colors = statusColors()
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
             CommandCodeProgressMetric(byId["five-hour"], "5 小时", colors, Modifier.weight(1f))
             CommandCodeProgressMetric(byId["weekly"], "周", colors, Modifier.weight(1f))
         }
         Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(18.dp),
             verticalAlignment = Alignment.Top,
         ) {
             CommandCodeMonthlyMetric(byId["credit-progress"], colors, Modifier.weight(1f))
@@ -792,15 +817,15 @@ private fun CommandCodeProgressMetric(
     val color = progressColor(percent, colors)
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(metric.label.ifEmpty { fallbackLabel }, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-            Text(formatPercent(percent), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = color)
+            Text(metric.label.ifEmpty { fallbackLabel }, style = MyTokenType.label, color = MyTokenThemeTokens.colors.muted, modifier = Modifier.weight(1f))
+            Text(formatPercent(percent), style = MyTokenType.numericValue, fontWeight = FontWeight.SemiBold, color = color)
         }
         UsageProgressBar(percent = percent, color = color)
         commandCodeProgressDetailLines(metric, Instant.now()).forEach { line ->
             Text(
                 text = line.text,
-                style = MaterialTheme.typography.labelSmall,
-                color = if (line.highlight) colors.positive else MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MyTokenType.caption,
+                color = if (line.highlight) colors.positive else MyTokenThemeTokens.colors.muted,
             )
         }
     }
@@ -820,28 +845,28 @@ private fun CommandCodeMonthlyMetric(
     val color = progressColor(percent, colors)
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(metric.label.ifEmpty { "月" }, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-            Text(formatPercent(percent), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = color)
+            Text(metric.label.ifEmpty { "月" }, style = MyTokenType.label, color = MyTokenThemeTokens.colors.muted, modifier = Modifier.weight(1f))
+            Text(formatPercent(percent), style = MyTokenType.numericValue, fontWeight = FontWeight.SemiBold, color = color)
         }
         UsageProgressBar(percent = percent, color = color)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = "已用 ${formatCurrency(metric.used, metric.currencyCode)}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MyTokenType.caption,
+                color = MyTokenThemeTokens.colors.muted,
                 modifier = Modifier.weight(1f),
             )
             Text(
                 text = "剩余 ${formatCurrency(metric.remaining, metric.currencyCode)}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MyTokenType.caption,
+                color = MyTokenThemeTokens.colors.muted,
             )
         }
         metric.windowEnd?.let { end ->
             Text(
                 text = formatResetTime(end),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MyTokenType.caption,
+                color = MyTokenThemeTokens.colors.muted,
             )
         }
     }
@@ -858,11 +883,11 @@ private fun CommandCodeRequestMetric(
             Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "累计请求",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MyTokenType.label,
+                    color = MyTokenThemeTokens.colors.muted,
                     modifier = Modifier.weight(1f),
                 )
-                Text("-", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("-", style = MyTokenType.numericValue, fontWeight = FontWeight.SemiBold)
             }
         } else {
             CommandCodePlaceholder("累计请求", modifier)
@@ -873,13 +898,13 @@ private fun CommandCodeRequestMetric(
         Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = metric.label.ifEmpty { "累计请求" },
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MyTokenType.label,
+                color = MyTokenThemeTokens.colors.muted,
                 modifier = Modifier.weight(1f),
             )
             Text(
                 text = "${formatCompact(metric.value)} 次",
-                style = MaterialTheme.typography.titleSmall,
+                style = MyTokenType.numericValue,
                 fontWeight = FontWeight.SemiBold,
             )
         }
@@ -887,12 +912,12 @@ private fun CommandCodeRequestMetric(
         Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
                 text = metric.label.ifEmpty { "累计请求" },
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MyTokenType.label,
+                color = MyTokenThemeTokens.colors.muted,
             )
             Text(
                 text = "${formatCompact(metric.value)} 次",
-                style = MaterialTheme.typography.titleSmall,
+                style = MyTokenType.numericValue,
                 fontWeight = FontWeight.SemiBold,
             )
         }
@@ -911,10 +936,10 @@ private fun CommandCodeValueMetric(
         return
     }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(metric.label.ifEmpty { fallbackLabel }, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(metric.label.ifEmpty { fallbackLabel }, style = MyTokenType.label, color = MyTokenThemeTokens.colors.muted)
         Text(
             text = formatCurrency(metric.value, metric.currencyCode),
-            style = MaterialTheme.typography.titleMedium,
+            style = MyTokenType.numericValue,
             fontWeight = FontWeight.SemiBold,
             color = statusColor(metric, null, colors),
         )
@@ -924,7 +949,7 @@ private fun CommandCodeValueMetric(
 @Composable
 private fun CommandCodePlaceholder(label: String, modifier: Modifier = Modifier) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text("-", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text(label, style = MyTokenType.label, color = MyTokenThemeTokens.colors.muted)
+        Text("-", style = MyTokenType.numericValue, fontWeight = FontWeight.SemiBold)
     }
 }

@@ -8,6 +8,7 @@ import ai.routin.mytoken.domain.model.ProviderId
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import java.util.UUID
@@ -51,6 +52,34 @@ class CredentialListAdaptiveTest {
 
         composeRule.onNodeWithTag("credential_grid").assertExists()
         composeRule.onAllNodesWithContentDescription("Routin").onFirst().assertExists()
+    }
+
+    @Test
+    @Config(qualifiers = "w1000dp-h1100dp")
+    fun 抽屉模式始终单列() {
+        composeRule.setContent {
+            MyTokenTheme {
+                CredentialListScreen(
+                    state = CredentialListUiState(
+                        isLoading = false,
+                        items = listOf(credential("主力 Key"), credential("备用 Key")),
+                    ),
+                    layoutMode = MyTokenLayoutMode.Expanded,
+                    drawerMode = true,
+                    onToggleEnabled = {},
+                    onMove = { _, _ -> },
+                    onEditCredential = {},
+                    onRequestDelete = {},
+                    onDismissDelete = {},
+                    onConfirmDelete = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("credential_grid").assertDoesNotExist()
+        composeRule.onNodeWithTag("credential_drawer_content").assertExists()
     }
 
     private fun credential(name: String) = Credential(

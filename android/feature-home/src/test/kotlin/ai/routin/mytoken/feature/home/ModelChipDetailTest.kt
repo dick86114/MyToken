@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -68,6 +69,10 @@ class ModelChipDetailTest {
         composeRule.onNodeWithText("自动续费").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Running").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("ark-code-latest").performScrollTo().assertIsDisplayed()
+        // 折叠态只露出第一个模型，点击堆叠卡展开后复制第二个。
+        composeRule.onNodeWithTag("detail_models_more", useUnmergedTree = true)
+            .performScrollTo()
+            .performClick()
         composeRule.onNodeWithContentDescription("复制模型 ID glm-5.3").performScrollTo()
         composeRule.onNodeWithContentDescription("复制模型 ID glm-5.3").performClick()
         composeRule.onNodeWithContentDescription("已复制模型 ID glm-5.3").assertIsDisplayed()

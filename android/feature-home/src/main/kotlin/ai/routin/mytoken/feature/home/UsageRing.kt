@@ -1,211 +1,186 @@
 package ai.routin.mytoken.feature.home
 
+import ai.routin.mytoken.core.ui.MyTokenMotion
+import ai.routin.mytoken.core.ui.MyTokenThemeTokens
+import ai.routin.mytoken.core.ui.MyTokenType
+import ai.routin.mytoken.core.ui.rememberMyTokenMotionEnabled
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import kotlin.math.max
+import kotlin.math.roundToInt
 
-/** 简洁卡片环形用量：数字放大突出，百分号缩小上移。 */
+/** 主机面板式仪表：270° 内 12 段刻度，外圈表框、内圈轴心。 */
+private const val SegmentCount = 12
+private const val ArcStartAngle = 135f
+private const val ArcSweepAngle = 270f
+private const val SegmentSweepAngle = 18.1f
+private const val SegmentGapDegrees = 2.2f
+private const val BezelRadiusRatio = 31.4f / 64f
+private const val SegmentRadiusRatio = 26f / 64f
+private const val HubRadiusRatio = 17.2f / 64f
+private const val SegmentStrokeRatio = 6f / 64f
+private const val HairlineRatio = 0.9f / 64f
+private const val SegmentHighlightRadiusRatio = 27.4f / 64f
+private const val SegmentHighlightSweep = 15.1f
+private const val SegmentHighlightInset = 1.5f
+
 @Composable
-internal fun UsageRing(
+internal fun UsageArcGauge(
     percent: Double?,
     tone: UsageMetricTone,
-    isDark: Boolean,
     diameter: Dp,
+    inactive: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
-    val colors = statusColors()
-    val accent = when (tone) {
-        UsageMetricTone.Warning -> colors.warning
-        UsageMetricTone.Critical -> colors.critical
-        UsageMetricTone.Normal -> colors.brand
+    val colors = MyTokenThemeTokens.colors
+    val accent = when {
+        inactive -> colors.track
+        tone == UsageMetricTone.Warning -> colors.warningFill
+        tone == UsageMetricTone.Critical -> colors.criticalFill
+        else -> colors.ink
     }
-    val track = if (isDark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.08f)
-    val strokeWidth = diameter * 0.10f
     val clamped = ((percent ?: 0.0).coerceIn(0.0, 100.0)).toFloat()
-
-    val numberSize = (if (diameter > 42.dp) 13.5 else 11.5).sp
-    val percentSize = (if (diameter > 42.dp) 10.5 else 9.0).sp
-    val numberWeight = if ((percent ?: 0.0) <= 0.0) FontWeight.SemiBold else FontWeight.Bold
-    // 状态色只用于圆环本体；数值保留常规前景色以维持易读性。
-    val labelColor = if ((percent ?: 0.0) <= 0.0) {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    } else {
-        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
+    // 数值变化时弧线平滑过渡；系统关闭动画时退化为瞬间跳变。
+    val motionEnabled = rememberMyTokenMotionEnabled()
+    val animatedPercent by animateFloatAsState(
+        targetValue = clamped,
+        animationSpec = tween(
+            durationMillis = MyTokenMotion.ringDurationMillis(motionEnabled),
+            easing = FastOutSlowInEasing,
+        ),
+        label = "usageArcPercent",
+    )
+    // 动态字体放大时同步放大仪表，避免圆心数字被 52dp 直径裁切。
+    val scaledDiameter = diameter * LocalDensity.current.fontScale.coerceIn(1f, 1.35f)
+    val numberStyle = when {
+        scaledDiameter >= 80.dp -> MyTokenType.detailRing
+        scaledDiameter >= 64.dp -> MyTokenType.ringFull
+        else -> MyTokenType.ringCompact
     }
     val numberText = CompactUsageCardPresentation.compactPercentNumberText(percent)
+    val contentColor = if (inactive) colors.muted else colors.ink
 
-    Box(modifier = Modifier.size(diameter), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = modifier.size(scaledDiameter),
+        contentAlignment = Alignment.Center,
+    ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val stroke = strokeWidth.toPx()
-            val inset = stroke / 2
-            val arcSize = size.copy(width = size.width - stroke, height = size.height - stroke)
-            drawArc(
-                color = track,
-                startAngle = 0f,
-                sweepAngle = 360f,
-                useCenter = false,
-                topLeft = androidx.compose.ui.geometry.Offset(inset, inset),
-                size = arcSize,
-                style = Stroke(width = stroke, cap = StrokeCap.Round),
-            )
-            if (clamped > 0f) {
-                drawArc(
-                    color = accent.copy(alpha = if (isDark) 0.20f else 0.13f),
-                    startAngle = -90f,
-                    sweepAngle = 360f * clamped / 100f,
-                    useCenter = true,
-                    topLeft = androidx.compose.ui.geometry.Offset(inset + stroke * 1.5f, inset + stroke * 1.5f),
-                    size = androidx.compose.ui.geometry.Size(
-                        width = (arcSize.width - stroke * 3f).coerceAtLeast(0f),
-                        height = (arcSize.height - stroke * 3f).coerceAtLeast(0f),
-                    ),
-                )
-                drawArc(
-                    color = accent,
-                    startAngle = -90f,
-                    sweepAngle = 360f * clamped / 100f,
-                    useCenter = false,
-                    topLeft = androidx.compose.ui.geometry.Offset(inset, inset),
-                    size = arcSize,
-                    style = Stroke(width = stroke, cap = StrokeCap.Round),
-                )
-            }
-        }
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                text = numberText,
-                style = TextStyle(
-                    fontSize = numberSize,
-                    fontWeight = numberWeight,
-                    fontFamily = FontFamily.Monospace,
-                ),
-                color = labelColor,
-                maxLines = 1,
-            )
-            Text(
-                text = "%",
-                style = TextStyle(
-                    fontSize = percentSize,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = FontFamily.Monospace,
-                ),
-                color = labelColor,
-                modifier = Modifier
-                    .padding(start = 1.dp)
-                    .offset(y = (-1).dp),
-                maxLines = 1,
-            )
-        }
-    }
-}
+            val side = size.minDimension
+            val center = Offset(size.width / 2f, size.height / 2f)
+            val bezelRadius = side * BezelRadiusRatio
+            val segmentRadius = side * SegmentRadiusRatio
+            val hubRadius = side * HubRadiusRatio
+            val segmentStroke = side * SegmentStrokeRatio
+            val hairline = side * HairlineRatio
+            val highlightRadius = side * SegmentHighlightRadiusRatio
 
-/**
- * 简洁模式方案 A：270° 细弧。数字仍居中，但圆弧不再闭合成完整仪表盘，
- * 轨道的视觉重量也更低；状态色只出现在进度弧上。
- */
-@Composable
-internal fun CompactArcGauge(
-    percent: Double?,
-    tone: UsageMetricTone,
-    isDark: Boolean,
-    diameter: Dp,
-) {
-    val colors = statusColors()
-    val accent = when (tone) {
-        UsageMetricTone.Warning -> colors.warning
-        UsageMetricTone.Critical -> colors.critical
-        UsageMetricTone.Normal -> colors.brand
-    }
-    val track = if (isDark) Color.White.copy(alpha = 0.065f) else Color.Black.copy(alpha = 0.065f)
-    val clamped = ((percent ?: 0.0).coerceIn(0.0, 100.0)).toFloat()
-    val trackStroke = if (diameter > 50.dp) 2.4.dp else 2.1.dp
-    val progressStroke = if (diameter > 50.dp) 3.1.dp else 2.7.dp
-    val numberSize = if (diameter > 50.dp) 14.sp else 12.5.sp
-    val percentSize = if (diameter > 50.dp) 9.sp else 8.sp
-    val numberText = CompactUsageCardPresentation.compactPercentNumberText(percent)
-    val labelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
-
-    Box(modifier = Modifier.size(diameter), contentAlignment = Alignment.Center) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            fun arcInset(stroke: Float) = stroke / 2f
-
-            val inset = arcInset(maxOf(trackStroke.toPx(), progressStroke.toPx()))
-            val arcSize = Size(
-                width = size.width - inset * 2f,
-                height = size.height - inset * 2f,
+            // 外圈表框：浅底 + 细描边 + 上下两道高光/阴影。
+            drawCircle(color = colors.subtle, radius = bezelRadius, center = center)
+            drawCircle(
+                color = colors.line,
+                radius = bezelRadius,
+                center = center,
+                style = Stroke(width = hairline),
             )
             drawArc(
-                color = track,
-                startAngle = CompactGaugeStartAngle,
-                sweepAngle = CompactGaugeSweepAngle,
+                color = colors.surface.copy(alpha = 0.7f),
+                startAngle = 200f,
+                sweepAngle = 140f,
                 useCenter = false,
-                topLeft = Offset(inset, inset),
-                size = arcSize,
-                style = Stroke(width = trackStroke.toPx(), cap = StrokeCap.Round),
+                topLeft = Offset(center.x - bezelRadius, center.y - bezelRadius),
+                size = Size(bezelRadius * 2f, bezelRadius * 2f),
+                style = Stroke(width = hairline, cap = StrokeCap.Round),
+            )
+            drawArc(
+                color = colors.ink.copy(alpha = 0.08f),
+                startAngle = 22f,
+                sweepAngle = 136f,
+                useCenter = false,
+                topLeft = Offset(center.x - bezelRadius, center.y - bezelRadius),
+                size = Size(bezelRadius * 2f, bezelRadius * 2f),
+                style = Stroke(width = hairline, cap = StrokeCap.Round),
             )
 
-            val progressSweep = if (clamped <= 0f) {
-                CompactGaugeZeroSweepAngle
+            val litSegments = if (animatedPercent <= 0f) {
+                0
             } else {
-                CompactGaugeSweepAngle * clamped / 100f
+                max(1, (animatedPercent / 100f * SegmentCount).roundToInt())
             }
+            repeat(SegmentCount) { index ->
+                val start = ArcStartAngle +
+                    index * (ArcSweepAngle / SegmentCount) +
+                    SegmentGapDegrees
+                drawArc(
+                    color = if (index < litSegments) accent else colors.track,
+                    startAngle = start,
+                    sweepAngle = SegmentSweepAngle,
+                    useCenter = false,
+                    topLeft = Offset(center.x - segmentRadius, center.y - segmentRadius),
+                    size = Size(segmentRadius * 2f, segmentRadius * 2f),
+                    style = Stroke(width = segmentStroke, cap = StrokeCap.Round),
+                )
+                if (index < litSegments) {
+                    drawArc(
+                        color = colors.surface.copy(alpha = 0.38f),
+                        startAngle = start + SegmentHighlightInset,
+                        sweepAngle = SegmentHighlightSweep,
+                        useCenter = false,
+                        topLeft = Offset(center.x - highlightRadius, center.y - highlightRadius),
+                        size = Size(highlightRadius * 2f, highlightRadius * 2f),
+                        style = Stroke(width = hairline * 0.9f, cap = StrokeCap.Round),
+                    )
+                }
+            }
+
+            // 内圈轴心：surface 底 + 细描边 + 内阴影弧。
+            drawCircle(color = colors.surface, radius = hubRadius, center = center)
+            drawCircle(
+                color = colors.line,
+                radius = hubRadius,
+                center = center,
+                style = Stroke(width = hairline),
+            )
             drawArc(
-                color = accent.copy(alpha = if (clamped <= 0f) 0.72f else 1f),
-                startAngle = CompactGaugeStartAngle,
-                sweepAngle = progressSweep,
+                color = colors.ink.copy(alpha = 0.10f),
+                startAngle = 150f,
+                sweepAngle = 240f,
                 useCenter = false,
-                topLeft = Offset(inset, inset),
-                size = arcSize,
-                style = Stroke(width = progressStroke.toPx(), cap = StrokeCap.Round),
+                topLeft = Offset(center.x - hubRadius, center.y - hubRadius),
+                size = Size(hubRadius * 2f, hubRadius * 2f),
+                style = Stroke(width = hairline * 0.8f, cap = StrokeCap.Round),
             )
         }
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                text = numberText,
-                style = TextStyle(
-                    fontSize = numberSize,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = (-0.35).sp,
-                ),
-                color = labelColor,
-                maxLines = 1,
-            )
-            Text(
-                text = "%",
-                style = TextStyle(
-                    fontSize = percentSize,
-                    fontWeight = FontWeight.SemiBold,
-                ),
-                color = labelColor,
-                modifier = Modifier
-                    .padding(start = 1.dp)
-                    .offset(y = (-1).dp),
-                maxLines = 1,
-            )
-        }
+        Text(
+            text = buildAnnotatedString {
+                append(numberText)
+                withStyle(SpanStyle(fontSize = MyTokenType.percentMark.fontSize)) {
+                    append("%")
+                }
+            },
+            style = numberStyle,
+            color = contentColor,
+            maxLines = 1,
+        )
     }
 }
-
-private const val CompactGaugeStartAngle = 135f
-private const val CompactGaugeSweepAngle = 270f
-private const val CompactGaugeZeroSweepAngle = 0.9f

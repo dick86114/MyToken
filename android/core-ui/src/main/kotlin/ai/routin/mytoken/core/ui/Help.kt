@@ -42,7 +42,7 @@ data class HelpSection(
 
 /** 轻量问号入口：只把真正需要解释的规则放进点击后的说明里。 */
 @Composable
-fun GlassHelpButton(
+fun MyTokenHelpButton(
     title: String,
     sections: List<HelpSection>,
     modifier: Modifier = Modifier,
@@ -50,9 +50,10 @@ fun GlassHelpButton(
     icon: ImageVector = Icons.Outlined.Info,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val colors = MyTokenThemeTokens.colors
     Box(
         modifier = modifier
-            .size(28.dp)
+            .size(MyTokenSize.touch)
             .clip(CircleShape)
             .clickable { expanded = true }
             .semantics { contentDescription = "查看$title 说明" },
@@ -61,7 +62,7 @@ fun GlassHelpButton(
         Icon(
             imageVector = Icons.AutoMirrored.Outlined.HelpOutline,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+            tint = colors.muted,
             modifier = Modifier.size(17.dp),
         )
     }
@@ -80,9 +81,9 @@ fun GlassHelpButton(
                                 label = row.label,
                                 detail = row.detail,
                                 markerColor = when (row.marker) {
-                                    HelpMarker.Positive -> MaterialTheme.colorScheme.secondary
-                                    HelpMarker.Warning -> MaterialTheme.colorScheme.tertiary
-                                    HelpMarker.Critical -> MaterialTheme.colorScheme.error
+                                    HelpMarker.Positive -> colors.positiveText
+                                    HelpMarker.Warning -> colors.warningText
+                                    HelpMarker.Critical -> colors.criticalText
                                     null -> null
                                 },
                             )
@@ -91,11 +92,11 @@ fun GlassHelpButton(
                 }
             },
             actions = {
-                GlassButton(
+                MyTokenButton(
                     text = "知道了",
                     onClick = { expanded = false },
                     modifier = Modifier.fillMaxWidth(),
-                    tone = GlassButtonTone.Primary,
+                    tone = MyTokenButtonTone.Primary,
                 )
             },
         )

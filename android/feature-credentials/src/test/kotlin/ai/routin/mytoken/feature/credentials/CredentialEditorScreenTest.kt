@@ -8,8 +8,11 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.platform.testTag
+import ai.routin.mytoken.domain.model.ProviderId
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTextInput
 import androidx.lifecycle.viewModelScope
@@ -94,12 +97,14 @@ class CredentialEditorScreenTest {
     }
 
     @Test
-    fun newEditorShowsProviderChipsAndBearerField() {
+    fun newEditorShowsProviderRowInsteadOfChips() {
         setContent()
 
         composeRule.onNodeWithText("新增凭证").assertIsDisplayed()
-        composeRule.onNodeWithText("Routin").assertIsDisplayed()
-        composeRule.onNodeWithText("火山方舟").assertIsDisplayed()
+        composeRule.onNodeWithTag("editor_provider_row", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("更换", useUnmergedTree = true).assertExists()
+        // 供应商列表只在打开 sheet 后出现
+        composeRule.onNodeWithTag("editor_provider_tile_routin", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithText("名称").assertIsDisplayed()
         composeRule.onNodeWithText("API Key（Bearer Token）", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("测试连接").assertIsDisplayed()
@@ -107,12 +112,23 @@ class CredentialEditorScreenTest {
     }
 
     @Test
-    fun switchingToVolcengineShowsAccessKeyPairFields() {
+    fun providerSheetListsAllProvidersAndSelectionChangesFields() {
         setContent()
 
-        composeRule.onNodeWithText("火山方舟").performClick()
+        composeRule.onNodeWithTag("editor_provider_row").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("editor_provider_sheet", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag("editor_provider_tile_volcengine", useUnmergedTree = true).assertExists()
+
+        // Robolectric 无法把触摸事件派发到 ModalBottomSheet 的 dialog 窗口，
+        // 直接调用语义点击动作来验证选择行为。
+        composeRule.onNodeWithTag("editor_provider_tile_volcengine")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        waitUntilVm { viewModel.state.value.providerId == ProviderId.Volcengine }
         composeRule.waitForIdle()
 
+        // Robolectric 不会销毁 ModalBottomSheet 的 dialog 语义节点，
+        // 因此用“选择后供应商行与字段已切换”证明选择生效且面板将要关闭。
         composeRule.onNodeWithText("Access Key ID").assertIsDisplayed()
         composeRule.onNodeWithText("Secret Access Key").assertIsDisplayed()
         composeRule.onNodeWithText("区域（默认 cn-beijing）").assertIsDisplayed()
@@ -175,6 +191,7 @@ class CredentialEditorScreenTest {
         waitUntilVm { viewModel.state.value.testResultMessage != null }
         composeRule.waitForIdle()
 
+        composeRule.onNodeWithTag("editor_test_result", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithText("凭证无效或没有该供应商权限", substring = true).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("测试失败仍可保存，失败原因不会丢失已填内容", substring = true).performScrollTo().assertIsDisplayed()
 
@@ -204,6 +221,8 @@ class CredentialEditorScreenTest {
         waitUntilVm { viewModel.state.value.testResultMessage != null }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithText("✓ 连接成功").assertIsDisplayed()
+        composeRule.onNodeWithTag("editor_test_result", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("连接成功", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("✓", substring = true).assertDoesNotExist()
     }
 }

@@ -1,8 +1,9 @@
 package ai.routin.mytoken.feature.home
 
 import ai.routin.mytoken.domain.model.ProviderId
-import kotlin.math.sqrt
+import java.io.File
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -25,18 +26,20 @@ class ProviderCatalogTest {
     }
 
     @Test
-    fun xiaomiAccentColorIsVisuallyDistinctFromCommandCode() {
-        val commandCode = ProviderCatalog.accentColor(ProviderId.CommandCode)
-        val xiaomi = ProviderCatalog.accentColor(ProviderId.Xiaomi)
-        val redDelta = commandCode.red - xiaomi.red
-        val greenDelta = commandCode.green - xiaomi.green
-        val blueDelta = commandCode.blue - xiaomi.blue
-        val distance = sqrt(
-            redDelta * redDelta +
-                greenDelta * greenDelta +
-                blueDelta * blueDelta
-        )
-
-        assertTrue("Command Code 和小米 MiMo 主题色过于接近", distance > 0.25)
+    fun accentColorIsRemovedFromCatalog() {
+        // 设计规范 P0：颜色只来自 token，供应商主题色已废弃（编译期即可发现引用）。
+        val source = sourceText("ProviderCatalog.kt")
+        assertFalse("ProviderCatalog 不应再提供 accentColor", source.contains("accentColor"))
     }
+
+}
+
+private fun sourceText(name: String): String {
+    val workingDir = File(System.getProperty("user.dir") ?: "/tmp")
+    val candidates = listOf(
+        workingDir.resolve("src/main/kotlin/ai/routin/mytoken/feature/home/$name"),
+        workingDir.resolve("android/feature-home/src/main/kotlin/ai/routin/mytoken/feature/home/$name"),
+    )
+    val file = candidates.firstOrNull(File::isFile) ?: throw AssertionError("找不到源文件：$name")
+    return file.readText()
 }

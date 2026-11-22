@@ -23,6 +23,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -49,20 +50,21 @@ class AndroidVisualRegressionTest {
 
     @Test
     fun 方案A材质契约只允许模态投影() {
-        assertEquals(MyTokenVisualPolicy.Material.WindowGlass, MyTokenVisualPolicy.materialFor(MyTokenVisualPolicy.SurfaceRole.Window))
+        assertEquals(MyTokenVisualPolicy.Material.Solid, MyTokenVisualPolicy.materialFor(MyTokenVisualPolicy.SurfaceRole.Window))
         assertEquals(MyTokenVisualPolicy.Material.Solid, MyTokenVisualPolicy.materialFor(MyTokenVisualPolicy.SurfaceRole.Card))
-        assertEquals(MyTokenVisualPolicy.Material.ModalGlass, MyTokenVisualPolicy.materialFor(MyTokenVisualPolicy.SurfaceRole.Modal))
+        assertEquals(MyTokenVisualPolicy.Material.Overlay, MyTokenVisualPolicy.materialFor(MyTokenVisualPolicy.SurfaceRole.Modal))
         assertFalse(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.Card))
         assertFalse(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.Window))
-        assertFalse(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.Modal))
+        assertTrue(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.Modal))
     }
 
     @Test
-    fun 方案A主题锁定品牌蓝与状态色() {
+    fun 方案A主题锁定报告黄与状态色() {
         var lightPrimary = Color.Unspecified
         var darkPrimary = Color.Unspecified
         var lightPositive = Color.Unspecified
         var darkDanger = Color.Unspecified
+        var darkOnPrimary = Color.Unspecified
 
         composeRule.setContent {
             MyTokenTheme(darkTheme = false) {
@@ -72,13 +74,15 @@ class AndroidVisualRegressionTest {
             MyTokenTheme(darkTheme = true) {
                 darkPrimary = MaterialTheme.colorScheme.primary
                 darkDanger = MaterialTheme.colorScheme.error
+                darkOnPrimary = MaterialTheme.colorScheme.onPrimary
             }
         }
 
-        assertEquals(0xFF2F6BFF.toInt(), lightPrimary.toArgb())
-        assertEquals(0xFF6E9DFF.toInt(), darkPrimary.toArgb())
-        assertEquals(0xFF2E9B77.toInt(), lightPositive.toArgb())
-        assertEquals(0xFFD25A60.toInt(), darkDanger.toArgb())
+        assertEquals(0xFFF3CB73.toInt(), lightPrimary.toArgb())
+        assertEquals(0xFFF3CB73.toInt(), darkPrimary.toArgb())
+        assertEquals(0xFF30C48D.toInt(), lightPositive.toArgb())
+        assertEquals(0xFFFF6369.toInt(), darkDanger.toArgb())
+        assertEquals(0xFF17181A.toInt(), darkOnPrimary.toArgb())
     }
 
     @Test
@@ -130,7 +134,9 @@ class AndroidVisualRegressionTest {
         }
 
         val resetText = formatResetTime(end)
-        composeRule.onNodeWithText("长周期套餐 · 到期 ${formatSubscriptionTime(expiry)}")
+        composeRule.onNodeWithText("长周期套餐").assertExists()
+        composeRule.onAllNodesWithText("后重置", substring = true, useUnmergedTree = true)
+            .onFirst()
             .assertExists()
         composeRule.onAllNodesWithText(resetText, useUnmergedTree = true)
             .fetchSemanticsNodes()
@@ -150,7 +156,7 @@ class AndroidVisualRegressionTest {
 
     @Test
     @Config(qualifiers = "w280dp-h1200dp")
-    fun 窄屏完整配额卡片保留窗口与辅助字段() {
+    fun 窄屏完整配额卡片保留窗口与重置信息() {
         val end = Instant.now().plus(Duration.ofHours(2))
         val credential = Credential(
             id = UUID.randomUUID(),
@@ -209,7 +215,7 @@ class AndroidVisualRegressionTest {
         }
 
         val root = composeRule.onRoot().getUnclippedBoundsInRoot()
-        listOf("5 小时用量", "本周用量", "模型调用").forEach { label ->
+        listOf("5 小时用量", "本周用量").forEach { label ->
             val bounds = composeRule.onNodeWithText(label).getUnclippedBoundsInRoot()
             assertTrue("$label should stay inside the card", bounds.left >= root.left)
             assertTrue("$label should stay inside the card", bounds.right <= root.right)

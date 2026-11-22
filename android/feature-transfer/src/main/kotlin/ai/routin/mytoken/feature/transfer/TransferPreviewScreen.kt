@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import ai.routin.mytoken.core.ui.GlassButton
-import ai.routin.mytoken.core.ui.GlassButtonTone
+import ai.routin.mytoken.core.ui.MyTokenButton
+import ai.routin.mytoken.core.ui.MyTokenButtonTone
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import androidx.compose.material3.ButtonDefaults
@@ -115,11 +115,11 @@ fun TransferPreviewScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
         ) {
-            GlassButton(onClick = onCancel, text = "取消")
-            GlassButton(onClick = { onConfirm(ImportConflictMode.SKIP) }, text = "跳过重复")
-            GlassButton(
+            MyTokenButton(onClick = onCancel, text = "取消")
+            MyTokenButton(onClick = { onConfirm(ImportConflictMode.SKIP) }, text = "跳过重复")
+            MyTokenButton(
                 onClick = { onConfirm(ImportConflictMode.OVERWRITE) },
-                tone = GlassButtonTone.Primary,
+                tone = MyTokenButtonTone.Primary,
                 text = "覆盖导入",
             )
         }
@@ -185,9 +185,9 @@ fun TransferCompletedScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
         )
-        GlassButton(
+        MyTokenButton(
             onClick = onDone,
-            tone = GlassButtonTone.Primary,
+            tone = MyTokenButtonTone.Primary,
             text = "完成",
         )
     }
