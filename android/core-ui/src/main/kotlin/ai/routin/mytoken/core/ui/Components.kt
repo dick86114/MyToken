@@ -33,7 +33,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -101,7 +100,7 @@ fun MyTokenButton(
             .background(toneColors.container)
             .clickable(
                 interactionSource = interactionSource,
-                indication = ripple(color = toneColors.base),
+                indication = null,
                 enabled = enabled,
                 onClick = onClick,
             )

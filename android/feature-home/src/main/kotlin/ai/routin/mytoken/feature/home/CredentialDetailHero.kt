@@ -16,9 +16,11 @@ import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import ai.routin.mytoken.domain.model.UsageMetricUnit
+import android.widget.Toast
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,11 +42,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineBreak
@@ -447,34 +451,39 @@ private fun DetailWindowRow(metric: UsageMetric) {
         }
         if (metric.resetCards.isNotEmpty()) {
             FlowRow(
-                modifier = Modifier.padding(top = 6.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text(
-                    text = "重置卡 ${metric.resetCards.size} 张",
-                    style = MyTokenType.caption,
-                    color = colors.muted,
-                    modifier = Modifier.align(Alignment.CenterVertically),
-                )
-                metric.resetCards.forEach { card ->
-                    Row(
+                metric.resetCards.forEachIndexed { index, card ->
+                    Column(
                         modifier = Modifier
-                            .testTag("detail_reset_chip")
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(colors.subtle)
-                            .border(1.dp, colors.line, RoundedCornerShape(6.dp))
-                            .padding(horizontal = 6.dp, vertical = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            .weight(1f)
+                            .background(colors.surface, MyTokenReportBodyShape)
+                            .border(1.dp, colors.line, MyTokenReportBodyShape)
+                            .padding(horizontal = 10.dp, vertical = 8.dp)
+                            .testTag("detail_reset_ticket"),
                     ) {
-                        ResetCardsGlyph(
-                            color = colors.muted,
-                            modifier = Modifier.size(width = 9.dp, height = 8.dp),
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            ResetCardsGlyph(
+                                color = colors.muted,
+                                modifier = Modifier.size(width = 9.dp, height = 8.dp),
+                            )
+                            Text(
+                                text = "重置卡 ${index + 1}",
+                                style = MyTokenType.caption,
+                                color = colors.muted,
+                            )
+                        }
                         Text(
                             text = formatResetCardCompact(card.expiresAt),
-                            style = MyTokenType.micro.copy(fontFamily = FontFamily.Monospace),
+                            modifier = Modifier.padding(top = 4.dp),
+                            style = MyTokenType.caption.copy(fontFamily = FontFamily.Monospace),
                             color = colors.ink,
                         )
                     }
@@ -643,6 +652,7 @@ private fun FactGrid(rows: List<Pair<String, String>>) {
 }
 
 /** 配置：官网链接、凭证类型与低额度预警值。 */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun DetailConfigSection(
     metadata: Map<CredentialMetadataKey, String>,
@@ -654,6 +664,8 @@ internal fun DetailConfigSection(
     if (metadata.isEmpty() && !showThreshold) return
     val colors = MyTokenThemeTokens.colors
     val uriHandler = LocalUriHandler.current
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
     MyTokenSection(
         title = "配置",
         modifier = Modifier.testTag("detail_config"),
@@ -685,9 +697,16 @@ internal fun DetailConfigSection(
                         modifier = Modifier
                             .weight(1f)
                             .testTag("detail_website_url")
-                            .clickable(role = Role.Button) {
-                                runCatching { uriHandler.openUri(value) }
-                            },
+                            .combinedClickable(
+                                role = Role.Button,
+                                onClick = {
+                                    runCatching { uriHandler.openUri(value) }
+                                },
+                                onLongClick = {
+                                    clipboard.setText(AnnotatedString(value))
+                                    Toast.makeText(context, "复制成功", Toast.LENGTH_SHORT).show()
+                                },
+                            ),
                     )
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.OpenInNew,

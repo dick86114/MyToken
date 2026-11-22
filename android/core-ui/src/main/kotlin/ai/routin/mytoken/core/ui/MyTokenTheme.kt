@@ -1,7 +1,10 @@
 package ai.routin.mytoken.core.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.IndicationNodeFactory
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.LocalOverscrollConfiguration
+import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -9,6 +12,10 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.node.DelegatableNode
+import androidx.compose.ui.node.DrawModifierNode
 
 private val LightColors = lightColorScheme(
     primary = MyTokenLightColors.actionFill,
@@ -67,6 +74,21 @@ private val DarkColors = darkColorScheme(
 /** 当前外观是否为深色；用于挑选需要反色的品牌资源。 */
 internal val LocalMyTokenDarkTheme = staticCompositionLocalOf { false }
 
+/** 全局空交互层：点击、长按都不再叠加灰色 ripple/阴影。 */
+private class NoIndicationNode : Modifier.Node(), DrawModifierNode {
+    override fun ContentDrawScope.draw() {
+        drawContent()
+    }
+}
+
+private object NoIndication : IndicationNodeFactory {
+    override fun create(interactionSource: InteractionSource): DelegatableNode = NoIndicationNode()
+
+    override fun equals(other: Any?): Boolean = other === this
+
+    override fun hashCode(): Int = -1
+}
+
 /** 固定使用 MyToken 的跨端品牌层级，避免动态取色破坏供应商语义色。 */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -83,6 +105,7 @@ fun MyTokenTheme(
         CompositionLocalProvider(
             LocalMyTokenColors provides tokens,
             LocalMyTokenDarkTheme provides darkTheme,
+            LocalIndication provides NoIndication,
             LocalOverscrollConfiguration provides null,
         ) {
             content()

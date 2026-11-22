@@ -383,7 +383,7 @@ class HomeScreenTest {
 
     @Test
     @Config(qualifiers = "w400dp-h900dp")
-    fun compactNewApiCardShowsOneMetricPerRow() {
+    fun compactNewApiCardUsesTwoColumnsWithoutTokenSuffix() {
         val credential = credential("New API 统计", ProviderId.NewAPI)
         val metrics = listOf(
             token("today-token", "今日 Token", 14_873_680.0),
@@ -402,22 +402,24 @@ class HomeScreenTest {
             }
         }
 
-        listOf("今日 Token", "近 24 小时 Token", "近 7 天 Token", "近 30 天 Token")
+        listOf("今日", "近 24 小时", "近 7 天", "近 30 天")
             .forEach { composeRule.onNodeWithText(it).assertIsDisplayed() }
+        listOf("今日 Token", "近 24 小时 Token", "近 7 天 Token", "近 30 天 Token")
+            .forEach { composeRule.onNodeWithText(it).assertDoesNotExist() }
         composeRule.onNodeWithText("14.87").assertIsDisplayed()
         composeRule.onNodeWithText("15.12").assertIsDisplayed()
         composeRule.onNodeWithText("139.74").assertIsDisplayed()
         composeRule.onNodeWithText("1.1").assertIsDisplayed()
 
-        val first = composeRule.onNodeWithText("今日 Token", useUnmergedTree = true)
+        val first = composeRule.onNodeWithText("今日", useUnmergedTree = true)
             .getUnclippedBoundsInRoot()
-        val second = composeRule.onNodeWithText("近 24 小时 Token", useUnmergedTree = true)
+        val second = composeRule.onNodeWithText("近 24 小时", useUnmergedTree = true)
             .getUnclippedBoundsInRoot()
-        val third = composeRule.onNodeWithText("近 7 天 Token", useUnmergedTree = true)
+        val third = composeRule.onNodeWithText("近 7 天", useUnmergedTree = true)
             .getUnclippedBoundsInRoot()
-        assertTrue("New API 简洁卡每个数据占一行，第二个指标应在下一行", second.top.value > first.top.value)
-        assertEquals("每行数据左对齐", first.left.value, second.left.value, 0.5f)
-        assertTrue(third.top.value > second.top.value)
+        assertEquals("New API 简洁卡恢复两列布局", first.top.value, second.top.value, 0.5f)
+        assertTrue("第二个指标应在右列", second.left.value > first.left.value)
+        assertTrue(third.top.value > first.top.value)
 
         val source = java.io.File(System.getProperty("user.dir"))
             .walkTopDown()
@@ -1675,6 +1677,7 @@ class HomeScreenTest {
         composeRule.onNodeWithText("现金 ¥10.00").assertIsDisplayed()
         composeRule.onNodeWithText("赠送 ¥2.50").assertIsDisplayed()
         composeRule.onNodeWithText("近 31 天").assertIsDisplayed()
+        composeRule.onNodeWithTag("usage_token_meter", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithText("按量计费").assertDoesNotExist()
         composeRule.onNodeWithText("¥2.00").assertIsDisplayed()
         composeRule.onNodeWithText("1,500").assertIsDisplayed()
@@ -1939,6 +1942,12 @@ class HomeScreenTest {
         composeRule.onNodeWithText("¥13.10").assertDoesNotExist()
         composeRule.onNodeWithText("RPM").assertIsDisplayed()
         composeRule.onNodeWithText("TPM").assertIsDisplayed()
+        val duration30 = composeRule.onNodeWithText("30 天", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val tpm = composeRule.onNodeWithText("TPM", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        assertEquals("TPM 应与右列事实左对齐", duration30.left.value, tpm.left.value, 1f)
+        assertTrue("TPM 应在 RPM 下方的右列", tpm.top.value > duration30.top.value)
         composeRule.onNodeWithText("42 次").assertIsDisplayed()
     }
 
@@ -2998,7 +3007,8 @@ class HomeScreenTest {
 
         repeat(2) {
             composeRule.onNodeWithTag("home_list_full").performTouchInput {
-                swipeDown(startY = height * 0.15f, endY = height * 0.85f, durationMillis = 300)
+                // 从卡片区起手；报告展开后屏幕顶部属于头部覆盖层。
+                swipeDown(startY = height * 0.45f, endY = height * 0.9f, durationMillis = 300)
             }
             composeRule.waitForIdle()
         }
@@ -3116,6 +3126,52 @@ class HomeScreenTest {
         assertTrue(
             "卡片回到顶部后继续下滑才展开报告，实际底部 ${restored.bottom.value}",
             restored.bottom.value > navBottom.value + 100f,
+        )
+    }
+
+    @Test
+    fun 下滑到卡片顶部时报告在同一次手势内跟随展开() {
+        val cards = (1..8).map { index ->
+            card(credential("跟随 $index"), metrics = listOf(progress(90.0, 100.0)))
+        }
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = cards,
+                        groups = emptyList(),
+                        credentialCount = cards.size,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        val navBottom = composeRule.onNodeWithTag("home_toolbar")
+            .getUnclippedBoundsInRoot()
+            .bottom
+        composeRule.onNodeWithTag("home_list_full").performTouchInput {
+            swipeUp(startY = height * 0.8f, endY = height * 0.15f, durationMillis = 300)
+        }
+        composeRule.waitForIdle()
+
+        // 一次快速回滑：卡片靠惯性回到顶部后，报告应紧接着在同一次手势里跟下来。
+        composeRule.onNodeWithTag("home_list_full").performTouchInput {
+            swipeDown(startY = height * 0.35f, endY = height * 0.75f, durationMillis = 60)
+        }
+        composeRule.waitForIdle()
+
+        val report = composeRule.onNodeWithTag("home_health_report")
+            .getUnclippedBoundsInRoot()
+        assertTrue(
+            "卡片回到顶部后报告应跟随展开，实际底部 ${report.bottom.value}",
+            report.bottom.value > navBottom.value + 20f,
         )
     }
 

@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -74,6 +75,69 @@ internal fun UsageSegmentMeter(
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(1.dp))
                     .background(if (index < litCells) litColor else colors.track),
+            )
+        }
+    }
+}
+
+internal data class UsageMeterSegment(
+    val weight: Double,
+    val color: Color,
+)
+
+/** 三段 Token 构成的分段条：与用量条共用 12 格硬件面板样式。 */
+@Composable
+internal fun UsageMultiSegmentMeter(
+    segments: List<UsageMeterSegment>,
+    modifier: Modifier = Modifier,
+    height: Dp = 11.dp,
+) {
+    val colors = MyTokenThemeTokens.colors
+    val motionEnabled = rememberMyTokenMotionEnabled()
+    val weights = segments.map { segment ->
+        animateFloatAsState(
+            targetValue = segment.weight.coerceAtLeast(0.0).toFloat(),
+            animationSpec = tween(
+                durationMillis = MyTokenMotion.ringDurationMillis(motionEnabled),
+            ),
+            label = "usageMultiSegmentMeter",
+        ).value
+    }
+    val total = weights.sum()
+    val cellColors = MutableList(SegmentCells) { colors.track }
+    if (total > 0f) {
+        var boundary = 0
+        var cumulative = 0f
+        weights.forEachIndexed { index, weight ->
+            cumulative += weight
+            val next = ((cumulative / total) * SegmentCells)
+                .roundToInt()
+                .coerceIn(boundary, SegmentCells)
+            for (cell in boundary until next) {
+                cellColors[cell] = segments[index].color
+            }
+            boundary = next
+        }
+    }
+    val shape = RoundedCornerShape(4.dp)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(height)
+            .clip(shape)
+            .background(colors.subtle)
+            .border(1.dp, colors.line, shape)
+            .padding(2.dp)
+            .testTag("usage_token_meter"),
+        horizontalArrangement = Arrangement.spacedBy(1.dp),
+    ) {
+        repeat(SegmentCells) { index ->
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(1.dp))
+                    .background(cellColors[index]),
             )
         }
     }

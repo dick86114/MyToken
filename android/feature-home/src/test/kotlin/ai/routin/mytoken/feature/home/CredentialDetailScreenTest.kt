@@ -1,6 +1,8 @@
 package ai.routin.mytoken.feature.home
 
 import ai.routin.mytoken.core.ui.MyTokenTheme
+import android.content.ClipboardManager
+import android.content.Context
 import ai.routin.mytoken.domain.model.AppError
 import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.model.CredentialKind
@@ -20,6 +22,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -30,6 +33,8 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
+import androidx.test.core.app.ApplicationProvider
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.style.TextOverflow
 import java.math.BigDecimal
@@ -44,6 +49,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowToast
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "w400dp-h1100dp")
@@ -368,7 +374,7 @@ class CredentialDetailScreenTest {
     }
 
     @Test
-    fun detailWindowsShowResetCardsAsCompactChips() {
+    fun detailWindowsShowResetCardsAsTickets() {
         val first = Instant.parse("2026-12-01T08:00:00Z")
         val second = Instant.parse("2026-12-15T08:00:00Z")
         val metric = progress("five-hour").copy(
@@ -388,9 +394,12 @@ class CredentialDetailScreenTest {
             }
         }
 
-        val chips = composeRule.onAllNodesWithTag("detail_reset_chip", useUnmergedTree = true)
+        val tickets = composeRule.onAllNodesWithTag("detail_reset_ticket", useUnmergedTree = true)
             .fetchSemanticsNodes()
-        assertEquals("重置卡应按到期日拆成日期 chip", 2, chips.size)
+        assertEquals("重置卡应按张数拆成票据", 2, tickets.size)
+        listOf("重置卡 1", "重置卡 2").forEach { label ->
+            composeRule.onNodeWithText(label, useUnmergedTree = true).assertExists()
+        }
         composeRule.onNodeWithText(formatResetCardCompact(first), useUnmergedTree = true)
             .assertExists()
         composeRule.onNodeWithText("重置卡 2 张 ·", substring = true, useUnmergedTree = true)
@@ -466,6 +475,40 @@ class CredentialDetailScreenTest {
         composeRule.onNodeWithContentDescription("复制模型 ID glm-5.3-air")
             .performScrollTo()
             .assertIsDisplayed()
+    }
+
+    @Test
+    fun detailWebsiteLongPressCopiesUrlAndToasts() {
+        val url = "https://example.com/console"
+        val credential = credential(
+            metadata = mapOf(CredentialMetadataKey.WebsiteURL to url),
+        )
+
+        composeRule.setContent {
+            MyTokenTheme {
+                CredentialDetailScreen(
+                    card = card(credential = credential),
+                    onBack = {},
+                    onRefresh = {},
+                    onEdit = {},
+                    onDelete = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("detail_website_url", useUnmergedTree = true)
+            .performScrollTo()
+            .performTouchInput { longClick() }
+        composeRule.waitForIdle()
+
+        assertEquals("复制成功", ShadowToast.getTextOfLatestToast())
+        val clipboard = ApplicationProvider.getApplicationContext<Context>()
+            .getSystemService(ClipboardManager::class.java)
+        assertEquals(
+            "长按应复制完整官网地址",
+            url,
+            clipboard.primaryClip?.getItemAt(0)?.text?.toString(),
+        )
     }
 
     @Test

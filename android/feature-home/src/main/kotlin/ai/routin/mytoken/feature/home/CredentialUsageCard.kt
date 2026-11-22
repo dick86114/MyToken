@@ -218,8 +218,12 @@ private fun CompactUsageCardBody(card: CredentialCardUi, health: UsageCardHealth
         )
 
         CompactUsageArrangement.ValueTiles -> CompactValueGrid(
-            metrics = metrics,
-            singleColumn = card.credential.providerId == ProviderId.NewAPI,
+            metrics = if (card.credential.providerId == ProviderId.NewAPI) {
+                // 简洁卡只保留周期区分文案，Token 单位由数值本身表达。
+                metrics.map { it.copy(label = it.label.removeSuffix(" Token")) }
+            } else {
+                metrics
+            },
         )
     }
 }
@@ -374,18 +378,14 @@ private fun CompactBalanceLayout(
 }
 
 @Composable
-private fun CompactValueGrid(
-    metrics: List<UsageMetric>,
-    singleColumn: Boolean = false,
-) {
-    val columns = if (singleColumn) 1 else 2
+private fun CompactValueGrid(metrics: List<UsageMetric>) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 2.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        metrics.chunked(columns).forEach { rowMetrics ->
+        metrics.chunked(2).forEach { rowMetrics ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -394,7 +394,7 @@ private fun CompactValueGrid(
                 rowMetrics.forEach { metric ->
                     CompactValueCell(metric = metric, modifier = Modifier.weight(1f))
                 }
-                repeat(columns - rowMetrics.size) { Spacer(modifier = Modifier.weight(1f)) }
+                repeat(2 - rowMetrics.size) { Spacer(modifier = Modifier.weight(1f)) }
             }
         }
     }

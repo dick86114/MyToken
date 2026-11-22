@@ -64,6 +64,29 @@ class MyTokenComponentsTest {
     }
 
     @Test
+    fun themeRemovesPressIndication() {
+        fun source(name: String): String = File(System.getProperty("user.dir"))
+            .walkTopDown()
+            .first { it.name == name }
+            .readText()
+
+        val theme = source("MyTokenTheme.kt")
+        val components = source("Components.kt")
+        assertTrue(
+            "主题应全局关闭点击灰色交互层",
+            theme.contains("LocalIndication provides NoIndication"),
+        )
+        assertFalse(
+            "按钮不再使用 ripple 交互层",
+            components.contains("indication = ripple("),
+        )
+        assertTrue(
+            "按钮点击指示改为空",
+            components.contains("indication = null"),
+        )
+    }
+
+    @Test
     fun primaryButtonUsesDarkInkOnAmberFill() {
         val source = File(System.getProperty("user.dir"))
             .walkTopDown()

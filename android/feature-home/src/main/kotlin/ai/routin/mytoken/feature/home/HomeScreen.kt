@@ -230,9 +230,9 @@ fun HomeScreen(
                     dismissPullIndicator()
                     return Offset.Zero
                 }
-                // 下滑时先把卡片滚回顶部，再继续展开报告；避免列表还在中间时
-                // 一小段回滑就把整块报告拉出来。
                 if (collapsedPx > 0f && activePageAtTop()) {
+                    // 列表已在顶部：下拉位移先用于展开报告，并消费掉这部分
+                    // 位移，避免列表再叠加一层灰色 overscroll 拉伸。
                     val expand = min(available.y, collapsedPx)
                     collapsedPx -= expand
                     return Offset(0f, expand)
@@ -252,10 +252,16 @@ fun HomeScreen(
                 source: NestedScrollSource,
             ): Offset {
                 val max = headerHeightPx.toFloat()
-                // 上滑时头部跟随卡片收起；下滑展开交给 onPreScroll，
-                // 只有列表确实回到顶部后才消费手势。
                 if (max > 0f && consumed.y < 0f) {
+                    // 上滑时头部跟随卡片收起。
                     collapsedPx = (collapsedPx - consumed.y).coerceIn(0f, max)
+                    return Offset.Zero
+                }
+                if (collapsedPx > 0f && available.y > 0f && activePageAtTop()) {
+                    // 卡片刚好回到顶部的同一次手势：剩余位移继续展开报告。
+                    val expand = min(available.y, collapsedPx)
+                    collapsedPx -= expand
+                    return Offset(0f, expand)
                 }
                 return Offset.Zero
             }

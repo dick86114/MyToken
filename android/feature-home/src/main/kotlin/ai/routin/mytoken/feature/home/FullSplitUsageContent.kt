@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -27,7 +26,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -398,7 +396,7 @@ private fun FullFactsGrid(facts: List<SplitFact>) {
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        facts.chunked(2).take(2).forEach { rowFacts ->
+        facts.chunked(2).take(3).forEach { rowFacts ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -424,7 +422,7 @@ private fun FullFactsGrid(facts: List<SplitFact>) {
                 repeat(2 - rowFacts.size) { Spacer(modifier = Modifier.weight(1f)) }
             }
         }
-        val rest = facts.drop(4)
+        val rest = facts.drop(6)
         if (rest.isNotEmpty()) {
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
@@ -669,7 +667,6 @@ private fun FullXiaomiUsage(
     val inputValue = inputTokens?.value ?: BigDecimal.ZERO
     val outputValue = outputTokens?.value ?: BigDecimal.ZERO
     val cacheValue = cacheTokens?.value ?: BigDecimal.ZERO
-    val tokenTotal = inputValue + outputValue + cacheValue
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
@@ -731,42 +728,15 @@ private fun FullXiaomiUsage(
                 }
             }
         }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 6.dp)
-                .height(4.dp)
-                .clip(CircleShape)
-                .background(colors.track),
-        ) {
-            if (tokenTotal.signum() > 0) {
-                val total = tokenTotal.toDouble()
-                if (inputValue.signum() > 0) {
-                    Box(
-                        modifier = Modifier
-                            .weight((inputValue.toDouble() / total).toFloat())
-                            .height(4.dp)
-                            .background(colors.cat1),
-                    )
-                }
-                if (outputValue.signum() > 0) {
-                    Box(
-                        modifier = Modifier
-                            .weight((outputValue.toDouble() / total).toFloat())
-                            .height(4.dp)
-                            .background(colors.cat2),
-                    )
-                }
-                if (cacheValue.signum() > 0) {
-                    Box(
-                        modifier = Modifier
-                            .weight((cacheValue.toDouble() / total).toFloat())
-                            .height(4.dp)
-                            .background(colors.cat3),
-                    )
-                }
-            }
-        }
+        UsageMultiSegmentMeter(
+            segments = listOf(
+                UsageMeterSegment(inputValue.toDouble(), colors.cat1),
+                UsageMeterSegment(outputValue.toDouble(), colors.cat2),
+                UsageMeterSegment(cacheValue.toDouble(), colors.cat3),
+            ),
+            modifier = Modifier.padding(top = 6.dp),
+            height = 11.dp,
+        )
         FlowRow(
             modifier = Modifier
                 .fillMaxWidth()
