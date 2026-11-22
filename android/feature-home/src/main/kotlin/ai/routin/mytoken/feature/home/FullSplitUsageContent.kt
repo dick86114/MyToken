@@ -1,7 +1,5 @@
 package ai.routin.mytoken.feature.home
 
-import ai.routin.mytoken.core.ui.MyTokenStatus
-import ai.routin.mytoken.core.ui.MyTokenStatusTone
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.domain.model.CredentialMetadataKey
@@ -23,7 +21,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,7 +35,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.sp
 import java.math.BigDecimal
 import java.time.Instant
 
@@ -54,11 +50,6 @@ private data class SplitCurrencyGroup(
     val balance: UsageMetric,
     val toppedUp: UsageMetric?,
     val granted: UsageMetric?,
-)
-
-private data class SplitAccountStatus(
-    val text: String,
-    val healthy: Boolean?,
 )
 
 @Composable
@@ -95,7 +86,6 @@ internal fun FullSplitUsageContent(
                 ),
                 leftLabel = primary?.let(::commandCodeWindowLabel) ?: "当前额度",
                 labelFormatter = ::commandCodeWindowLabel,
-                bottom = { FullCommandCodeSummary(byId) },
             )
         }
 
@@ -105,9 +95,6 @@ internal fun FullSplitUsageContent(
                 leftLabel = "Token 套餐",
                 endLabel = "有效期至",
                 endOverride = card.snapshot?.subscriptionEndAt,
-                remainingFormatter = { metric ->
-                    "${formatCompact(metric.remaining)} tokens"
-                },
                 facts = tokenPackFacts(byId["token"], card),
             )
         }
@@ -117,9 +104,6 @@ internal fun FullSplitUsageContent(
                 primary = byId["plan-total"],
                 leftLabel = "套餐",
                 endLabel = "到期",
-                remainingFormatter = { metric ->
-                    "${formatGrouped(metric.remaining)} credits"
-                },
                 facts = mimoPlanFacts(byId["plan-total"], metrics, card),
             )
         }
@@ -131,7 +115,6 @@ internal fun FullSplitUsageContent(
                 secondary = listOfNotNull(
                     byId["weekly"]?.takeIf { it.id != primary?.id },
                 ),
-                facts = glmFacts(byId),
                 leftLabel = primary?.let(::windowLabel) ?: "当前用量",
             )
         }
@@ -159,7 +142,6 @@ internal fun FullSplitUsageContent(
                 primary = ordered.firstOrNull(),
                 secondary = ordered.drop(1),
                 leftLabel = ordered.firstOrNull()?.let(::quotaWindowLabel) ?: "当前额度",
-                facts = openCodeFacts(card),
             )
         }
 
@@ -172,7 +154,6 @@ internal fun FullSplitUsageContent(
                 primary = ordered.firstOrNull(),
                 secondary = ordered.drop(1),
                 leftLabel = ordered.firstOrNull()?.let(::quotaWindowLabel) ?: "当前额度",
-                facts = routinFacts(card, byId),
             )
         }
 
@@ -226,43 +207,45 @@ private fun FullSplitLayout(
 private fun FullQuotaSplit(
     primary: UsageMetric?,
     secondary: List<UsageMetric>,
-    facts: List<SplitFact> = emptyList(),
     leftLabel: String,
     endLabel: String = "重置",
     labelFormatter: (UsageMetric) -> String = ::windowLabel,
-    bottom: (@Composable () -> Unit)? = null,
 ) {
     if (primary == null) {
         EmptyUsageText()
         return
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        FullSplitLayout(
-            left = {
-                FullQuotaFocus(
-                    metric = primary,
-                    label = leftLabel,
-                    endLabel = endLabel,
-                )
-            },
-            right = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    secondary.forEach { metric ->
-                        FullWindowRow(
-                            metric = metric,
-                            endLabel = endLabel,
-                            labelFormatter = labelFormatter,
-                        )
-                    }
-                    if (facts.isNotEmpty()) {
-                        FullFacts(facts = facts, topPadding = if (secondary.isEmpty()) 0.dp else 8.dp)
-                    }
-                }
-            },
+    if (secondary.isEmpty()) {
+        // 只有单一窗口时不再留空右栏，仪表居中铺满卡片。
+        FullHeroFocus(
+            metric = primary,
+            label = leftLabel,
+            endLabel = endLabel,
         )
-        bottom?.invoke()
+        return
     }
+
+    FullSplitLayout(
+        left = {
+            FullHeroFocus(
+                metric = primary,
+                label = leftLabel,
+                endLabel = endLabel,
+            )
+        },
+        right = {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                secondary.forEach { metric ->
+                    FullPeriodRow(
+                        metric = metric,
+                        endLabel = endLabel,
+                        labelFormatter = labelFormatter,
+                    )
+                }
+            }
+        },
+    )
 }
 
 @Composable
@@ -270,7 +253,6 @@ private fun FullPackSplit(
     primary: UsageMetric?,
     leftLabel: String,
     endLabel: String,
-    remainingFormatter: (UsageMetric) -> String,
     facts: List<SplitFact>,
     endOverride: Instant? = null,
 ) {
@@ -281,100 +263,41 @@ private fun FullPackSplit(
 
     FullSplitLayout(
         left = {
-            FullQuotaFocus(
+            FullHeroFocus(
                 metric = primary,
                 label = leftLabel,
                 endLabel = endLabel,
                 endOverride = endOverride,
-                remainingFormatter = remainingFormatter,
             )
         },
         right = {
-            FullFacts(facts = facts, topPadding = 0.dp)
+            FullFactsGrid(facts = facts)
         },
     )
 }
 
+/** 完整卡主指标：标签 + 重置卡 chip 一行，仪表居中，下方只保留重置/到期文案。 */
 @Composable
-private fun FullQuotaFocus(
+private fun FullHeroFocus(
     metric: UsageMetric,
     label: String,
     endLabel: String,
     endOverride: Instant? = null,
-    remainingFormatter: (UsageMetric) -> String = ::formatRemaining,
     note: String? = null,
 ) {
     val colors = MyTokenThemeTokens.colors
     val percent = progressPercent(metric)
     val tone = splitTone(metric, percent)
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = label,
-            style = MyTokenType.caption,
-            color = colors.muted,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        // 设计稿：重置卡 chip 换行到主指标标签下方，与标签左对齐。
-        if (metric.resetCards.isNotEmpty()) {
-            ResetCardsBadge(
-                metric = metric,
-                style = ResetCardsBadgeStyle.Detail,
-                modifier = Modifier.padding(top = 4.dp),
-            )
-        }
-        UsageArcGauge(
-            percent = percent,
-            tone = when (tone) {
-                SplitTone.Warning -> UsageMetricTone.Warning
-                SplitTone.Critical -> UsageMetricTone.Critical
-                SplitTone.Normal -> UsageMetricTone.Normal
-            },
-            diameter = 64.dp,
-            modifier = Modifier
-                .padding(top = 7.dp)
-                .testTag("full_ring_primary"),
-        )
-        Text(
-            text = "剩余 ${remainingFormatter(metric)}",
-            modifier = Modifier.padding(top = 6.dp),
-            style = MyTokenType.caption,
-            color = colors.muted,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = note ?: quotaEndText(metric.windowEnd ?: endOverride, endLabel) ?: "—",
-            modifier = Modifier.padding(top = 1.dp),
-            style = MyTokenType.caption,
-            color = colors.muted,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-@Composable
-private fun FullWindowRow(
-    metric: UsageMetric,
-    endLabel: String,
-    labelFormatter: (UsageMetric) -> String,
-) {
-    val colors = MyTokenThemeTokens.colors
-    val percent = progressPercent(metric)
-    val tone = splitTone(metric, percent)
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 14.dp),
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
-                text = labelFormatter(metric),
+                text = label,
                 style = MyTokenType.caption,
                 color = colors.muted,
                 maxLines = 1,
@@ -383,7 +306,51 @@ private fun FullWindowRow(
             if (metric.resetCards.isNotEmpty()) {
                 ResetCardsBadge(metric = metric, style = ResetCardsBadgeStyle.Detail)
             }
-            Spacer(modifier = Modifier.weight(1f))
+        }
+        UsageArcGauge(
+            percent = percent,
+            tone = splitToneUsageTone(tone),
+            diameter = 64.dp,
+            modifier = Modifier
+                .padding(top = 8.dp)
+                .testTag("full_ring_primary"),
+        )
+        Text(
+            text = note ?: quotaEndText(metric.windowEnd ?: endOverride, endLabel) ?: "—",
+            modifier = Modifier.padding(top = 4.dp),
+            style = MyTokenType.caption,
+            color = colors.muted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+/** 完整卡周期行：标签 + 百分比，分段仪表，重置文案。 */
+@Composable
+private fun FullPeriodRow(
+    metric: UsageMetric,
+    endLabel: String,
+    labelFormatter: (UsageMetric) -> String,
+) {
+    val colors = MyTokenThemeTokens.colors
+    val percent = progressPercent(metric)
+    val tone = splitTone(metric, percent)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = labelFormatter(metric),
+                modifier = Modifier.weight(1f),
+                style = MyTokenType.caption,
+                color = colors.muted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             Text(
                 text = formatPercent(percent),
                 style = MyTokenType.label.copy(fontWeight = FontWeight(650)),
@@ -395,185 +362,83 @@ private fun FullWindowRow(
                 maxLines = 1,
             )
         }
-        UsageProgressBar(
+        UsageSegmentMeter(
             percent = percent,
-            color = splitToneColor(tone),
-            modifier = Modifier.padding(top = 5.dp),
-            height = 3.dp,
+            tone = splitToneUsageTone(tone),
+            modifier = Modifier.padding(top = 6.dp),
+            height = 11.dp,
         )
-    }
-}
-
-@Composable
-private fun FullFacts(
-    facts: List<SplitFact>,
-    topPadding: androidx.compose.ui.unit.Dp,
-) {
-    val colors = MyTokenThemeTokens.colors
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = topPadding),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        facts.forEach { fact ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Top,
-            ) {
-                Text(
-                    text = fact.label,
-                    style = MyTokenType.caption,
-                    color = colors.muted,
-                    maxLines = 1,
-                )
-                Spacer(modifier = Modifier.width(7.dp))
-                Text(
-                    text = fact.value,
-                    modifier = Modifier.weight(1f),
-                    style = MyTokenType.caption,
-                    color = if (fact.positive) colors.positiveText else colors.ink,
-                    textAlign = TextAlign.End,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+        quotaEndText(metric.windowEnd, endLabel)?.let { resetText ->
+            Text(
+                text = resetText,
+                modifier = Modifier.padding(top = 3.dp),
+                style = MyTokenType.caption,
+                color = colors.muted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
 
+/** 事实网格：前 4 项两列，其余收进一行，对应设计稿的 facts-grid / facts-line。 */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun FullCommandCodeSummary(byId: Map<String, UsageMetric>) {
+private fun FullFactsGrid(facts: List<SplitFact>) {
     val colors = MyTokenThemeTokens.colors
-    val composition = listOfNotNull(
-        byId["monthly-remaining"]?.let { Triple("月度", it.value, it.currencyCode) },
-        byId["purchased-remaining"]?.let { Triple("购买", it.value, it.currencyCode) },
-        byId["free-remaining"]?.let { Triple("赠送", it.value, it.currencyCode) },
-    )
-    val periodSpent = byId["period-spent"]
-    val requests = byId["request-count"]
-    if (composition.isEmpty() && periodSpent == null && requests == null) return
-    val total = composition.fold(BigDecimal.ZERO) { acc, item -> acc + (item.second ?: BigDecimal.ZERO) }
-    // 额度构成：月度用墨色（重置余额），赠送用行动黄，购买保持中性灰。
-    val tints = listOf(colors.ink, colors.cat2, colors.actionFill)
-
     Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (composition.isNotEmpty()) {
+        facts.chunked(2).take(2).forEach { rowFacts ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(text = "额度构成", style = MyTokenType.caption, color = colors.muted)
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = "余额 ${formatCurrency(total, composition.first().third)}",
-                    style = MyTokenType.caption.copy(fontWeight = FontWeight(650)),
-                    color = colors.ink,
-                )
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(5.dp)
-                    .clip(CircleShape)
-                    .background(colors.track),
-            ) {
-                if (total.signum() > 0) {
-                    composition.forEachIndexed { index, item ->
-                        val weight = (item.second ?: BigDecimal.ZERO).toDouble() / total.toDouble()
-                        if (weight > 0.0) {
-                            Box(
-                                modifier = Modifier
-                                    .weight(weight.toFloat())
-                                    .height(5.dp)
-                                    .background(tints[index]),
-                            )
-                        }
-                    }
-                }
-            }
-            FlowRow(
-                modifier = Modifier.padding(top = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                composition.forEachIndexed { index, item ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(5.dp)
-                                .background(tints[index], CircleShape),
-                        )
+                rowFacts.forEach { fact ->
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "${item.first} ${formatCurrency(item.second, item.third)}",
+                            text = fact.label,
                             style = MyTokenType.caption,
                             color = colors.muted,
                             maxLines = 1,
                         )
+                        Text(
+                            text = fact.value,
+                            modifier = Modifier.padding(top = 2.dp),
+                            style = MyTokenType.label,
+                            color = if (fact.positive) colors.positiveText else colors.ink,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                repeat(2 - rowFacts.size) { Spacer(modifier = Modifier.weight(1f)) }
+            }
+        }
+        val rest = facts.drop(4)
+        if (rest.isNotEmpty()) {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                rest.forEach { fact ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = fact.label,
+                            style = MyTokenType.caption,
+                            color = colors.muted,
+                        )
+                        Text(
+                            text = fact.value,
+                            style = MyTokenType.caption.copy(fontWeight = FontWeight.SemiBold),
+                            color = if (fact.positive) colors.positiveText else colors.ink,
+                        )
                     }
                 }
             }
         }
-        if (periodSpent != null || requests != null) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(text = "累计请求", style = MyTokenType.caption, color = colors.muted)
-                    Text(
-                        text = requests?.let { "${formatCompact(it.value)} 次" } ?: "-",
-                        style = MyTokenType.caption.copy(fontWeight = FontWeight(650)),
-                        color = colors.ink,
-                    )
-                }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(text = "本周期消费", style = MyTokenType.caption, color = colors.muted)
-                    Text(
-                        text = periodSpent?.let { formatCurrency(it.value, it.currencyCode) } ?: "-",
-                        style = MyTokenType.caption.copy(fontWeight = FontWeight(650)),
-                        color = colors.ink,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CommandCodeSummaryValue(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier,
-    alignEnd: Boolean = false,
-) {
-    val colors = MyTokenThemeTokens.colors
-    Column(
-        modifier = modifier,
-        horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start,
-    ) {
-        Text(
-            text = label,
-            style = MyTokenType.caption,
-            color = colors.muted,
-        )
-        Text(
-            text = value,
-            modifier = Modifier.padding(top = 1.dp),
-            style = MyTokenType.caption,
-            fontWeight = FontWeight.SemiBold,
-            color = colors.ink,
-            maxLines = 1,
-        )
     }
 }
 
@@ -594,13 +459,6 @@ private fun FullDeepSeekBalance(
             group = primary,
             primaryLabel = "充值",
             secondaryLabel = "赠金",
-            status = balanceAccountStatus(card, metrics),
-            modelsText = modelCountText(card),
-            facts = listOf(
-                "账户状态" to (card.snapshot?.statusText?.trim()?.removePrefix("账户")?.ifBlank { "可用" } ?: "可用"),
-                "可用模型" to modelCountText(card),
-                "计费方式" to "按量",
-            ),
         )
         groups.drop(1).forEach { group ->
             FullSecondaryBalance(group = group, modifier = Modifier.padding(top = 24.dp))
@@ -630,13 +488,6 @@ private fun FullXiaomiApiBalance(
             ),
             primaryLabel = "现金",
             secondaryLabel = "赠送",
-            status = balanceAccountStatus(card, metrics),
-            modelsText = modelCountText(card),
-            facts = listOf(
-                "账户状态" to (card.snapshot?.statusText?.trim()?.removePrefix("账户")?.ifBlank { "可用" } ?: "可用"),
-                "可用模型" to modelCountText(card),
-                "计费方式" to "按量",
-            ),
         )
         FullXiaomiUsage(metrics = metrics)
     }
@@ -648,9 +499,6 @@ private fun FullBalanceHero(
     group: SplitCurrencyGroup,
     primaryLabel: String,
     secondaryLabel: String,
-    status: SplitAccountStatus,
-    modelsText: String,
-    facts: List<Pair<String, String>> = emptyList(),
 ) {
     val colors = MyTokenThemeTokens.colors
     val currency = group.balance.currencyCode?.trim()?.uppercase().orEmpty()
@@ -665,22 +513,14 @@ private fun FullBalanceHero(
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
+        Text(
+            text = title,
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = title,
-                modifier = Modifier.weight(1f),
-                style = MyTokenType.caption,
-                color = colors.muted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (status.healthy == false) {
-                FullAccountStatus(status = status)
-            }
-        }
+            style = MyTokenType.caption,
+            color = colors.muted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
         Text(
             text = formatCurrency(group.balance.value, group.balance.currencyCode),
             modifier = Modifier.padding(top = 8.dp),
@@ -742,26 +582,6 @@ private fun FullBalanceHero(
                 currencyCode = group.balance.currencyCode,
                 color = colors.actionFill,
             )
-        }
-        if (facts.isNotEmpty()) {
-            FlowRow(
-                modifier = Modifier
-                    .padding(top = 12.dp)
-                    .testTag("full_balance_facts"),
-                horizontalArrangement = Arrangement.spacedBy(18.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                facts.forEach { (label, value) ->
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(text = label, style = MyTokenType.caption, color = colors.muted)
-                        Text(
-                            text = value,
-                            style = MyTokenType.caption.copy(fontWeight = FontWeight.SemiBold),
-                            color = colors.ink,
-                        )
-                    }
-                }
-            }
         }
     }
 }
@@ -1020,172 +840,32 @@ private fun FullNewApiSplit(metrics: List<UsageMetric>) {
         return
     }
 
-    val windows = listOf(
-        "今日" to ("today-token" to "today-token-cost"),
-        "近 24 小时" to ("one-day-token" to "one-day-token-cost"),
-        "近 7 天" to ("seven-day-token" to "seven-day-token-cost"),
-        "近 30 天" to ("thirty-day-token" to "thirty-day-token-cost"),
-    )
-
-    Column {
-        FullSplitLayout(
-            left = {
-                FullQuotaFocus(
-                    metric = primary,
-                    label = "账户额度",
-                    endLabel = "重置",
-                    note = "不自动重置",
-                )
-            },
-            right = {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    windows.forEach { (label, ids) ->
-                        val tokens = byId[ids.first]
-                        val cost = byId[ids.second]
-                        FullNewApiWindowRow(
-                            label = label,
-                            tokens = tokens,
-                            cost = cost,
-                        )
-                    }
-                }
-            },
-        )
-        FullRealtimeLine(
-            items = listOfNotNull(
-                byId["rpm"]?.let { "RPM" to formatGrouped(it.value) },
-                byId["tpm"]?.let { "TPM" to formatGrouped(it.value) },
-                byId["request-count"]?.let {
-                    "累计请求" to "${formatCompact(it.value)} 次"
-                },
-            ),
-        )
-    }
-}
-
-@Composable
-private fun FullNewApiWindowRow(
-    label: String,
-    tokens: UsageMetric?,
-    cost: UsageMetric?,
-) {
-    val colors = MyTokenThemeTokens.colors
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = label,
-            modifier = Modifier.width(64.dp),
-            style = MyTokenType.caption,
-            color = colors.muted,
-            maxLines = 1,
-        )
-        Text(
-            text = tokens?.value?.let { "${formatCompact(it)} tokens" } ?: "-",
-            modifier = Modifier.weight(1f),
-            style = MyTokenType.label,
-            color = colors.ink,
-            maxLines = 1,
-        )
-        Text(
-            text = cost?.let { formatCurrency(it.value, it.currencyCode) } ?: "-",
-            style = MyTokenType.caption,
-            color = colors.muted,
-            maxLines = 1,
-        )
-    }
-}
-
-@Composable
-private fun FullRealtimeLine(items: List<Pair<String, String>>) {
-    if (items.isEmpty()) return
-    val colors = MyTokenThemeTokens.colors
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        items.forEachIndexed { index, item ->
-            if (index > 0) {
-                Box(
-                    modifier = Modifier
-                        .width(1.dp)
-                        .height(13.dp)
-                        .background(colors.line),
-                )
-            }
-            Row(
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = item.first,
-                    style = MyTokenType.micro,
-                    color = colors.muted,
-                )
-                Spacer(modifier = Modifier.width(3.dp))
-                Text(
-                    text = item.second,
-                    style = MyTokenType.label,
-                    color = colors.ink,
-                    maxLines = 1,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun FullAccountStatus(status: SplitAccountStatus) {
-    MyTokenStatus(
-        text = status.text,
-        tone = when (status.healthy) {
-            true -> MyTokenStatusTone.Neutral
-            false -> MyTokenStatusTone.Critical
-            null -> MyTokenStatusTone.Neutral
+    FullSplitLayout(
+        left = {
+            FullHeroFocus(
+                metric = primary,
+                label = "账户额度",
+                endLabel = "重置",
+                note = "不自动重置",
+            )
+        },
+        right = {
+            FullFactsGrid(facts = newApiFacts(byId))
         },
     )
 }
 
-private fun openCodeFacts(card: CredentialCardUi): List<SplitFact> = buildList {
-    card.snapshot?.billingMode?.let { add(SplitFact("续费", it)) }
-    card.snapshot?.subscriptionEndAt?.let {
-        add(SplitFact("到期", formatSubscriptionTime(it).substringBefore(' ')))
+private fun newApiFacts(byId: Map<String, UsageMetric>): List<SplitFact> = buildList {
+    fun tokenFact(id: String, label: String) {
+        byId[id]?.let { add(SplitFact(label, "${formatCompact(it.value)} tokens")) }
     }
-}
-
-private fun routinFacts(card: CredentialCardUi, byId: Map<String, UsageMetric>): List<SplitFact> = buildList {
-    byId["token"]?.let { token ->
-        add(
-            SplitFact(
-                "Token 包",
-                "${formatCompact(token.remaining)} / ${formatCompact(token.limit)}",
-            ),
-        )
-    }
-    card.snapshot?.subscriptionEndAt?.let {
-        add(SplitFact("到期", formatSubscriptionTime(it).substringBefore(' ')))
-    }
-}
-
-private fun glmFacts(byId: Map<String, UsageMetric>): List<SplitFact> = buildList {
-    byId["model-calls"]?.let {
-        add(SplitFact("模型调用", "${formatCompact(it.value)} 次"))
-    }
-    byId["zcode-mcp"]?.let {
-        add(
-            SplitFact(
-                "MCP 调用",
-                "${formatGrouped(it.used ?: it.value)} / ${formatGrouped(it.limit)}",
-            ),
-        )
-    }
-    byId["activity-total-tokens"]?.let {
-        add(SplitFact("累计 Tokens", formatCompact(it.value)))
-    }
+    tokenFact("today-token", "今日 Token")
+    tokenFact("one-day-token", "24 小时")
+    tokenFact("seven-day-token", "7 天")
+    tokenFact("thirty-day-token", "30 天")
+    byId["rpm"]?.let { add(SplitFact("RPM", formatGrouped(it.value))) }
+    byId["tpm"]?.let { add(SplitFact("TPM", formatGrouped(it.value))) }
+    byId["request-count"]?.let { add(SplitFact("累计请求", "${formatCompact(it.value)} 次")) }
 }
 
 private fun tokenPackFacts(
@@ -1252,40 +932,11 @@ private fun deepSeekCurrencyGroups(metrics: List<UsageMetric>): List<SplitCurren
     }
 }
 
-private fun modelCountText(card: CredentialCardUi): String =
-    card.snapshot?.allowedModels.orEmpty().size
-        .takeIf { it > 0 }
-        ?.let { "$it 个" }
-        ?: "—"
-
 private fun isXiaomiApiBalanceCard(card: CredentialCardUi): Boolean {
     if (card.credential.providerId != ProviderId.Xiaomi) return false
     val usageKind = card.credential.metadata[CredentialMetadataKey.UsageKind]
         ?: card.snapshot?.usageKind
     return usageKind != "plan"
-}
-
-private fun balanceAccountStatus(
-    card: CredentialCardUi,
-    metrics: List<UsageMetric>,
-): SplitAccountStatus {
-    val availability = metrics.firstOrNull { it.id == "availability" }
-    if (availability != null) {
-        val available = (availability.value?.signum() ?: 0) > 0
-        return SplitAccountStatus(
-            text = if (available) "账户可用" else "账户不可用",
-            healthy = available,
-        )
-    }
-    val raw = card.snapshot?.statusText?.trim()?.takeIf { it.isNotEmpty() }
-    if (raw != null) {
-        val text = if (raw.startsWith("账户")) raw else "账户$raw"
-        val healthy = !raw.contains("不可用") &&
-            !raw.contains("失效") &&
-            card.snapshot?.status != 0
-        return SplitAccountStatus(text = text, healthy = healthy)
-    }
-    return SplitAccountStatus(text = "账户状态 —", healthy = null)
 }
 
 private fun splitTone(metric: UsageMetric, percent: Double?): SplitTone {
@@ -1301,11 +952,10 @@ private fun splitTone(metric: UsageMetric, percent: Double?): SplitTone {
     return SplitTone.Normal
 }
 
-@Composable
-private fun splitToneColor(tone: SplitTone): Color = when (tone) {
-    SplitTone.Normal -> MyTokenThemeTokens.colors.ink
-    SplitTone.Warning -> MyTokenThemeTokens.colors.warningFill
-    SplitTone.Critical -> MyTokenThemeTokens.colors.criticalFill
+private fun splitToneUsageTone(tone: SplitTone): UsageMetricTone = when (tone) {
+    SplitTone.Normal -> UsageMetricTone.Normal
+    SplitTone.Warning -> UsageMetricTone.Warning
+    SplitTone.Critical -> UsageMetricTone.Critical
 }
 
 internal fun formatRemaining(metric: UsageMetric): String {

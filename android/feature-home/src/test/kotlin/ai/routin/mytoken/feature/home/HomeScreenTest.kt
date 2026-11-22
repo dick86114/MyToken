@@ -278,7 +278,7 @@ class HomeScreenTest {
 
     @Test
     @Config(qualifiers = "w400dp-h1100dp")
-    fun fullGlmCardShowsResetCardCountBelowRemainingTime() {
+    fun fullGlmCardShowsOnlyPrimaryResetCardChip() {
         val credential = credential("GLM 完整模式", ProviderId.Glm)
         val testCard = card(
             credential,
@@ -295,7 +295,7 @@ class HomeScreenTest {
         }
 
         composeRule.onNodeWithContentDescription("2 张重置卡").assertExists()
-        composeRule.onNodeWithContentDescription("1 张重置卡").assertExists()
+        composeRule.onNodeWithContentDescription("1 张重置卡").assertDoesNotExist()
     }
 
     @Test
@@ -576,10 +576,8 @@ class HomeScreenTest {
                     .isNotEmpty(),
             )
         }
-        // “可用模型”只在主余额区出现一次
-        composeRule.onAllNodesWithText("可用模型", useUnmergedTree = true)
-            .fetchSemanticsNodes()
-            .let { assertEquals(1, it.size) }
+        // 完整余额卡不再平铺账户事实。
+        composeRule.onNodeWithText("可用模型", useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test
@@ -775,7 +773,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun fullResetChipsSitNextToTheirLabels() {
+    fun fullPrimaryResetChipSitsNextToItsLabel() {
         val credential = credential("完整重置卡", ProviderId.Glm)
         val testCard = card(
             credential,
@@ -798,18 +796,15 @@ class HomeScreenTest {
         val chips = composeRule.onAllNodesWithTag("reset_chip", useUnmergedTree = true)
             .fetchSemanticsNodes()
             .map { it.boundsInRoot }
-        assertEquals("完整卡重置 chip 数量", 2, chips.size)
+        assertEquals("完整卡只保留主指标重置 chip", 1, chips.size)
         val primaryLabel = composeRule.onNodeWithText("5 小时用量", useUnmergedTree = true)
             .getUnclippedBoundsInRoot()
-        assertTrue("主指标 chip 应在标签下方换行", chips[0].top >= primaryLabel.bottom.value - 1f)
         assertTrue(
-            "主指标 chip 应与标签左对齐",
-            abs(primaryLabel.left.value - chips[0].left) <= 2f,
+            "主指标 chip 应在标签右侧同一行",
+            chips[0].left >= primaryLabel.right.value - 1f &&
+                chips[0].top < primaryLabel.bottom.value,
         )
-        val weeklyLabel = composeRule.onNodeWithText("本周用量", useUnmergedTree = true)
-            .getUnclippedBoundsInRoot()
-        val gap = chips[1].left - weeklyLabel.right.value
-        assertTrue("窗口 chip 应紧贴其标签，实际间隙 ${gap}dp", gap in 0f..10f)
+        composeRule.onNodeWithContentDescription("1 张重置卡").assertDoesNotExist()
     }
 
     @Test
@@ -926,7 +921,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun fullBalanceCardSpacesLegendAndFacts() {
+    fun fullBalanceCardShowsCompositionLegendWithoutFacts() {
         val credential = credential("DeepSeek 完整余额", ProviderId.DeepSeek)
         val total = balance(38.40).copy(id = "balance")
         val toppedUp = total.copy(
@@ -959,12 +954,9 @@ class HomeScreenTest {
             }
         }
 
-        val legend = composeRule.onNodeWithTag("full_balance_legend_row", useUnmergedTree = true)
-            .getUnclippedBoundsInRoot()
-        val facts = composeRule.onNodeWithTag("full_balance_facts", useUnmergedTree = true)
-            .getUnclippedBoundsInRoot()
-        val gap = facts.top.value - legend.bottom.value
-        assertTrue("图例与 facts 之间应留出行距，实际 ${gap}dp", gap >= 10f)
+        composeRule.onNodeWithText("余额构成").assertIsDisplayed()
+        composeRule.onNodeWithTag("full_balance_legend_row", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag("full_balance_facts", useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test
@@ -1239,7 +1231,7 @@ class HomeScreenTest {
         }
         activeText("熠").assertIsDisplayed()
         activeText("5 小时额度").assertIsDisplayed()
-        composeRule.onAllNodesWithText("剩余", substring = true, useUnmergedTree = true).onFirst().assertIsDisplayed()
+        activeText("42%").assertIsDisplayed()
     }
 
     @Test
@@ -1416,7 +1408,7 @@ class HomeScreenTest {
 
     @Test
     @Config(qualifiers = "w400dp-h1100dp")
-    fun fullDeepSeekCardUsesBalanceHeroAndShowsAllAccountFields() {
+    fun fullDeepSeekCardUsesBalanceHeroWithoutAccountFacts() {
         val credential = credential("DeepSeek 余额", ProviderId.DeepSeek)
         val total = UsageMetric(
             id = "balance",
@@ -1481,8 +1473,8 @@ class HomeScreenTest {
         composeRule.onNodeWithText("账户可用").assertDoesNotExist()
         composeRule.onNodeWithText("充值 ¥33.40").assertIsDisplayed()
         composeRule.onNodeWithText("赠金 ¥5.00").assertIsDisplayed()
-        composeRule.onNodeWithText("可用模型").assertIsDisplayed()
-        composeRule.onNodeWithText("2 个").assertIsDisplayed()
+        composeRule.onNodeWithText("可用模型").assertDoesNotExist()
+        composeRule.onNodeWithText("2 个").assertDoesNotExist()
         composeRule.onNodeWithText("deepseek-v4-flash").assertDoesNotExist()
     }
 
@@ -1558,18 +1550,14 @@ class HomeScreenTest {
         composeRule.onNodeWithText("$23.86").assertIsDisplayed()
         composeRule.onNodeWithText("USD 账户").assertIsDisplayed()
         composeRule.onNodeWithText("充值 $18.86 · 赠金 $5.00").assertIsDisplayed()
-        composeRule.onNodeWithText("可用模型").assertIsDisplayed()
-        composeRule.onNodeWithText("2 个").assertIsDisplayed()
+        composeRule.onNodeWithText("可用模型").assertDoesNotExist()
+        composeRule.onNodeWithText("2 个").assertDoesNotExist()
         composeRule.onNodeWithText("账户可用").assertDoesNotExist()
-        assertEquals(
-            1,
-            composeRule.onAllNodesWithText("可用模型").fetchSemanticsNodes().size,
-        )
     }
 
     @Test
     @Config(qualifiers = "w400dp-h1100dp")
-    fun fullDeepSeekUnavailableAccountStillSurfacesStatus() {
+    fun fullDeepSeekUnavailableAccountDropsInlineStatusRow() {
         val credential = credential("DeepSeek 不可用", ProviderId.DeepSeek)
         val total = balance(38.40).copy(id = "balance", label = "余额")
         val availability = total.copy(
@@ -1598,7 +1586,7 @@ class HomeScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("账户不可用").assertIsDisplayed()
+        composeRule.onNodeWithText("账户不可用").assertDoesNotExist()
     }
 
     @Test
@@ -1679,8 +1667,8 @@ class HomeScreenTest {
         composeRule.onNodeWithText("未命中 900").assertIsDisplayed()
         composeRule.onNodeWithText("输出 300").assertIsDisplayed()
         composeRule.onNodeWithText("缓存 300").assertIsDisplayed()
-        composeRule.onNodeWithText("可用模型").assertIsDisplayed()
-        composeRule.onNodeWithText("6 个").assertIsDisplayed()
+        composeRule.onNodeWithText("可用模型").assertDoesNotExist()
+        composeRule.onNodeWithText("6 个").assertDoesNotExist()
         composeRule.onNodeWithText("mimo-v2.5-pro").assertDoesNotExist()
         assertEquals(
             1,
@@ -1734,7 +1722,7 @@ class HomeScreenTest {
 
     @Test
     @Config(qualifiers = "w360dp-h1200dp")
-    fun commandCodeCardUsesRequestedMetricLayout() {
+    fun commandCodeFullCardShowsPeriodLedgerOnly() {
         val command = credential("Command Code", ProviderId.CommandCode)
         fun metric(
             id: String,
@@ -1789,32 +1777,25 @@ class HomeScreenTest {
             }
         }
 
-        listOf("5 小时额度", "本周额度", "本月额度", "累计请求").forEach {
+        listOf("5 小时额度", "本周额度", "本月额度").forEach {
             composeRule.onNodeWithText(it).assertIsDisplayed()
         }
         composeRule.onNodeWithText("额度单位：美元（USD）").assertDoesNotExist()
         composeRule.onNodeWithText("18%").assertIsDisplayed()
-        composeRule.onNodeWithText("剩余 \$11.55").assertIsDisplayed()
+        composeRule.onNodeWithText("7%").assertIsDisplayed()
         composeRule.onNodeWithText("34%").assertIsDisplayed()
-        composeRule.onNodeWithText("额度构成").assertIsDisplayed()
-        // 设计稿用构成条 + 图例，而不是一行拼接文本。
+        composeRule.onNodeWithText("剩余 \$11.55").assertDoesNotExist()
+        composeRule.onNodeWithText("累计请求", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithText("9.7K 次", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithText("额度构成").assertDoesNotExist()
         listOf("月度 \$34.42", "购买 \$0.00", "赠送 \$0.00").forEach { legend ->
-            composeRule.onNodeWithText(legend, useUnmergedTree = true).assertExists()
+            composeRule.onNodeWithText(legend, useUnmergedTree = true).assertDoesNotExist()
         }
-        composeRule.onNodeWithText("余额 \$34.42", useUnmergedTree = true).assertExists()
-        val requestTextResults = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
-        composeRule.onNodeWithText("9.7K 次", useUnmergedTree = true)
-            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
-                action(requestTextResults)
-            }
-        assertEquals(1, requestTextResults.single().lineCount)
-        composeRule.onNodeWithText("累计请求", useUnmergedTree = true).assertIsDisplayed()
-        composeRule.onNodeWithText("9.7K 次", useUnmergedTree = true).assertIsDisplayed()
     }
 
     @Test
     @Config(qualifiers = "w400dp-h1100dp")
-    fun fullGlmCardGroupsActivityBelowTheQuotaWindows() {
+    fun fullGlmCardShowsPeriodLedgerWithoutActivityFacts() {
         val credential = credential("GLM 完整模式", ProviderId.Glm)
         fun valueMetric(id: String, label: String, value: Double, unit: UsageMetricUnit) =
             UsageMetric(
@@ -1866,18 +1847,16 @@ class HomeScreenTest {
         composeRule.onNodeWithText("5 小时用量").assertIsDisplayed()
         composeRule.onNodeWithText("本周用量").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("2 张重置卡").assertExists()
-        composeRule.onNodeWithContentDescription("1 张重置卡").assertExists()
-        composeRule.onNodeWithText("模型调用").assertIsDisplayed()
-        composeRule.onNodeWithText("22 次").assertIsDisplayed()
-        composeRule.onNodeWithText("MCP 调用").assertIsDisplayed()
-        composeRule.onNodeWithText("461 / 1,000").assertIsDisplayed()
-        composeRule.onNodeWithText("累计 Tokens").assertIsDisplayed()
-        composeRule.onNodeWithText("1.89B").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("1 张重置卡").assertDoesNotExist()
+        composeRule.onNodeWithText("模型调用").assertDoesNotExist()
+        composeRule.onNodeWithText("22 次").assertDoesNotExist()
+        composeRule.onNodeWithText("MCP 调用").assertDoesNotExist()
+        composeRule.onNodeWithText("累计 Tokens").assertDoesNotExist()
     }
 
     @Test
     @Config(qualifiers = "w400dp-h1100dp")
-    fun fullNewApiCardPairsTokenAndCostAcrossWindows() {
+    fun fullNewApiCardShowsTokenFactsWithoutCosts() {
         val credential = credential("New API 统计", ProviderId.NewAPI)
         val quota = progress(3.5, 14.0).copy(
             id = "quota-progress",
@@ -1931,12 +1910,15 @@ class HomeScreenTest {
 
         composeRule.onNodeWithText("账户额度").assertIsDisplayed()
         composeRule.onNodeWithText("25%").assertIsDisplayed()
-        composeRule.onNodeWithText("剩余 ¥10.50").assertIsDisplayed()
-        composeRule.onNodeWithText("今日").assertIsDisplayed()
+        composeRule.onNodeWithText("剩余 ¥10.50").assertDoesNotExist()
+        listOf("今日 Token", "24 小时", "7 天", "30 天").forEach { label ->
+            composeRule.onNodeWithText(label).assertIsDisplayed()
+        }
         composeRule.onNodeWithText("14.87M tokens").assertIsDisplayed()
-        composeRule.onNodeWithText("¥1.40").assertIsDisplayed()
         composeRule.onNodeWithText("15.12M tokens").assertIsDisplayed()
         composeRule.onNodeWithText("1.1B tokens").assertIsDisplayed()
+        composeRule.onNodeWithText("¥1.40").assertDoesNotExist()
+        composeRule.onNodeWithText("¥13.10").assertDoesNotExist()
         composeRule.onNodeWithText("RPM").assertIsDisplayed()
         composeRule.onNodeWithText("TPM").assertIsDisplayed()
         composeRule.onNodeWithText("42 次").assertIsDisplayed()
@@ -1990,7 +1972,7 @@ class HomeScreenTest {
 
         composeRule.onNodeWithText("套餐").assertIsDisplayed()
         composeRule.onNodeWithText("25%").assertIsDisplayed()
-        composeRule.onNodeWithText("剩余 15,000 credits").assertIsDisplayed()
+        composeRule.onNodeWithText("剩余 15,000 credits").assertDoesNotExist()
         composeRule.onNodeWithText("套餐总量").assertIsDisplayed()
         composeRule.onNodeWithText("20,000 credits").assertIsDisplayed()
         composeRule.onNodeWithText("已使用").assertIsDisplayed()
@@ -2034,7 +2016,7 @@ class HomeScreenTest {
 
         composeRule.onNodeWithText("Token 套餐").assertIsDisplayed()
         composeRule.onNodeWithText("32%").assertIsDisplayed()
-        composeRule.onNodeWithText("剩余 680M tokens").assertIsDisplayed()
+        composeRule.onNodeWithText("剩余 680M tokens").assertDoesNotExist()
         composeRule.onNodeWithText("总额度").assertIsDisplayed()
         composeRule.onNodeWithText("1B tokens").assertIsDisplayed()
         composeRule.onNodeWithText("已使用").assertIsDisplayed()

@@ -156,7 +156,7 @@ class AndroidVisualRegressionTest {
 
     @Test
     @Config(qualifiers = "w280dp-h1200dp")
-    fun 窄屏完整配额卡片保留窗口与辅助字段() {
+    fun 窄屏完整配额卡片保留窗口与重置信息() {
         val end = Instant.now().plus(Duration.ofHours(2))
         val credential = Credential(
             id = UUID.randomUUID(),
@@ -215,7 +215,7 @@ class AndroidVisualRegressionTest {
         }
 
         val root = composeRule.onRoot().getUnclippedBoundsInRoot()
-        listOf("5 小时用量", "本周用量", "模型调用").forEach { label ->
+        listOf("5 小时用量", "本周用量").forEach { label ->
             val bounds = composeRule.onNodeWithText(label).getUnclippedBoundsInRoot()
             assertTrue("$label should stay inside the card", bounds.left >= root.left)
             assertTrue("$label should stay inside the card", bounds.right <= root.right)

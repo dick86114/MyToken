@@ -300,15 +300,11 @@ private fun CompactMiniProgressRow(metric: UsageMetric) {
             color = colors.muted,
             maxLines = 1,
         )
-        UsageProgressBar(
+        UsageSegmentMeter(
             percent = percent,
-            color = when (tone) {
-                UsageMetricTone.Warning -> colors.warningFill
-                UsageMetricTone.Critical -> colors.criticalFill
-                UsageMetricTone.Normal -> colors.ink
-            },
+            tone = tone,
             modifier = Modifier.weight(1f),
-            height = 3.dp,
+            height = 9.dp,
         )
         Text(
             text = formatPercent(percent),

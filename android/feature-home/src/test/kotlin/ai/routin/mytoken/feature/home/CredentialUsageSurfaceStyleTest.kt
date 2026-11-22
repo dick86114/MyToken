@@ -26,11 +26,38 @@ class CredentialUsageSurfaceStyleTest {
     }
 
     @Test
-    fun `弧线统一为270度几何`() {
-        assertTrue(ringSource.contains("ArcStartAngle = 135f"))
-        assertTrue(ringSource.contains("ArcSweepAngle = 270f"))
+    fun `仪表盘改为主机面板分段样式`() {
+        assertTrue("12 段仪表刻度", ringSource.contains("SegmentCount = 12"))
+        assertTrue("从 135° 起", ringSource.contains("ArcStartAngle = 135f"))
+        assertTrue("每段 18.1°", ringSource.contains("SegmentSweepAngle = 18.1f"))
+        assertTrue("段间留 2.2°", ringSource.contains("SegmentGapDegrees = 2.2f"))
+        assertTrue("外圈表框", ringSource.contains("drawCircle"))
+        assertTrue("内圈轴心", ringSource.contains("HubRadiusRatio"))
         assertTrue(source.contains("UsageArcGauge"))
-        assertFalse(ringSource.contains("drawArc(\n                color = track,\n                startAngle = 0f"))
+    }
+
+    @Test
+    fun `进度条改为十二格分段仪表`() {
+        val meter = sourceText("UsageSegmentMeter.kt")
+        assertTrue("统一 12 格", meter.contains("SegmentCells = 12"))
+        assertTrue("正常态使用墨色", meter.contains("UsageMetricTone.Normal -> colors.ink"))
+        assertTrue("简洁卡窗口行使用分段仪表", source.contains("UsageSegmentMeter("))
+        assertTrue(
+            "完整卡周期行使用分段仪表",
+            sourceText("FullSplitUsageContent.kt").contains("UsageSegmentMeter("),
+        )
+    }
+
+    @Test
+    fun `完整卡按设计稿收敛为周期账本`() {
+        val full = sourceText("FullSplitUsageContent.kt")
+        assertTrue("主指标使用统一 Hero 组件", full.contains("FullHeroFocus("))
+        assertTrue("完整卡周期行独立组件", full.contains("FullPeriodRow("))
+        assertTrue("单窗口完整卡居中展示", full.contains("if (secondary.isEmpty())"))
+        assertTrue("New API 使用事实网格", full.contains("FullFactsGrid("))
+        assertFalse("完整额度卡不再平铺事实列表", full.contains("FullFacts(facts = facts"))
+        assertFalse("CommandCode 完整卡不再内嵌额度构成", full.contains("FullCommandCodeSummary(byId)"))
+        assertFalse("余额构成不再带账户事实", full.contains("full_balance_facts"))
     }
 
     @Test
@@ -42,11 +69,11 @@ class CredentialUsageSurfaceStyleTest {
     }
 
     @Test
-    fun `正常账户状态使用中性色文字`() {
+    fun `完整卡不再内嵌账户状态行`() {
         val full = sourceText("FullSplitUsageContent.kt")
-        // 规格 §7.6：正常 = 中性点 + 中性文字；绿色只用于数据可视化。
-        assertTrue(full.contains("true -> MyTokenStatusTone.Neutral"))
-        assertFalse(full.contains("true -> MyTokenStatusTone.Positive"))
+        // 新设计把状态收敛到卡片头部，余额主体只保留金额与构成。
+        assertFalse(full.contains("MyTokenStatus("))
+        assertFalse(full.contains("FullAccountStatus("))
     }
 
     @Test
@@ -192,15 +219,23 @@ class CredentialUsageSurfaceStyleTest {
         listOf("UsageCardSkeleton.kt", "CredentialUsageCard.kt", "CredentialDetailHero.kt").forEach { name ->
             val text = sourceText(name)
             assertFalse("$name 正常细条不再使用绿色", text.contains("UsageMetricTone.Normal -> colors.positiveFill"))
-            assertTrue(
-                "$name 正常细条应使用墨色",
-                Regex("UsageMetricTone\\.Normal -> colors\\.ink").findAll(text).count() >=
-                    if (name == "UsageCardSkeleton.kt") 1 else 2,
-            )
         }
         assertTrue(
-            "完整卡细条正常态应使用墨色",
-            sourceText("FullSplitUsageContent.kt").contains("SplitTone.Normal -> MyTokenThemeTokens.colors.ink"),
+            "紧凑卡细条正常态应使用墨色",
+            sourceText("UsageCardSkeleton.kt").contains("UsageMetricTone.Normal -> colors.ink"),
+        )
+        assertTrue(
+            "详情页细条正常态应使用墨色",
+            Regex("UsageMetricTone\\.Normal -> colors\\.ink")
+                .findAll(sourceText("CredentialDetailHero.kt")).count() >= 2,
+        )
+        assertTrue(
+            "紧凑卡窗口行改用分段仪表",
+            sourceText("CredentialUsageCard.kt").contains("UsageSegmentMeter("),
+        )
+        assertTrue(
+            "完整卡周期行改用分段仪表",
+            sourceText("FullSplitUsageContent.kt").contains("UsageSegmentMeter("),
         )
     }
 
@@ -218,14 +253,6 @@ class CredentialUsageSurfaceStyleTest {
             assertTrue("充值/现金构成条应为黑色", composition.contains(".background(colors.ink)"))
             assertTrue("赠送构成条应为黄色", composition.contains(".background(colors.actionFill)"))
         }
-
-        val commandCode = full
-            .substringAfter("private fun FullCommandCodeSummary")
-            .substringBefore("@Composable\nprivate fun CommandCodeSummaryValue")
-        assertTrue(
-            "CommandCode 额度构成应为墨色/中性/黄色，不再使用 cat1",
-            commandCode.contains("listOf(colors.ink, colors.cat2, colors.actionFill)"),
-        )
 
         val detail = sourceText("CredentialDetailHero.kt")
         listOf(

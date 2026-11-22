@@ -27,12 +27,23 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.math.max
+import kotlin.math.roundToInt
 
-/** 唯一的弧线几何：270°，从 135° 起顺时针，圆头，无渐变、无发光。 */
+/** 主机面板式仪表：270° 内 12 段刻度，外圈表框、内圈轴心。 */
+private const val SegmentCount = 12
 private const val ArcStartAngle = 135f
 private const val ArcSweepAngle = 270f
-private const val ArcZeroSweepAngle = 0.9f
-private val ArcStrokeWidth = 3.5.dp
+private const val SegmentSweepAngle = 18.1f
+private const val SegmentGapDegrees = 2.2f
+private const val BezelRadiusRatio = 31.4f / 64f
+private const val SegmentRadiusRatio = 26f / 64f
+private const val HubRadiusRatio = 17.2f / 64f
+private const val SegmentStrokeRatio = 6f / 64f
+private const val HairlineRatio = 0.9f / 64f
+private const val SegmentHighlightRadiusRatio = 27.4f / 64f
+private const val SegmentHighlightSweep = 15.1f
+private const val SegmentHighlightInset = 1.5f
 
 @Composable
 internal fun UsageArcGauge(
@@ -60,8 +71,7 @@ internal fun UsageArcGauge(
         ),
         label = "usageArcPercent",
     )
-    val trackStroke = ArcStrokeWidth
-    // 动态字体放大时同步放大弧线，避免圆心数字被 52dp 直径裁切。
+    // 动态字体放大时同步放大仪表，避免圆心数字被 52dp 直径裁切。
     val scaledDiameter = diameter * LocalDensity.current.fontScale.coerceIn(1f, 1.35f)
     val numberStyle = when {
         scaledDiameter >= 80.dp -> MyTokenType.detailRing
@@ -76,31 +86,89 @@ internal fun UsageArcGauge(
         contentAlignment = Alignment.Center,
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val inset = trackStroke.toPx() / 2f
-            val arcSize = Size(size.width - inset * 2f, size.height - inset * 2f)
+            val side = size.minDimension
+            val center = Offset(size.width / 2f, size.height / 2f)
+            val bezelRadius = side * BezelRadiusRatio
+            val segmentRadius = side * SegmentRadiusRatio
+            val hubRadius = side * HubRadiusRatio
+            val segmentStroke = side * SegmentStrokeRatio
+            val hairline = side * HairlineRatio
+            val highlightRadius = side * SegmentHighlightRadiusRatio
+
+            // 外圈表框：浅底 + 细描边 + 上下两道高光/阴影。
+            drawCircle(color = colors.subtle, radius = bezelRadius, center = center)
+            drawCircle(
+                color = colors.line,
+                radius = bezelRadius,
+                center = center,
+                style = Stroke(width = hairline),
+            )
             drawArc(
-                color = colors.track,
-                startAngle = ArcStartAngle,
-                sweepAngle = ArcSweepAngle,
+                color = colors.surface.copy(alpha = 0.7f),
+                startAngle = 200f,
+                sweepAngle = 140f,
                 useCenter = false,
-                topLeft = Offset(inset, inset),
-                size = arcSize,
-                style = Stroke(width = trackStroke.toPx(), cap = StrokeCap.Round),
+                topLeft = Offset(center.x - bezelRadius, center.y - bezelRadius),
+                size = Size(bezelRadius * 2f, bezelRadius * 2f),
+                style = Stroke(width = hairline, cap = StrokeCap.Round),
+            )
+            drawArc(
+                color = colors.ink.copy(alpha = 0.08f),
+                startAngle = 22f,
+                sweepAngle = 136f,
+                useCenter = false,
+                topLeft = Offset(center.x - bezelRadius, center.y - bezelRadius),
+                size = Size(bezelRadius * 2f, bezelRadius * 2f),
+                style = Stroke(width = hairline, cap = StrokeCap.Round),
             )
 
-            val progressSweep = if (animatedPercent <= 0f) {
-                ArcZeroSweepAngle
+            val litSegments = if (animatedPercent <= 0f) {
+                0
             } else {
-                ArcSweepAngle * animatedPercent / 100f
+                max(1, (animatedPercent / 100f * SegmentCount).roundToInt())
             }
+            repeat(SegmentCount) { index ->
+                val start = ArcStartAngle +
+                    index * (ArcSweepAngle / SegmentCount) +
+                    SegmentGapDegrees
+                drawArc(
+                    color = if (index < litSegments) accent else colors.track,
+                    startAngle = start,
+                    sweepAngle = SegmentSweepAngle,
+                    useCenter = false,
+                    topLeft = Offset(center.x - segmentRadius, center.y - segmentRadius),
+                    size = Size(segmentRadius * 2f, segmentRadius * 2f),
+                    style = Stroke(width = segmentStroke, cap = StrokeCap.Round),
+                )
+                if (index < litSegments) {
+                    drawArc(
+                        color = colors.surface.copy(alpha = 0.38f),
+                        startAngle = start + SegmentHighlightInset,
+                        sweepAngle = SegmentHighlightSweep,
+                        useCenter = false,
+                        topLeft = Offset(center.x - highlightRadius, center.y - highlightRadius),
+                        size = Size(highlightRadius * 2f, highlightRadius * 2f),
+                        style = Stroke(width = hairline * 0.9f, cap = StrokeCap.Round),
+                    )
+                }
+            }
+
+            // 内圈轴心：surface 底 + 细描边 + 内阴影弧。
+            drawCircle(color = colors.surface, radius = hubRadius, center = center)
+            drawCircle(
+                color = colors.line,
+                radius = hubRadius,
+                center = center,
+                style = Stroke(width = hairline),
+            )
             drawArc(
-                color = accent,
-                startAngle = ArcStartAngle,
-                sweepAngle = progressSweep,
+                color = colors.ink.copy(alpha = 0.10f),
+                startAngle = 150f,
+                sweepAngle = 240f,
                 useCenter = false,
-                topLeft = Offset(inset, inset),
-                size = arcSize,
-                style = Stroke(width = trackStroke.toPx(), cap = StrokeCap.Round),
+                topLeft = Offset(center.x - hubRadius, center.y - hubRadius),
+                size = Size(hubRadius * 2f, hubRadius * 2f),
+                style = Stroke(width = hairline * 0.8f, cap = StrokeCap.Round),
             )
         }
         Text(
