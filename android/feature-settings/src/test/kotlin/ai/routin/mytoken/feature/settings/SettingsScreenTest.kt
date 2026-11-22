@@ -383,6 +383,9 @@ class SettingsScreenTest {
 
         scrollToAbout()
         composeRule.onNodeWithText("发现 v0.2.0").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_update_star", useUnmergedTree = true)
+            .performScrollTo()
+            .assertExists()
         composeRule.onNodeWithText("下载并安装").performScrollTo().assertIsDisplayed()
     }
 

@@ -37,7 +37,7 @@ import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.SaveAlt
-import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.automirrored.outlined.Forward
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -317,7 +317,7 @@ private fun ShareHeader(
                 onClick = { onAction(UsageShareAction.Save) },
             )
             ShareActionButton(
-                icon = Icons.Outlined.Share,
+                icon = Icons.AutoMirrored.Outlined.Forward,
                 description = "分享用量",
                 testTag = "share_action_share",
                 enabled = !isExporting,

@@ -115,6 +115,32 @@ class CredentialUsageSurfaceStyleTest {
     }
 
     @Test
+    fun `详情与分享页使用指定图标`() {
+        val detail = sourceText("CredentialDetailScreen.kt")
+        val share = sourceText("UsageShareDialog.kt")
+
+        assertTrue("分享入口应使用机票+飞机图标", detail.contains("AirplaneTicketGlyph"))
+        assertTrue("机票图标内应叠加飞机", detail.contains("Icons.Filled.Flight"))
+        assertTrue("删除按钮应为红色", detail.contains("tint = colors.criticalFill"))
+        assertTrue("分享按钮应使用右转箭头", share.contains("AutoMirrored.Outlined.Forward"))
+        assertTrue("复制按钮保持双文档图标", share.contains("Icons.Outlined.ContentCopy"))
+        assertTrue("保存按钮保持托盘下箭头", share.contains("Icons.Outlined.SaveAlt"))
+    }
+
+    @Test
+    fun `首页使用新更新星星与密度图标`() {
+        val chrome = sourceText("HomeChrome.kt")
+        val density = chrome.substringAfter("private fun DensityGlyph")
+
+        assertTrue(chrome.contains("MyTokenUpdateStarIcon"))
+        assertFalse(chrome.contains("UpdateStarGlyph"))
+        assertTrue("首页设置入口使用实心 gear", chrome.contains("Icons.Filled.Settings"))
+        assertFalse(chrome.contains("Icons.Outlined.Settings"))
+        assertTrue("简洁密度应为 2x2 网格", density.contains("listOf(3.5f, 13.3f)"))
+        assertTrue("完整密度应为带分隔线的 1x2 矩形", density.contains("drawLine("))
+    }
+
+    @Test
     fun `密度切换组件不做加载动画`() {
         val chrome = sourceText("HomeChrome.kt")
 

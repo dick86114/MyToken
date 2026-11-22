@@ -223,7 +223,7 @@ class CredentialDetailScreenTest {
     }
 
     @Test
-    fun detailShareAndMoreAre48() {
+    fun detailShareDeleteAndBackAre48() {
         composeRule.setContent {
             MyTokenTheme {
                 CredentialDetailScreen(
@@ -236,7 +236,7 @@ class CredentialDetailScreenTest {
             }
         }
 
-        listOf("分享用量", "更多操作", "返回").forEach { description ->
+        listOf("分享用量", "删除凭证", "返回").forEach { description ->
             val bounds = composeRule.onNodeWithContentDescription(description, useUnmergedTree = true)
                 .getUnclippedBoundsInRoot()
             assertTrue(
@@ -244,6 +244,8 @@ class CredentialDetailScreenTest {
                 bounds.bottom - bounds.top >= 48.dp,
             )
         }
+        composeRule.onNodeWithContentDescription("更多操作", useUnmergedTree = true)
+            .assertDoesNotExist()
     }
 
     @Test

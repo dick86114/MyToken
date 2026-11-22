@@ -3,8 +3,6 @@ package ai.routin.mytoken.feature.home
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenButton
 import ai.routin.mytoken.core.ui.MyTokenButtonTone
-import ai.routin.mytoken.core.ui.MyTokenDropdownMenu
-import ai.routin.mytoken.core.ui.MyTokenDropdownMenuItem
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.MyTokenSize
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
@@ -34,8 +32,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.filled.Flight
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -83,16 +86,12 @@ fun CredentialDetailScreen(
 ) {
     val colors = MyTokenThemeTokens.colors
     var showShare by remember { mutableStateOf(false) }
-    var showMore by remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
             DetailTopBar(
                 cardExists = card != null,
                 onBack = onBack,
                 onShare = { showShare = true },
-                onMore = { showMore = true },
-                moreExpanded = showMore,
-                onDismissMore = { showMore = false },
                 onDelete = onDelete,
             )
         },
@@ -182,9 +181,6 @@ private fun DetailTopBar(
     cardExists: Boolean,
     onBack: () -> Unit,
     onShare: () -> Unit,
-    onMore: () -> Unit,
-    moreExpanded: Boolean,
-    onDismissMore: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val colors = MyTokenThemeTokens.colors
@@ -220,45 +216,69 @@ private fun DetailTopBar(
                     contentDescription = "分享用量",
                     onClick = onShare,
                     icon = {
-                        Icon(
-                            imageVector = Icons.Outlined.Share,
-                            contentDescription = null,
+                        AirplaneTicketGlyph(
                             tint = colors.ink,
+                            modifier = Modifier
+                                .size(20.dp)
+                                .testTag("detail_share_icon"),
+                        )
+                    },
+                )
+                TopBarIconButton(
+                    contentDescription = "删除凭证",
+                    onClick = onDelete,
+                    modifier = Modifier.testTag("detail_delete"),
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Filled.Delete,
+                            contentDescription = null,
+                            tint = colors.criticalFill,
                             modifier = Modifier.size(20.dp),
                         )
                     },
                 )
-                Box {
-                    TopBarIconButton(
-                        contentDescription = "更多操作",
-                        onClick = onMore,
-                        icon = {
-                            Icon(
-                                imageVector = Icons.Filled.MoreVert,
-                                contentDescription = null,
-                                tint = colors.ink,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        },
-                    )
-                    MyTokenDropdownMenu(
-                        expanded = moreExpanded,
-                        onDismissRequest = onDismissMore,
-                    ) {
-                        MyTokenDropdownMenuItem(
-                            text = "删除凭证",
-                            destructive = true,
-                            leadingIcon = Icons.Filled.Delete,
-                            onClick = {
-                                onDismissMore()
-                                onDelete()
-                            },
-                            modifier = Modifier.testTag("detail_delete"),
-                        )
-                    }
-                }
             }
         }
+    }
+}
+
+/** SF 的 airplane.ticket：票据轮廓 + 虚线撕裂线 + 小飞机。 */
+@Composable
+private fun AirplaneTicketGlyph(
+    tint: Color,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val stroke = 1.4.dp.toPx()
+            val insetX = 1.4.dp.toPx()
+            val insetY = 2.5.dp.toPx()
+            drawRoundRect(
+                color = tint,
+                topLeft = Offset(insetX, insetY),
+                size = Size(size.width - insetX * 2f, size.height - insetY * 2f),
+                cornerRadius = CornerRadius(2.6.dp.toPx()),
+                style = Stroke(width = stroke),
+            )
+            val perforationX = size.width * 0.38f
+            drawLine(
+                color = tint,
+                start = Offset(perforationX, insetY + 1.dp.toPx()),
+                end = Offset(perforationX, size.height - insetY - 1.dp.toPx()),
+                strokeWidth = 1.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(
+                    floatArrayOf(1.1.dp.toPx(), 1.1.dp.toPx()),
+                ),
+            )
+        }
+        Icon(
+            imageVector = Icons.Filled.Flight,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier
+                .padding(start = 6.dp)
+                .size(8.5.dp),
+        )
     }
 }
 
@@ -266,11 +286,13 @@ private fun DetailTopBar(
 private fun TopBarIconButton(
     contentDescription: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
     icon: @Composable () -> Unit,
 ) {
     Box(
         modifier = Modifier
             .size(MyTokenSize.touch)
+            .then(modifier)
             .clip(RoundedCornerShape(12.dp))
             .clickable(role = Role.Button, onClick = onClick)
             .semantics { this.contentDescription = contentDescription },

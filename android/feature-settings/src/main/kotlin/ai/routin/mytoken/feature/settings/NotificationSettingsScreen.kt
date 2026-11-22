@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,6 +40,12 @@ fun NotificationSettingsSection(
         SettingSwitchRow(
             label = "凭证失效提醒",
             supportingText = "Key 失效或权限不足时通知",
+            iconContent = {
+                SettingsBadgedIcon(
+                    base = Icons.Outlined.CreditCard,
+                    modifier = Modifier.testTag("settings_credential_failure_icon"),
+                )
+            },
             checked = settings.credentialFailureAlertsEnabled,
             onChange = onCredentialFailureAlertsChange,
         )

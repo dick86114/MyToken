@@ -378,6 +378,7 @@ fun MyTokenRow(
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     iconPlate: Boolean = false,
+    iconContent: (@Composable () -> Unit)? = null,
 ) {
     val colors = MyTokenThemeTokens.colors
     Row(
@@ -395,7 +396,20 @@ fun MyTokenRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(MyTokenSpacing.md),
     ) {
-        icon?.let {
+        val iconSlot: (@Composable () -> Unit)? = when {
+            icon != null -> {
+                {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = colors.muted,
+                        modifier = Modifier.size(if (iconPlate) 15.dp else 18.dp),
+                    )
+                }
+            }
+            else -> iconContent
+        }
+        iconSlot?.let { slot ->
             if (iconPlate) {
                 Box(
                     modifier = Modifier
@@ -404,20 +418,10 @@ fun MyTokenRow(
                         .border(1.dp, colors.line, RoundedCornerShape(8.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        imageVector = it,
-                        contentDescription = null,
-                        tint = colors.muted,
-                        modifier = Modifier.size(15.dp),
-                    )
+                    slot()
                 }
             } else {
-                Icon(
-                    imageVector = it,
-                    contentDescription = null,
-                    tint = colors.muted,
-                    modifier = Modifier.size(18.dp),
-                )
+                slot()
             }
         }
         Column(modifier = Modifier.weight(1f)) {
@@ -457,13 +461,16 @@ fun MyTokenRow(
 fun SettingRow(
     title: String,
     supportingText: String? = null,
+    icon: ImageVector? = null,
+    iconContent: (@Composable () -> Unit)? = null,
     trailing: @Composable () -> Unit,
 ) {
     MyTokenRow(
-        icon = null,
+        icon = icon,
         title = title,
         supportingText = supportingText,
         trailing = trailing,
+        iconContent = iconContent,
     )
 }
 

@@ -1,6 +1,9 @@
 package ai.routin.mytoken.feature.settings
 
 import ai.routin.mytoken.core.ui.MyTokenSwitch
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Autorenew
+import androidx.compose.material.icons.outlined.SyncProblem
 import androidx.compose.runtime.Composable
 import ai.routin.mytoken.core.ui.SettingRow
 
@@ -15,12 +18,14 @@ fun RefreshSettingsSection(
         SettingSwitchRow(
             label = "打开应用时刷新",
             supportingText = "启动后立即拉取一次用量",
+            icon = Icons.Outlined.Autorenew,
             checked = settings.openAppRefresh,
             onChange = onOpenAppRefreshChange,
         )
         SettingSwitchRow(
             label = "失败后自动重试",
             supportingText = "网络波动时静默重试一次",
+            icon = Icons.Outlined.SyncProblem,
             checked = settings.retryOnFailure,
             onChange = onRetryOnFailureChange,
         )
@@ -33,8 +38,15 @@ internal fun SettingSwitchRow(
     checked: Boolean,
     onChange: (Boolean) -> Unit,
     supportingText: String? = null,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    iconContent: (@Composable () -> Unit)? = null,
 ) {
-    SettingRow(title = label, supportingText = supportingText) {
+    SettingRow(
+        title = label,
+        supportingText = supportingText,
+        icon = icon,
+        iconContent = iconContent,
+    ) {
         MyTokenSwitch(
             checked = checked,
             onCheckedChange = onChange,

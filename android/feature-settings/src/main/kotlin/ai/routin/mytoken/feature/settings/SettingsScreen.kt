@@ -38,7 +38,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.material.icons.outlined.IosShare
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -87,6 +88,7 @@ import ai.routin.mytoken.core.ui.MyTokenSurface
 import ai.routin.mytoken.core.ui.MyTokenThemePreviewColors
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
+import ai.routin.mytoken.core.ui.MyTokenUpdateStarIcon
 import ai.routin.mytoken.core.ui.MyTokenDialog
 import ai.routin.mytoken.core.ui.MyTokenDialogRow
 import ai.routin.mytoken.core.ui.MyTokenDialogSection
@@ -237,7 +239,7 @@ fun SettingsScreen(
                     modifier = Modifier.testTag("settings_migration_cell"),
                 ) {
                     MyTokenRow(
-                        icon = Icons.Filled.QrCodeScanner,
+                        icon = Icons.Outlined.QrCodeScanner,
                         title = "从 Mac 导入",
                         supportingText = "扫码接收 Mac 凭证",
                         iconPlate = true,
@@ -253,7 +255,13 @@ fun SettingsScreen(
                         },
                     )
                     MyTokenRow(
-                        icon = Icons.Filled.Download,
+                        icon = null,
+                        iconContent = {
+                            SettingsBadgedIcon(
+                                base = Icons.Outlined.IosShare,
+                                modifier = Modifier.testTag("settings_export_logs_icon"),
+                            )
+                        },
                         title = "导出诊断日志",
                         supportingText = "生成已脱敏的本机日志",
                         iconPlate = true,
@@ -715,19 +723,13 @@ private fun UpdateSection(
         is AppUpdateUiState.Available -> {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .background(
-                            MaterialTheme.colorScheme.primary,
-                            RoundedCornerShape(10.dp),
-                        ),
+                    modifier = Modifier.size(44.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.ArrowUpward,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(22.dp),
+                    MyTokenUpdateStarIcon(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .testTag("settings_update_star"),
                     )
                 }
                 Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {

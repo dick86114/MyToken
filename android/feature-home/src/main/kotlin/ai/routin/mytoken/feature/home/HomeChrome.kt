@@ -9,10 +9,10 @@ import ai.routin.mytoken.core.ui.MyTokenDialogTone
 import ai.routin.mytoken.core.ui.MyTokenRadius
 import ai.routin.mytoken.core.ui.MyTokenSize
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
+import ai.routin.mytoken.core.ui.MyTokenUpdateStarIcon
 import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.ProviderLogoPlate
 import ai.routin.mytoken.core.ui.isMyTokenDarkTheme
-import ai.routin.mytoken.core.ui.rememberMyTokenMotionEnabled
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageCardDensity
 import androidx.compose.foundation.Canvas
@@ -47,17 +47,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -74,9 +70,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
@@ -271,7 +265,7 @@ internal fun HomeToolbar(
         ) {
             if (darkTheme) {
                 Icon(
-                    imageVector = Icons.Outlined.Settings,
+                    imageVector = Icons.Filled.Settings,
                     contentDescription = null,
                     tint = colors.ink,
                     modifier = Modifier
@@ -279,7 +273,7 @@ internal fun HomeToolbar(
                         .graphicsLayer { alpha = 1f - progress() },
                 )
                 Icon(
-                    imageVector = Icons.Outlined.Settings,
+                    imageVector = Icons.Filled.Settings,
                     contentDescription = null,
                     tint = colors.reportTicketInk,
                     modifier = Modifier
@@ -288,7 +282,7 @@ internal fun HomeToolbar(
                 )
             } else {
                 Icon(
-                    imageVector = Icons.Outlined.Settings,
+                    imageVector = Icons.Filled.Settings,
                     contentDescription = null,
                     tint = colors.ink,
                     modifier = Modifier.size(20.dp),
@@ -335,19 +329,11 @@ internal fun HomeUpdateBanner(
             .testTag("home_update_banner"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
+        MyTokenUpdateStarIcon(
             modifier = Modifier
-                .size(34.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(colors.reportTicket),
-            contentAlignment = Alignment.Center,
-        ) {
-            UpdateStarGlyph(
-                modifier = Modifier
-                    .size(23.dp)
-                    .testTag("home_update_star"),
-            )
-        }
+                .size(30.dp)
+                .testTag("home_update_star"),
+        )
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -375,71 +361,6 @@ internal fun HomeUpdateBanner(
             color = colors.actionText,
             maxLines = 1,
         )
-    }
-}
-
-/** 更新提示条的星星：四角星 + 呼吸光晕；减少动态时保持静态。 */
-@Composable
-private fun UpdateStarGlyph(modifier: Modifier = Modifier) {
-    val colors = MyTokenThemeTokens.colors
-    val motionEnabled = rememberMyTokenMotionEnabled()
-    val twinkle = if (motionEnabled) {
-        val transition = rememberInfiniteTransition(label = "update-star")
-        val value by transition.animateFloat(
-            initialValue = 0.35f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 1300),
-                repeatMode = RepeatMode.Reverse,
-            ),
-            label = "update-star-twinkle",
-        )
-        value
-    } else {
-        1f
-    }
-    Canvas(modifier = modifier) {
-        val center = Offset(size.width / 2f, size.height / 2f)
-        val radius = size.minDimension / 2f
-        drawCircle(
-            color = colors.reportTicketInk.copy(alpha = 0.10f + 0.14f * twinkle),
-            radius = radius * (0.92f + 0.06f * twinkle),
-            center = center,
-        )
-        val star = Path().apply {
-            moveTo(center.x, center.y - radius)
-            quadraticTo(
-                center.x + radius * 0.12f,
-                center.y - radius * 0.12f,
-                center.x + radius,
-                center.y,
-            )
-            quadraticTo(
-                center.x + radius * 0.12f,
-                center.y + radius * 0.12f,
-                center.x,
-                center.y + radius,
-            )
-            quadraticTo(
-                center.x - radius * 0.12f,
-                center.y + radius * 0.12f,
-                center.x - radius,
-                center.y,
-            )
-            quadraticTo(
-                center.x - radius * 0.12f,
-                center.y - radius * 0.12f,
-                center.x,
-                center.y - radius,
-            )
-            close()
-        }
-        scale(0.86f + 0.14f * twinkle, pivot = center) {
-            drawPath(
-                path = star,
-                color = colors.reportTicketInk.copy(alpha = 0.72f + 0.28f * twinkle),
-            )
-        }
     }
 }
 
@@ -935,8 +856,8 @@ private fun RowScope.DensityIconOption(
 }
 
 /**
- * 按设计稿 24×24 图标几何等比缩放到 19dp：简洁为两块竖版圆角矩形，
- * 完整为三条横向圆角矩形；选中时线宽从 1.7 提到 1.9。
+ * SF Symbol 风格的密度图标：简洁为 `app.grid.2x2`，完整为 `rectangle.grid.1x2`。
+ * 统一 24×24 几何缩放到 19dp；选中时线宽略增。
  */
 @Composable
 private fun DensityGlyph(
@@ -948,33 +869,34 @@ private fun DensityGlyph(
     Canvas(modifier = modifier.size(19.dp)) {
         val scale = size.width / 24f
         val stroke = Stroke(width = (if (emphasized) 1.9f else 1.7f) * scale)
+        val radius = CornerRadius(2.2f * scale)
         if (compact) {
-            val top = 4f * scale
-            val height = 16f * scale
-            val width = 7.5f * scale
-            val radius = CornerRadius(2f * scale)
-            listOf(3.5f, 13f).forEach { left ->
-                drawRoundRect(
-                    color = tint,
-                    topLeft = Offset(left * scale, top),
-                    size = Size(width, height),
-                    cornerRadius = radius,
-                    style = stroke,
-                )
+            val cell = 7.2f * scale
+            listOf(3.5f, 13.3f).forEach { x ->
+                listOf(3.5f, 13.3f).forEach { y ->
+                    drawRoundRect(
+                        color = tint,
+                        topLeft = Offset(x * scale, y * scale),
+                        size = Size(cell, cell),
+                        cornerRadius = radius,
+                        style = stroke,
+                    )
+                }
             }
         } else {
-            val width = 17f * scale
-            val height = 4.5f * scale
-            val radius = CornerRadius(1.6f * scale)
-            repeat(3) { index ->
-                drawRoundRect(
-                    color = tint,
-                    topLeft = Offset(3.5f * scale, (4f + index * 6f) * scale),
-                    size = Size(width, height),
-                    cornerRadius = radius,
-                    style = stroke,
-                )
-            }
+            drawRoundRect(
+                color = tint,
+                topLeft = Offset(3.5f * scale, 3.5f * scale),
+                size = Size(17f * scale, 17f * scale),
+                cornerRadius = CornerRadius(2.6f * scale),
+                style = stroke,
+            )
+            drawLine(
+                color = tint,
+                start = Offset(3.5f * scale, 12f * scale),
+                end = Offset(20.5f * scale, 12f * scale),
+                strokeWidth = stroke.width,
+            )
         }
     }
 }
