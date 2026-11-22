@@ -116,6 +116,7 @@ internal fun FullSplitUsageContent(
                     byId["weekly"]?.takeIf { it.id != primary?.id },
                 ),
                 leftLabel = primary?.let(::windowLabel) ?: "当前用量",
+                facts = glmActivityFacts(byId),
             )
         }
 
@@ -210,6 +211,7 @@ private fun FullQuotaSplit(
     leftLabel: String,
     endLabel: String = "重置",
     labelFormatter: (UsageMetric) -> String = ::windowLabel,
+    facts: List<SplitFact> = emptyList(),
 ) {
     if (primary == null) {
         EmptyUsageText()
@@ -242,6 +244,9 @@ private fun FullQuotaSplit(
                         endLabel = endLabel,
                         labelFormatter = labelFormatter,
                     )
+                }
+                if (facts.isNotEmpty()) {
+                    FullFactsGrid(facts = facts)
                 }
             }
         },
@@ -351,6 +356,9 @@ private fun FullPeriodRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            if (metric.resetCards.isNotEmpty()) {
+                ResetCardsBadge(metric = metric, style = ResetCardsBadgeStyle.Detail)
+            }
             Text(
                 text = formatPercent(percent),
                 style = MyTokenType.label.copy(fontWeight = FontWeight(650)),
@@ -512,78 +520,64 @@ private fun FullBalanceHero(
         0.0
     }
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = title,
-            modifier = Modifier.fillMaxWidth(),
-            style = MyTokenType.caption,
-            color = colors.muted,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = formatCurrency(group.balance.value, group.balance.currencyCode),
-            modifier = Modifier.padding(top = 8.dp),
-            style = MyTokenType.display,
-            color = colors.ink,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = "余额构成",
-            modifier = Modifier.padding(top = 14.dp),
-            style = MyTokenType.caption,
-            color = colors.muted,
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp)
-                .height(5.dp)
-                .clip(CircleShape)
-                .background(colors.track),
-        ) {
-            if (total.signum() > 0) {
-                if (primaryWeight > 0.0) {
-                    Box(
-                        modifier = Modifier
-                            .weight(primaryWeight.toFloat())
-                            .height(5.dp)
-                            .background(colors.ink),
+    FullSplitLayout(
+        left = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = title,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MyTokenType.caption,
+                    color = colors.muted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = formatCurrency(group.balance.value, group.balance.currencyCode),
+                    modifier = Modifier.padding(top = 8.dp),
+                    style = MyTokenType.displayCompact,
+                    color = colors.ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        },
+        right = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = "余额构成",
+                    style = MyTokenType.caption,
+                    color = colors.muted,
+                )
+                UsageCompositionMeter(
+                    primaryWeight = primaryWeight.takeIf { total.signum() > 0 },
+                    height = 11.dp,
+                )
+                FlowRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("full_balance_legend_row"),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    FullBalanceLegend(
+                        label = primaryLabel,
+                        metric = group.toppedUp,
+                        currencyCode = group.balance.currencyCode,
+                        color = colors.ink,
                     )
-                }
-                if (primaryWeight < 1.0) {
-                    Box(
-                        modifier = Modifier
-                            .weight((1.0 - primaryWeight).toFloat())
-                            .height(5.dp)
-                            .background(colors.actionFill),
+                    FullBalanceLegend(
+                        label = secondaryLabel,
+                        metric = group.granted,
+                        currencyCode = group.balance.currencyCode,
+                        color = colors.actionFill,
                     )
                 }
             }
-        }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp)
-                .testTag("full_balance_legend_row"),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            FullBalanceLegend(
-                label = primaryLabel,
-                metric = group.toppedUp,
-                currencyCode = group.balance.currencyCode,
-                color = colors.ink,
-            )
-            FullBalanceLegend(
-                label = secondaryLabel,
-                metric = group.granted,
-                currencyCode = group.balance.currencyCode,
-                color = colors.actionFill,
-            )
-        }
-    }
+        },
+    )
 }
 
 @Composable
@@ -616,33 +610,11 @@ private fun FullSecondaryBalance(group: SplitCurrencyGroup, modifier: Modifier =
                 maxLines = 1,
             )
         }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 5.dp)
-                .height(4.dp)
-                .clip(CircleShape)
-                .background(colors.track),
-        ) {
-            if (total.signum() > 0) {
-                if (primaryWeight > 0.0) {
-                    Box(
-                        modifier = Modifier
-                            .weight(primaryWeight.toFloat())
-                            .height(4.dp)
-                            .background(colors.ink),
-                    )
-                }
-                if (primaryWeight < 1.0) {
-                    Box(
-                        modifier = Modifier
-                            .weight((1.0 - primaryWeight).toFloat())
-                            .height(4.dp)
-                            .background(colors.actionFill),
-                    )
-                }
-            }
-        }
+        UsageCompositionMeter(
+            primaryWeight = primaryWeight.takeIf { total.signum() > 0 },
+            modifier = Modifier.padding(top = 5.dp),
+            height = 9.dp,
+        )
         Text(
             text = "充值 ${formatSplitMetricAmount(group.toppedUp?.value, group.toppedUp ?: group.balance)} · " +
                 "赠金 ${formatSplitMetricAmount(group.granted?.value, group.granted ?: group.balance)}",
@@ -853,6 +825,13 @@ private fun FullNewApiSplit(metrics: List<UsageMetric>) {
             FullFactsGrid(facts = newApiFacts(byId))
         },
     )
+}
+
+private fun glmActivityFacts(byId: Map<String, UsageMetric>): List<SplitFact> = buildList {
+    byId["model-calls"]?.let { add(SplitFact("调用次数", "${formatCompact(it.value)} 次")) }
+    byId["activity-total-tokens"]?.let {
+        add(SplitFact("累计 Tokens", "${formatCompact(it.value)} tokens"))
+    }
 }
 
 private fun newApiFacts(byId: Map<String, UsageMetric>): List<SplitFact> = buildList {

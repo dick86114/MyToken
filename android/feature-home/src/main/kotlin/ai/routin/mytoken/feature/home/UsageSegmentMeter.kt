@@ -78,3 +78,57 @@ internal fun UsageSegmentMeter(
         }
     }
 }
+
+/**
+ * 余额构成的分段条：左段墨色表示充值/现金，右段黄色表示赠送。
+ * [primaryWeight] 为 null 时整条回到轨道色（没有可拆分的构成）。
+ */
+@Composable
+internal fun UsageCompositionMeter(
+    primaryWeight: Double?,
+    modifier: Modifier = Modifier,
+    height: Dp = 9.dp,
+) {
+    val colors = MyTokenThemeTokens.colors
+    val motionEnabled = rememberMyTokenMotionEnabled()
+    val target = (primaryWeight ?: 0.0).coerceIn(0.0, 1.0).toFloat()
+    val animatedWeight by animateFloatAsState(
+        targetValue = target,
+        animationSpec = tween(
+            durationMillis = MyTokenMotion.ringDurationMillis(motionEnabled),
+        ),
+        label = "usageCompositionMeter",
+    )
+    val primaryCells = if (primaryWeight == null) {
+        0
+    } else {
+        (animatedWeight * SegmentCells).roundToInt().coerceIn(0, SegmentCells)
+    }
+    val shape = RoundedCornerShape(4.dp)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(height)
+            .clip(shape)
+            .background(colors.subtle)
+            .border(1.dp, colors.line, shape)
+            .padding(2.dp)
+            .testTag("usage_composition_meter"),
+        horizontalArrangement = Arrangement.spacedBy(1.dp),
+    ) {
+        repeat(SegmentCells) { index ->
+            val color = when {
+                primaryWeight == null -> colors.track
+                index < primaryCells -> colors.ink
+                else -> colors.actionFill
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(1.dp))
+                    .background(color),
+            )
+        }
+    }
+}

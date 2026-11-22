@@ -278,7 +278,7 @@ class HomeScreenTest {
 
     @Test
     @Config(qualifiers = "w400dp-h1100dp")
-    fun fullGlmCardShowsOnlyPrimaryResetCardChip() {
+    fun fullGlmCardShowsResetCardsForBothWindows() {
         val credential = credential("GLM 完整模式", ProviderId.Glm)
         val testCard = card(
             credential,
@@ -295,7 +295,7 @@ class HomeScreenTest {
         }
 
         composeRule.onNodeWithContentDescription("2 张重置卡").assertExists()
-        composeRule.onNodeWithContentDescription("1 张重置卡").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("1 张重置卡").assertExists()
     }
 
     @Test
@@ -383,7 +383,7 @@ class HomeScreenTest {
 
     @Test
     @Config(qualifiers = "w400dp-h900dp")
-    fun compactValueGridUsesSpacingNotDividers() {
+    fun compactNewApiCardShowsOneMetricPerRow() {
         val credential = credential("New API 统计", ProviderId.NewAPI)
         val metrics = listOf(
             token("today-token", "今日 Token", 14_873_680.0),
@@ -415,9 +415,9 @@ class HomeScreenTest {
             .getUnclippedBoundsInRoot()
         val third = composeRule.onNodeWithText("近 7 天 Token", useUnmergedTree = true)
             .getUnclippedBoundsInRoot()
-        assertEquals(first.top.value, second.top.value, 0.5f)
-        assertTrue(second.left.value > first.left.value)
-        assertTrue(third.top.value > first.top.value)
+        assertTrue("New API 简洁卡每个数据占一行，第二个指标应在下一行", second.top.value > first.top.value)
+        assertEquals("每行数据左对齐", first.left.value, second.left.value, 0.5f)
+        assertTrue(third.top.value > second.top.value)
 
         val source = java.io.File(System.getProperty("user.dir"))
             .walkTopDown()
@@ -773,7 +773,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun fullPrimaryResetChipSitsNextToItsLabel() {
+    fun fullResetChipsSitNextToTheirLabels() {
         val credential = credential("完整重置卡", ProviderId.Glm)
         val testCard = card(
             credential,
@@ -796,15 +796,20 @@ class HomeScreenTest {
         val chips = composeRule.onAllNodesWithTag("reset_chip", useUnmergedTree = true)
             .fetchSemanticsNodes()
             .map { it.boundsInRoot }
-        assertEquals("完整卡只保留主指标重置 chip", 1, chips.size)
-        val primaryLabel = composeRule.onNodeWithText("5 小时用量", useUnmergedTree = true)
-            .getUnclippedBoundsInRoot()
-        assertTrue(
-            "主指标 chip 应在标签右侧同一行",
-            chips[0].left >= primaryLabel.right.value - 1f &&
-                chips[0].top < primaryLabel.bottom.value,
-        )
-        composeRule.onNodeWithContentDescription("1 张重置卡").assertDoesNotExist()
+        assertEquals("完整卡两个窗口各自保留重置 chip", 2, chips.size)
+        listOf("5 小时用量", "本周用量").forEach { label ->
+            val labelBounds = composeRule.onNodeWithText(label, useUnmergedTree = true)
+                .getUnclippedBoundsInRoot()
+            assertTrue(
+                "$label 的重置 chip 应在标签右侧同一行",
+                chips.any { chip ->
+                    chip.left >= labelBounds.right.value - 1f &&
+                        chip.top < labelBounds.bottom.value &&
+                        chip.bottom > labelBounds.top.value
+                },
+            )
+        }
+        composeRule.onNodeWithContentDescription("1 张重置卡").assertExists()
     }
 
     @Test
@@ -957,6 +962,15 @@ class HomeScreenTest {
         composeRule.onNodeWithText("余额构成").assertIsDisplayed()
         composeRule.onNodeWithTag("full_balance_legend_row", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithTag("full_balance_facts", useUnmergedTree = true).assertDoesNotExist()
+        val composition = composeRule.onNodeWithTag("usage_composition_meter", useUnmergedTree = true)
+            .assertExists()
+            .getUnclippedBoundsInRoot()
+        val amount = composeRule.onNodeWithText("¥38.40", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        assertTrue(
+            "余额构成条应移到金额右侧，meter.left=${composition.left.value} amount.right=${amount.right.value}",
+            composition.left.value > amount.right.value,
+        )
     }
 
     @Test
@@ -1795,7 +1809,7 @@ class HomeScreenTest {
 
     @Test
     @Config(qualifiers = "w400dp-h1100dp")
-    fun fullGlmCardShowsPeriodLedgerWithoutActivityFacts() {
+    fun fullGlmCardShowsCallsTokensAndWeeklyResetCard() {
         val credential = credential("GLM 完整模式", ProviderId.Glm)
         fun valueMetric(id: String, label: String, value: Double, unit: UsageMetricUnit) =
             UsageMetric(
@@ -1847,11 +1861,15 @@ class HomeScreenTest {
         composeRule.onNodeWithText("5 小时用量").assertIsDisplayed()
         composeRule.onNodeWithText("本周用量").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("2 张重置卡").assertExists()
-        composeRule.onNodeWithContentDescription("1 张重置卡").assertDoesNotExist()
-        composeRule.onNodeWithText("模型调用").assertDoesNotExist()
-        composeRule.onNodeWithText("22 次").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("1 张重置卡").assertExists()
+        composeRule.onNodeWithText("× 2", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("× 1", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("重置卡 2", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithText("调用次数").assertIsDisplayed()
+        composeRule.onNodeWithText("22 次").assertIsDisplayed()
         composeRule.onNodeWithText("MCP 调用").assertDoesNotExist()
-        composeRule.onNodeWithText("累计 Tokens").assertDoesNotExist()
+        composeRule.onNodeWithText("累计 Tokens").assertIsDisplayed()
+        composeRule.onNodeWithText("1.89B tokens").assertIsDisplayed()
     }
 
     @Test
@@ -3038,6 +3056,70 @@ class HomeScreenTest {
     }
 
     @Test
+    fun 下滑时先滚回卡片再展开报告() {
+        val cards = (1..8).map { index ->
+            card(credential("先卡片 $index"), metrics = listOf(progress(90.0, 100.0)))
+        }
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = cards,
+                        groups = emptyList(),
+                        credentialCount = cards.size,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        val navBottom = composeRule.onNodeWithTag("home_toolbar")
+            .getUnclippedBoundsInRoot()
+            .bottom
+        composeRule.onNodeWithTag("home_list_full").performTouchInput {
+            swipeUp(startY = height * 0.8f, endY = height * 0.15f, durationMillis = 300)
+        }
+        composeRule.waitForIdle()
+        val collapsed = composeRule.onNodeWithTag("home_health_report")
+            .getUnclippedBoundsInRoot()
+        assertTrue(
+            "上滑后报告应收起，实际底部 ${collapsed.bottom.value}",
+            collapsed.bottom.value <= navBottom.value + 2f,
+        )
+
+        // 卡片尚未回到顶部时，下滑只滚动卡片，不应提前把报告拉回来。
+        composeRule.onNodeWithTag("home_list_full").performTouchInput {
+            swipeDown(startY = height * 0.2f, endY = height * 0.45f, durationMillis = 300)
+        }
+        composeRule.waitForIdle()
+        val stillCollapsed = composeRule.onNodeWithTag("home_health_report")
+            .getUnclippedBoundsInRoot()
+        assertTrue(
+            "卡片未回到顶部前报告应保持收起，实际底部 ${stillCollapsed.bottom.value}",
+            stillCollapsed.bottom.value <= navBottom.value + 2f,
+        )
+
+        repeat(3) {
+            composeRule.onNodeWithTag("home_list_full").performTouchInput {
+                swipeDown(startY = height * 0.15f, endY = height * 0.9f, durationMillis = 300)
+            }
+            composeRule.waitForIdle()
+        }
+        val restored = composeRule.onNodeWithTag("home_health_report")
+            .getUnclippedBoundsInRoot()
+        assertTrue(
+            "卡片回到顶部后继续下滑才展开报告，实际底部 ${restored.bottom.value}",
+            restored.bottom.value > navBottom.value + 100f,
+        )
+    }
+
+    @Test
     fun 多条风险报告展开时首张卡片紧贴工具条() {
         val cards = (1..8).map { index ->
             card(credential("贴边 $index"), metrics = listOf(progress(90.0, 100.0)))
@@ -3550,8 +3632,16 @@ class HomeScreenTest {
         composeRule.onNodeWithTag("home_update_star", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithTag("home_update_banner").assertIsDisplayed()
         composeRule.onNodeWithText("发现新版本 6.1.0", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithText("点击更新", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithText("去更新", useUnmergedTree = true).assertDoesNotExist()
         val banner = composeRule.onNodeWithTag("home_update_banner")
             .getUnclippedBoundsInRoot()
+        val action = composeRule.onNodeWithTag("home_update_action", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        assertTrue(
+            "更新文案应离开右边缘，banner.right=${banner.right.value} action.right=${action.right.value}",
+            banner.right.value - action.right.value >= 18f,
+        )
         val report = composeRule.onNodeWithTag("home_health_report")
             .getUnclippedBoundsInRoot()
         assertTrue(

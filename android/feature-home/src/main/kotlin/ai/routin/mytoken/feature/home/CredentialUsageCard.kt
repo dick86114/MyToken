@@ -10,6 +10,7 @@ import ai.routin.mytoken.core.ui.MyTokenDialogTone
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
+import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageCardDensity
 import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
@@ -216,7 +217,10 @@ private fun CompactUsageCardBody(card: CredentialCardUi, health: UsageCardHealth
             health = health,
         )
 
-        CompactUsageArrangement.ValueTiles -> CompactValueGrid(metrics = metrics)
+        CompactUsageArrangement.ValueTiles -> CompactValueGrid(
+            metrics = metrics,
+            singleColumn = card.credential.providerId == ProviderId.NewAPI,
+        )
     }
 }
 
@@ -370,14 +374,18 @@ private fun CompactBalanceLayout(
 }
 
 @Composable
-private fun CompactValueGrid(metrics: List<UsageMetric>) {
+private fun CompactValueGrid(
+    metrics: List<UsageMetric>,
+    singleColumn: Boolean = false,
+) {
+    val columns = if (singleColumn) 1 else 2
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 2.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        metrics.chunked(2).forEach { rowMetrics ->
+        metrics.chunked(columns).forEach { rowMetrics ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -386,7 +394,7 @@ private fun CompactValueGrid(metrics: List<UsageMetric>) {
                 rowMetrics.forEach { metric ->
                     CompactValueCell(metric = metric, modifier = Modifier.weight(1f))
                 }
-                repeat(2 - rowMetrics.size) { Spacer(modifier = Modifier.weight(1f)) }
+                repeat(columns - rowMetrics.size) { Spacer(modifier = Modifier.weight(1f)) }
             }
         }
     }

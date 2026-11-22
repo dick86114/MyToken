@@ -26,6 +26,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
@@ -199,6 +200,88 @@ class CredentialDetailScreenTest {
                     .isNotEmpty(),
             )
         }
+        assertEquals(
+            "每个币种余额卡应为小票据样式",
+            2,
+            composeRule.onAllNodesWithTag("detail_balance_ticket", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .size,
+        )
+        assertTrue(
+            "余额构成应使用分段条",
+            composeRule.onAllNodesWithTag("usage_composition_meter", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isNotEmpty(),
+        )
+    }
+
+    @Test
+    fun detailWindowsUseSegmentedMeter() {
+        val metric = progress("five-hour").copy(
+            label = "5 小时用量",
+            windowEnd = fetchedAt.plusSeconds(3600),
+        )
+        composeRule.setContent {
+            MyTokenTheme {
+                CredentialDetailScreen(
+                    card = card(metrics = listOf(metric)),
+                    onBack = {},
+                    onRefresh = {},
+                    onEdit = {},
+                    onDelete = {},
+                )
+            }
+        }
+
+        assertTrue(
+            "详情页进度条应使用十二格分段仪表",
+            composeRule.onAllNodesWithTag("usage_segment_meter", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isNotEmpty(),
+        )
+    }
+
+    @Test
+    fun detailShowsAllRemainingMetricValues() {
+        fun value(id: String, label: String, value: Double, unit: UsageMetricUnit) = UsageMetric(
+            id = id,
+            label = label,
+            value = BigDecimal.valueOf(value),
+            unit = unit,
+            presentation = UsageMetricPresentation.Value,
+            semantic = UsageMetricSemantic.Value,
+            healthState = UsageMetricHealthState.Normal,
+        )
+        val card = card(
+            credential = credential(ProviderId.Glm),
+            metrics = listOf(
+                progress("five-hour").copy(label = "5 小时用量"),
+                value("model-calls", "模型调用量", 22.0, UsageMetricUnit.Request),
+                value("activity-total-tokens", "累计 Token 数", 1_890_000_000.0, UsageMetricUnit.Token),
+                value("zcode-mcp", "MCP 调用量", 461.0, UsageMetricUnit.Request),
+            ),
+        )
+        composeRule.setContent {
+            MyTokenTheme {
+                CredentialDetailScreen(
+                    card = card,
+                    onBack = {},
+                    onRefresh = {},
+                    onEdit = {},
+                    onDelete = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("用量明细", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        listOf("模型调用量", "22 次", "累计 Token 数", "1.89B tokens", "MCP 调用量", "461 次")
+            .forEach { text ->
+                composeRule.onNodeWithText(text, useUnmergedTree = true)
+                    .performScrollTo()
+                    .assertIsDisplayed()
+            }
     }
 
     @Test
@@ -244,6 +327,13 @@ class CredentialDetailScreenTest {
                 bounds.bottom - bounds.top >= 48.dp,
             )
         }
+        val root = composeRule.onRoot().getUnclippedBoundsInRoot()
+        val delete = composeRule.onNodeWithContentDescription("删除凭证", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        assertTrue(
+            "删除按钮应离开右边缘，root.right=${root.right.value} delete.right=${delete.right.value}",
+            root.right.value - delete.right.value >= 8f,
+        )
         composeRule.onNodeWithContentDescription("更多操作", useUnmergedTree = true)
             .assertDoesNotExist()
     }

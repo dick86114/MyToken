@@ -1,6 +1,7 @@
 package ai.routin.mytoken.feature.home
 
 import ai.routin.mytoken.core.ui.MyTokenRadius
+import ai.routin.mytoken.core.ui.MyTokenReportBodyShape
 import ai.routin.mytoken.core.ui.MyTokenRow
 import ai.routin.mytoken.core.ui.MyTokenSection
 import ai.routin.mytoken.core.ui.MyTokenStatus
@@ -247,32 +248,10 @@ private fun BalanceHero(card: CredentialCardUi, balance: UsageMetric) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(5.dp)
-                .clip(CircleShape)
-                .background(colors.track),
-        ) {
-            if (total.signum() > 0) {
-                if (primaryWeight > 0.0) {
-                    Box(
-                        modifier = Modifier
-                            .weight(primaryWeight.toFloat())
-                            .height(5.dp)
-                            .background(colors.ink),
-                    )
-                }
-                if (primaryWeight < 1.0) {
-                    Box(
-                        modifier = Modifier
-                            .weight((1.0 - primaryWeight).toFloat())
-                            .height(5.dp)
-                            .background(colors.actionFill),
-                    )
-                }
-            }
-        }
+        UsageCompositionMeter(
+            primaryWeight = primaryWeight.takeIf { total.signum() > 0 },
+            height = 9.dp,
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             BalanceLegend("充值", toppedUp?.value, balance.currencyCode, colors.ink)
             BalanceLegend("赠金", granted?.value, balance.currencyCode, colors.actionFill)
@@ -351,7 +330,9 @@ internal fun DetailWindowsSection(card: CredentialCardUi) {
                     color = MyTokenThemeTokens.colors.muted,
                 )
             } else {
-                balances.forEach { balance ->
+                val primaries = balances.filterNot { isBalanceComponentId(it.id) }
+                    .ifEmpty { balances }
+                primaries.forEach { balance ->
                     CurrencyBalanceRow(card = card, balance = balance)
                 }
             }
@@ -361,6 +342,45 @@ internal fun DetailWindowsSection(card: CredentialCardUi) {
             }
         }
     }
+}
+
+/** 详情页兜底：把接口返回、但未进入窗口/余额/Facts 的指标全部列出来。 */
+@Composable
+internal fun DetailMetricsSection(card: CredentialCardUi) {
+    // 这些指标已经在「套餐与订阅」里以专用文案展示，避免详情页出现重复行。
+    val factsHandledIds = buildSet {
+        add("purchased-remaining")
+        add("free-remaining")
+        if (card.credential.providerId == ProviderId.CommandCode) add("request-count")
+    }
+    val metrics = card.snapshot?.metrics.orEmpty().filter {
+        (it.presentation == UsageMetricPresentation.Value ||
+            it.presentation == UsageMetricPresentation.Status) &&
+            it.id !in factsHandledIds
+    }
+    if (metrics.isEmpty()) return
+
+    MyTokenSection(
+        title = "用量明细",
+        modifier = Modifier.testTag("detail_metrics"),
+    ) {
+        FactGrid(
+            rows = metrics.map { metric ->
+                metric.label.ifBlank { metric.id } to formatDetailMetricValue(metric)
+            },
+        )
+    }
+}
+
+internal fun formatDetailMetricValue(metric: UsageMetric): String = when {
+    metric.id.contains("duration") -> formatUsageDuration(metric.value)
+    metric.unit == UsageMetricUnit.Currency ->
+        formatCurrency(metric.value, metric.currencyCode)
+    metric.unit == UsageMetricUnit.Token -> "${formatCompact(metric.value)} tokens"
+    metric.unit == UsageMetricUnit.Request -> "${formatCompact(metric.value)} 次"
+    metric.unit == UsageMetricUnit.Boolean_ ->
+        if ((metric.value ?: BigDecimal.ZERO).signum() > 0) "是" else "否"
+    else -> formatDecimal(metric.value)
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -399,15 +419,11 @@ private fun DetailWindowRow(metric: UsageMetric) {
                 },
             )
         }
-        UsageProgressBar(
+        UsageSegmentMeter(
             percent = percent,
-            color = when (tone) {
-                UsageMetricTone.Warning -> colors.warningFill
-                UsageMetricTone.Critical -> colors.criticalFill
-                UsageMetricTone.Normal -> colors.ink
-            },
+            tone = tone,
             modifier = Modifier.padding(top = 7.dp),
-            height = 4.dp,
+            height = 11.dp,
         )
         Row(
             modifier = Modifier
@@ -477,7 +493,16 @@ private fun CurrencyBalanceRow(card: CredentialCardUi, balance: UsageMetric) {
     val secondaryValue = granted?.value ?: BigDecimal.ZERO
     val total = primaryValue + secondaryValue
     val primaryWeight = if (total.signum() > 0) primaryValue.toDouble() / total.toDouble() else 0.0
-    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
+            .background(colors.surface, MyTokenReportBodyShape)
+            .border(1.dp, colors.line, MyTokenReportBodyShape)
+            .padding(12.dp)
+            .testTag("detail_balance_ticket"),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
                 text = "${balance.currencyCode ?: "余额"} 账户",
@@ -492,32 +517,10 @@ private fun CurrencyBalanceRow(card: CredentialCardUi, balance: UsageMetric) {
                 maxLines = 1,
             )
         }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(4.dp)
-                .clip(CircleShape)
-                .background(colors.track),
-        ) {
-            if (total.signum() > 0) {
-                if (primaryWeight > 0.0) {
-                    Box(
-                        modifier = Modifier
-                            .weight(primaryWeight.toFloat())
-                            .height(4.dp)
-                            .background(colors.ink),
-                    )
-                }
-                if (primaryWeight < 1.0) {
-                    Box(
-                        modifier = Modifier
-                            .weight((1.0 - primaryWeight).toFloat())
-                            .height(4.dp)
-                            .background(colors.actionFill),
-                    )
-                }
-            }
-        }
+        UsageCompositionMeter(
+            primaryWeight = primaryWeight.takeIf { total.signum() > 0 },
+            height = 9.dp,
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             BalanceLegend("充值", toppedUp?.value, balance.currencyCode, colors.ink)
             BalanceLegend("赠金", granted?.value, balance.currencyCode, colors.actionFill)
@@ -717,6 +720,14 @@ internal fun DetailConfigSection(
         }
     }
 }
+
+/** 充值/赠金等构成项由余额卡内部的图例展示，不再单独占一张票据。 */
+private fun isBalanceComponentId(id: String): Boolean = listOf(
+    "toppedUpBalance",
+    "grantedBalance",
+    "cash-balance",
+    "gift-balance",
+).any(id::startsWith)
 
 private fun findBalanceMetric(
     card: CredentialCardUi,

@@ -38,9 +38,8 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.testTag
@@ -332,7 +331,7 @@ internal fun ResetCardsBadge(
                 modifier = Modifier.size(width = 9.dp, height = 8.dp),
             )
             Text(
-                text = if (detail) "重置卡 ${cards.size}" else cards.size.toString(),
+                text = if (detail) "× ${cards.size}" else cards.size.toString(),
                 style = MyTokenType.micro,
                 fontWeight = FontWeight(650),
                 color = colors.muted,
@@ -382,29 +381,29 @@ internal fun ResetCardsBadge(
     }
 }
 
-/** 设计稿叠卡图标：一张完整卡片 + 右上角露出的后卡折角。 */
+/** 小票据图标：票据轮廓 + 虚线撕口，用于重置卡数量。 */
 @Composable
 internal fun ResetCardsGlyph(color: Color, modifier: Modifier = Modifier) {
     Canvas(modifier = modifier) {
         val stroke = 1.dp.toPx()
         val w = size.width
         val h = size.height
-        val back = Path().apply {
-            moveTo(w * 0.25f, stroke / 2f)
-            lineTo(w * 0.94f, stroke / 2f)
-            lineTo(w * 0.94f, h * 0.78f)
-        }
-        drawPath(
-            path = back,
-            color = color,
-            style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round),
-        )
+        val inset = stroke / 2f
         drawRoundRect(
             color = color,
-            topLeft = Offset(stroke / 2f, h * 0.28f),
-            size = Size(w * 0.70f, h * 0.64f),
-            cornerRadius = CornerRadius(w * 0.128f, w * 0.128f),
+            topLeft = Offset(inset, h * 0.16f),
+            size = Size(w - inset * 2f, h * 0.72f),
+            cornerRadius = CornerRadius(w * 0.10f, w * 0.10f),
             style = Stroke(width = stroke),
+        )
+        drawLine(
+            color = color,
+            start = Offset(w * 0.36f, h * 0.24f),
+            end = Offset(w * 0.36f, h * 0.80f),
+            strokeWidth = stroke,
+            pathEffect = PathEffect.dashPathEffect(
+                floatArrayOf(w * 0.08f, w * 0.08f),
+            ),
         )
     }
 }
@@ -634,7 +633,7 @@ private fun glmActivityText(metric: UsageMetric): String = when (metric.id) {
     else -> formatDecimal(metric.value)
 }
 
-private fun formatUsageDuration(milliseconds: BigDecimal?): String {
+internal fun formatUsageDuration(milliseconds: BigDecimal?): String {
     if (milliseconds == null) return "-"
     val totalMinutes = milliseconds.divide(BigDecimal(60_000), 0, RoundingMode.DOWN).toLong()
     val days = totalMinutes / (24 * 60)

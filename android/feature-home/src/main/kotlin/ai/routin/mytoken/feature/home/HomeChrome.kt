@@ -341,7 +341,10 @@ internal fun HomeUpdateBanner(
             )
         }
         Text(
-            text = "去更新",
+            text = "点击更新",
+            modifier = Modifier
+                .padding(end = 10.dp)
+                .testTag("home_update_action"),
             style = MyTokenType.caption,
             fontWeight = FontWeight.SemiBold,
             color = colors.actionText,

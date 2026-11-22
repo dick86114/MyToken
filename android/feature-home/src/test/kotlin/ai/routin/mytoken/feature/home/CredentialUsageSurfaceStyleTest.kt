@@ -61,6 +61,39 @@ class CredentialUsageSurfaceStyleTest {
     }
 
     @Test
+    fun `完整卡补回调用事实并把余额构成移到右侧`() {
+        val full = sourceText("FullSplitUsageContent.kt")
+        assertTrue("GLM 完整卡展示调用次数", full.contains("调用次数"))
+        assertTrue("GLM 完整卡展示累计 Tokens", full.contains("累计 Tokens"))
+        val balanceHero = full
+            .substringAfter("private fun FullBalanceHero")
+            .substringBefore("@Composable\nprivate fun FullSecondaryBalance")
+        assertTrue("余额构成改为左右分栏", balanceHero.contains("FullSplitLayout("))
+        assertTrue("余额构成使用分段条", balanceHero.contains("UsageCompositionMeter("))
+    }
+
+    @Test
+    fun `重置卡徽标只显示图标与数量`() {
+        val grid = sourceText("UsageMetricGrid.kt")
+        assertTrue("完整/详情徽标显示 × 数量", grid.contains("\"× "))
+        assertFalse("徽标不再写重置卡文字", grid.contains("\"重置卡 "))
+    }
+
+    @Test
+    fun `详情页沿用分段仪表与票据余额卡`() {
+        val detail = sourceText("CredentialDetailHero.kt")
+        val screen = sourceText("CredentialDetailScreen.kt")
+        assertTrue("详情窗口使用分段仪表", detail.contains("UsageSegmentMeter("))
+        assertTrue("详情余额构成使用分段条", detail.contains("UsageCompositionMeter("))
+        assertTrue("余额行改为小票据", detail.contains("MyTokenReportBodyShape"))
+        assertTrue("票据行有测试标记", detail.contains("detail_balance_ticket"))
+        assertTrue(
+            "删除按钮离开右边缘",
+            screen.contains("modifier = Modifier.padding(end = 8.dp).testTag(\"detail_delete\")"),
+        )
+    }
+
+    @Test
     fun `简洁卡片使用骨架与迷你窗口行`() {
         assertTrue(source.contains("UsageCardFrame"))
         assertTrue(source.contains("UsageCardIdentity"))
@@ -225,9 +258,8 @@ class CredentialUsageSurfaceStyleTest {
             sourceText("UsageCardSkeleton.kt").contains("UsageMetricTone.Normal -> colors.ink"),
         )
         assertTrue(
-            "详情页细条正常态应使用墨色",
-            Regex("UsageMetricTone\\.Normal -> colors\\.ink")
-                .findAll(sourceText("CredentialDetailHero.kt")).count() >= 2,
+            "详情页进度条改用分段仪表",
+            sourceText("CredentialDetailHero.kt").contains("UsageSegmentMeter("),
         )
         assertTrue(
             "紧凑卡窗口行改用分段仪表",
@@ -250,8 +282,7 @@ class CredentialUsageSurfaceStyleTest {
         ).forEach { composition ->
             assertFalse("额度构成不再使用灰色分类色", composition.contains("colors.cat1"))
             assertFalse("额度构成不再使用灰色分类色", composition.contains("colors.cat2"))
-            assertTrue("充值/现金构成条应为黑色", composition.contains(".background(colors.ink)"))
-            assertTrue("赠送构成条应为黄色", composition.contains(".background(colors.actionFill)"))
+            assertTrue("额度构成改用统一分段条", composition.contains("UsageCompositionMeter("))
         }
 
         val detail = sourceText("CredentialDetailHero.kt")
@@ -263,9 +294,12 @@ class CredentialUsageSurfaceStyleTest {
         ).forEach { composition ->
             assertFalse("详情页额度构成不再使用灰色分类色", composition.contains("colors.cat1"))
             assertFalse("详情页额度构成不再使用灰色分类色", composition.contains("colors.cat2"))
-            assertTrue("详情页充值构成条应为黑色", composition.contains(".background(colors.ink)"))
-            assertTrue("详情页赠送构成条应为黄色", composition.contains(".background(colors.actionFill)"))
+            assertTrue("详情页构成条改用统一分段条", composition.contains("UsageCompositionMeter("))
         }
+
+        val meter = sourceText("UsageSegmentMeter.kt")
+        assertTrue("充值/现金构成段为墨色", meter.contains("index < primaryCells -> colors.ink"))
+        assertTrue("赠送构成段为黄色", meter.contains("else -> colors.actionFill"))
     }
 
     private fun sourceText(name: String): String {

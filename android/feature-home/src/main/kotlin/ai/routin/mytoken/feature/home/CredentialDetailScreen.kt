@@ -157,6 +157,7 @@ fun CredentialDetailScreen(
             ) {
                 DetailHero(card = card, nextRefreshAt = nextRefreshAt)
                 DetailWindowsSection(card = card)
+                DetailMetricsSection(card = card)
                 DetailFactsSection(card = card)
                 DetailConfigSection(
                     metadata = card.credential.metadata,
@@ -227,7 +228,7 @@ private fun DetailTopBar(
                 TopBarIconButton(
                     contentDescription = "删除凭证",
                     onClick = onDelete,
-                    modifier = Modifier.testTag("detail_delete"),
+                    modifier = Modifier.padding(end = 8.dp).testTag("detail_delete"),
                     icon = {
                         Icon(
                             imageVector = Icons.Filled.Delete,
