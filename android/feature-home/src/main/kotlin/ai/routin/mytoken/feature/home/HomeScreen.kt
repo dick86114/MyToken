@@ -167,6 +167,7 @@ fun HomeScreen(
     var pullSettleJob by remember { mutableStateOf<Job?>(null) }
     var pendingLocateId by remember { mutableStateOf<UUID?>(null) }
     var showUpdateDialog by remember { mutableStateOf(false) }
+    var pagerHasUserInput by remember { mutableStateOf(false) }
 
     val density = LocalDensity.current
     val topNavHeightPx = with(density) { 60.dp.toPx() }
@@ -176,6 +177,14 @@ fun HomeScreen(
     val chromeVisible = !state.isLoading && allCards.isNotEmpty()
     val latestRefreshing by rememberUpdatedState(state.isRefreshingAll)
     val latestRefreshAll by rememberUpdatedState(onRefreshAll)
+    // 刷新仍在后台进行，但用户一旦上滑就立即收起顶部指示器，避免它长期残留在页面顶端。
+    fun dismissPullIndicator() {
+        if (pullOffsetPx <= 0f && !pullTriggered) return
+        pullSettleJob?.cancel()
+        pullSettleJob = null
+        pullTriggered = false
+        pullOffsetPx = 0f
+    }
     // 列表原生滚动；头部在 onPostScroll 里同步跟随，不再拦截 fling。
     val pullConnection = remember {
         object : NestedScrollConnection {
@@ -186,6 +195,7 @@ fun HomeScreen(
                 if (source != NestedScrollSource.UserInput) return Offset.Zero
                 if (available.y < 0f) {
                     pullArmed = false
+                    dismissPullIndicator()
                     return Offset.Zero
                 }
                 if (!pullArmed || latestRefreshing || collapsedPx > 0f) {
@@ -249,10 +259,10 @@ fun HomeScreen(
 
     // 程序化定位不会派发 nested scroll；直接读第一张卡的布局位移来同步头部。
     // 首卡 offset 恰为负的列表滚动量，offset 缺失即已滚过整块头部。
-    fun collapseTargetFromList(): Float {
+    fun collapseTargetFromList(density: UsageCardDensity = usageCardDensity): Float {
         val max = headerHeightPx.toFloat()
         if (max <= 0f) return 0f
-        val firstCardOffset = when (homeScrollMode(usageCardDensity, screenWidthDp)) {
+        val firstCardOffset = when (homeScrollMode(density, screenWidthDp)) {
             HomeScrollMode.FullList ->
                 homeScrollStates.full.layoutInfo.visibleItemsInfo
                     .firstOrNull { it.index == 0 }?.offset
@@ -287,13 +297,26 @@ fun HomeScreen(
             .collect { page ->
                 val settled =
                     if (page == 0) UsageCardDensity.COMPACT else UsageCardDensity.FULL
+                // 两页各自保留滚动位置；切页后头部必须对齐新页，而不是沿用上一页的收起量。
+                collapsedPx = collapseTargetFromList(settled)
                 if (settled != latestDensity) latestToggleDensity()
+            }
+    }
+
+    // 用户一旦亲手滑过分页，就由手势与落页结果决定模式；晚到的旧密度回调不能抢回页面。
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.isScrollInProgress }
+            .distinctUntilChanged()
+            .collect { scrolling ->
+                if (scrolling) pagerHasUserInput = true
             }
     }
 
     // 顶部按钮切换模式时，让整页平滑滑到目标页而不是直接跳变；同时覆盖
     // 连续点击（动画进行中反向点击）的情况，targetPage 不同就重新定向。
+    // 用户已经滑过分页后跳过，避免与快速反滑或延迟落库的旧回调打架。
     LaunchedEffect(usageCardDensity) {
+        if (pagerHasUserInput) return@LaunchedEffect
         val target = if (usageCardDensity == UsageCardDensity.COMPACT) 0 else 1
         if (pagerState.settledPage != target || pagerState.targetPage != target) {
             if (motionEnabled) pagerState.animateScrollToPage(target) else pagerState.scrollToPage(target)
@@ -652,6 +675,7 @@ fun HomeScreen(
                                             if (dragAmount < 0f) {
                                                 // 同一次手势只要向上滚过，就要求重新起手才能下拉刷新。
                                                 pullArmed = false
+                                                dismissPullIndicator()
                                                 // dispatchRawDelta 正值向列表尾部滚动，与手势方向相反。
                                                 val consumed = activeScrollableState().dispatchRawDelta(-dragAmount)
                                                 collapsedPx = (collapsedPx + consumed)

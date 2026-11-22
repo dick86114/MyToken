@@ -30,7 +30,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Text
@@ -206,10 +205,9 @@ private fun CompactUsageCardBody(card: CredentialCardUi, health: UsageCardHealth
     when (CompactUsageCardPresentation.arrangement(metrics)) {
         CompactUsageArrangement.Balance -> CompactBalanceLayout(
             metric = metrics.first(),
-            composition = CompactBalanceCompositionPolicy.segments(
+            granted = CompactBalanceCompositionPolicy.segments(
                 card.snapshot?.metrics.orEmpty(),
-            ),
-            modelCount = card.snapshot?.allowedModels.orEmpty().size,
+            ).firstOrNull { it.kind == CompactBalanceSegmentKind.Granted }?.value,
         )
 
         CompactUsageArrangement.RingWithWindows -> CompactRingWithWindows(
@@ -264,7 +262,7 @@ private fun CompactRingWithWindows(
             }
         }
 
-        val miniRows = compactMiniRows(card = card, metrics = metrics)
+        val miniRows = compactMiniRows(metrics = metrics)
         if (miniRows.isNotEmpty()) {
             Column(
                 modifier = Modifier
@@ -272,41 +270,16 @@ private fun CompactRingWithWindows(
                     .padding(top = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(5.dp),
             ) {
-                miniRows.forEach { row ->
-                    when (row) {
-                        is CompactMiniRow.Progress -> CompactMiniProgressRow(row.metric)
-                        is CompactMiniRow.Text -> CompactMiniTextRow(row.label, row.value)
-                    }
+                miniRows.forEach { metric ->
+                    CompactMiniProgressRow(metric)
                 }
             }
         }
     }
 }
 
-private sealed interface CompactMiniRow {
-    data class Progress(val metric: UsageMetric) : CompactMiniRow
-    data class Text(val label: String, val value: String) : CompactMiniRow
-}
-
-private fun compactMiniRows(
-    card: CredentialCardUi,
-    metrics: List<UsageMetric>,
-): List<CompactMiniRow> = buildList {
-    metrics.drop(1)
-        .filter { it.presentation == UsageMetricPresentation.Progress }
-        .forEach { add(CompactMiniRow.Progress(it)) }
-
-    val usageKind = card.credential.metadata[ai.routin.mytoken.domain.model.CredentialMetadataKey.UsageKind]
-        ?: card.snapshot?.usageKind
-    if (usageKind == "plan" || usageKind == "tokenPack") {
-        val plan = metrics.firstOrNull()
-        val remaining = plan?.remaining
-        val limit = plan?.limit
-        if (remaining != null && limit != null) {
-            add(CompactMiniRow.Text("剩余", "${formatCompact(remaining)} / ${formatCompact(limit)}"))
-        }
-    }
-}
+private fun compactMiniRows(metrics: List<UsageMetric>): List<UsageMetric> =
+    metrics.drop(1).filter { it.presentation == UsageMetricPresentation.Progress }
 
 @Composable
 private fun CompactMiniProgressRow(metric: UsageMetric) {
@@ -351,45 +324,11 @@ private fun CompactMiniProgressRow(metric: UsageMetric) {
 }
 
 @Composable
-private fun CompactMiniTextRow(label: String, value: String) {
-    val colors = MyTokenThemeTokens.colors
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(18.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = label,
-            style = MyTokenType.caption,
-            color = colors.muted,
-            maxLines = 1,
-        )
-        Spacer(modifier = Modifier.weight(1f))
-        Text(
-            text = value,
-            style = MyTokenType.caption.copy(
-                fontWeight = FontWeight.SemiBold,
-                fontFeatureSettings = "tnum",
-            ),
-            color = colors.ink,
-            maxLines = 1,
-        )
-    }
-}
-
-@Composable
 private fun CompactBalanceLayout(
     metric: UsageMetric,
-    composition: List<CompactBalanceSegment>,
-    modelCount: Int,
+    granted: BigDecimal?,
 ) {
     val colors = MyTokenThemeTokens.colors
-    val currency = metric.currencyCode?.trim()?.uppercase().orEmpty()
-    val title = if (currency.isEmpty()) "账户余额" else "账户余额 · $currency"
-    val compositionTotal = composition.fold(BigDecimal.ZERO) { total, segment ->
-        total + segment.value
-    }
     val amount = splitBalanceAmount(formatCurrency(metric.value, metric.currencyCode))
     val markSpan = SpanStyle(
         fontSize = 0.6.em,
@@ -397,10 +336,11 @@ private fun CompactBalanceLayout(
         color = colors.muted,
     )
 
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 9.dp),
+        verticalAlignment = Alignment.Bottom,
     ) {
         Text(
             text = buildAnnotatedString {
@@ -413,99 +353,23 @@ private fun CompactBalanceLayout(
                     withStyle(markSpan) { append(amount.suffix) }
                 }
             },
+            modifier = Modifier.weight(1f),
             style = MyTokenType.displayCompact,
             color = colors.ink,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Text(
-            text = title,
-            modifier = Modifier.padding(top = 4.dp),
-            style = MyTokenType.caption,
-            color = colors.muted,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (composition.isNotEmpty()) {
+        if (granted != null && granted.signum() > 0) {
             Text(
-                text = "余额构成",
-                modifier = Modifier.padding(top = 12.dp),
+                text = "含赠金 ${formatCurrency(granted, metric.currencyCode)}",
+                modifier = Modifier
+                    .padding(start = 6.dp, bottom = 2.dp)
+                    .testTag("compact_balance_granted"),
                 style = MyTokenType.caption,
                 color = colors.muted,
+                maxLines = 1,
             )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp)
-                    .height(5.dp)
-                    .clip(CircleShape)
-                    .background(colors.track),
-            ) {
-                if (compositionTotal.signum() > 0) {
-                    composition.forEach { segment ->
-                        val weight = segment.value.toDouble() / compositionTotal.toDouble()
-                        if (weight > 0.0) {
-                            Box(
-                                modifier = Modifier
-                                    .weight(weight.toFloat())
-                                    .height(5.dp)
-                                    .background(
-                                        when (segment.kind) {
-                                            CompactBalanceSegmentKind.ToppedUp -> colors.cat1
-                                            CompactBalanceSegmentKind.Granted -> colors.cat2
-                                        },
-                                    ),
-                            )
-                        }
-                    }
-                }
-            }
-            Column(
-                modifier = Modifier.padding(top = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                composition.forEach { segment ->
-                    CompactBalanceLegend(
-                        segment = segment,
-                        currencyCode = metric.currencyCode,
-                    )
-                }
-            }
         }
-        if (modelCount > 0) {
-            Spacer(modifier = Modifier.height(8.dp))
-            CompactMiniTextRow(label = "可用模型", value = "$modelCount 个")
-        }
-    }
-}
-
-@Composable
-private fun CompactBalanceLegend(
-    segment: CompactBalanceSegment,
-    currencyCode: String?,
-) {
-    val colors = MyTokenThemeTokens.colors
-    val tint = when (segment.kind) {
-        CompactBalanceSegmentKind.ToppedUp -> colors.cat1
-        CompactBalanceSegmentKind.Granted -> colors.cat2
-    }
-    Row(
-        modifier = Modifier.testTag("compact_balance_legend"),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(5.dp)
-                .background(tint, CircleShape),
-        )
-        Text(
-            text = "${segment.label} ${formatCurrency(segment.value, currencyCode)}",
-            style = MyTokenType.caption,
-            color = colors.muted,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
     }
 }
 

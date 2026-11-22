@@ -46,6 +46,8 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
@@ -321,16 +323,11 @@ class HomeScreenTest {
         }
 
         composeRule.onNodeWithText("¥12.50").assertIsDisplayed()
-        composeRule.onNodeWithText("现金 ¥10.00").assertIsDisplayed()
-        composeRule.onNodeWithText("赠送 ¥2.50").assertIsDisplayed()
-        val cashBounds = composeRule.onNodeWithText("现金 ¥10.00", useUnmergedTree = true)
-            .getUnclippedBoundsInRoot()
-        val giftBounds = composeRule.onNodeWithText("赠送 ¥2.50", useUnmergedTree = true)
-            .getUnclippedBoundsInRoot()
-        assertTrue(
-            "窄卡内图例按设计纵向换行：cash=$cashBounds gift=$giftBounds",
-            giftBounds.top.value >= cashBounds.bottom.value - 1f,
-        )
+        composeRule.onNodeWithText("含赠金 ¥2.50", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("现金 ¥10.00").assertDoesNotExist()
+        composeRule.onNodeWithText("赠送 ¥2.50").assertDoesNotExist()
+        composeRule.onNodeWithText("余额构成").assertDoesNotExist()
+        composeRule.onNodeWithText("可用模型").assertDoesNotExist()
     }
 
     @Test
@@ -352,7 +349,9 @@ class HomeScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("待刷新").assertIsDisplayed()
+        composeRule.onNodeWithTag("card_footer_left", useUnmergedTree = true)
+            .assertTextEquals("${formatResetTime(now)} 更新")
+        composeRule.onNodeWithText("待刷新").assertDoesNotExist()
         composeRule.onNodeWithText("数据过期").assertDoesNotExist()
     }
 
@@ -544,7 +543,8 @@ class HomeScreenTest {
 
         composeRule.onAllNodesWithTag("card_skeleton", useUnmergedTree = true).assertCountEquals(0)
         composeRule.onNodeWithTag("compact_ring_primary", useUnmergedTree = true).assertExists()
-        composeRule.onNodeWithText("刷新中", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag("card_footer_left", useUnmergedTree = true)
+            .assertTextEquals("${formatResetTime(now)} 更新")
     }
 
     @Test
@@ -641,6 +641,64 @@ class HomeScreenTest {
         }
 
         composeRule.onNodeWithContentDescription("主账号，正常，42%", substring = true)
+            .assertExists()
+    }
+
+    @Test
+    fun 简洁卡正常状态不显示圆点只有报警才显示() {
+        val normal = credential("简洁正常")
+        val warning = credential("简洁报警")
+        composeRule.setContent {
+            MyTokenTheme {
+                Column {
+                    CredentialUsageCard(
+                        card = card(normal, metrics = listOf(progress(20.0, 100.0))),
+                        onOpen = {},
+                        onRetry = {},
+                        usageCardDensity = UsageCardDensity.COMPACT,
+                    )
+                    CredentialUsageCard(
+                        card = card(warning, metrics = listOf(progress(90.0, 100.0))),
+                        onOpen = {},
+                        onRetry = {},
+                        usageCardDensity = UsageCardDensity.COMPACT,
+                    )
+                }
+            }
+        }
+
+        composeRule.onAllNodesWithTag("credential_status_dot_${normal.id}", useUnmergedTree = true)
+            .assertCountEquals(0)
+        composeRule.onNodeWithTag("credential_status_dot_${warning.id}", useUnmergedTree = true)
+            .assertExists()
+    }
+
+    @Test
+    fun 完整卡正常状态不显示圆点只有报警才显示() {
+        val normal = credential("完整正常")
+        val warning = credential("完整报警")
+        composeRule.setContent {
+            MyTokenTheme {
+                Column {
+                    CredentialUsageCard(
+                        card = card(normal, metrics = listOf(progress(20.0, 100.0))),
+                        onOpen = {},
+                        onRetry = {},
+                        usageCardDensity = UsageCardDensity.FULL,
+                    )
+                    CredentialUsageCard(
+                        card = card(warning, metrics = listOf(progress(90.0, 100.0))),
+                        onOpen = {},
+                        onRetry = {},
+                        usageCardDensity = UsageCardDensity.FULL,
+                    )
+                }
+            }
+        }
+
+        composeRule.onAllNodesWithTag("credential_status_dot_${normal.id}", useUnmergedTree = true)
+            .assertCountEquals(0)
+        composeRule.onNodeWithTag("credential_status_dot_${warning.id}", useUnmergedTree = true)
             .assertExists()
     }
 
@@ -798,7 +856,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun compactBalanceCardGivesLowerHalfBreathingRoom() {
+    fun compactBalanceOmitsTitleCompositionAndModelsButShowsGift() {
         val credential = credential("DeepSeek 简洁余额", ProviderId.DeepSeek)
         val total = balance(38.40).copy(id = "balance")
         val toppedUp = total.copy(
@@ -822,6 +880,7 @@ class HomeScreenTest {
                         credential,
                         metrics = listOf(total, toppedUp, granted),
                         planName = "API 余额",
+                        allowedModels = listOf("deepseek-v4-flash", "deepseek-v4-pro"),
                         subscriptionEndAt = null,
                     ),
                     onOpen = {},
@@ -831,12 +890,39 @@ class HomeScreenTest {
             }
         }
 
-        val legends = composeRule.onAllNodesWithTag("compact_balance_legend", useUnmergedTree = true)
-            .fetchSemanticsNodes()
-            .map { it.boundsInRoot }
-        assertEquals("余额构成应有两行", 2, legends.size)
-        val gap = legends[1].top - legends[0].bottom
-        assertTrue("余额构成两行之间应留出行距，实际 ${gap}dp", gap >= 8f)
+        composeRule.onNodeWithText("¥38.40").assertIsDisplayed()
+        composeRule.onNodeWithText("含赠金 ¥5.00", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("账户余额 · CNY").assertDoesNotExist()
+        composeRule.onNodeWithText("余额构成").assertDoesNotExist()
+        composeRule.onNodeWithText("可用模型").assertDoesNotExist()
+        composeRule.onAllNodesWithTag("compact_balance_legend", useUnmergedTree = true)
+            .assertCountEquals(0)
+        composeRule.onNodeWithTag("card_footer_left", useUnmergedTree = true)
+            .assertTextEquals("${formatResetTime(now)} 更新")
+    }
+
+    @Test
+    fun compactPlanCardOmitsRemainingRowAndShowsUpdateTime() {
+        val credential = credential("套餐简洁")
+        composeRule.setContent {
+            MyTokenTheme {
+                CredentialUsageCard(
+                    card = card(
+                        credential,
+                        metrics = listOf(progress(20.0, 100.0)),
+                        usageKind = "plan",
+                    ),
+                    onOpen = {},
+                    onRetry = {},
+                    usageCardDensity = UsageCardDensity.COMPACT,
+                )
+            }
+        }
+
+        composeRule.onAllNodesWithText("剩余", substring = true, useUnmergedTree = true)
+            .assertCountEquals(0)
+        composeRule.onNodeWithTag("card_footer_left", useUnmergedTree = true)
+            .assertTextEquals("${formatResetTime(now)} 更新")
     }
 
     @Test
@@ -1635,8 +1721,10 @@ class HomeScreenTest {
         }
 
         composeRule.onNodeWithText("余额账户").assertExists()
-        composeRule.onNodeWithText("账户余额 · CNY").assertIsDisplayed()
+        composeRule.onNodeWithText("账户余额 · CNY").assertDoesNotExist()
         composeRule.onNodeWithText("¥38.42").assertIsDisplayed()
+        composeRule.onNodeWithTag("card_footer_left", useUnmergedTree = true)
+            .assertTextEquals("${formatResetTime(now)} 更新")
         composeRule.onNodeWithText("充足", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithText("偏低", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithText("不足", useUnmergedTree = true).assertDoesNotExist()
@@ -2194,6 +2282,55 @@ class HomeScreenTest {
     }
 
     @Test
+    fun 刷新未结束时上滑会立即收起顶部刷新图标() {
+        val cards = (1..3).map { index ->
+            card(credential("刷新收起 $index"), metrics = listOf(progress(20.0, 100.0)))
+        }
+        var refreshing by mutableStateOf(false)
+        var refreshCalls = 0
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = cards,
+                        groups = emptyList(),
+                        credentialCount = cards.size,
+                        isRefreshingAll = refreshing,
+                    ),
+                    onRefreshAll = {
+                        refreshCalls += 1
+                        refreshing = true
+                    },
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("home_list_full").performTouchInput {
+            down(Offset(width / 2f, 20f))
+            moveTo(Offset(width / 2f, 460f), delayMillis = 220)
+            up()
+        }
+        composeRule.waitUntil(5_000) { refreshing && refreshCalls == 1 }
+        composeRule.onNodeWithTag("home_pull_indicator", useUnmergedTree = true)
+            .assertIsDisplayed()
+
+        // 刷新还在进行时立刻上滑：指示器必须收起，但不能取消已经在跑的刷新。
+        composeRule.onNodeWithTag("home_list_full").performTouchInput {
+            swipeUp(startY = height * 0.92f, endY = height * 0.08f, durationMillis = 300)
+        }
+        composeRule.waitForIdle()
+        assertTrue("刷新不应被上滑取消", refreshing)
+        composeRule.onNodeWithTag("home_pull_indicator", useUnmergedTree = true)
+            .assertDoesNotExist()
+    }
+
+    @Test
     fun 从列表下方一路滑到顶部不会触发刷新() {
         val cards = (1..8).map { index ->
             card(credential("长列表 $index"), metrics = listOf(progress(20.0, 100.0)))
@@ -2523,6 +2660,197 @@ class HomeScreenTest {
     }
 
     @Test
+    fun 快速反向滑动不会被上一次模式切换拉回() {
+        var density by mutableStateOf(UsageCardDensity.COMPACT)
+        composeRule.setContent {
+            MaterialTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = (1..6).map { card(credential("反向滑动 $it"), metrics = listOf(progress(20.0, 100.0))) },
+                        groups = emptyList(),
+                        credentialCount = 6,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    usageCardDensity = density,
+                    onToggleUsageCardDensity = {
+                        density = if (density == UsageCardDensity.COMPACT) {
+                            UsageCardDensity.FULL
+                        } else {
+                            UsageCardDensity.COMPACT
+                        }
+                    },
+                )
+            }
+        }
+
+        // 先左滑，在分页尚未完全停稳时立刻右滑，最终必须停在简洁页。
+        composeRule.mainClock.autoAdvance = false
+        composeRule.onNodeWithTag("home_pager").performTouchInput {
+            swipeLeft(startX = width * 0.9f, endX = width * 0.1f, durationMillis = 90)
+        }
+        composeRule.mainClock.advanceTimeBy(100)
+        composeRule.onNodeWithTag("home_pager").performTouchInput {
+            swipeRight(startX = width * 0.1f, endX = width * 0.9f, durationMillis = 90)
+        }
+        composeRule.mainClock.autoAdvance = true
+        composeRule.waitUntil(5_000) {
+            runCatching { activeNode("home_grid_2_columns").fetchSemanticsNode() }.isSuccess
+        }
+        assertEquals(UsageCardDensity.COMPACT, density)
+    }
+
+    @Test
+    fun 用户滑动后过期的密度回调不会把分页抢回去() {
+        var density by mutableStateOf(UsageCardDensity.FULL)
+        composeRule.setContent {
+            MaterialTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = (1..6).map { card(credential("过期回调 $it"), metrics = listOf(progress(20.0, 100.0))) },
+                        groups = emptyList(),
+                        credentialCount = 6,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    usageCardDensity = density,
+                    onToggleUsageCardDensity = {
+                        density = if (density == UsageCardDensity.FULL) {
+                            UsageCardDensity.COMPACT
+                        } else {
+                            UsageCardDensity.FULL
+                        }
+                    },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("home_pager").performTouchInput {
+            swipeRight(startX = width * 0.1f, endX = width * 0.9f, durationMillis = 180)
+        }
+        composeRule.waitUntil(5_000) {
+            runCatching { activeNode("home_grid_2_columns").fetchSemanticsNode() }.isSuccess
+        }
+
+        // 模拟上一次模式写入晚到：用户已经滑到简洁页，旧的 FULL 回调不能把页面抢回去。
+        composeRule.runOnIdle { density = UsageCardDensity.FULL }
+        composeRule.waitForIdle()
+        assertTrue(
+            "过期的密度回调不应把页面从简洁页拉回完整页",
+            runCatching { activeNode("home_grid_2_columns").fetchSemanticsNode() }.isSuccess,
+        )
+    }
+
+    @Test
+    fun 用户左滑后过期的密度回调不会把分页抢回去() {
+        var density by mutableStateOf(UsageCardDensity.COMPACT)
+        composeRule.setContent {
+            MaterialTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = (1..6).map { card(credential("左滑过期 $it"), metrics = listOf(progress(20.0, 100.0))) },
+                        groups = emptyList(),
+                        credentialCount = 6,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    usageCardDensity = density,
+                    onToggleUsageCardDensity = {
+                        density = if (density == UsageCardDensity.COMPACT) {
+                            UsageCardDensity.FULL
+                        } else {
+                            UsageCardDensity.COMPACT
+                        }
+                    },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("home_pager").performTouchInput {
+            swipeLeft(startX = width * 0.9f, endX = width * 0.1f, durationMillis = 180)
+        }
+        composeRule.waitUntil(5_000) {
+            runCatching { activeNode("home_list_full").fetchSemanticsNode() }.isSuccess
+        }
+
+        // 旧的 COMPACT 回调不能把已经左滑到的完整页抢回简洁页。
+        composeRule.runOnIdle { density = UsageCardDensity.COMPACT }
+        composeRule.waitForIdle()
+        assertTrue(
+            "过期的密度回调不应把页面从完整页拉回简洁页",
+            runCatching { activeNode("home_list_full").fetchSemanticsNode() }.isSuccess,
+        )
+    }
+
+    @Test
+    fun 切换密度后头部与目标页顶部对齐() {
+        val cards = (1..12).map { index ->
+            card(credential("密度对齐 $index"), metrics = listOf(progress(20.0, 100.0)))
+        }
+        var density by mutableStateOf(UsageCardDensity.COMPACT)
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = cards,
+                        groups = emptyList(),
+                        credentialCount = cards.size,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    usageCardDensity = density,
+                    onToggleUsageCardDensity = {
+                        density = if (density == UsageCardDensity.COMPACT) {
+                            UsageCardDensity.FULL
+                        } else {
+                            UsageCardDensity.COMPACT
+                        }
+                    },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("home_grid_2_columns").performTouchInput {
+            swipeUp(startY = height * 0.92f, endY = height * 0.08f, durationMillis = 300)
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("home_pager").performTouchInput {
+            swipeLeft(startX = width * 0.85f, endX = width * 0.15f, durationMillis = 180)
+        }
+        composeRule.waitUntil(5_000) {
+            runCatching { activeNode("home_list_full").fetchSemanticsNode() }.isSuccess
+        }
+        composeRule.waitForIdle()
+
+        val toolbarBottom = composeRule.onNodeWithTag("home_provider_toolbar")
+            .getUnclippedBoundsInRoot()
+            .bottom
+        val firstTop = activeNode("credential_card_${cards[0].credential.id}")
+            .getUnclippedBoundsInRoot()
+            .top
+        assertTrue(
+            "切换后目标页在顶部时，首张卡片应紧贴工具条，实际 gap=${firstTop.value - toolbarBottom.value}dp",
+            abs(firstTop.value - toolbarBottom.value) <= 3f,
+        )
+    }
+
+    @Test
     fun 报告风险项点击回调携带凭证() {
         val warning = card(credential("风险"), metrics = listOf(progress(90.0, 100.0)))
         var clicked: UUID? = null
@@ -2724,6 +3052,43 @@ class HomeScreenTest {
         assertTrue(
             "小幅上滑后报告仍应有一部分留在视口内，实际 top=${report.top.value} bottom=${report.bottom.value} nav=${navBottom.value}",
             report.top.value < navBottom.value && report.bottom.value > navBottom.value + 20f,
+        )
+    }
+
+    @Test
+    fun 多条风险报告展开时首张卡片紧贴工具条() {
+        val cards = (1..8).map { index ->
+            card(credential("贴边 $index"), metrics = listOf(progress(90.0, 100.0)))
+        }
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = cards,
+                        groups = emptyList(),
+                        credentialCount = cards.size,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    usageCardDensity = UsageCardDensity.COMPACT,
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        val toolbarBottom = composeRule.onNodeWithTag("home_provider_toolbar")
+            .getUnclippedBoundsInRoot()
+            .bottom
+        val firstCardTop = composeRule.onNodeWithTag("credential_card_${cards[0].credential.id}")
+            .getUnclippedBoundsInRoot()
+            .top
+        assertTrue(
+            "首张卡片应紧跟工具条，实际 gap=${firstCardTop.value - toolbarBottom.value}dp",
+            abs(firstCardTop.value - toolbarBottom.value) <= 3f,
         )
     }
 

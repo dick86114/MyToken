@@ -70,9 +70,19 @@ class CredentialUsageSurfaceStyleTest {
         assertFalse(home.contains("Icons.Outlined.Refresh"))
         assertTrue(glyph.contains("M20 7v5h-5"))
         assertTrue(glyph.contains("tint: Color"))
-        assertTrue(report.contains("tint = colors.reportTicketInk"))
+        assertTrue("刷新图标应使用报告底部底色对应的反色", report.contains("tint = colors.reportInk"))
         // 报告右下角只保留透明图标，不再有黄色圆形底。
         assertFalse(report.contains("report_refresh_circle"))
+    }
+
+    @Test
+    fun `报告左下角同步文案加粗`() {
+        val report = sourceText("HomeHealthReport.kt")
+        val footer = report
+            .substringAfter("text = \"最近同步")
+            .substringBefore("Box(")
+
+        assertTrue("最近同步文案应加粗", footer.contains("fontWeight = FontWeight.SemiBold"))
     }
 
     @Test

@@ -272,6 +272,7 @@ internal fun HomeHealthReport(
                 text = "最近同步 $syncLabel",
                 modifier = Modifier.weight(1f),
                 style = MyTokenType.caption,
+                fontWeight = FontWeight.SemiBold,
                 color = colors.reportMuted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -296,7 +297,8 @@ internal fun HomeHealthReport(
             ) {
                 // 透明图标直接落在报告票面上，不再套黄色圆形底。
                 ReportRefreshGlyph(
-                    tint = colors.reportTicketInk,
+                    // 报告底部随主题反色，图标使用与之对应的墨水色而不是固定深色。
+                    tint = colors.reportInk,
                     modifier = Modifier
                         .size(18.dp)
                         .graphicsLayer {

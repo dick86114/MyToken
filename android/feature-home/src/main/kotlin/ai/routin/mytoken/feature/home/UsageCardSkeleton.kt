@@ -242,26 +242,40 @@ internal fun UsageCardIdentity(
                 Modifier
             }
             if (showStatus) {
+                val tone = usageCardStatusTone(health)
+                val alert = tone != MyTokenStatusTone.Neutral
                 if (compact) {
-                    // 设计稿简洁卡头部只保留状态圆点，文字留给完整卡。
-                    Box(
-                        modifier = statusModifier
-                            .size(6.dp)
-                            .clip(CircleShape)
-                            .background(
-                                when (usageCardStatusTone(health)) {
-                                    MyTokenStatusTone.Warning -> colors.warningFill
-                                    MyTokenStatusTone.Critical -> colors.criticalFill
-                                    MyTokenStatusTone.Positive -> colors.positiveFill
-                                    MyTokenStatusTone.Neutral -> colors.statusDotNormal
-                                },
-                            ),
-                    )
-                } else {
+                    // 简洁卡只在报警时显示状态点；正常状态不再常驻圆点。
+                    if (alert) {
+                        Box(
+                            modifier = statusModifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    when (tone) {
+                                        MyTokenStatusTone.Warning -> colors.warningFill
+                                        MyTokenStatusTone.Critical -> colors.criticalFill
+                                        MyTokenStatusTone.Positive -> colors.positiveFill
+                                        MyTokenStatusTone.Neutral -> colors.statusDotNormal
+                                    },
+                                )
+                                .testTag("credential_status_dot_${card.credential.id}"),
+                        )
+                    }
+                } else if (alert) {
                     MyTokenStatus(
                         text = statusText,
-                        tone = usageCardStatusTone(health),
+                        tone = tone,
+                        modifier = statusModifier
+                            .testTag("credential_status_dot_${card.credential.id}"),
+                    )
+                } else {
+                    Text(
+                        text = statusText,
                         modifier = statusModifier,
+                        style = MyTokenType.caption,
+                        color = colors.muted,
+                        maxLines = 1,
                     )
                 }
             }
@@ -459,30 +473,19 @@ internal fun usageCardFooterParts(card: CredentialCardUi, health: UsageCardHealt
     val expiry = snapshot?.subscriptionEndAt?.let(::formatShortExpiry)
     val countdown = primary?.windowEnd?.let { "${formatCompactCountdown(it)} 后重置" }.orEmpty()
 
-    return when (health) {
-        UsageCardHealth.Failed -> (snapshot?.fetchedAt?.let {
-            "更新失败 · 上次成功 ${formatResetTime(it)}"
-        } ?: "更新失败") to ""
-
-        UsageCardHealth.Stale -> "待刷新" to (snapshot?.fetchedAt?.let { "${formatResetTime(it)} 的数据" } ?: "")
-        UsageCardHealth.Loading -> "刷新中" to ""
-        UsageCardHealth.Disabled -> "已停用" to ""
-        UsageCardHealth.Warning -> "接近上限" to countdown
-        UsageCardHealth.Critical -> "已达上限" to countdown
+    // 左下角统一显示更新时间；右下角只保留与用量/到期相关的信息。
+    val right = when (health) {
+        UsageCardHealth.Warning, UsageCardHealth.Critical -> countdown
         UsageCardHealth.Normal -> when {
-            balance != null -> compactAccountStatus(card) to update
-            usageKind == "plan" && expiry != null ->
-                (snapshot?.statusText?.takeIf { it.isNotBlank() } ?: "有效") to "$expiry 到期"
-            primary?.windowEnd != null -> update to countdown
-            expiry != null -> "有效" to "$expiry 到期"
-            else -> update to ""
+            balance != null -> ""
+            usageKind == "plan" && expiry != null -> "$expiry 到期"
+            primary?.windowEnd != null -> countdown
+            expiry != null -> "$expiry 到期"
+            else -> ""
         }
+        else -> ""
     }
-}
-
-internal fun compactAccountStatus(card: CredentialCardUi): String {
-    val raw = card.snapshot?.statusText?.trim()?.takeIf { it.isNotEmpty() } ?: return "账户可用"
-    return if (raw.startsWith("账户")) raw else "账户$raw"
+    return update to right
 }
 
 @Composable
