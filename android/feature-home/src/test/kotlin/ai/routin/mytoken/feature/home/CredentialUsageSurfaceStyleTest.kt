@@ -169,6 +169,21 @@ class CredentialUsageSurfaceStyleTest {
     }
 
     @Test
+    fun `主页渐变延伸到状态栏形成沉浸式导航`() {
+        val home = sourceText("HomeScreen.kt")
+        val root = home
+            .substringAfter("Scaffold { padding ->")
+            .substringBefore("MyTokenAdaptiveContent(")
+        val header = home
+            .substringAfter("// 报告和工具条是覆盖层")
+            .substringBefore(".testTag(\"home_collapsing_header\")")
+
+        assertFalse("背景层不能被系统栏内边距裁掉", root.contains("padding(padding)"))
+        assertTrue("内容区仍需避开系统栏", home.contains("padding(padding)"))
+        assertTrue("头部渐变切片需要计入状态栏高度", header.contains("calculateTopPadding"))
+    }
+
+    @Test
     fun `正常进度条由绿色改为墨色`() {
         val ring = sourceText("UsageRing.kt")
         assertTrue("弧线正常态应使用墨色", ring.contains("else -> colors.ink"))

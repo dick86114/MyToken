@@ -573,8 +573,8 @@ fun HomeScreen(
 
     Scaffold { padding ->
         Box(
+            // 背景层铺满整个窗口（含状态栏），内容区再按系统栏内边距避让。
             modifier = Modifier
-                .padding(padding)
                 .fillMaxSize()
                 .onSizeChanged { rootHeightPx = it.height.toFloat() }
                 // 整页背景随收起进度从顶部黄色渐变到画布色；深色主题即黄到黑。
@@ -594,7 +594,9 @@ fun HomeScreen(
             MyTokenAdaptiveContent(
                 maxWidth = 1440.dp,
                 horizontalPadding = 16.dp,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     HomeToolbar(
@@ -670,9 +672,11 @@ fun HomeScreen(
                                     // 遮罩必须放在图层内，否则收起后仍以原尺寸盖住下方卡片。
                                     // 绘制整页渐变的对应切片，既挡住下方卡片又不出现接缝。
                                     .drawBehind {
-                                        val headerTopPx = topNavHeightPx +
-                                            pullOffsetPx -
-                                            headerHeightPx * collapseProgress()
+                                        val headerTopPx =
+                                            padding.calculateTopPadding().toPx() +
+                                                topNavHeightPx +
+                                                pullOffsetPx -
+                                                headerHeightPx * collapseProgress()
                                         val pageHeight = rootHeightPx
                                         val startFraction = if (pageHeight > 0f) {
                                             (headerTopPx / pageHeight).coerceIn(0f, 1f)
