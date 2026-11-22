@@ -161,6 +161,7 @@ fun HomeScreen(
     var highlightedCredentialId by remember { mutableStateOf<UUID?>(null) }
     var flashTick by remember { mutableIntStateOf(0) }
     var headerHeightPx by remember { mutableIntStateOf(0) }
+    var rootHeightPx by remember { mutableFloatStateOf(0f) }
     var collapsedPx by remember { mutableFloatStateOf(0f) }
     var pullOffsetPx by remember { mutableFloatStateOf(0f) }
     var pullArmed by remember { mutableStateOf(false) }
@@ -575,17 +576,21 @@ fun HomeScreen(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .background(colors.canvas),
+                .onSizeChanged { rootHeightPx = it.height.toFloat() }
+                // 整页背景随收起进度从顶部黄色渐变到画布色；深色主题即黄到黑。
+                .drawBehind {
+                    drawRect(
+                        Brush.verticalGradient(
+                            0f to lerp(
+                                colors.canvas,
+                                colors.reportTicket,
+                                collapseProgress(),
+                            ),
+                            1f to colors.canvas,
+                        ),
+                    )
+                },
         ) {
-            // 导航底色铺满屏幕宽度，内容仍按 1440dp 居中。
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp)
-                    .drawBehind {
-                        drawRect(lerp(colors.canvas, colors.reportTicket, collapseProgress()))
-                    },
-            )
             MyTokenAdaptiveContent(
                 maxWidth = 1440.dp,
                 horizontalPadding = 16.dp,
@@ -662,8 +667,44 @@ fun HomeScreen(
                                         translationY =
                                             pullOffsetPx - headerHeightPx * collapseProgress()
                                     }
-                                    // 底色必须放在图层内，否则收起后仍以原尺寸盖住下方卡片。
-                                    .background(colors.canvas)
+                                    // 遮罩必须放在图层内，否则收起后仍以原尺寸盖住下方卡片。
+                                    // 绘制整页渐变的对应切片，既挡住下方卡片又不出现接缝。
+                                    .drawBehind {
+                                        val headerTopPx = topNavHeightPx +
+                                            pullOffsetPx -
+                                            headerHeightPx * collapseProgress()
+                                        val pageHeight = rootHeightPx
+                                        val startFraction = if (pageHeight > 0f) {
+                                            (headerTopPx / pageHeight).coerceIn(0f, 1f)
+                                        } else {
+                                            0f
+                                        }
+                                        val endFraction = if (pageHeight > 0f) {
+                                            ((headerTopPx + size.height) / pageHeight)
+                                                .coerceIn(0f, 1f)
+                                        } else {
+                                            0f
+                                        }
+                                        val highlight = lerp(
+                                            colors.canvas,
+                                            colors.reportTicket,
+                                            collapseProgress(),
+                                        )
+                                        drawRect(
+                                            brush = Brush.verticalGradient(
+                                                0f to lerp(
+                                                    highlight,
+                                                    colors.canvas,
+                                                    startFraction,
+                                                ),
+                                                1f to lerp(
+                                                    highlight,
+                                                    colors.canvas,
+                                                    endFraction,
+                                                ),
+                                            ),
+                                        )
+                                    }
                                     // 完全收起后不再绘制整块报告，深列表快速 fling 更轻。
                                     .drawWithContent {
                                         if (collapseProgress() < 1f) drawContent()

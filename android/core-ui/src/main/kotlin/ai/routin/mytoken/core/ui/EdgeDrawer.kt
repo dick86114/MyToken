@@ -305,7 +305,7 @@ fun MyTokenEdgeDrawerHost(
                             .width(3.dp)
                             .height(64.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f))
+                            .background(MyTokenThemeTokens.colors.actionFill)
                             .testTag(
                                 if (activeSide == MyTokenEdgeDrawerSide.Start) {
                                     "edge_drawer_handle_bar_start"

@@ -28,9 +28,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.outlined.ArrowCircleUp
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Handyman
 import androidx.compose.material.icons.outlined.Info
@@ -71,6 +72,8 @@ import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.MyTokenButton
 import ai.routin.mytoken.core.ui.MyTokenButtonTone
 import ai.routin.mytoken.core.ui.MyTokenBrandMark
+import ai.routin.mytoken.core.ui.MyTokenReportBodyShape
+import ai.routin.mytoken.core.ui.MyTokenReportTicketShape
 import ai.routin.mytoken.core.ui.MyTokenRadius
 import ai.routin.mytoken.core.ui.MyTokenRow
 import ai.routin.mytoken.core.ui.MyTokenSection
@@ -500,11 +503,11 @@ private fun BreathingUpdateArrow(onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            imageVector = Icons.Filled.ArrowUpward,
+            imageVector = Icons.Outlined.ArrowCircleUp,
             contentDescription = null,
             tint = colors.actionFill,
             modifier = Modifier
-                .size(18.dp)
+                .size(20.dp)
                 .graphicsLayer {
                     alpha = if (motionEnabled) 0.45f + 0.55f * breathe else 1f
                     val scale = if (motionEnabled) 0.9f + 0.1f * breathe else 1f
@@ -930,25 +933,17 @@ private fun SettingsHeader(drawerMode: Boolean, onClose: (() -> Unit)?) {
 @Composable
 private fun SettingsProfileCard(appVersion: String) {
     val colors = MyTokenThemeTokens.colors
-    val shape = RoundedCornerShape(MyTokenRadius.card)
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("settings_profile")
-            .clip(shape)
-            .background(colors.actionFill)
-            .border(1.dp, colors.reportTicketInk.copy(alpha = 0.35f), shape),
+            // 与凭证报告同款票据形状：左上、右下圆角，右上、左下切角。
+            .background(colors.reportSurface, MyTokenReportBodyShape),
     ) {
-        // 内圈细线模拟铭牌的压边，图文固定用黑色，不随主题反相。
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .padding(5.dp)
-                .border(1.dp, colors.reportTicketInk.copy(alpha = 0.14f), shape),
-        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .background(colors.reportTicket, MyTokenReportTicketShape)
                 .padding(horizontal = 18.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -958,19 +953,30 @@ private fun SettingsProfileCard(appVersion: String) {
                 size = 44.dp,
                 darkTheme = false,
             )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "MyToken",
-                    style = MyTokenType.profileName,
-                    color = colors.reportTicketInk,
-                )
-                Text(
-                    text = "v$appVersion · 凭证只在本机",
-                    modifier = Modifier.padding(top = 2.dp),
-                    style = MyTokenType.caption,
-                    color = colors.reportTicketInk.copy(alpha = 0.72f),
-                )
-            }
+            Text(
+                text = "MyToken",
+                style = MyTokenType.profileName,
+                color = colors.reportTicketInk,
+            )
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 44.dp)
+                .padding(horizontal = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "v$appVersion",
+                style = MyTokenType.label.copy(fontWeight = FontWeight.SemiBold),
+                color = colors.reportInk,
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = "凭证只在本机",
+                style = MyTokenType.caption,
+                color = colors.reportMuted,
+            )
         }
     }
 }
@@ -995,12 +1001,16 @@ private fun ThemeSelector(
     ) {
         options.forEach { (label, mode) ->
             val isSelected = mode == selected
+            // 外观选项只保留描边反馈，不叠默认的灰色按压遮罩。
+            val interactionSource = remember { MutableInteractionSource() }
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .testTag("theme_option_${mode.name}")
                     .selectable(
                         selected = isSelected,
+                        interactionSource = interactionSource,
+                        indication = null,
                         role = Role.RadioButton,
                         onClick = { onSelect(mode) },
                     ),

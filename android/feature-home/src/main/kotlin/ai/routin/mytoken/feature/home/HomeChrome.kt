@@ -57,14 +57,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -123,15 +121,12 @@ internal fun HomeToolbar(
     val collapsed by remember {
         derivedStateOf { progress() > 0.5f }
     }
-    // 页面上滑时导航底色由画布色过渡到报告票面黄，logo 保持原位；
+    // 页面上滑时整页背景由画布色过渡到报告票面黄，导航保持透明；
     // 品牌字标上移淡出，报告摘要与报警供应商 logo 从右侧淡入。
     Row(
         modifier = modifier
             .fillMaxWidth()
             .height(60.dp)
-            .drawBehind {
-                drawRect(lerp(colors.canvas, colors.reportTicket, progress()))
-            }
             .testTag("home_toolbar"),
         verticalAlignment = Alignment.CenterVertically,
     ) {

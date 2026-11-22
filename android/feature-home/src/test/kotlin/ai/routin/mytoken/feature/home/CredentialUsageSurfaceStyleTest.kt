@@ -53,7 +53,7 @@ class CredentialUsageSurfaceStyleTest {
     fun `报告在任何健康状态都保持琥珀票面`() {
         val report = sourceText("HomeHealthReport.kt")
         // 用户明确覆盖设计稿：全部正常时也不再退回灰色。
-        assertTrue(report.contains(".background(colors.reportTicket, ReportTicketShape)"))
+        assertTrue(report.contains(".background(colors.reportTicket, MyTokenReportTicketShape)"))
         assertFalse(report.contains("reportTicketNormal"))
         assertFalse(report.contains("reportDialTrackNormal"))
     }
@@ -98,19 +98,39 @@ class CredentialUsageSurfaceStyleTest {
     }
 
     @Test
-    fun `头部底色跟随收起位移而不是留在原位遮挡卡片`() {
+    fun `头部渐变底色跟随收起位移而不是留在原位遮挡卡片`() {
         val home = sourceText("HomeScreen.kt")
         val header = home
             .substringAfter("// 报告和工具条是覆盖层")
             .substringBefore(".testTag(\"home_collapsing_header\")")
         val layer = header.indexOf(".graphicsLayer")
-        val background = header.indexOf(".background(colors.canvas)")
+        val backdrop = header.indexOf(".drawBehind")
 
         assertTrue("头部缺少位移图层", layer >= 0)
-        assertTrue("头部缺少实色底", background >= 0)
+        assertTrue("头部缺少渐变遮罩", backdrop >= 0)
         assertTrue(
-            "头部底色必须画在位移民图层内部，否则收起后仍会覆盖下方卡片",
-            layer < background,
+            "头部遮罩必须画在位移民图层内部，否则收起后仍会覆盖下方卡片",
+            layer < backdrop,
+        )
+        assertFalse("头部不再铺实色画布", header.contains(".background(colors.canvas)"))
+    }
+
+    @Test
+    fun `主页背景从上到下渐变为黄色`() {
+        val home = sourceText("HomeScreen.kt")
+        val root = home
+            .substringAfter("Scaffold { padding ->")
+            .substringBefore("MyTokenAdaptiveContent(")
+
+        assertTrue("整页背景应使用垂直渐变", root.contains("Brush.verticalGradient"))
+        assertTrue("渐变顶部随收起进度变黄", root.contains("collapseProgress()"))
+        assertTrue("渐变底部回落到画布色", root.contains("1f to colors.canvas"))
+        assertFalse("不再单独铺 60dp 导航色块", root.contains("height(60.dp)"))
+
+        val chrome = sourceText("HomeChrome.kt")
+        assertFalse(
+            "导航栏不再单独绘制实色底",
+            chrome.contains("drawRect(lerp(colors.canvas, colors.reportTicket"),
         )
     }
 

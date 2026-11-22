@@ -54,6 +54,8 @@ class SettingsIconographyTest {
         assertTrue(settings.contains("Icons.Filled.History"))
         assertTrue(settings.contains("settings_version_value"))
         assertTrue(settings.contains("settings_update_available_arrow"))
+        assertTrue("有更新时使用圆圈上箭头", settings.contains("Icons.Outlined.ArrowCircleUp"))
+        assertFalse(settings.contains("Icons.Filled.ArrowUpward"))
         assertTrue(settings.contains("MyTokenUpdateDialog"))
         assertTrue(settings.contains("UpdateSettingsDialog"))
         assertTrue(settings.contains("update_source_github"))
@@ -64,17 +66,39 @@ class SettingsIconographyTest {
     }
 
     @Test
-    fun `设置资料卡使用黄色铭牌与固定黑色图文`() {
+    fun `设置资料卡使用上黄下黑的票据铭牌`() {
         val settings = sourceText("SettingsScreen.kt")
         val profile = settings
             .substringAfter("private fun SettingsProfileCard")
             .substringBefore("@Composable\nprivate fun ThemeSelector")
 
-        assertTrue("铭牌底色应为黄色", profile.contains(".background(colors.actionFill)"))
-        assertTrue("铭牌应有深色包边", profile.contains("border(1.dp, colors.reportTicketInk"))
+        assertTrue(
+            "铭牌外形应与凭证报告一致，右上和左下切角",
+            profile.contains(".background(colors.reportSurface, MyTokenReportBodyShape)"),
+        )
+        assertTrue(
+            "黄色票面承载 Logo 与名称",
+            profile.contains(".background(colors.reportTicket, MyTokenReportTicketShape)"),
+        )
         assertTrue("铭牌 Logo 固定使用黑色版本", profile.contains("darkTheme = false"))
-        assertTrue("铭牌标题必须固定为黑色", profile.contains("color = colors.reportTicketInk"))
-        assertFalse("铭牌文案不再使用会随主题变化的 ink", profile.contains("color = colors.ink"))
+        assertTrue("铭牌名称必须固定为黑色", profile.contains("color = colors.reportTicketInk"))
+        assertTrue("黑色部分显示版本号", profile.contains("text = \"v\$appVersion\""))
+        assertTrue("版本号使用报告反色墨水", profile.contains("color = colors.reportInk"))
+        assertFalse("铭牌不再使用整块黄底", profile.contains("colors.actionFill"))
+    }
+
+    @Test
+    fun `外观选项点击不显示灰色遮罩`() {
+        val settings = sourceText("SettingsScreen.kt")
+        val selector = settings
+            .substringAfter("private fun ThemeSelector")
+            .substringBefore("/** 三张主题预览卡")
+
+        assertTrue("外观选项不显示按压遮罩", selector.contains("indication = null"))
+        assertTrue(
+            "外观选项应显式提供交互源以关闭默认 indication",
+            selector.contains("interactionSource = remember { MutableInteractionSource() }"),
+        )
     }
 
     @Test
