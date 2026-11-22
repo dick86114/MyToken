@@ -110,8 +110,20 @@ class CredentialUsageSurfaceStyleTest {
         assertTrue("票据行有测试标记", detail.contains("detail_reset_ticket"))
         assertTrue(
             "删除按钮离开右边缘",
-            screen.contains("modifier = Modifier.padding(end = 8.dp).testTag(\"detail_delete\")"),
+            screen.contains("modifier = Modifier.padding(end = 16.dp).testTag(\"detail_delete\")"),
         )
+    }
+
+    @Test
+    fun `重置卡票据左黄右黑白呼应报告`() {
+        val detail = sourceText("CredentialDetailHero.kt")
+        val resetBlock = detail
+            .substringAfter("private fun DetailWindowRow")
+            .substringBefore("@Composable\nprivate fun", missingDelimiterValue = detail)
+        assertTrue("左侧票面使用报告黄", resetBlock.contains("colors.reportTicket"))
+        assertTrue("文案使用报告黄上的深色字", resetBlock.contains("colors.reportTicketInk"))
+        assertTrue("右侧时间块使用黑/白反相", resetBlock.contains("colors.reportSurface"))
+        assertTrue("时间文字使用反相字色", resetBlock.contains("colors.reportInk"))
     }
 
     @Test

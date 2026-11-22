@@ -228,7 +228,7 @@ private fun DetailTopBar(
                 TopBarIconButton(
                     contentDescription = "删除凭证",
                     onClick = onDelete,
-                    modifier = Modifier.padding(end = 8.dp).testTag("detail_delete"),
+                    modifier = Modifier.padding(end = 16.dp).testTag("detail_delete"),
                     icon = {
                         Icon(
                             imageVector = Icons.Filled.Delete,

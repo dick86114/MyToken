@@ -19,13 +19,14 @@ import ai.routin.mytoken.domain.model.UsageMetricUnit
 import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -40,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.PathEffect
@@ -446,42 +448,45 @@ private fun DetailWindowRow(metric: UsageMetric) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(colors.surface, MyTokenReportBodyShape)
-                            .border(1.dp, colors.line, MyTokenReportBodyShape)
-                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                            .height(IntrinsicSize.Min)
+                            .clip(MyTokenReportBodyShape)
+                            .background(colors.reportTicket)
                             .testTag("detail_reset_ticket"),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        ResetCardsGlyph(
-                            color = colors.muted,
-                            modifier = Modifier.size(width = 9.dp, height = 8.dp),
-                        )
-                        Column(
+                        Row(
                             modifier = Modifier
                                 .weight(1f)
-                                .padding(start = 8.dp),
+                                .padding(start = 12.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(
-                                text = "重置卡 ${index + 1}",
-                                style = MyTokenType.label,
-                                color = colors.ink,
+                            ResetCardsGlyph(
+                                color = colors.reportTicketMuted,
+                                modifier = Modifier.size(width = 9.dp, height = 8.dp),
                             )
-                            Text(
-                                text = "到期时间",
-                                modifier = Modifier.padding(top = 2.dp),
-                                style = MyTokenType.caption,
-                                color = colors.muted,
-                            )
+                            Column(modifier = Modifier.padding(start = 8.dp)) {
+                                Text(
+                                    text = "重置卡 ${index + 1}",
+                                    style = MyTokenType.label,
+                                    color = colors.reportTicketInk,
+                                )
+                                Text(
+                                    text = "到期时间",
+                                    modifier = Modifier.padding(top = 2.dp),
+                                    style = MyTokenType.caption,
+                                    color = colors.reportTicketMuted,
+                                )
+                            }
                         }
-                        // 机票式撕口虚线，把日期放在右侧票根。
+                        // 机票式撕口虚线，把日期放进黑/白票根。
                         Box(
                             modifier = Modifier
-                                .padding(horizontal = 10.dp)
+                                .padding(horizontal = 6.dp)
                                 .width(1.dp)
                                 .height(30.dp)
                                 .drawBehind {
                                     drawLine(
-                                        color = colors.line,
+                                        color = colors.reportTicketMuted.copy(alpha = 0.65f),
                                         start = Offset(size.width / 2f, 0f),
                                         end = Offset(size.width / 2f, size.height),
                                         strokeWidth = 1.dp.toPx(),
@@ -491,12 +496,20 @@ private fun DetailWindowRow(metric: UsageMetric) {
                                     )
                                 },
                         )
-                        Text(
-                            text = formatResetCardCompact(card.expiresAt),
-                            style = MyTokenType.label.copy(fontFamily = FontFamily.Monospace),
-                            color = colors.ink,
-                            maxLines = 1,
-                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .background(colors.reportSurface)
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = formatResetCardCompact(card.expiresAt),
+                                style = MyTokenType.label.copy(fontFamily = FontFamily.Monospace),
+                                color = colors.reportInk,
+                                maxLines = 1,
+                            )
+                        }
                     }
                 }
             }
