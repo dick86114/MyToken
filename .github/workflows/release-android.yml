@@ -1,17 +1,30 @@
 name: 发布 Android
-run-name: 发布 Android v${{ inputs.version }} · ${{ inputs.release_notes }}
+run-name: 发布 Android ${{ inputs.release_channel == 'preview' && '预览版' || '正式版' }} v${{ inputs.version }} · ${{ inputs.release_notes }}
 
 on:
   workflow_dispatch:
     inputs:
+      release_channel:
+        description: '发布通道（preview 仅供维护者测试，不推送给正式用户）'
+        required: true
+        type: choice
+        options:
+          - stable
+          - preview
+        default: stable
       version:
         description: 'Android versionName（建议与 macOS 主版本一致，例如 5.1.8）'
         required: true
         type: string
       version_code:
-        description: 'Android versionCode（必须比已发布版本更大）'
+        description: 'Android versionCode（不得低于当前正式版；预览版建议与之后正式版一致，便于覆盖安装）'
         required: true
         type: string
+      preview_iteration:
+        description: '预览版序号（仅 preview 使用，同一版本多次测试时递增）'
+        required: false
+        type: string
+        default: '1'
       release_notes:
         description: 'Android 发布说明（Markdown，首行用于工作流名称）'
         required: true
@@ -27,11 +40,13 @@ concurrency:
 
 jobs:
   build:
-    name: 构建 Android APK v${{ inputs.version }}
+    name: 构建 Android APK v${{ inputs.version }} (${{ inputs.release_channel }})
     runs-on: ubuntu-latest
     env:
       RELEASE_VERSION: ${{ inputs.version }}
       RELEASE_VERSION_CODE: ${{ inputs.version_code }}
+      RELEASE_CHANNEL: ${{ inputs.release_channel }}
+      PREVIEW_ITERATION: ${{ inputs.preview_iteration }}
       ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -54,16 +69,41 @@ jobs:
           cache: gradle
       - name: 校验版本号
         run: |
-          [[ "${RELEASE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          [[ "${{ inputs.version_code }}" =~ ^[1-9][0-9]*$ ]]
-          (( ${{ inputs.version_code }} <= 2100000000 ))
+          if [[ ! "${RELEASE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::versionName 必须形如 6.1.0"
+            exit 1
+          fi
+          if [[ ! "${RELEASE_VERSION_CODE}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::versionCode 必须是正整数"
+            exit 1
+          fi
+          if (( RELEASE_VERSION_CODE > 2100000000 )); then
+            echo "::error::versionCode 不能超过 2100000000"
+            exit 1
+          fi
+          if [[ "${RELEASE_CHANNEL}" != "stable" && "${RELEASE_CHANNEL}" != "preview" ]]; then
+            echo "::error::release_channel 只能是 stable 或 preview"
+            exit 1
+          fi
+          if [[ "${RELEASE_CHANNEL}" == "preview" && ! "${PREVIEW_ITERATION}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::预览版序号 preview_iteration 必须是正整数"
+            exit 1
+          fi
       - name: 写入发布摘要
         env:
           RELEASE_NOTES: ${{ inputs.release_notes }}
         run: |
           {
-            echo "## MyToken Android v${RELEASE_VERSION} (versionCode ${RELEASE_VERSION_CODE})"
+            echo "## MyToken Android v${RELEASE_VERSION} (${RELEASE_CHANNEL}, versionCode ${RELEASE_VERSION_CODE})"
             echo
+            if [[ "${RELEASE_CHANNEL}" == "preview" ]]; then
+              echo "> 预览版 ${PREVIEW_ITERATION}：仅用于维护者安装测试，不会出现在正式用户的更新检查中。"
+              echo
+              if [[ -z "${ANDROID_KEYSTORE_BASE64}" ]]; then
+                echo "> 注意：本次未配置签名 secrets，预览包使用 Debug 签名，无法覆盖安装正式版。"
+                echo
+              fi
+            fi
             printf '%s\n' "${RELEASE_NOTES}"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: 校验签名配置
@@ -122,20 +162,37 @@ jobs:
               ":app:assembleRelease"
             )
             apk_source="android/app/build/outputs/apk/release/app-release.apk"
-            apk_name="MyToken-${RELEASE_VERSION}-android.apk"
+            if [[ "${RELEASE_CHANNEL}" == "preview" ]]; then
+              apk_name="MyToken-${RELEASE_VERSION}-android-preview.${PREVIEW_ITERATION}.apk"
+            else
+              apk_name="MyToken-${RELEASE_VERSION}-android.apk"
+            fi
           else
             echo "::warning::未配置 Android 签名 secrets，本次发布 APK 将使用 Debug 签名。"
             args+=(":app:assembleDebug")
             apk_source="android/app/build/outputs/apk/debug/app-debug.apk"
-            apk_name="MyToken-${RELEASE_VERSION}-android-debug.apk"
+            if [[ "${RELEASE_CHANNEL}" == "preview" ]]; then
+              apk_name="MyToken-${RELEASE_VERSION}-android-preview.${PREVIEW_ITERATION}-debug.apk"
+            else
+              apk_name="MyToken-${RELEASE_VERSION}-android-debug.apk"
+            fi
           fi
           ./android/gradlew -p android "${args[@]}" --stacktrace
           mkdir -p android/build/dist
           cp "${apk_source}" "android/build/dist/${apk_name}"
+      - name: 留存 R8 mapping
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mytoken-android-mapping-${{ inputs.version }}-${{ inputs.release_channel }}-${{ inputs.preview_iteration }}
+          path: android/app/build/outputs/mapping/release/mapping.txt
+          if-no-files-found: ignore
+          retention-days: 90
       # 把版本号写入发布时刻的发版 commit：Release created_at 取自 tag 指向的
       # commit 时间，保证“最后发布的客户端”在 Releases 页面排在最前；
       # versionCode/versionName 一并入库，master 上的 Android 版本号与发布保持一致。
       - name: 提交发版 commit
+        if: inputs.release_channel == 'stable'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -143,6 +200,7 @@ jobs:
           git diff --cached --quiet || git commit -m "chore(release): Android v${RELEASE_VERSION}"
           git push origin HEAD:master
       - name: 创建 / 追加 Android 资产到 vX Release
+        if: inputs.release_channel == 'stable'
         uses: softprops/action-gh-release@v2
         with:
           target_commitish: master
@@ -157,9 +215,29 @@ jobs:
           make_latest: true
           files: android/build/dist/*.apk
 
+      # 预览版使用独立 tag 与资产名，应用内更新只认正式 tag，因此不会推给正式用户。
+      # tag 故意不含 v 前缀：即使旧版更新器的正则只做宽松匹配，也无法把它解析成正式版本号。
+      - name: 创建 Android 预览版 Release
+        if: inputs.release_channel == 'preview'
+        uses: softprops/action-gh-release@v2
+        with:
+          target_commitish: master
+          tag_name: android-preview-${{ inputs.version }}-${{ inputs.preview_iteration }}
+          name: MyToken Android ${{ inputs.version }} 预览版 ${{ inputs.preview_iteration }}
+          body: |
+            ## Android 预览版
+            > 仅供维护者安装测试，不会通过应用内更新推送给正式用户。
+            > 下载下方 APK 覆盖安装即可；需与正式版使用同一签名，且 versionCode 不低于当前版本。
+            ${{ inputs.release_notes }}
+          prerelease: true
+          generate_release_notes: false
+          make_latest: false
+          files: android/build/dist/*.apk
+
       # 兼容桥：旧版安卓更新器只认 android-v tag。
       # 等大部分用户升到内置双 tag 更新器的版本后可移除此步骤。
       - name: 创建旧版 android-v 兼容 Release
+        if: inputs.release_channel == 'stable'
         uses: softprops/action-gh-release@v2
         with:
           target_commitish: master

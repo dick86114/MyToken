@@ -293,6 +293,12 @@ class GitHubAppUpdateController(
             val releases = org.json.JSONArray(body)
             for (index in 0 until releases.length()) {
                 val release = releases.getJSONObject(index)
+                // 预览版与草稿只给维护者测试，不进入正式用户的更新历史。
+                if (release.optBoolean("draft", false) ||
+                    release.optBoolean("prerelease", false)
+                ) {
+                    continue
+                }
                 val tagName = release.optString("tag_name")
                 val match = ANDROID_RELEASE_TAG_REGEX.matchEntire(tagName)
                 if (match != null) {
@@ -404,6 +410,8 @@ class GitHubAppUpdateController(
         val json = (0 until releases.length())
             .asSequence()
             .map { releases.getJSONObject(it) }
+            // GitHub 的预览版/草稿即使带正式 tag 和 APK，也不能推给正式用户。
+            .filter { !it.optBoolean("draft", false) && !it.optBoolean("prerelease", false) }
             .filter { RELEASE_TAG_REGEX.matchEntire(it.optString("tag_name")) != null }
             .filter { release -> release.hasApkAsset() }
             .maxWithOrNull(Comparator { left, right ->
@@ -563,23 +571,25 @@ class GitHubAppUpdateController(
                 org.xmlpull.v1.XmlPullParser.TEXT -> if (inEntry) currentText.append(parser.text)
                 org.xmlpull.v1.XmlPullParser.END_TAG -> when (parser.name) {
                     "id" -> if (inEntry && version == null) {
-                        version = androidVersion(currentText.toString().trim().substringAfterLast('/'))
-                            ?: if (includeMergedVTag) {
-                                mergedVTagVersion(currentText.toString().trim().substringAfterLast('/'))
-                            } else {
-                                null
-                            }
+                        val tag = currentText.toString().trim().substringAfterLast('/')
+                        version = if (isPreviewReleaseText(tag)) {
+                            null
+                        } else {
+                            androidVersion(tag)
+                                ?: if (includeMergedVTag) mergedVTagVersion(tag) else null
+                        }
                     }
                     "title" -> if (inEntry && version == null) {
-                        version = Regex("android-v\\d+(?:\\.\\d+)+")
-                            .find(currentText.toString().trim())
-                            ?.value
-                            ?.let(::androidVersion)
-                            ?: if (includeMergedVTag) {
-                                mergedVTagVersion(currentText.toString().trim())
-                            } else {
-                                null
-                            }
+                        val title = currentText.toString().trim()
+                        version = if (isPreviewReleaseText(title)) {
+                            null
+                        } else {
+                            Regex("android-v\\d+(?:\\.\\d+)+")
+                                .find(title)
+                                ?.value
+                                ?.let(::androidVersion)
+                                ?: if (includeMergedVTag) mergedVTagVersion(title) else null
+                        }
                     }
                     "content" -> if (inEntry) notes = currentText.toString().trim()
                     "published", "updated" -> if (inEntry && publishedAt == null) {
@@ -612,6 +622,10 @@ class GitHubAppUpdateController(
         val match = Regex("v(\\d+(?:\\.\\d+)+)").find(text) ?: return null
         return match.groupValues[1]
     }
+
+    /** 预览版 tag/标题只用于维护者测试，不参与正式更新检测。 */
+    private fun isPreviewReleaseText(text: String): Boolean =
+        text.contains("preview", ignoreCase = true) || text.contains("预览")
 
     private fun install(update: DownloadedUpdate) {
         val uri = FileProvider.getUriForFile(

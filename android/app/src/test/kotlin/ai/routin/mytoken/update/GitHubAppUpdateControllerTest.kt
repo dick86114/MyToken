@@ -167,6 +167,141 @@ class GitHubAppUpdateControllerTest {
     }
 
     @Test
+    fun 预览版与草稿Release不会被当作可用更新() = runBlocking {
+        val body = """
+        [
+          {"tag_name":"v6.3.0","draft":true,"assets":[
+            {"name":"MyToken-6.3.0-android.apk","browser_download_url":"https://example.com/draft.apk"}
+          ]},
+          {"tag_name":"v6.2.0","prerelease":true,"assets":[
+            {"name":"MyToken-6.2.0-android.apk","browser_download_url":"https://example.com/preview.apk"}
+          ]},
+          {"tag_name":"v6.1.0","prerelease":false,"assets":[
+            {"name":"MyToken-6.1.0-android.apk","browser_download_url":"https://example.com/stable.apk"}
+          ]}
+        ]
+        """.trimIndent()
+        val controller = GitHubAppUpdateController(
+            context = ApplicationProvider.getApplicationContext<Context>(),
+            currentVersionName = "6.1.0",
+            network = { _, _ -> UpdateResponse(body) },
+        )
+
+        controller.checkForUpdates()
+        val state = withTimeout(5_000) {
+            controller.state.first {
+                it is AppUpdateUiState.UpToDate ||
+                    it is AppUpdateUiState.Available ||
+                    it is AppUpdateUiState.Error
+            }
+        }
+
+        assertTrue("预览版/草稿不应触发正式版更新：$state", state is AppUpdateUiState.UpToDate)
+    }
+
+    @Test
+    fun 预览版命名即使未标记prerelease也不会进入更新() = runBlocking {
+        val body = """
+        [
+          {"tag_name":"android-preview-6.2.0-1","prerelease":false,"assets":[
+            {"name":"MyToken-6.2.0-android-preview.1.apk","browser_download_url":"https://example.com/preview.apk"}
+          ]},
+          {"tag_name":"v6.1.0","prerelease":false,"assets":[
+            {"name":"MyToken-6.1.0-android.apk","browser_download_url":"https://example.com/stable.apk"}
+          ]}
+        ]
+        """.trimIndent()
+        val controller = GitHubAppUpdateController(
+            context = ApplicationProvider.getApplicationContext<Context>(),
+            currentVersionName = "6.1.0",
+            network = { _, _ -> UpdateResponse(body) },
+        )
+
+        controller.checkForUpdates()
+        val state = withTimeout(5_000) {
+            controller.state.first {
+                it is AppUpdateUiState.UpToDate ||
+                    it is AppUpdateUiState.Available ||
+                    it is AppUpdateUiState.Error
+            }
+        }
+
+        assertTrue("预览版命名不应匹配正式更新：$state", state is AppUpdateUiState.UpToDate)
+    }
+
+    @Test
+    fun 历史版本不包含预览版与草稿Release() = runBlocking {
+        val body = """
+        [
+          {"tag_name":"v6.3.0","draft":true,"html_url":"https://github.com/dick86114/MyToken/releases/tag/v6.3.0","body":"草稿","published_at":"2026-10-03T00:00:00Z","assets":[
+            {"name":"MyToken-6.3.0-android.apk","browser_download_url":"https://example.com/draft.apk"}
+          ]},
+          {"tag_name":"v6.2.0","prerelease":true,"html_url":"https://github.com/dick86114/MyToken/releases/tag/v6.2.0","body":"预览","published_at":"2026-10-02T00:00:00Z","assets":[
+            {"name":"MyToken-6.2.0-android.apk","browser_download_url":"https://example.com/preview.apk"}
+          ]},
+          {"tag_name":"v6.1.0","prerelease":false,"html_url":"https://github.com/dick86114/MyToken/releases/tag/v6.1.0","body":"正式","published_at":"2026-10-01T00:00:00Z","assets":[
+            {"name":"MyToken-6.1.0-android.apk","browser_download_url":"https://example.com/stable.apk"}
+          ]}
+        ]
+        """.trimIndent()
+        val controller = GitHubAppUpdateController(
+            context = ApplicationProvider.getApplicationContext<Context>(),
+            currentVersionName = "6.1.0",
+            network = { _, _ -> UpdateResponse(body) },
+        )
+
+        controller.loadReleaseHistory()
+        val state = withTimeout(5_000) {
+            controller.releaseHistoryState.first { it is AppReleaseHistoryUiState.Loaded }
+        } as AppReleaseHistoryUiState.Loaded
+
+        assertEquals(listOf("6.1.0"), state.releases.map { it.version })
+    }
+
+    @Test
+    fun 镜像Atom中的预览版不会覆盖正式版() = runBlocking {
+        val previewAndStableAtom = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <feed xmlns="http://www.w3.org/2005/Atom">
+          <entry>
+            <id>tag:github.com,2008:Repository/1/android-preview-v0.0.9-1</id>
+            <updated>2026-10-02T12:00:00Z</updated>
+            <link rel="alternate" href="https://github.com/dick86114/MyToken/releases/tag/android-preview-v0.0.9-1" />
+            <title>MyToken Android v0.0.9 预览版 1</title>
+          </entry>
+          <entry>
+            <id>tag:github.com,2008:Repository/1/android-v0.0.8</id>
+            <updated>2026-10-01T12:00:00Z</updated>
+            <link rel="alternate" href="https://github.com/dick86114/MyToken/releases/tag/android-v0.0.8" />
+            <title>MyToken Android v0.0.8</title>
+          </entry>
+        </feed>
+        """.trimIndent()
+        val controller = GitHubAppUpdateController(
+            context = ApplicationProvider.getApplicationContext<Context>(),
+            currentVersionName = "0.0.1",
+            mirrorBaseProvider = { "https://ghfast.top" },
+            network = { url, _ ->
+                if (url.startsWith("https://api.github.com")) throw IOException("blocked")
+                UpdateResponse(previewAndStableAtom)
+            },
+            probeStatus = { _ -> 200 },
+        )
+
+        controller.checkForUpdates()
+        val state = withTimeout(5_000) {
+            controller.state.first {
+                it is AppUpdateUiState.Available ||
+                    it is AppUpdateUiState.Error ||
+                    it is AppUpdateUiState.UpToDate
+            }
+        }
+
+        assertTrue("预览版不应成为更新候选：$state", state is AppUpdateUiState.Available)
+        assertEquals("0.0.8", (state as AppUpdateUiState.Available).version)
+    }
+
+    @Test
     fun 历史版本纳入带APK的vTag并排除仅macOS的vTag() = runBlocking {
         val body = """
         [

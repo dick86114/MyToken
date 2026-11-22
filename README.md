@@ -156,6 +156,9 @@ cd android
 - `android-ci.yml`：`android/` 变更时触发，跑全模块 JVM 测试并编译 instrumented 测试。
 - `release-macos.yml` / `release-android.yml`：手动触发，填写版本号与发布说明，
   自动创建标签、生成 GitHub Release 并上传构建产物。
+- `release-android.yml` 提供 `stable` / `preview` 两个发布通道：`preview` 以独立
+  `android-preview-X-N` 标签发布 GitHub prerelease，不进入应用内更新；测试通过后
+  再用同一版本号选择 `stable` 发布正式版。
 
 ## 贡献
 

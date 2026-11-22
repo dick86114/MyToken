@@ -54,8 +54,21 @@ cd android
   （Android 11-）与 `data_extraction_rules.xml`（Android 12+）排除数据库、
   DataStore 与 `noBackupFilesDir` 作为纵深防御。Keystore 包裹的密文
   （`cred-*.bin`）本身因密钥不可导出也无法跨设备恢复。
-- 发布构建（release）：无开发密钥、无测试 URL、无完整日志开关；minification
-  保持关闭直至在真机完成供应商签名相关 keep 规则验证。
+- 发布构建（release）：无开发密钥、无测试 URL、无完整日志开关；已开启
+  R8（`isMinifyEnabled` + `isShrinkResources`），发布前需在真机回归供应商
+  凭证、刷新、分享、扫码导入、Widget 与通知，并留存
+  `app/build/outputs/mapping/release/mapping.txt` 用于崩溃栈还原。
+- 安装包体积：只打包 `arm64-v8a` 与 `armeabi-v7a`；原生库压缩进 APK
+  （`useLegacyPackaging`），安装时解压到应用目录，以缩小下载体积。
+
+## 发布通道
+
+- `release-android.yml` 的 `release_channel` 选择 `preview` 时，构建产物以
+  `android-preview-X-N` 独立标签、GitHub prerelease 形式发布，资产名带
+  `-android-preview.N`；应用内更新与历史版本只识别正式 `vX` / `android-vX`，
+  因此预览版不会推送给正式用户。
+- 预览版不提交版本号到 master；测试通过后用相同 versionName / versionCode
+  选择 `stable` 发布正式版，可直接覆盖安装预览包（需使用同一签名）。
 - 日志：诊断输出只包含失败消息，不含凭证材料、密文或网页会话内容。
 
 ## 手工验收（待真机验证）

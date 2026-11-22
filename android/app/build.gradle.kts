@@ -14,6 +14,12 @@ android {
         targetSdk = 34
         versionCode = 610
         versionName = "6.1.0"
+
+        // 只保留真机使用的 ARM 架构；x86/x86_64 仅模拟器需要，不再进入安装包。
+        // 注意：Apple Silicon 模拟器是 arm64，不受影响；Intel Mac 的 x86 模拟器需临时移除该过滤。
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     buildTypes {
@@ -26,11 +32,13 @@ android {
             resValue("string", "widget_overview_label", "MyToken 总览（Debug）")
         }
         release {
-            // R8/minification stays off until a full provider-signing keep pass
-            // is verified on a real device; the release build contains no
-            // development keys, test URLs, or debug logging switches (verified
-            // by the Task 11 release audit in docs/android/README.md).
-            isMinifyEnabled = false
+            // R8 已开启：发布前需在真机回归添加/刷新凭证、分享、扫码导入、Widget 与通知。
+            // 崩溃还原依赖 app/build/outputs/mapping/release/mapping.txt，发版时需留存。
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+            )
         }
     }
 
@@ -45,6 +53,13 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    packaging {
+        jniLibs {
+            // 压缩原生库以缩小下载包；安装时解压到应用目录。
+            useLegacyPackaging = true
+        }
     }
 
     testOptions {
