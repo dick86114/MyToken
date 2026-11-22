@@ -21,14 +21,15 @@ internal fun SettingsBadgedIcon(
     base: ImageVector,
     modifier: Modifier = Modifier,
     tint: Color = MyTokenThemeTokens.colors.muted,
+    size: androidx.compose.ui.unit.Dp = 18.dp,
 ) {
-    Box(modifier = modifier.size(18.dp)) {
+    Box(modifier = modifier.size(size)) {
         Icon(
             imageVector = base,
             contentDescription = null,
             tint = tint,
             modifier = Modifier
-                .size(17.dp)
+                .size(size * 0.94f)
                 .align(Alignment.BottomStart),
         )
         Icon(
@@ -36,7 +37,7 @@ internal fun SettingsBadgedIcon(
             contentDescription = null,
             tint = tint,
             modifier = Modifier
-                .size(9.dp)
+                .size(size * 0.5f)
                 .align(Alignment.TopEnd)
                 .offset(x = 1.dp, y = (-1).dp),
         )

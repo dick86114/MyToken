@@ -43,6 +43,8 @@ fun NotificationSettingsSection(
             iconContent = {
                 SettingsBadgedIcon(
                     base = Icons.Outlined.CreditCard,
+                    tint = MyTokenThemeTokens.colors.actionFill,
+                    size = 22.dp,
                     modifier = Modifier.testTag("settings_credential_failure_icon"),
                 )
             },

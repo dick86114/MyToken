@@ -9,6 +9,7 @@ import ai.routin.mytoken.core.ui.MyTokenMotion
 import ai.routin.mytoken.core.ui.MyTokenRadius
 import ai.routin.mytoken.core.ui.MyTokenSize
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
+import ai.routin.mytoken.core.ui.MyTokenUpdateDialog
 import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.rememberMyTokenMotionEnabled
 import ai.routin.mytoken.domain.model.ProviderId
@@ -769,7 +770,7 @@ fun HomeScreen(
     }
 
     if (showUpdateDialog) {
-        HomeUpdateDialog(
+        MyTokenUpdateDialog(
             version = updateVersion,
             releaseNotes = updateReleaseNotes,
             confirmLabel = updateConfirmLabel,
@@ -778,6 +779,8 @@ fun HomeScreen(
                 onConfirmUpdate()
             },
             onDismiss = { showUpdateDialog = false },
+            modifier = Modifier.testTag("home_update_dialog"),
+            confirmTag = "home_update_confirm",
         )
     }
 }

@@ -3,8 +3,8 @@ package ai.routin.mytoken.feature.settings
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
@@ -24,7 +24,7 @@ class LoadedReleaseNotesManualRefreshTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun 已加载状态仍显示手动获取当前版本日志按钮() {
+    fun 打开历史版本时主动刷新发布记录() {
         val refreshCount = AtomicInteger()
         val releases = listOf(
             AppReleaseHistoryItem(
@@ -53,14 +53,11 @@ class LoadedReleaseNotesManualRefreshTest {
         composeRule.onNodeWithTag("settings_list")
             .performScrollToNode(hasText("关于"))
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("settings_release_notes_toggle")
-            .performScrollTo()
-            .performClick()
-        composeRule.waitForIdle()
-        composeRule.onNodeWithContentDescription("获取当前版本日志")
+        composeRule.onNodeWithTag("settings_release_history")
             .performScrollTo()
             .performClick()
 
         assertEquals(1, refreshCount.get())
+        composeRule.onNodeWithText("历史版本").assertExists()
     }
 }

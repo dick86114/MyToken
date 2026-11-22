@@ -379,6 +379,8 @@ fun MyTokenRow(
     modifier: Modifier = Modifier,
     iconPlate: Boolean = false,
     iconContent: (@Composable () -> Unit)? = null,
+    iconTint: Color = MyTokenThemeTokens.colors.muted,
+    iconSize: Dp? = null,
 ) {
     val colors = MyTokenThemeTokens.colors
     Row(
@@ -402,8 +404,10 @@ fun MyTokenRow(
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = colors.muted,
-                        modifier = Modifier.size(if (iconPlate) 15.dp else 18.dp),
+                        tint = iconTint,
+                        modifier = Modifier.size(
+                            iconSize ?: if (iconPlate) 15.dp else 18.dp,
+                        ),
                     )
                 }
             }
@@ -464,6 +468,8 @@ fun SettingRow(
     icon: ImageVector? = null,
     iconContent: (@Composable () -> Unit)? = null,
     trailing: @Composable () -> Unit,
+    iconTint: Color = MyTokenThemeTokens.colors.muted,
+    iconSize: Dp? = null,
 ) {
     MyTokenRow(
         icon = icon,
@@ -471,6 +477,8 @@ fun SettingRow(
         supportingText = supportingText,
         trailing = trailing,
         iconContent = iconContent,
+        iconTint = iconTint,
+        iconSize = iconSize,
     )
 }
 

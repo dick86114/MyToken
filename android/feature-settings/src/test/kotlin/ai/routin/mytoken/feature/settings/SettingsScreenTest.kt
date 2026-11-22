@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
@@ -45,6 +46,12 @@ class SettingsScreenTest {
         mirrorBase: String = "",
         onOpenInstallPermissionSettings: () -> Unit = {},
         onCheckForUpdates: () -> Unit = {},
+        tokenMask: String? = null,
+        onDownloadAndInstall: (String, String) -> Unit = { _, _ -> },
+        onInstallDownloadedUpdate: () -> Unit = {},
+        onMirrorBaseChange: (String) -> Unit = {},
+        onGitHubTokenSave: (String) -> Unit = {},
+        onGitHubTokenRemove: () -> Unit = {},
         logExportState: LogExportUiState = LogExportUiState.Idle,
         onExportLogs: () -> Unit = {},
         onShareLogs: () -> Unit = {},
@@ -75,7 +82,10 @@ class SettingsScreenTest {
                         isLoading = false,
                         refresh = refreshStore.state.value,
                         display = displayStore.state.value.copy(themeMode = themeMode),
-                        update = UpdateSettings(mirrorBase = mirrorBase),
+                        update = UpdateSettings(
+                            mirrorBase = mirrorBase,
+                            githubTokenMask = tokenMask,
+                        ),
                     ),
                     appVersion = "0.1.0",
                     updateState = updateState,
@@ -89,6 +99,11 @@ class SettingsScreenTest {
                     onOpenTransfer = onOpenTransfer,
                     onOpenInstallPermissionSettings = onOpenInstallPermissionSettings,
                     onCheckForUpdates = onCheckForUpdates,
+                    onDownloadAndInstall = onDownloadAndInstall,
+                    onInstallDownloadedUpdate = onInstallDownloadedUpdate,
+                    onMirrorBaseChange = onMirrorBaseChange,
+                    onGitHubTokenSave = onGitHubTokenSave,
+                    onGitHubTokenRemove = onGitHubTokenRemove,
                     logExportState = logExportState,
                     onExportLogs = onExportLogs,
                     onShareLogs = onShareLogs,
@@ -259,17 +274,18 @@ class SettingsScreenTest {
         composeRule.onNodeWithText("关于").assertIsDisplayed()
         composeRule.onNodeWithText("关于与更新").assertDoesNotExist()
         composeRule.onNodeWithTag("settings_about_version").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("版本").assertIsDisplayed()
-        composeRule.onNodeWithText("检查更新").assertIsDisplayed()
-        composeRule.onNodeWithText("更新日志").assertExists()
-        composeRule.onNodeWithText("更新源与令牌").assertExists()
-        composeRule.onNodeWithContentDescription("打开 GitHub").assertDoesNotExist()
-        composeRule.onNodeWithText("当前版本修复内容").assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("查看历史版本").assertDoesNotExist()
-        composeRule.onNodeWithText("GitHub 令牌").assertDoesNotExist()
+        composeRule.onNodeWithText("当前版本").assertIsDisplayed()
+        composeRule.onNodeWithText("v0.1.0").assertIsDisplayed()
+        composeRule.onNodeWithText("查看历史版本").assertIsDisplayed()
+        composeRule.onNodeWithText("支持项目").assertIsDisplayed()
+        composeRule.onNodeWithText("更新设置").assertIsDisplayed()
+        composeRule.onNodeWithText("版本").assertDoesNotExist()
+        composeRule.onNodeWithText("检查更新").assertDoesNotExist()
+        composeRule.onNodeWithText("更新日志").assertDoesNotExist()
+        composeRule.onNodeWithText("更新源与令牌").assertDoesNotExist()
+        composeRule.onNodeWithText("发现新版本").assertDoesNotExist()
+        composeRule.onNodeWithTag("settings_check_updates").assertDoesNotExist()
         composeRule.onNodeWithTag("check_updates_button").assertDoesNotExist()
-        composeRule.onNodeWithTag("settings_check_updates").assertExists()
-        composeRule.onNodeWithTag("update_channel_selector").assertDoesNotExist()
 
         // macOS-only settings must not appear on Android.
         composeRule.onNodeWithText("菜单栏").assertDoesNotExist()
@@ -315,12 +331,12 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun aboutCheckUpdateRowStartsCheck() {
+    fun tappingVersionStartsCheck() {
         var checks = 0
         setContent(onCheckForUpdates = { checks++ })
 
         scrollToAbout()
-        composeRule.onNodeWithTag("settings_check_updates")
+        composeRule.onNodeWithTag("settings_version_value")
             .performScrollTo()
             .performClick()
 
@@ -328,12 +344,11 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun historyIconOpensReleaseHistoryDialog() {
+    fun historyRowOpensReleaseHistoryDialogDirectly() {
         setContent()
         scrollToAbout()
-        expandReleaseNotes()
 
-        composeRule.onNodeWithContentDescription("查看历史版本")
+        composeRule.onNodeWithTag("settings_release_history")
             .performScrollTo()
             .performClick()
 
@@ -342,70 +357,99 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun installPermissionUsesSinglePrimaryAction() {
-        var openedPermissionSettings = 0
+    fun updateAvailableArrowOpensInstallDialog() {
+        var installs = 0
         setContent(
             updateState = AppUpdateUiState.NeedsInstallPermission("0.2.0"),
-            onOpenInstallPermissionSettings = { openedPermissionSettings++ },
+            onInstallDownloadedUpdate = { installs++ },
         )
         scrollToAbout()
 
-        composeRule.onNodeWithText("授权并安装").assertExists()
-        composeRule.onNodeWithText("打开安装权限设置").assertDoesNotExist()
-        composeRule.onNodeWithText("授权后继续安装").assertDoesNotExist()
-        composeRule.onNodeWithTag("install_permission_button")
+        composeRule.onNodeWithTag("settings_update_available_arrow", useUnmergedTree = true)
             .performScrollTo()
             .performClick()
+        composeRule.onNodeWithTag("settings_update_dialog", useUnmergedTree = true)
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_update_confirm", useUnmergedTree = true)
+            .performClick()
 
-        assertEquals(1, openedPermissionSettings)
+        assertEquals(1, installs)
     }
 
     @Test
-    fun advancedSettingsAreCollapsedUntilRequested() {
-        setContent()
+    fun updateSettingsDialogChoosesSourceAndSavesToken() {
+        var savedToken: String? = null
+        var savedMirror: String? = null
+        setContent(
+            onMirrorBaseChange = { savedMirror = it },
+            onGitHubTokenSave = { savedToken = it },
+        )
 
         scrollToAbout()
-        composeRule.onNodeWithTag("settings_release_notes_toggle").assertIsDisplayed()
-        composeRule.onNodeWithTag("settings_update_advanced_toggle").assertIsDisplayed()
-        composeRule.onNodeWithTag("update_channel_selector").assertDoesNotExist()
-        composeRule.onNodeWithText("GitHub 令牌").assertDoesNotExist()
+        composeRule.onNodeWithTag("settings_update_settings")
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithTag("settings_update_settings_dialog", useUnmergedTree = true)
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("update_source_github").assertIsSelected()
+        composeRule.onNodeWithTag("github_token_input").assertExists()
+        composeRule.onNodeWithTag("update_mirror_0").assertDoesNotExist()
+
+        composeRule.onNodeWithTag("github_token_input").performTextInput("ghp_test_token")
+        composeRule.onNodeWithTag("update_settings_save").performClick()
+
+        assertEquals("", savedMirror)
+        assertEquals("ghp_test_token", savedToken)
+        composeRule.onNodeWithTag("settings_update_settings_dialog", useUnmergedTree = true)
+            .assertDoesNotExist()
+    }
+
+    @Test
+    fun updateSettingsDialogSavesCdnMirror() {
+        var savedMirror: String? = null
+        setContent(onMirrorBaseChange = { savedMirror = it })
+
+        scrollToAbout()
+        composeRule.onNodeWithTag("settings_update_settings")
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithTag("update_source_cdn").performClick()
+        composeRule.onNodeWithTag("github_token_input").assertDoesNotExist()
+        composeRule.onNodeWithTag("update_mirror_1").performClick()
+        composeRule.onNodeWithTag("update_settings_save").performClick()
+
+        assertTrue(savedMirror != null && savedMirror!!.contains("gh-proxy"))
     }
 
     @Test
     fun aboutRowSurfacesAvailableUpdate() {
+        var downloaded = false
         setContent(
             updateState = AppUpdateUiState.Available(
                 version = "0.2.0",
                 releaseNotes = "新版本说明",
                 downloadUrl = "https://example.com/MyToken.apk",
             ),
+            onDownloadAndInstall = { version, url ->
+                downloaded = version == "0.2.0" && url == "https://example.com/MyToken.apk"
+            },
         )
 
         scrollToAbout()
-        composeRule.onNodeWithText("发现 v0.2.0").assertIsDisplayed()
-        composeRule.onNodeWithTag("settings_update_star", useUnmergedTree = true)
+        composeRule.onNodeWithText("发现新版本").assertDoesNotExist()
+        composeRule.onNodeWithTag("settings_update_available_arrow", useUnmergedTree = true)
             .performScrollTo()
             .assertExists()
-        composeRule.onNodeWithText("下载并安装").performScrollTo().assertIsDisplayed()
-    }
+        composeRule.onNodeWithTag("settings_update_available_arrow", useUnmergedTree = true)
+            .performClick()
+        composeRule.onNodeWithTag("settings_update_dialog", useUnmergedTree = true)
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("新版本说明", substring = true, useUnmergedTree = true)
+            .assertExists()
+        composeRule.onNodeWithTag("settings_update_confirm", useUnmergedTree = true)
+            .performClick()
 
-    @Test
-    fun aboutAndUpdateDetailsDiscloseProgressively() {
-        setContent()
-        scrollToAbout()
-
-        composeRule.onNodeWithTag("settings_check_updates").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("更新日志").assertExists()
-        composeRule.onNodeWithText("更新源与令牌").assertExists()
-        composeRule.onNodeWithText("GitHub 令牌").assertDoesNotExist()
-
-        expandReleaseNotes()
-        composeRule.onNodeWithText("当前版本修复内容").assertExists()
-        composeRule.onNodeWithContentDescription("查看历史版本").assertExists()
-
-        expandUpdateAdvanced()
-        composeRule.onNodeWithText("GitHub 令牌").assertExists()
-        composeRule.onNodeWithTag("update_channel_selector").assertExists()
+        assertTrue(downloaded)
     }
 
     private fun scrollToAbout() {
@@ -413,17 +457,4 @@ class SettingsScreenTest {
         composeRule.waitForIdle()
     }
 
-    private fun expandReleaseNotes() {
-        composeRule.onNodeWithTag("settings_release_notes_toggle")
-            .performScrollTo()
-            .performClick()
-        composeRule.waitForIdle()
-    }
-
-    private fun expandUpdateAdvanced() {
-        composeRule.onNodeWithTag("settings_update_advanced_toggle")
-            .performScrollTo()
-            .performClick()
-        composeRule.waitForIdle()
-    }
 }

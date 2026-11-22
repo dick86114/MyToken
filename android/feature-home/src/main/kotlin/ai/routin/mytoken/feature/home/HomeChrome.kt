@@ -1,11 +1,6 @@
 package ai.routin.mytoken.feature.home
 
 import ai.routin.mytoken.core.ui.MyTokenBrandMark
-import ai.routin.mytoken.core.ui.MyTokenButton
-import ai.routin.mytoken.core.ui.MyTokenButtonTone
-import ai.routin.mytoken.core.ui.MyTokenDialog
-import ai.routin.mytoken.core.ui.MyTokenDialogSection
-import ai.routin.mytoken.core.ui.MyTokenDialogTone
 import ai.routin.mytoken.core.ui.MyTokenRadius
 import ai.routin.mytoken.core.ui.MyTokenSize
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
@@ -31,8 +26,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -48,7 +41,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -84,7 +76,6 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import java.util.UUID
 import kotlinx.coroutines.launch
 
@@ -361,89 +352,6 @@ internal fun HomeUpdateBanner(
             color = colors.actionText,
             maxLines = 1,
         )
-    }
-}
-
-/** 首页更新弹窗：直接展示 Release 说明并确认更新，不要求用户再进设置查找按钮。 */
-@Composable
-internal fun HomeUpdateDialog(
-    version: String?,
-    releaseNotes: String?,
-    confirmLabel: String,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val colors = MyTokenThemeTokens.colors
-    val notes = releaseNotes?.trim().orEmpty()
-    MyTokenDialog(
-        title = version?.takeIf { it.isNotBlank() }?.let { "发现新版本 $it" } ?: "发现新版本",
-        subtitle = "确认后将开始下载并安装",
-        icon = Icons.Outlined.Star,
-        tone = MyTokenDialogTone.Info,
-        onDismissRequest = onDismiss,
-        modifier = Modifier.testTag("home_update_dialog"),
-        content = {
-            MyTokenDialogSection(title = "更新日志") {
-                if (notes.isBlank()) {
-                    Text(
-                        text = "此版本没有提供更新说明。",
-                        style = MyTokenType.caption,
-                        color = colors.muted,
-                    )
-                } else {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 280.dp)
-                            .verticalScroll(rememberScrollState())
-                            .testTag("home_update_release_notes"),
-                        verticalArrangement = Arrangement.spacedBy(3.dp),
-                    ) {
-                        UpdateReleaseNotes(notes)
-                    }
-                }
-            }
-        },
-        actions = {
-            MyTokenButton(
-                text = "稍后",
-                onClick = onDismiss,
-                modifier = Modifier.weight(1f),
-                tone = MyTokenButtonTone.Neutral,
-            )
-            MyTokenButton(
-                text = confirmLabel,
-                onClick = onConfirm,
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("home_update_confirm"),
-                tone = MyTokenButtonTone.Primary,
-            )
-        },
-    )
-}
-
-/** Release notes 的轻量 Markdown 子集：标题加粗、列表转圆点，其他按行展示。 */
-@Composable
-private fun UpdateReleaseNotes(markdown: String) {
-    val colors = MyTokenThemeTokens.colors
-    markdown.replace("\r\n", "\n").split('\n').forEach { rawLine ->
-        val heading = rawLine.replaceFirst(Regex("^#{1,6}\\s+"), "")
-        val isHeading = heading != rawLine
-        val line = if (isHeading) {
-            heading
-        } else {
-            rawLine.replaceFirst(Regex("^\\s*[-*+]\\s+"), "• ")
-        }
-        if (line.isNotBlank()) {
-            Text(
-                text = line.replace("**", "").replace("`", ""),
-                style = MyTokenType.caption,
-                fontWeight = if (isHeading) FontWeight.Bold else FontWeight.Normal,
-                color = if (isHeading) colors.ink else colors.muted,
-                lineHeight = 18.sp,
-            )
-        }
     }
 }
 

@@ -1,10 +1,5 @@
 package ai.routin.mytoken.feature.settings
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,18 +31,18 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Handyman
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.IosShare
-import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.LightMode
@@ -57,11 +52,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -73,6 +64,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import kotlinx.coroutines.launch
 import ai.routin.mytoken.core.ui.SectionCard
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
@@ -88,7 +80,8 @@ import ai.routin.mytoken.core.ui.MyTokenSurface
 import ai.routin.mytoken.core.ui.MyTokenThemePreviewColors
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
-import ai.routin.mytoken.core.ui.MyTokenUpdateStarIcon
+import ai.routin.mytoken.core.ui.MyTokenIcons
+import ai.routin.mytoken.core.ui.MyTokenUpdateDialog
 import ai.routin.mytoken.core.ui.MyTokenDialog
 import ai.routin.mytoken.core.ui.MyTokenDialogRow
 import ai.routin.mytoken.core.ui.MyTokenDialogSection
@@ -99,13 +92,19 @@ import ai.routin.mytoken.core.ui.myTokenFilterChipBorder
 import ai.routin.mytoken.core.ui.myTokenFilterChipColors
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import ai.routin.mytoken.core.ui.rememberMyTokenMotionEnabled
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
@@ -154,21 +153,56 @@ fun SettingsScreen(
     onClose: (() -> Unit)? = null,
 ) {
     var showReleaseHistory by remember { mutableStateOf(false) }
-    var releaseNotesExpanded by rememberSaveable { mutableStateOf(false) }
-    var updateAdvancedExpanded by rememberSaveable { mutableStateOf(false) }
+    var showUpdateSettings by remember { mutableStateOf(false) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
+    val versionScale = remember { androidx.compose.animation.core.Animatable(1f) }
+    val versionScope = androidx.compose.runtime.rememberCoroutineScope()
     LogExportDialog(
         state = logExportState,
         onShare = onShareLogs,
         onDismiss = onDismissLogExport,
     )
     val uriHandler = LocalUriHandler.current
-    val currentRelease = (releaseHistoryState as? AppReleaseHistoryUiState.Loaded)
-        ?.releases
-        ?.firstOrNull { it.version == appVersion }
+    val updateDialogVersion = when (val update = updateState) {
+        is AppUpdateUiState.Available -> update.version
+        is AppUpdateUiState.ReadyToInstall -> update.version
+        is AppUpdateUiState.NeedsInstallPermission -> update.version
+        else -> null
+    }
+    val updateDialogNotes = (updateState as? AppUpdateUiState.Available)?.releaseNotes
+    val updateDialogConfirmLabel = when (updateState) {
+        is AppUpdateUiState.ReadyToInstall,
+        is AppUpdateUiState.NeedsInstallPermission,
+        -> "安装更新"
+        else -> "下载并安装"
+    }
+    val confirmUpdateDialog: () -> Unit = {
+        when (val update = updateState) {
+            is AppUpdateUiState.Available ->
+                onDownloadAndInstall(update.version, update.downloadUrl)
+            is AppUpdateUiState.ReadyToInstall,
+            is AppUpdateUiState.NeedsInstallPermission,
+            -> onInstallDownloadedUpdate()
+            else -> Unit
+        }
+        showUpdateDialog = false
+    }
 
-    // 打开设置页只读本地缓存；用户点击“获取”后才请求网络并回写缓存。
-    LaunchedEffect(Unit) {
-        onLoadCachedReleaseHistory()
+    fun checkUpdateFromVersion() {
+        versionScope.launch {
+            versionScale.animateTo(
+                targetValue = 0.94f,
+                animationSpec = androidx.compose.animation.core.tween(90),
+            )
+            versionScale.animateTo(
+                targetValue = 1f,
+                animationSpec = androidx.compose.animation.core.spring(
+                    dampingRatio = 0.55f,
+                    stiffness = 620f,
+                ),
+            )
+        }
+        if (updateState !is AppUpdateUiState.Checking) onCheckForUpdates()
     }
 
     Scaffold(
@@ -242,7 +276,8 @@ fun SettingsScreen(
                         icon = Icons.Outlined.QrCodeScanner,
                         title = "从 Mac 导入",
                         supportingText = "扫码接收 Mac 凭证",
-                        iconPlate = true,
+                        iconTint = MyTokenThemeTokens.colors.actionFill,
+                        iconSize = 22.dp,
                         onClick = onOpenTransfer,
                         modifier = Modifier.testTag("settings_import_from_mac"),
                         trailing = {
@@ -259,12 +294,13 @@ fun SettingsScreen(
                         iconContent = {
                             SettingsBadgedIcon(
                                 base = Icons.Outlined.IosShare,
+                                tint = MyTokenThemeTokens.colors.actionFill,
+                                size = 22.dp,
                                 modifier = Modifier.testTag("settings_export_logs_icon"),
                             )
                         },
                         title = "导出诊断日志",
                         supportingText = "生成已脱敏的本机日志",
-                        iconPlate = true,
                         onClick = onExportLogs,
                         modifier = Modifier.testTag("settings_export_logs"),
                         trailing = {
@@ -282,87 +318,121 @@ fun SettingsScreen(
                 key = "about",
                 span = { GridItemSpan(maxLineSpan) },
             ) {
+                val colors = MyTokenThemeTokens.colors
+                val chevron: @Composable () -> Unit = {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = colors.muted,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
                 MyTokenSection(
                     title = "关于",
                     modifier = Modifier.testTag("settings_about_span"),
                 ) {
                     MyTokenRow(
-                        icon = null,
-                        title = "版本",
-                        value = appVersion,
-                        // 长按版本号导出诊断日志：真机不方便连 adb 时也能把日志发给开发者。
+                        icon = Icons.Outlined.Info,
+                        title = "当前版本",
+                        iconTint = colors.actionFill,
+                        iconSize = 22.dp,
+                        // 长按版本号仍可导出诊断日志，点击版本号则检测更新。
                         modifier = Modifier
                             .testTag("settings_about_version")
                             .pointerInput(Unit) {
                                 detectTapGestures(onLongPress = { onExportLogs() })
                             },
-                    )
-                    MyTokenRow(
-                        icon = null,
-                        title = "检查更新",
-                        value = updateRowStatus(updateState),
-                        onClick = {
-                            if (updateState.canCheckManually) onCheckForUpdates()
-                        },
-                        modifier = Modifier.testTag("settings_check_updates"),
-                        trailing = { AboutChevron(expanded = false) },
-                    )
-                    if (updateState.showsUpdateActions) {
-                        UpdateSection(
-                            state = updateState,
-                            currentVersion = appVersion,
-                            onCheckForUpdates = onCheckForUpdates,
-                            onDownloadAndInstall = onDownloadAndInstall,
-                            onOpenInstallPermissionSettings = onOpenInstallPermissionSettings,
-                            onInstallDownloadedUpdate = onInstallDownloadedUpdate,
-                        )
-                    }
-                    AboutDisclosureRow(
-                        title = "更新日志",
-                        expanded = releaseNotesExpanded,
-                        onToggle = { releaseNotesExpanded = !releaseNotesExpanded },
-                        toggleTag = "settings_release_notes_toggle",
-                    ) {
-                        CurrentReleaseNotesSection(
-                            state = releaseHistoryState,
-                            currentVersion = appVersion,
-                            onRetry = onLoadReleaseHistory,
-                            onShowHistory = { showReleaseHistory = true },
-                        )
-                        Text(
-                            text = "在 GitHub 查看",
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(MyTokenRadius.pill))
-                                .clickable(role = Role.Button) {
-                                    uriHandler.openUri(
-                                        currentRelease?.releaseUrl
-                                            ?: "https://github.com/dick86114/MyToken/releases",
+                        trailing = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Text(
+                                    text = "v$appVersion",
+                                    modifier = Modifier
+                                        .testTag("settings_version_value")
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .clickable(
+                                            role = Role.Button,
+                                            onClick = ::checkUpdateFromVersion,
+                                        )
+                                        .padding(horizontal = 4.dp, vertical = 4.dp)
+                                        .graphicsLayer {
+                                            scaleX = versionScale.value
+                                            scaleY = versionScale.value
+                                        }
+                                        .semantics {
+                                            contentDescription =
+                                                "当前版本 v$appVersion，点击检测更新"
+                                        },
+                                    style = MyTokenType.label,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = colors.ink,
+                                )
+                                if (updateState is AppUpdateUiState.Checking) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier
+                                            .size(12.dp)
+                                            .testTag("settings_version_checking"),
+                                        strokeWidth = 1.6.dp,
+                                        color = colors.actionFill,
                                     )
                                 }
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                                .testTag("about_github_link"),
-                            style = MyTokenType.label,
-                            color = MyTokenThemeTokens.colors.actionText,
-                        )
-                    }
-                    AboutDisclosureRow(
-                        title = "更新源与令牌",
-                        supportingText = if (state.update.mirrorBase.isBlank()) "GitHub" else "CDN",
-                        expanded = updateAdvancedExpanded,
-                        onToggle = { updateAdvancedExpanded = !updateAdvancedExpanded },
-                        toggleTag = "settings_update_advanced_toggle",
-                    ) {
-                        UpdateChannelSection(
-                            mirrorBase = state.update.mirrorBase,
-                            onMirrorBaseChange = onMirrorBaseChange,
-                        )
-                        GitHubTokenSection(
-                            tokenMask = state.update.githubTokenMask,
-                            error = state.update.githubTokenError,
-                            onSave = onGitHubTokenSave,
-                            onRemove = onGitHubTokenRemove,
-                        )
-                    }
+                                if (updateDialogVersion != null) {
+                                    BreathingUpdateArrow(
+                                        onClick = { showUpdateDialog = true },
+                                    )
+                                }
+                            }
+                        },
+                    )
+                    MyTokenRow(
+                        icon = Icons.Filled.History,
+                        title = "查看历史版本",
+                        iconTint = colors.actionFill,
+                        iconSize = 22.dp,
+                        onClick = {
+                            showReleaseHistory = true
+                            onLoadCachedReleaseHistory()
+                            onLoadReleaseHistory()
+                        },
+                        modifier = Modifier.testTag("settings_release_history"),
+                        trailing = chevron,
+                    )
+                    MyTokenRow(
+                        icon = MyTokenIcons.GitHub,
+                        title = "支持项目",
+                        iconTint = colors.actionFill,
+                        iconSize = 22.dp,
+                        onClick = {
+                            uriHandler.openUri("https://github.com/dick86114/MyToken")
+                        },
+                        modifier = Modifier.testTag("settings_support_project"),
+                        trailing = {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = "在 GitHub 支持项目",
+                                tint = colors.actionFill,
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .testTag("settings_support_star"),
+                            )
+                        },
+                    )
+                    MyTokenRow(
+                        icon = Icons.Outlined.Handyman,
+                        title = "更新设置",
+                        supportingText = if (state.update.mirrorBase.isBlank()) {
+                            "GitHub 直连"
+                        } else {
+                            "CDN 镜像"
+                        },
+                        iconTint = colors.actionFill,
+                        iconSize = 22.dp,
+                        onClick = { showUpdateSettings = true },
+                        modifier = Modifier.testTag("settings_update_settings"),
+                        trailing = chevron,
+                    )
                 }
             }
         }
@@ -376,82 +446,222 @@ fun SettingsScreen(
             onRetry = onLoadReleaseHistory,
         )
     }
+    if (showUpdateDialog) {
+        MyTokenUpdateDialog(
+            version = updateDialogVersion,
+            releaseNotes = updateDialogNotes,
+            confirmLabel = updateDialogConfirmLabel,
+            onConfirm = confirmUpdateDialog,
+            onDismiss = { showUpdateDialog = false },
+            modifier = Modifier.testTag("settings_update_dialog"),
+            confirmTag = "settings_update_confirm",
+        )
+    }
+    if (showUpdateSettings) {
+        UpdateSettingsDialog(
+            mirrorBase = state.update.mirrorBase,
+            tokenMask = state.update.githubTokenMask,
+            tokenError = state.update.githubTokenError,
+            onSave = { mirror, token ->
+                onMirrorBaseChange(mirror)
+                if (!token.isNullOrBlank()) onGitHubTokenSave(token)
+                showUpdateSettings = false
+            },
+            onRemoveToken = onGitHubTokenRemove,
+            onDismiss = { showUpdateSettings = false },
+        )
+    }
 }
 
+/** 有可用更新时，版本号后方的向上箭头；整枚图标连续呼吸闪烁。 */
 @Composable
-private fun CurrentReleaseNotesSection(
-    state: AppReleaseHistoryUiState,
-    currentVersion: String,
-    onRetry: () -> Unit,
-    onShowHistory: () -> Unit,
+private fun BreathingUpdateArrow(onClick: () -> Unit) {
+    val colors = MyTokenThemeTokens.colors
+    val motionEnabled = rememberMyTokenMotionEnabled()
+    val breathe = if (motionEnabled) {
+        val transition = rememberInfiniteTransition(label = "settings-update-arrow")
+        val value by transition.animateFloat(
+            initialValue = 0.4f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1400),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "settings-update-arrow-breathe",
+        )
+        value
+    } else {
+        1f
+    }
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = "有新版本，查看更新" }
+            .testTag("settings_update_available_arrow"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.ArrowUpward,
+            contentDescription = null,
+            tint = colors.actionFill,
+            modifier = Modifier
+                .size(18.dp)
+                .graphicsLayer {
+                    alpha = if (motionEnabled) 0.45f + 0.55f * breathe else 1f
+                    val scale = if (motionEnabled) 0.9f + 0.1f * breathe else 1f
+                    scaleX = scale
+                    scaleY = scale
+                },
+        )
+    }
+}
+
+/** 更新设置弹窗：选择 GitHub 直连（可选令牌）或 CDN 镜像，并统一保存。 */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun UpdateSettingsDialog(
+    mirrorBase: String,
+    tokenMask: String?,
+    tokenError: String?,
+    onSave: (String, String?) -> Unit,
+    onRemoveToken: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(
-                onClick = onRetry,
-                modifier = Modifier
-                    .size(28.dp)
-                    .testTag("release_notes_refresh_button"),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Refresh,
-                    contentDescription = "获取当前版本日志",
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    val colors = MyTokenThemeTokens.colors
+    var github by remember { mutableStateOf(mirrorBase.isBlank()) }
+    var mirror by remember {
+        mutableStateOf(mirrorBase.ifBlank { DEFAULT_UPDATE_CDN_BASES.first() })
+    }
+    var tokenInput by rememberSaveable { mutableStateOf("") }
+
+    MyTokenDialog(
+        title = "更新设置",
+        subtitle = "选择安装包来源与下载方式",
+        icon = Icons.Outlined.Handyman,
+        tone = MyTokenDialogTone.Info,
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag("settings_update_settings_dialog"),
+        content = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "更新来源",
+                    style = MyTokenType.label,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.ink,
                 )
-            }
-            Spacer(modifier = Modifier.weight(1f))
-            IconButton(
-                onClick = onShowHistory,
-                modifier = Modifier
-                    .size(40.dp)
-                    .testTag("release_history_button"),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.History,
-                    contentDescription = "查看历史版本",
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-        }
-        when (state) {
-            AppReleaseHistoryUiState.Idle -> Text(
-                text = "暂无更新日志",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            AppReleaseHistoryUiState.Loading -> {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                    Text(
-                        text = "正在加载...",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    FilterChip(
+                        selected = github,
+                        onClick = { github = true },
+                        label = { Text("GitHub 直连") },
+                        colors = myTokenFilterChipColors(selected = github),
+                        border = myTokenFilterChipBorder(selected = github),
+                        modifier = Modifier.testTag("update_source_github"),
+                    )
+                    FilterChip(
+                        selected = !github,
+                        onClick = { github = false },
+                        label = { Text("CDN 镜像") },
+                        colors = myTokenFilterChipColors(selected = !github),
+                        border = myTokenFilterChipBorder(selected = !github),
+                        modifier = Modifier.testTag("update_source_cdn"),
                     )
                 }
-            }
-            is AppReleaseHistoryUiState.Error -> Text(
-                text = "日志获取失败",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-            is AppReleaseHistoryUiState.Loaded -> {
-                val current = state.releases.firstOrNull { it.version == currentVersion }
-                if (current == null || current.releaseNotes.isBlank()) {
+                if (github) {
                     Text(
-                        text = "暂无更新日志",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = "GitHub 令牌（可选）",
+                        style = MyTokenType.label,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.ink,
+                    )
+                    Text(
+                        text = "公开仓库可留空；填写令牌可提高 API 请求额度。",
+                        style = MyTokenType.caption,
+                        color = colors.muted,
+                    )
+                    if (tokenMask != null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text(
+                                text = "已保存 $tokenMask",
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("github_token_mask"),
+                                style = MyTokenType.caption,
+                                color = colors.muted,
+                            )
+                            TextButton(
+                                onClick = onRemoveToken,
+                                modifier = Modifier.testTag("github_token_remove_button"),
+                            ) {
+                                Text("移除")
+                            }
+                        }
+                    }
+                    OutlinedTextField(
+                        value = tokenInput,
+                        onValueChange = { tokenInput = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("github_token_input"),
+                        singleLine = true,
+                        placeholder = { Text("ghp_ 或 github_pat_ 令牌") },
+                        visualTransformation = PasswordVisualTransformation(),
                     )
                 } else {
-                    MarkdownText(markdown = current.releaseNotes)
+                    Text(
+                        text = "镜像源",
+                        style = MyTokenType.label,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.ink,
+                    )
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        DEFAULT_UPDATE_CDN_BASES.forEachIndexed { index, base ->
+                            FilterChip(
+                                selected = mirror == base,
+                                onClick = { mirror = base },
+                                label = { Text(base.removePrefix("https://")) },
+                                colors = myTokenFilterChipColors(selected = mirror == base),
+                                border = myTokenFilterChipBorder(selected = mirror == base),
+                                modifier = Modifier.testTag("update_mirror_$index"),
+                            )
+                        }
+                    }
+                }
+                if (tokenError != null) {
+                    Text(
+                        text = tokenError,
+                        style = MyTokenType.caption,
+                        color = colors.criticalText,
+                    )
                 }
             }
-        }
-    }
+        },
+        actions = {
+            MyTokenButton(
+                text = "取消",
+                onClick = onDismiss,
+                modifier = Modifier.weight(1f),
+                tone = MyTokenButtonTone.Neutral,
+            )
+            MyTokenButton(
+                text = "保存",
+                onClick = {
+                    onSave(
+                        if (github) "" else mirror,
+                        if (github) tokenInput.takeIf { it.isNotBlank() } else null,
+                    )
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("update_settings_save"),
+                tone = MyTokenButtonTone.Primary,
+            )
+        },
+    )
 }
 
 /** 「关于」长按导出的反馈：成功给出位置与分享入口，失败说明原因。 */
@@ -680,288 +890,6 @@ private fun ReleaseHistoryList(releases: List<AppReleaseHistoryItem>) {
 }
 
 @Composable
-private fun UpdateSection(
-    state: AppUpdateUiState,
-    currentVersion: String,
-    onCheckForUpdates: () -> Unit,
-    onDownloadAndInstall: (String, String) -> Unit,
-    onOpenInstallPermissionSettings: () -> Unit,
-    onInstallDownloadedUpdate: () -> Unit,
-) {
-    when (state) {
-        is AppUpdateUiState.Checking -> {
-            Text(
-                text = "正在检查更新",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            MyTokenButton(
-                onClick = onCheckForUpdates,
-                enabled = false,
-                tone = MyTokenButtonTone.Primary,
-                text = "检测更新",
-                icon = Icons.Filled.Refresh,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("check_updates_button"),
-            )
-        }
-
-        is AppUpdateUiState.Downloading -> {
-            val progress = state.progress
-            Text(
-                text = if (progress == null) "正在下载更新..." else "正在下载更新 ${(progress * 100).toInt()}%",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            LinearProgressIndicator(
-                progress = { ((progress ?: 0f).coerceIn(0f, 1f)) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-
-        is AppUpdateUiState.Available -> {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier.size(44.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    MyTokenUpdateStarIcon(
-                        modifier = Modifier
-                            .size(34.dp)
-                            .testTag("settings_update_star"),
-                    )
-                }
-                Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
-                    val updateAccent = MyTokenThemeTokens.colors.actionText
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .background(MyTokenThemeTokens.colors.actionFill, RoundedCornerShape(MyTokenRadius.pill)),
-                        )
-                        Text(
-                            text = "发现新版本",
-                            modifier = Modifier.padding(start = 5.dp),
-                            style = MyTokenType.label,
-                            color = updateAccent,
-                        )
-                    }
-                    Row(modifier = Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "v${state.version}",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            text = "v$currentVersion",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textDecoration = TextDecoration.LineThrough,
-                            modifier = Modifier.padding(start = 6.dp),
-                        )
-                    }
-                }
-            }
-            if (state.releaseNotes.isNotBlank()) {
-                MarkdownText(
-                    markdown = state.releaseNotes,
-                    modifier = Modifier.padding(top = 10.dp),
-                )
-            }
-            MyTokenButton(
-                onClick = { onDownloadAndInstall(state.version, state.downloadUrl) },
-                modifier = Modifier.fillMaxWidth().testTag("download_update_button"),
-                tone = MyTokenButtonTone.Primary,
-                text = "下载并安装",
-                icon = Icons.Filled.Download,
-            )
-        }
-
-        is AppUpdateUiState.NeedsInstallPermission -> {
-            var permissionRequestPending by rememberSaveable { mutableStateOf(false) }
-            LifecycleResumeEffect(Unit) {
-                if (permissionRequestPending) {
-                    permissionRequestPending = false
-                    onInstallDownloadedUpdate()
-                }
-                onPauseOrDispose {}
-            }
-            Text(
-                text = "需要安装权限",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            MyTokenButton(
-                onClick = {
-                    permissionRequestPending = true
-                    onOpenInstallPermissionSettings()
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("install_permission_button"),
-                tone = MyTokenButtonTone.Primary,
-                text = "授权并安装",
-                icon = Icons.AutoMirrored.Filled.OpenInNew,
-            )
-        }
-
-        is AppUpdateUiState.ReadyToInstall -> {
-            Text(
-                text = "v${state.version} 已下载完成。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            MyTokenButton(
-                onClick = onInstallDownloadedUpdate,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("install_update_button"),
-                tone = MyTokenButtonTone.Primary,
-                text = "安装更新",
-                icon = Icons.Filled.ArrowUpward,
-            )
-        }
-
-        is AppUpdateUiState.Error -> {
-            Text(
-                text = "更新失败，请重试",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-            MyTokenButton(
-                onClick = onCheckForUpdates,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("check_updates_button"),
-                tone = MyTokenButtonTone.Primary,
-                text = "重试",
-                icon = Icons.Filled.Refresh,
-            )
-        }
-
-        is AppUpdateUiState.UpToDate -> {
-            Text(
-                text = "已是最新版本",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            MyTokenButton(
-                onClick = onCheckForUpdates,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("check_updates_button"),
-                tone = MyTokenButtonTone.Primary,
-                text = "检测更新",
-                icon = Icons.Filled.Refresh,
-            )
-        }
-
-        AppUpdateUiState.Idle -> MyTokenButton(
-            onClick = onCheckForUpdates,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("check_updates_button"),
-            tone = MyTokenButtonTone.Primary,
-            text = "检测更新",
-            icon = Icons.Filled.Refresh,
-        )
-    }
-}
-
-/** 设计稿“关于”区：版本 / 检查更新 / 更新日志 / 更新源与令牌，四行常显。 */
-private fun updateRowStatus(state: AppUpdateUiState): String = when (state) {
-    AppUpdateUiState.Idle -> "未检查"
-    AppUpdateUiState.Checking -> "检查中…"
-    is AppUpdateUiState.UpToDate -> "已是最新"
-    is AppUpdateUiState.Available -> "发现 v${state.version}"
-    is AppUpdateUiState.Downloading -> "下载中"
-    is AppUpdateUiState.ReadyToInstall -> "待安装"
-    is AppUpdateUiState.NeedsInstallPermission -> "待授权"
-    is AppUpdateUiState.Error -> "检查失败"
-}
-
-private val AppUpdateUiState.canCheckManually: Boolean
-    get() = this is AppUpdateUiState.Idle ||
-        this is AppUpdateUiState.UpToDate ||
-        this is AppUpdateUiState.Error
-
-private val AppUpdateUiState.showsUpdateActions: Boolean
-    get() = this is AppUpdateUiState.Available ||
-        this is AppUpdateUiState.Downloading ||
-        this is AppUpdateUiState.ReadyToInstall ||
-        this is AppUpdateUiState.NeedsInstallPermission
-
-@Composable
-private fun AboutChevron(expanded: Boolean) {
-    Icon(
-        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-        contentDescription = null,
-        tint = MyTokenThemeTokens.colors.muted,
-        modifier = Modifier
-            .size(18.dp)
-            .rotate(if (expanded) 90f else 0f),
-    )
-}
-
-@Composable
-private fun AboutDisclosureRow(
-    title: String,
-    expanded: Boolean,
-    onToggle: () -> Unit,
-    toggleTag: String,
-    supportingText: String? = null,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    val colors = MyTokenThemeTokens.colors
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = MyTokenSize.settingsRowMin)
-                .testTag(toggleTag)
-                .clickable(role = Role.Button, onClick = onToggle)
-                .semantics {
-                    stateDescription = if (expanded) "已展开" else "已收起"
-                }
-                .padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MyTokenType.body,
-                    color = colors.ink,
-                    maxLines = 1,
-                )
-                if (supportingText != null) {
-                    Text(
-                        text = supportingText,
-                        style = MyTokenType.caption,
-                        color = colors.muted,
-                        maxLines = 1,
-                    )
-                }
-            }
-            AboutChevron(expanded = expanded)
-        }
-        AnimatedVisibility(
-            visible = expanded,
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut(),
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                content = content,
-            )
-        }
-    }
-}
-
-@Composable
 private fun SettingsHeader(drawerMode: Boolean, onClose: (() -> Unit)?) {
     val colors = MyTokenThemeTokens.colors
     Row(
@@ -1172,167 +1100,6 @@ private fun ThemePreviewScene(
                 .clip(RoundedCornerShape(4.dp))
                 .background(cardColor),
         )
-    }
-}
-
-@Composable
-private fun GitHubTokenSection(
-    tokenMask: String?,
-    error: String?,
-    onSave: (String) -> Unit,
-    onRemove: () -> Unit,
-) {
-    var tokenInput by rememberSaveable { mutableStateOf("") }
-
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(
-            text = "GitHub 令牌",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = "检查更新时使用。带令牌每小时 5000 次请求，不带仅 60 次；公开仓库只读权限即可。",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        if (tokenMask == null) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                OutlinedTextField(
-                    value = tokenInput,
-                    onValueChange = { tokenInput = it },
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("github_token_input"),
-                    singleLine = true,
-                    placeholder = { Text("ghp_ 或 github_pat_ 令牌") },
-                    visualTransformation = PasswordVisualTransformation(),
-                )
-                MyTokenButton(
-                    onClick = {
-                        onSave(tokenInput)
-                        tokenInput = ""
-                    },
-                    enabled = tokenInput.isNotBlank(),
-                    tone = MyTokenButtonTone.Primary,
-                    text = "保存",
-                    modifier = Modifier.testTag("github_token_save_button"),
-                )
-            }
-        } else {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Text(
-                    text = tokenMask,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("github_token_mask"),
-                )
-                TextButton(
-                    onClick = onRemove,
-                    modifier = Modifier.testTag("github_token_remove_button"),
-                ) {
-                    Text("移除")
-                }
-            }
-        }
-
-        if (error != null) {
-            Text(
-                text = error,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun UpdateChannelSection(
-    mirrorBase: String,
-    onMirrorBaseChange: (String) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(
-            text = "更新源",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("update_channel_selector"),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            FilterChip(
-                selected = mirrorBase.isEmpty(),
-                onClick = { onMirrorBaseChange("") },
-                label = {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Code,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                        )
-                        Text("GitHub")
-                    }
-                },
-                colors = myTokenFilterChipColors(selected = mirrorBase.isEmpty()),
-                border = myTokenFilterChipBorder(selected = mirrorBase.isEmpty()),
-            )
-            FilterChip(
-                selected = mirrorBase.isNotEmpty(),
-                onClick = {
-                    if (mirrorBase.isEmpty()) {
-                        onMirrorBaseChange(DEFAULT_UPDATE_CDN_BASES.first())
-                    }
-                },
-                label = {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Cloud,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                        )
-                        Text("CDN")
-                    }
-                },
-                colors = myTokenFilterChipColors(selected = mirrorBase.isNotEmpty()),
-                border = myTokenFilterChipBorder(selected = mirrorBase.isNotEmpty()),
-            )
-        }
-        if (mirrorBase.isNotEmpty()) {
-            Text(
-                text = "镜像源",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                DEFAULT_UPDATE_CDN_BASES.forEach { base ->
-                    FilterChip(
-                        selected = mirrorBase == base,
-                        onClick = { onMirrorBaseChange(base) },
-                        label = { Text(text = base.removePrefix("https://")) },
-                        colors = myTokenFilterChipColors(selected = mirrorBase == base),
-                        border = myTokenFilterChipBorder(selected = mirrorBase == base),
-                    )
-                }
-            }
-        }
     }
 }
 
