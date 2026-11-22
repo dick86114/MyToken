@@ -148,6 +148,64 @@ class CredentialUsageSurfaceStyleTest {
         assertTrue(chrome.contains("tint = if (selected) colors.canvas else colors.muted"))
     }
 
+    @Test
+    fun `正常进度条由绿色改为墨色`() {
+        val ring = sourceText("UsageRing.kt")
+        assertTrue("弧线正常态应使用墨色", ring.contains("else -> colors.ink"))
+        assertFalse(ring.contains("else -> colors.positiveFill"))
+
+        listOf("UsageCardSkeleton.kt", "CredentialUsageCard.kt", "CredentialDetailHero.kt").forEach { name ->
+            val text = sourceText(name)
+            assertFalse("$name 正常细条不再使用绿色", text.contains("UsageMetricTone.Normal -> colors.positiveFill"))
+            assertTrue(
+                "$name 正常细条应使用墨色",
+                Regex("UsageMetricTone\\.Normal -> colors\\.ink").findAll(text).count() >=
+                    if (name == "UsageCardSkeleton.kt") 1 else 2,
+            )
+        }
+        assertTrue(
+            "完整卡细条正常态应使用墨色",
+            sourceText("FullSplitUsageContent.kt").contains("SplitTone.Normal -> MyTokenThemeTokens.colors.ink"),
+        )
+    }
+
+    @Test
+    fun `额度构成条统一黑黄双色`() {
+        val full = sourceText("FullSplitUsageContent.kt")
+        listOf(
+            full.substringAfter("private fun FullBalanceHero")
+                .substringBefore("@Composable\nprivate fun FullSecondaryBalance"),
+            full.substringAfter("private fun FullSecondaryBalance")
+                .substringBefore("@Composable\nprivate fun FullBalanceLegend"),
+        ).forEach { composition ->
+            assertFalse("额度构成不再使用灰色分类色", composition.contains("colors.cat1"))
+            assertFalse("额度构成不再使用灰色分类色", composition.contains("colors.cat2"))
+            assertTrue("充值/现金构成条应为黑色", composition.contains(".background(colors.ink)"))
+            assertTrue("赠送构成条应为黄色", composition.contains(".background(colors.actionFill)"))
+        }
+
+        val commandCode = full
+            .substringAfter("private fun FullCommandCodeSummary")
+            .substringBefore("@Composable\nprivate fun CommandCodeSummaryValue")
+        assertTrue(
+            "CommandCode 额度构成应为墨色/中性/黄色，不再使用 cat1",
+            commandCode.contains("listOf(colors.ink, colors.cat2, colors.actionFill)"),
+        )
+
+        val detail = sourceText("CredentialDetailHero.kt")
+        listOf(
+            detail.substringAfter("private fun BalanceHero")
+                .substringBefore("@Composable\nprivate fun BalanceLegend"),
+            detail.substringAfter("private fun CurrencyBalanceRow")
+                .substringBefore("@Composable\nprivate fun", missingDelimiterValue = ""),
+        ).forEach { composition ->
+            assertFalse("详情页额度构成不再使用灰色分类色", composition.contains("colors.cat1"))
+            assertFalse("详情页额度构成不再使用灰色分类色", composition.contains("colors.cat2"))
+            assertTrue("详情页充值构成条应为黑色", composition.contains(".background(colors.ink)"))
+            assertTrue("详情页赠送构成条应为黄色", composition.contains(".background(colors.actionFill)"))
+        }
+    }
+
     private fun sourceText(name: String): String {
         val workingDir = File(System.getProperty("user.dir") ?: error("缺少 user.dir"))
         val candidates = listOf(

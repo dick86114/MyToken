@@ -360,7 +360,7 @@ internal fun UsageCardWindowRow(
             color = when (tone) {
                 UsageMetricTone.Warning -> colors.warningFill
                 UsageMetricTone.Critical -> colors.criticalFill
-                UsageMetricTone.Normal -> colors.positiveFill
+                UsageMetricTone.Normal -> colors.ink
             },
             modifier = Modifier.padding(top = 3.dp),
             height = 3.dp,

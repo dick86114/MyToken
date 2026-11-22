@@ -63,6 +63,31 @@ class SettingsIconographyTest {
         assertFalse(settings.contains("UpdateSection("))
     }
 
+    @Test
+    fun `设置资料卡使用黄色铭牌与固定黑色图文`() {
+        val settings = sourceText("SettingsScreen.kt")
+        val profile = settings
+            .substringAfter("private fun SettingsProfileCard")
+            .substringBefore("@Composable\nprivate fun ThemeSelector")
+
+        assertTrue("铭牌底色应为黄色", profile.contains(".background(colors.actionFill)"))
+        assertTrue("铭牌应有深色包边", profile.contains("border(1.dp, colors.reportTicketInk"))
+        assertTrue("铭牌 Logo 固定使用黑色版本", profile.contains("darkTheme = false"))
+        assertTrue("铭牌标题必须固定为黑色", profile.contains("color = colors.reportTicketInk"))
+        assertFalse("铭牌文案不再使用会随主题变化的 ink", profile.contains("color = colors.ink"))
+    }
+
+    @Test
+    fun `外观选中边框使用黄色`() {
+        val settings = sourceText("SettingsScreen.kt")
+        val scene = settings
+            .substringAfter("private fun ThemePreviewScene")
+            .substringBefore("private val DEFAULT_UPDATE_CDN_BASES")
+
+        assertTrue("选中的主题预览应使用黄色描边", scene.contains("selected -> colors.actionFill"))
+        assertFalse("选中的主题预览不再使用墨色描边", scene.contains("selected -> colors.ink"))
+    }
+
     private fun sourceText(name: String): String {
         val candidates = listOf(
             root.resolve("src/main/kotlin/ai/routin/mytoken/feature/settings/$name"),

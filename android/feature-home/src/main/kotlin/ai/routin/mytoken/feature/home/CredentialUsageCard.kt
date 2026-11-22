@@ -305,7 +305,7 @@ private fun CompactMiniProgressRow(metric: UsageMetric) {
             color = when (tone) {
                 UsageMetricTone.Warning -> colors.warningFill
                 UsageMetricTone.Critical -> colors.criticalFill
-                UsageMetricTone.Normal -> colors.positiveFill
+                UsageMetricTone.Normal -> colors.ink
             },
             modifier = Modifier.weight(1f),
             height = 3.dp,

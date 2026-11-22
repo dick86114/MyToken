@@ -47,7 +47,7 @@ internal fun UsageArcGauge(
         inactive -> colors.track
         tone == UsageMetricTone.Warning -> colors.warningFill
         tone == UsageMetricTone.Critical -> colors.criticalFill
-        else -> colors.positiveFill
+        else -> colors.ink
     }
     val clamped = ((percent ?: 0.0).coerceIn(0.0, 100.0)).toFloat()
     // 数值变化时弧线平滑过渡；系统关闭动画时退化为瞬间跳变。

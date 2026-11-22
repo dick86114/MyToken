@@ -260,7 +260,7 @@ private fun BalanceHero(card: CredentialCardUi, balance: UsageMetric) {
                         modifier = Modifier
                             .weight(primaryWeight.toFloat())
                             .height(5.dp)
-                            .background(colors.cat1),
+                            .background(colors.ink),
                     )
                 }
                 if (primaryWeight < 1.0) {
@@ -268,14 +268,14 @@ private fun BalanceHero(card: CredentialCardUi, balance: UsageMetric) {
                         modifier = Modifier
                             .weight((1.0 - primaryWeight).toFloat())
                             .height(5.dp)
-                            .background(colors.cat2),
+                            .background(colors.actionFill),
                     )
                 }
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            BalanceLegend("充值", toppedUp?.value, balance.currencyCode, colors.cat1)
-            BalanceLegend("赠金", granted?.value, balance.currencyCode, colors.cat2)
+            BalanceLegend("充值", toppedUp?.value, balance.currencyCode, colors.ink)
+            BalanceLegend("赠金", granted?.value, balance.currencyCode, colors.actionFill)
         }
     }
 }
@@ -404,7 +404,7 @@ private fun DetailWindowRow(metric: UsageMetric) {
             color = when (tone) {
                 UsageMetricTone.Warning -> colors.warningFill
                 UsageMetricTone.Critical -> colors.criticalFill
-                UsageMetricTone.Normal -> colors.positiveFill
+                UsageMetricTone.Normal -> colors.ink
             },
             modifier = Modifier.padding(top = 7.dp),
             height = 4.dp,
@@ -505,7 +505,7 @@ private fun CurrencyBalanceRow(card: CredentialCardUi, balance: UsageMetric) {
                         modifier = Modifier
                             .weight(primaryWeight.toFloat())
                             .height(4.dp)
-                            .background(colors.cat1),
+                            .background(colors.ink),
                     )
                 }
                 if (primaryWeight < 1.0) {
@@ -513,14 +513,14 @@ private fun CurrencyBalanceRow(card: CredentialCardUi, balance: UsageMetric) {
                         modifier = Modifier
                             .weight((1.0 - primaryWeight).toFloat())
                             .height(4.dp)
-                            .background(colors.cat2),
+                            .background(colors.actionFill),
                     )
                 }
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            BalanceLegend("充值", toppedUp?.value, balance.currencyCode, colors.cat1)
-            BalanceLegend("赠金", granted?.value, balance.currencyCode, colors.cat2)
+            BalanceLegend("充值", toppedUp?.value, balance.currencyCode, colors.ink)
+            BalanceLegend("赠金", granted?.value, balance.currencyCode, colors.actionFill)
         }
     }
 }

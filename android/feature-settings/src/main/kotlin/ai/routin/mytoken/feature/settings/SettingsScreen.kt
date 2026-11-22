@@ -76,7 +76,6 @@ import ai.routin.mytoken.core.ui.MyTokenRow
 import ai.routin.mytoken.core.ui.MyTokenSection
 import ai.routin.mytoken.core.ui.MyTokenSize
 import ai.routin.mytoken.core.ui.MyTokenSpacing
-import ai.routin.mytoken.core.ui.MyTokenSurface
 import ai.routin.mytoken.core.ui.MyTokenThemePreviewColors
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
@@ -87,7 +86,6 @@ import ai.routin.mytoken.core.ui.MyTokenDialogRow
 import ai.routin.mytoken.core.ui.MyTokenDialogSection
 import ai.routin.mytoken.core.ui.MyTokenDialogStatus
 import ai.routin.mytoken.core.ui.MyTokenDialogTone
-import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
 import ai.routin.mytoken.core.ui.myTokenFilterChipBorder
 import ai.routin.mytoken.core.ui.myTokenFilterChipColors
 import androidx.compose.ui.Modifier
@@ -932,35 +930,45 @@ private fun SettingsHeader(drawerMode: Boolean, onClose: (() -> Unit)?) {
 @Composable
 private fun SettingsProfileCard(appVersion: String) {
     val colors = MyTokenThemeTokens.colors
-    MyTokenSurface(
+    val shape = RoundedCornerShape(MyTokenRadius.card)
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag("settings_profile"),
-        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
-        shape = RoundedCornerShape(MyTokenRadius.card),
+            .testTag("settings_profile")
+            .clip(shape)
+            .background(colors.actionFill)
+            .border(1.dp, colors.reportTicketInk.copy(alpha = 0.35f), shape),
     ) {
+        // 内圈细线模拟铭牌的压边，图文固定用黑色，不随主题反相。
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .padding(5.dp)
+                .border(1.dp, colors.reportTicketInk.copy(alpha = 0.14f), shape),
+        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(horizontal = 18.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             MyTokenBrandMark(
                 modifier = Modifier.testTag("settings_brand_logo"),
                 size = 44.dp,
+                darkTheme = false,
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "MyToken",
                     style = MyTokenType.profileName,
-                    color = colors.ink,
+                    color = colors.reportTicketInk,
                 )
                 Text(
                     text = "v$appVersion · 凭证只在本机",
                     modifier = Modifier.padding(top = 2.dp),
                     style = MyTokenType.caption,
-                    color = colors.muted,
+                    color = colors.reportTicketInk.copy(alpha = 0.72f),
                 )
             }
         }
@@ -1019,7 +1027,7 @@ private fun ThemeSelector(
     }
 }
 
-/** 三张主题预览卡：固定展示浅色/深色场景，选中时用墨色描边。 */
+/** 三张主题预览卡：固定展示浅色/深色场景，选中时用黄色强调描边。 */
 @Composable
 private fun ThemePreviewScene(
     mode: AppThemeMode,
@@ -1046,7 +1054,7 @@ private fun ThemePreviewScene(
         else -> preview.lightCard
     }
     val borderColor = when {
-        selected -> colors.ink
+        selected -> colors.actionFill
         isDark -> preview.darkBorder
         else -> preview.sceneBorder
     }

@@ -455,7 +455,8 @@ private fun FullCommandCodeSummary(byId: Map<String, UsageMetric>) {
     val requests = byId["request-count"]
     if (composition.isEmpty() && periodSpent == null && requests == null) return
     val total = composition.fold(BigDecimal.ZERO) { acc, item -> acc + (item.second ?: BigDecimal.ZERO) }
-    val tints = listOf(colors.cat1, colors.cat2, colors.cat3)
+    // 额度构成：月度用墨色（重置余额），赠送用行动黄，购买保持中性灰。
+    val tints = listOf(colors.ink, colors.cat2, colors.actionFill)
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
@@ -708,7 +709,7 @@ private fun FullBalanceHero(
                         modifier = Modifier
                             .weight(primaryWeight.toFloat())
                             .height(5.dp)
-                            .background(colors.cat1),
+                            .background(colors.ink),
                     )
                 }
                 if (primaryWeight < 1.0) {
@@ -716,7 +717,7 @@ private fun FullBalanceHero(
                         modifier = Modifier
                             .weight((1.0 - primaryWeight).toFloat())
                             .height(5.dp)
-                            .background(colors.cat2),
+                            .background(colors.actionFill),
                     )
                 }
             }
@@ -733,13 +734,13 @@ private fun FullBalanceHero(
                 label = primaryLabel,
                 metric = group.toppedUp,
                 currencyCode = group.balance.currencyCode,
-                color = colors.cat1,
+                color = colors.ink,
             )
             FullBalanceLegend(
                 label = secondaryLabel,
                 metric = group.granted,
                 currencyCode = group.balance.currencyCode,
-                color = colors.cat2,
+                color = colors.actionFill,
             )
         }
         if (facts.isNotEmpty()) {
@@ -809,7 +810,7 @@ private fun FullSecondaryBalance(group: SplitCurrencyGroup, modifier: Modifier =
                         modifier = Modifier
                             .weight(primaryWeight.toFloat())
                             .height(4.dp)
-                            .background(colors.cat1),
+                            .background(colors.ink),
                     )
                 }
                 if (primaryWeight < 1.0) {
@@ -817,7 +818,7 @@ private fun FullSecondaryBalance(group: SplitCurrencyGroup, modifier: Modifier =
                         modifier = Modifier
                             .weight((1.0 - primaryWeight).toFloat())
                             .height(4.dp)
-                            .background(colors.cat2),
+                            .background(colors.actionFill),
                     )
                 }
             }
@@ -1302,7 +1303,7 @@ private fun splitTone(metric: UsageMetric, percent: Double?): SplitTone {
 
 @Composable
 private fun splitToneColor(tone: SplitTone): Color = when (tone) {
-    SplitTone.Normal -> MyTokenThemeTokens.colors.positiveFill
+    SplitTone.Normal -> MyTokenThemeTokens.colors.ink
     SplitTone.Warning -> MyTokenThemeTokens.colors.warningFill
     SplitTone.Critical -> MyTokenThemeTokens.colors.criticalFill
 }
