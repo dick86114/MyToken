@@ -698,7 +698,20 @@ final class ProjectBootstrapTests: XCTestCase {
 
         XCTAssertTrue(workflow.contains(releaseNotesInput))
         XCTAssertTrue(workflow.contains("run-name: 发布 macOS v${{ inputs.version }} · ${{ inputs.release_notes }}"))
-        XCTAssertTrue(androidWorkflow.contains("run-name: 发布 Android v${{ inputs.version }} · ${{ inputs.release_notes }}"))
+        XCTAssertTrue(
+            androidWorkflow.contains(
+                "run-name: 发布 Android ${{ inputs.release_channel == 'preview' && '预览版' || '正式版' }} v${{ inputs.version }} · ${{ inputs.release_notes }}"
+            )
+        )
+        XCTAssertTrue(androidWorkflow.contains("release_channel:"))
+        XCTAssertTrue(androidWorkflow.contains("- preview"))
+        XCTAssertTrue(
+            androidWorkflow.contains(
+                "tag_name: android-preview-${{ inputs.version }}-${{ inputs.preview_iteration }}"
+            )
+        )
+        XCTAssertTrue(androidWorkflow.contains("prerelease: true"))
+        XCTAssertTrue(androidWorkflow.contains("if: inputs.release_channel == 'stable'"))
         XCTAssertTrue(workflow.contains("release_notes:"))
         XCTAssertTrue(workflow.contains("body: |"))
         XCTAssertTrue(workflow.contains("## macOS"))
