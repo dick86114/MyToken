@@ -88,6 +88,36 @@ class SettingsIconographyTest {
     }
 
     @Test
+    fun `支持项目星标带文案和黄色描边`() {
+        val settings = sourceText("SettingsScreen.kt")
+        val support = settings
+            .substringAfter("title = \"支持项目\"")
+            .substringBefore("Icons.Outlined.Handyman")
+
+        assertTrue("星标应带「加星标」文案", support.contains("text = \"加星标\""))
+        assertTrue("星标应套黄色外框", support.contains(".border(1.dp, colors.actionFill"))
+        assertTrue(support.contains("settings_support_star"))
+    }
+
+    @Test
+    fun `设置页行距收紧`() {
+        val settings = sourceText("SettingsScreen.kt")
+
+        assertTrue(
+            "分节间距应使用紧凑值",
+            settings.contains("Arrangement.spacedBy(MyTokenSpacing.settingsSectionCompact)"),
+        )
+        assertTrue(
+            "卡片内边距应使用紧凑值",
+            settings.contains("contentPadding = MyTokenSpacing.cardCompact"),
+        )
+        assertTrue(
+            "设置行间距应使用紧凑值",
+            settings.contains("contentSpacing = MyTokenSpacing.sm"),
+        )
+    }
+
+    @Test
     fun `外观选项点击不显示灰色遮罩`() {
         val settings = sourceText("SettingsScreen.kt")
         val selector = settings

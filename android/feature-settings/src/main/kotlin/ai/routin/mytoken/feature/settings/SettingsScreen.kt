@@ -230,7 +230,7 @@ fun SettingsScreen(
                 bottom = if (drawerMode) 24.dp else 96.dp,
             ),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(MyTokenSpacing.settingsSection),
+            verticalArrangement = Arrangement.spacedBy(MyTokenSpacing.settingsSectionCompact),
         ) {
             item(
                 key = "settings_header",
@@ -244,7 +244,12 @@ fun SettingsScreen(
                 }
             }
             item(key = "theme") {
-                SectionCard(title = "外观", modifier = Modifier.testTag("settings_theme_cell")) {
+                SectionCard(
+                    title = "外观",
+                    modifier = Modifier.testTag("settings_theme_cell"),
+                    contentPadding = MyTokenSpacing.cardCompact,
+                    contentSpacing = MyTokenSpacing.sm,
+                ) {
                     ThemeSelector(
                         selected = state.display.themeMode,
                         onSelect = onThemeModeChange,
@@ -272,6 +277,8 @@ fun SettingsScreen(
                 MyTokenSection(
                     title = "数据",
                     modifier = Modifier.testTag("settings_migration_cell"),
+                    contentPadding = MyTokenSpacing.cardCompact,
+                    contentSpacing = MyTokenSpacing.sm,
                 ) {
                     MyTokenRow(
                         icon = Icons.Outlined.QrCodeScanner,
@@ -331,6 +338,8 @@ fun SettingsScreen(
                 MyTokenSection(
                     title = "关于",
                     modifier = Modifier.testTag("settings_about_span"),
+                    contentPadding = MyTokenSpacing.cardCompact,
+                    contentSpacing = MyTokenSpacing.sm,
                 ) {
                     MyTokenRow(
                         icon = Icons.Outlined.Info,
@@ -410,14 +419,30 @@ fun SettingsScreen(
                         },
                         modifier = Modifier.testTag("settings_support_project"),
                         trailing = {
-                            Icon(
-                                imageVector = Icons.Filled.Star,
-                                contentDescription = "在 GitHub 支持项目",
-                                tint = colors.actionFill,
+                            Row(
                                 modifier = Modifier
-                                    .size(20.dp)
-                                    .testTag("settings_support_star"),
-                            )
+                                    .testTag("settings_support_star")
+                                    .clip(RoundedCornerShape(MyTokenRadius.pill))
+                                    .border(1.dp, colors.actionFill, RoundedCornerShape(MyTokenRadius.pill))
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                                    .semantics {
+                                        contentDescription = "加星标，在 GitHub 支持项目"
+                                    },
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Star,
+                                    contentDescription = null,
+                                    tint = colors.actionFill,
+                                    modifier = Modifier.size(14.dp),
+                                )
+                                Text(
+                                    text = "加星标",
+                                    style = MyTokenType.caption,
+                                    color = colors.actionText,
+                                )
+                            }
                         },
                     )
                     MyTokenRow(
@@ -1132,5 +1157,9 @@ internal fun Section(
     title: String,
     content: @Composable () -> Unit,
 ) {
-    SectionCard(title = title) { content() }
+    SectionCard(
+        title = title,
+        contentPadding = MyTokenSpacing.cardCompact,
+        contentSpacing = MyTokenSpacing.sm,
+    ) { content() }
 }

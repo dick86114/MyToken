@@ -303,7 +303,7 @@ fun MyTokenEdgeDrawerHost(
                     Box(
                         modifier = Modifier
                             .width(3.dp)
-                            .height(64.dp)
+                            .height(48.dp)
                             .clip(CircleShape)
                             .background(MyTokenThemeTokens.colors.actionFill)
                             .testTag(

@@ -143,7 +143,9 @@ fun MyTokenSwitch(
     contentDescription: String? = null,
 ) {
     val colors = MyTokenThemeTokens.colors
-    // 开关统一使用报告票面黄；黄色底上用深色滑块保证对比度。
+    val darkTheme = LocalMyTokenDarkTheme.current
+    // 开关统一使用报告票面黄；浅色主题用白色滑块，深色主题保持黑滑块。
+    val thumbColor = if (darkTheme) colors.reportTicketInk else colors.surface
     val trackColor by animateColorAsState(
         targetValue = if (checked) colors.reportTicket else colors.track,
         animationSpec = spring(dampingRatio = 1f, stiffness = 700f),
@@ -178,7 +180,7 @@ fun MyTokenSwitch(
                     .padding(start = thumbOffset)
                     .requiredSize(23.dp)
                     .clip(RoundedCornerShape(MyTokenRadius.pill))
-                    .background(if (checked) colors.reportTicketInk else colors.surface),
+                    .background(thumbColor),
             )
         }
     }
@@ -311,6 +313,8 @@ fun MyTokenSection(
     title: String,
     modifier: Modifier = Modifier,
     action: (@Composable () -> Unit)? = null,
+    contentPadding: Dp = MyTokenSpacing.cardFull,
+    contentSpacing: Dp = MyTokenSpacing.md,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = MyTokenThemeTokens.colors
@@ -338,8 +342,8 @@ fun MyTokenSection(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(MyTokenSpacing.cardFull),
-                verticalArrangement = Arrangement.spacedBy(MyTokenSpacing.md),
+                    .padding(contentPadding),
+                verticalArrangement = Arrangement.spacedBy(contentSpacing),
             ) {
                 content()
             }
@@ -353,9 +357,16 @@ fun SectionCard(
     title: String,
     modifier: Modifier = Modifier,
     supportingText: String? = null,
+    contentPadding: Dp = MyTokenSpacing.cardFull,
+    contentSpacing: Dp = MyTokenSpacing.md,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    MyTokenSection(title = title, modifier = modifier) {
+    MyTokenSection(
+        title = title,
+        modifier = modifier,
+        contentPadding = contentPadding,
+        contentSpacing = contentSpacing,
+    ) {
         if (supportingText != null) {
             Text(
                 text = supportingText,
@@ -394,7 +405,7 @@ fun MyTokenRow(
                     Modifier
                 },
             )
-            .padding(vertical = 4.dp),
+            .padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(MyTokenSpacing.md),
     ) {

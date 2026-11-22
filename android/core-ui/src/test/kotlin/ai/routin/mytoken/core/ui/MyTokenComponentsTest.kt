@@ -53,14 +53,14 @@ class MyTokenComponentsTest {
     }
 
     @Test
-    fun switchUsesReportYellowAndDarkThumb() {
+    fun switchUsesWhiteThumbInLightAndBlackInDark() {
         val source = File(System.getProperty("user.dir"))
             .walkTopDown()
             .first { it.name == "Components.kt" }
             .readText()
 
         assertTrue(source.contains("if (checked) colors.reportTicket else colors.track"))
-        assertTrue(source.contains("if (checked) colors.reportTicketInk else colors.surface"))
+        assertTrue(source.contains("if (darkTheme) colors.reportTicketInk else colors.surface"))
     }
 
     @Test

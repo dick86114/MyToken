@@ -22,5 +22,6 @@ class EdgeDrawerHandleColorTest {
             handle.contains("background(MyTokenThemeTokens.colors.actionFill)"),
         )
         assertFalse("拖拽手柄不再使用灰色遮罩", handle.contains("onSurface.copy"))
+        assertTrue("拖拽手柄长度缩短到 48dp", handle.contains(".height(48.dp)"))
     }
 }
