@@ -894,18 +894,30 @@ final class ProjectBootstrapTests: XCTestCase {
                 .appendingPathComponent("android/feature-home/src/main/kotlin/ai/routin/mytoken/feature/home/CredentialUsageCard.kt"),
             encoding: .utf8
         )
-        // 失败徽章改挂头像后，标题区改为 CredentialCardHeader：头像徽章在左，刷新按钮在右。
-        let headerStart = try XCTUnwrap(card.range(of: "CredentialCardHeader("))
-        let avatarCallIndex = try XCTUnwrap(card.range(of: "AvatarWithFailureBadge(card = card"))
-        let refreshTagIndex = try XCTUnwrap(card.range(of: "credential_refresh_${card.credential.id}"))
-        let header = card[headerStart.lowerBound..<refreshTagIndex.lowerBound]
+        let skeleton = try String(
+            contentsOf: projectRoot
+                .appendingPathComponent("android/feature-home/src/main/kotlin/ai/routin/mytoken/feature/home/UsageCardSkeleton.kt"),
+            encoding: .utf8
+        )
+        // 视觉刷新后标题区由 UsageCardIdentity 统一渲染：头像徽章在左，刷新按钮在右。
+        XCTAssertTrue(card.contains("UsageCardIdentity("))
+        let headerStart = try XCTUnwrap(skeleton.range(of: "internal fun UsageCardIdentity("))
+        let headerEnd = try XCTUnwrap(
+            skeleton.range(
+                of: "internal fun UsageCardWindowRow(",
+                range: headerStart.upperBound..<skeleton.endIndex
+            )
+        )
+        let header = skeleton[headerStart.lowerBound..<headerEnd.lowerBound]
+        let avatarTagIndex = try XCTUnwrap(header.range(of: "credential_avatar_${card.credential.id}"))
+        let failureTagIndex = try XCTUnwrap(header.range(of: "credential_failure_${card.credential.id}"))
+        let refreshTagIndex = try XCTUnwrap(header.range(of: "credential_refresh_${card.credential.id}"))
 
-        XCTAssertTrue(header.contains("AvatarWithFailureBadge(card = card"))
-        XCTAssertTrue(card.contains("credential_failure_${card.credential.id}"))
-        XCTAssertTrue(avatarCallIndex.lowerBound < refreshTagIndex.lowerBound)
-        XCTAssertFalse(card.contains("widthIn(max = 96.dp)"))
-        // StatusPill 单行截断是防御性设计，防止大字号下头部徽章溢出。
-        XCTAssertTrue(card.contains("overflow = TextOverflow.Ellipsis"))
+        XCTAssertTrue(avatarTagIndex.lowerBound < failureTagIndex.lowerBound)
+        XCTAssertTrue(failureTagIndex.lowerBound < refreshTagIndex.lowerBound)
+        XCTAssertFalse(skeleton.contains("widthIn(max = 96.dp)"))
+        // 身份文字单行截断是防御性设计，防止大字号下头部溢出。
+        XCTAssertTrue(skeleton.contains("overflow = TextOverflow.Ellipsis"))
     }
 
     func test弹窗设置入口复用右键菜单设置逻辑() throws {
