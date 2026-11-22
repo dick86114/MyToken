@@ -1681,6 +1681,7 @@ class HomeScreenTest {
         composeRule.onNodeWithText("按量计费").assertDoesNotExist()
         composeRule.onNodeWithText("¥2.00").assertIsDisplayed()
         composeRule.onNodeWithText("1,500").assertIsDisplayed()
+        composeRule.onNodeWithText("tokens", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithText("未命中 900").assertIsDisplayed()
         composeRule.onNodeWithText("输出 300").assertIsDisplayed()
         composeRule.onNodeWithText("缓存 300").assertIsDisplayed()
@@ -1935,9 +1936,11 @@ class HomeScreenTest {
         listOf("今日 Token", "24 小时", "7 天", "30 天").forEach { label ->
             composeRule.onNodeWithText(label).assertIsDisplayed()
         }
-        composeRule.onNodeWithText("14.87M tokens").assertIsDisplayed()
-        composeRule.onNodeWithText("15.12M tokens").assertIsDisplayed()
-        composeRule.onNodeWithText("1.1B tokens").assertIsDisplayed()
+        composeRule.onNodeWithText("14.87M").assertIsDisplayed()
+        composeRule.onNodeWithText("15.12M").assertIsDisplayed()
+        composeRule.onNodeWithText("1.1B").assertIsDisplayed()
+        composeRule.onNodeWithText("14.87M tokens").assertDoesNotExist()
+        composeRule.onNodeWithText("15.12M tokens").assertDoesNotExist()
         composeRule.onNodeWithText("¥1.40").assertDoesNotExist()
         composeRule.onNodeWithText("¥13.10").assertDoesNotExist()
         composeRule.onNodeWithText("RPM").assertIsDisplayed()

@@ -709,23 +709,13 @@ private fun FullXiaomiUsage(
                     style = MyTokenType.caption,
                     color = colors.muted,
                 )
-                Row(
+                Text(
+                    text = formatGrouped(totalTokens?.value),
                     modifier = Modifier.padding(top = 1.dp),
-                    verticalAlignment = Alignment.Bottom,
-                ) {
-                    Text(
-                        text = formatGrouped(totalTokens?.value),
-                        style = MyTokenType.numericValue,
-                        color = colors.ink,
-                        maxLines = 1,
-                    )
-                    Text(
-                        text = "tokens",
-                        modifier = Modifier.padding(start = 2.dp, bottom = 1.dp),
-                        style = MyTokenType.micro,
-                        color = colors.muted,
-                    )
-                }
+                    style = MyTokenType.numericValue,
+                    color = colors.ink,
+                    maxLines = 1,
+                )
             }
         }
         UsageMultiSegmentMeter(
@@ -806,7 +796,7 @@ private fun glmActivityFacts(byId: Map<String, UsageMetric>): List<SplitFact> = 
 
 private fun newApiFacts(byId: Map<String, UsageMetric>): List<SplitFact> = buildList {
     fun tokenFact(id: String, label: String) {
-        byId[id]?.let { add(SplitFact(label, "${formatCompact(it.value)} tokens")) }
+        byId[id]?.let { add(SplitFact(label, formatCompact(it.value))) }
     }
     tokenFact("today-token", "今日 Token")
     tokenFact("one-day-token", "24 小时")

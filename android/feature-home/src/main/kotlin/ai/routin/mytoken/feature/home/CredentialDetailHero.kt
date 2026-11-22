@@ -24,8 +24,6 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -42,6 +40,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
@@ -319,31 +320,17 @@ private fun HeroFooter(card: CredentialCardUi, nextRefreshAt: Instant?) {
 /** 全部窗口：每条进度指标一行；余额卡改为按币种分组展示。 */
 @Composable
 internal fun DetailWindowsSection(card: CredentialCardUi) {
-    val metrics = card.snapshot?.metrics.orEmpty()
+    // 余额型凭证没有窗口概念，余额与构成已在 Hero 中展示，不再渲染空区块。
+    val progress = card.snapshot?.metrics.orEmpty()
+        .filter { it.presentation == UsageMetricPresentation.Progress }
+    if (progress.isEmpty()) return
+
     MyTokenSection(
         title = "全部窗口",
         modifier = Modifier.testTag("detail_windows"),
     ) {
-        val progress = metrics.filter { it.presentation == UsageMetricPresentation.Progress }
-        if (progress.isEmpty()) {
-            val balances = metrics.filter { it.presentation == UsageMetricPresentation.Balance }
-            if (balances.isEmpty()) {
-                Text(
-                    text = "暂无窗口数据",
-                    style = MyTokenType.caption,
-                    color = MyTokenThemeTokens.colors.muted,
-                )
-            } else {
-                val primaries = balances.filterNot { isBalanceComponentId(it.id) }
-                    .ifEmpty { balances }
-                primaries.forEach { balance ->
-                    CurrencyBalanceRow(card = card, balance = balance)
-                }
-            }
-        } else {
-            progress.sortedBy(::windowDisplayRank).forEach { metric ->
-                DetailWindowRow(metric)
-            }
+        progress.sortedBy(::windowDisplayRank).forEach { metric ->
+            DetailWindowRow(metric)
         }
     }
 }
@@ -387,7 +374,6 @@ internal fun formatDetailMetricValue(metric: UsageMetric): String = when {
     else -> formatDecimal(metric.value)
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DetailWindowRow(metric: UsageMetric) {
     val colors = MyTokenThemeTokens.colors
@@ -450,89 +436,70 @@ private fun DetailWindowRow(metric: UsageMetric) {
             )
         }
         if (metric.resetCards.isNotEmpty()) {
-            FlowRow(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 metric.resetCards.forEachIndexed { index, card ->
-                    Column(
+                    Row(
                         modifier = Modifier
-                            .weight(1f)
+                            .fillMaxWidth()
                             .background(colors.surface, MyTokenReportBodyShape)
                             .border(1.dp, colors.line, MyTokenReportBodyShape)
-                            .padding(horizontal = 10.dp, vertical = 8.dp)
+                            .padding(horizontal = 12.dp, vertical = 10.dp)
                             .testTag("detail_reset_ticket"),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ResetCardsGlyph(
+                            color = colors.muted,
+                            modifier = Modifier.size(width = 9.dp, height = 8.dp),
+                        )
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(start = 8.dp),
                         ) {
-                            ResetCardsGlyph(
-                                color = colors.muted,
-                                modifier = Modifier.size(width = 9.dp, height = 8.dp),
-                            )
                             Text(
                                 text = "重置卡 ${index + 1}",
+                                style = MyTokenType.label,
+                                color = colors.ink,
+                            )
+                            Text(
+                                text = "到期时间",
+                                modifier = Modifier.padding(top = 2.dp),
                                 style = MyTokenType.caption,
                                 color = colors.muted,
                             )
                         }
+                        // 机票式撕口虚线，把日期放在右侧票根。
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 10.dp)
+                                .width(1.dp)
+                                .height(30.dp)
+                                .drawBehind {
+                                    drawLine(
+                                        color = colors.line,
+                                        start = Offset(size.width / 2f, 0f),
+                                        end = Offset(size.width / 2f, size.height),
+                                        strokeWidth = 1.dp.toPx(),
+                                        pathEffect = PathEffect.dashPathEffect(
+                                            floatArrayOf(3.dp.toPx(), 3.dp.toPx()),
+                                        ),
+                                    )
+                                },
+                        )
                         Text(
                             text = formatResetCardCompact(card.expiresAt),
-                            modifier = Modifier.padding(top = 4.dp),
-                            style = MyTokenType.caption.copy(fontFamily = FontFamily.Monospace),
+                            style = MyTokenType.label.copy(fontFamily = FontFamily.Monospace),
                             color = colors.ink,
+                            maxLines = 1,
                         )
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun CurrencyBalanceRow(card: CredentialCardUi, balance: UsageMetric) {
-    val colors = MyTokenThemeTokens.colors
-    val toppedUp = findBalanceMetric(card, balance, "toppedUpBalance")
-    val granted = findBalanceMetric(card, balance, "grantedBalance")
-    val primaryValue = toppedUp?.value ?: BigDecimal.ZERO
-    val secondaryValue = granted?.value ?: BigDecimal.ZERO
-    val total = primaryValue + secondaryValue
-    val primaryWeight = if (total.signum() > 0) primaryValue.toDouble() / total.toDouble() else 0.0
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 8.dp)
-            .background(colors.surface, MyTokenReportBodyShape)
-            .border(1.dp, colors.line, MyTokenReportBodyShape)
-            .padding(12.dp)
-            .testTag("detail_balance_ticket"),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                text = "${balance.currencyCode ?: "余额"} 账户",
-                style = MyTokenType.label,
-                color = colors.muted,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = formatCurrency(balance.value, balance.currencyCode),
-                style = MyTokenType.numericValue,
-                color = colors.ink,
-                maxLines = 1,
-            )
-        }
-        UsageCompositionMeter(
-            primaryWeight = primaryWeight.takeIf { total.signum() > 0 },
-            height = 9.dp,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            BalanceLegend("充值", toppedUp?.value, balance.currencyCode, colors.ink)
-            BalanceLegend("赠金", granted?.value, balance.currencyCode, colors.actionFill)
         }
     }
 }
@@ -558,9 +525,9 @@ internal fun DetailFactsSection(card: CredentialCardUi) {
                     usageType(snapshot.usageKind)
                 },
                 "状态" to (snapshot.statusText ?: subscriptionStatus(card, snapshot.status)),
-                "计费" to (snapshot.billingMode ?: "接口未返回"),
-                "开始" to (snapshot.subscriptionStartAt?.let(::formatFullTime) ?: "接口未返回"),
-                "结束" to (snapshot.subscriptionEndAt?.let(::formatFullTime) ?: "接口未返回"),
+                "计费" to (snapshot.billingMode ?: "-"),
+                "开始" to (snapshot.subscriptionStartAt?.let(::formatFullTime) ?: "-"),
+                "结束" to (snapshot.subscriptionEndAt?.let(::formatFullTime) ?: "-"),
             ),
         )
         if (card.credential.providerId == ProviderId.CommandCode) {
@@ -617,11 +584,13 @@ internal fun DetailFactsSection(card: CredentialCardUi) {
         }
     }
 
-    MyTokenSection(
-        title = "账户与模型",
-        modifier = Modifier.testTag("detail_models"),
-    ) {
-        AllowedModelsSection(models = snapshot.allowedModels)
+    if (snapshot.allowedModels.isNotEmpty()) {
+        MyTokenSection(
+            title = "账户与模型",
+            modifier = Modifier.testTag("detail_models"),
+        ) {
+            AllowedModelsSection(models = snapshot.allowedModels)
+        }
     }
 }
 
@@ -740,14 +709,6 @@ internal fun DetailConfigSection(
     }
 }
 
-/** 充值/赠金等构成项由余额卡内部的图例展示，不再单独占一张票据。 */
-private fun isBalanceComponentId(id: String): Boolean = listOf(
-    "toppedUpBalance",
-    "grantedBalance",
-    "cash-balance",
-    "gift-balance",
-).any(id::startsWith)
-
 private fun findBalanceMetric(
     card: CredentialCardUi,
     balance: UsageMetric,
@@ -755,8 +716,13 @@ private fun findBalanceMetric(
 ): UsageMetric? {
     val metrics = card.snapshot?.metrics.orEmpty()
     val currency = balance.currencyCode?.uppercase().orEmpty()
-    return metrics.firstOrNull { it.id == "$prefix-$currency" }
-        ?: metrics.firstOrNull { it.id == prefix }
+    val aliases = when (prefix) {
+        "toppedUpBalance" -> listOf("cash-balance", "cash-balance-$currency")
+        "grantedBalance" -> listOf("gift-balance", "gift-balance-$currency")
+        else -> emptyList()
+    }
+    return (listOf("$prefix-$currency", prefix) + aliases)
+        .firstNotNullOfOrNull { id -> metrics.firstOrNull { it.id == id } }
 }
 
 internal fun formatDetailAmount(value: BigDecimal?, metric: UsageMetric): String = when (metric.unit) {

@@ -80,13 +80,30 @@ class CredentialUsageSurfaceStyleTest {
     }
 
     @Test
-    fun `详情页沿用分段仪表与票据余额卡`() {
+    fun `列表到顶后立即跟随下拉展开报告`() {
+        val home = sourceText("HomeScreen.kt")
+        assertTrue(
+            "第一张卡片可见时即允许展开报告",
+            home.contains("homeScrollStates.full.firstVisibleItemIndex == 0"),
+        )
+        assertTrue(
+            "简洁网格同样以第一张卡片可见为准",
+            home.contains("homeScrollStates.compact.firstVisibleItemIndex == 0"),
+        )
+        assertFalse(
+            "不再等列表完全回顶才开始展开",
+            home.contains("firstVisibleItemScrollOffset == 0"),
+        )
+    }
+
+    @Test
+    fun `详情页沿用分段仪表与票据重置卡`() {
         val detail = sourceText("CredentialDetailHero.kt")
         val screen = sourceText("CredentialDetailScreen.kt")
         assertTrue("详情窗口使用分段仪表", detail.contains("UsageSegmentMeter("))
         assertTrue("详情余额构成使用分段条", detail.contains("UsageCompositionMeter("))
-        assertTrue("余额行改为小票据", detail.contains("MyTokenReportBodyShape"))
-        assertTrue("票据行有测试标记", detail.contains("detail_balance_ticket"))
+        assertTrue("重置卡改为票据", detail.contains("MyTokenReportBodyShape"))
+        assertTrue("票据行有测试标记", detail.contains("detail_reset_ticket"))
         assertTrue(
             "删除按钮离开右边缘",
             screen.contains("modifier = Modifier.padding(end = 8.dp).testTag(\"detail_delete\")"),
@@ -286,16 +303,11 @@ class CredentialUsageSurfaceStyleTest {
         }
 
         val detail = sourceText("CredentialDetailHero.kt")
-        listOf(
-            detail.substringAfter("private fun BalanceHero")
-                .substringBefore("@Composable\nprivate fun BalanceLegend"),
-            detail.substringAfter("private fun CurrencyBalanceRow")
-                .substringBefore("@Composable\nprivate fun", missingDelimiterValue = ""),
-        ).forEach { composition ->
-            assertFalse("详情页额度构成不再使用灰色分类色", composition.contains("colors.cat1"))
-            assertFalse("详情页额度构成不再使用灰色分类色", composition.contains("colors.cat2"))
-            assertTrue("详情页构成条改用统一分段条", composition.contains("UsageCompositionMeter("))
-        }
+        val composition = detail.substringAfter("private fun BalanceHero")
+            .substringBefore("@Composable\nprivate fun BalanceLegend")
+        assertFalse("详情页额度构成不再使用灰色分类色", composition.contains("colors.cat1"))
+        assertFalse("详情页额度构成不再使用灰色分类色", composition.contains("colors.cat2"))
+        assertTrue("详情页构成条改用统一分段条", composition.contains("UsageCompositionMeter("))
 
         val meter = sourceText("UsageSegmentMeter.kt")
         assertTrue("充值/现金构成段为墨色", meter.contains("index < primaryCells -> colors.ink"))

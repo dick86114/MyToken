@@ -204,17 +204,10 @@ fun HomeScreen(
     }
 
     fun activePageAtTop(): Boolean = when (activeScrollMode()) {
-        HomeScrollMode.CompactGrid ->
-            homeScrollStates.compact.firstVisibleItemIndex == 0 &&
-                homeScrollStates.compact.firstVisibleItemScrollOffset == 0
-
-        HomeScrollMode.FullWideGrid ->
-            homeScrollStates.fullWide.firstVisibleItemIndex == 0 &&
-                homeScrollStates.fullWide.firstVisibleItemScrollOffset == 0
-
-        HomeScrollMode.FullList ->
-            homeScrollStates.full.firstVisibleItemIndex == 0 &&
-                homeScrollStates.full.firstVisibleItemScrollOffset == 0
+        // 第一张卡片一露头就允许展开报告，避免继续下拉时卡片先滑到屏幕中间。
+        HomeScrollMode.CompactGrid -> homeScrollStates.compact.firstVisibleItemIndex == 0
+        HomeScrollMode.FullWideGrid -> homeScrollStates.fullWide.firstVisibleItemIndex == 0
+        HomeScrollMode.FullList -> homeScrollStates.full.firstVisibleItemIndex == 0
     }
 
     // 列表原生滚动；头部在 onPostScroll 里同步跟随，不再拦截 fling。

@@ -167,15 +167,13 @@ class CredentialDetailScreenTest {
     }
 
     @Test
-    fun balanceDetailUsesCompositionAndGroupsCurrencies() {
+    fun balanceDetailShowsCompositionWithoutWindowsSection() {
         val balanceCard = card(
             credential = credential(ProviderId.DeepSeek),
             metrics = listOf(
                 balance("balance-CNY", 120.0, "CNY"),
                 balance("toppedUpBalance-CNY", 80.0, "CNY"),
                 balance("grantedBalance-CNY", 40.0, "CNY"),
-                balance("balance-USD", 50.0, "USD"),
-                balance("toppedUpBalance-USD", 50.0, "USD"),
             ),
         )
         composeRule.setContent {
@@ -190,35 +188,44 @@ class CredentialDetailScreenTest {
             }
         }
 
-        listOf("¥120.00", "$50.00").forEach { amount ->
-            assertTrue(
-                "应展示 $amount",
-                composeRule.onAllNodesWithText(amount, useUnmergedTree = true)
-                    .fetchSemanticsNodes()
-                    .isNotEmpty(),
-            )
-        }
-        listOf("充值", "赠金").forEach { legend ->
-            assertTrue(
-                "应展示构成图例 $legend",
-                composeRule.onAllNodesWithText(legend, substring = true, useUnmergedTree = true)
-                    .fetchSemanticsNodes()
-                    .isNotEmpty(),
-            )
-        }
-        assertEquals(
-            "每个币种余额卡应为小票据样式",
-            2,
-            composeRule.onAllNodesWithTag("detail_balance_ticket", useUnmergedTree = true)
-                .fetchSemanticsNodes()
-                .size,
-        )
+        composeRule.onNodeWithText("¥120.00", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("充值 ¥80.00", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("赠金 ¥40.00", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("全部窗口", useUnmergedTree = true).assertDoesNotExist()
         assertTrue(
             "余额构成应使用分段条",
             composeRule.onAllNodesWithTag("usage_composition_meter", useUnmergedTree = true)
                 .fetchSemanticsNodes()
                 .isNotEmpty(),
         )
+    }
+
+    @Test
+    fun xiaomiBalanceDetailShowsCashAndGiftValues() {
+        val balanceCard = card(
+            credential = credential(ProviderId.Xiaomi),
+            metrics = listOf(
+                balance("account-balance", 12.5, "CNY"),
+                balanceComponent("cash-balance", "现金余额", 10.0, "CNY"),
+                balanceComponent("gift-balance", "赠送余额", 2.5, "CNY"),
+            ),
+        )
+        composeRule.setContent {
+            MyTokenTheme {
+                CredentialDetailScreen(
+                    card = balanceCard,
+                    onBack = {},
+                    onRefresh = {},
+                    onEdit = {},
+                    onDelete = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("充值 ¥10.00", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("赠金 ¥2.50", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("充值 -", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithText("赠金 -", useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test
@@ -400,6 +407,13 @@ class CredentialDetailScreenTest {
         listOf("重置卡 1", "重置卡 2").forEach { label ->
             composeRule.onNodeWithText(label, useUnmergedTree = true).assertExists()
         }
+        assertEquals(
+            "每张重置卡票据都应展示到期时间",
+            2,
+            composeRule.onAllNodesWithText("到期时间", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .size,
+        )
         composeRule.onNodeWithText(formatResetCardCompact(first), useUnmergedTree = true)
             .assertExists()
         composeRule.onNodeWithText("重置卡 2 张 ·", substring = true, useUnmergedTree = true)
@@ -453,6 +467,31 @@ class CredentialDetailScreenTest {
             .performScrollTo()
             .performClick()
         composeRule.onNodeWithTag("detail_models_more", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun detailHidesModelsSectionAndUsesDashForMissingFacts() {
+        composeRule.setContent {
+            MyTokenTheme {
+                CredentialDetailScreen(
+                    card = card(),
+                    onBack = {},
+                    onRefresh = {},
+                    onEdit = {},
+                    onDelete = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("账户与模型", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithText("接口未返回", substring = true, useUnmergedTree = true)
+            .assertDoesNotExist()
+        assertTrue(
+            "缺失的计费/开始/结束应显示 -",
+            composeRule.onAllNodesWithText("-", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .size >= 3,
+        )
     }
 
     @Test
@@ -579,6 +618,22 @@ class CredentialDetailScreenTest {
             tops[0] < tops[1] && tops[1] < tops[2],
         )
     }
+
+    private fun balanceComponent(
+        id: String,
+        label: String,
+        value: Double,
+        currency: String,
+    ) = UsageMetric(
+        id = id,
+        label = label,
+        value = BigDecimal.valueOf(value),
+        unit = UsageMetricUnit.Currency,
+        presentation = UsageMetricPresentation.Value,
+        semantic = UsageMetricSemantic.Value,
+        currencyCode = currency,
+        healthState = UsageMetricHealthState.Normal,
+    )
 
     private fun balance(id: String, value: Double, currency: String) = UsageMetric(
         id = id,

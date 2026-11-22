@@ -47,6 +47,7 @@ import kotlinx.coroutines.delay
 
 @Composable
 internal fun AllowedModelsSection(models: List<String>, modifier: Modifier = Modifier) {
+    if (models.isEmpty()) return
     var copiedModelID by remember { mutableStateOf<String?>(null) }
     var expanded by remember(models) { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
@@ -71,27 +72,18 @@ internal fun AllowedModelsSection(models: List<String>, modifier: Modifier = Mod
                 style = MyTokenType.caption,
                 color = colors.muted,
             )
-            if (models.isNotEmpty()) {
-                Text(
-                    text = if (models.size == 1 || expanded) {
-                        "${models.size} 个 · 点击复制"
-                    } else {
-                        "${models.size} 个"
-                    },
-                    style = MyTokenType.caption,
-                    color = colors.muted,
-                )
-            }
+            Text(
+                text = if (models.size == 1 || expanded) {
+                    "${models.size} 个 · 点击复制"
+                } else {
+                    "${models.size} 个"
+                },
+                style = MyTokenType.caption,
+                color = colors.muted,
+            )
         }
 
         when {
-            models.isEmpty() -> Text(
-                text = "接口未返回",
-                style = MyTokenType.caption,
-                color = colors.ink,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-
             models.size == 1 -> ModelGridItem(
                 modelID = models.single(),
                 isCopied = copiedModelID == models.single(),
