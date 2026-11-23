@@ -119,6 +119,16 @@ class TransferWireTest {
     }
 
     @Test
+    fun `package decode accepts balance warning threshold metadata`() {
+        val withThreshold = TransferFixtures.PACKAGE_JSON.replace(
+            "\"metadata\":{\"baseURL\":\"https://api.example.com/v1\"}",
+            "\"metadata\":{\"baseURL\":\"https://api.example.com/v1\",\"balanceWarningThreshold\":\"10\"}"
+        )
+        val packageData = TransferPackageCodec.decode(withThreshold.toByteArray())
+        assertEquals("10", packageData.credentials[0].metadata["balanceWarningThreshold"])
+    }
+
+    @Test
     fun `package decode rejects unknown metadata key`() {
         val withBadMetadata = TransferFixtures.PACKAGE_JSON.replace(
             "\"metadata\":{\"baseURL\":\"https://api.example.com/v1\"}",

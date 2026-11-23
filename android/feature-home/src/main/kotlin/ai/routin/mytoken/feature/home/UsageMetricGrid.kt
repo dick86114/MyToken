@@ -73,11 +73,10 @@ internal fun statusColor(metric: UsageMetric, percent: Double?, colors: StatusCo
         UsageMetricHealthState.Stale, UsageMetricHealthState.Unknown -> if (percent == null) colors.neutral else colors.brand
     }
 
-/** 百分比驱动变色：和 macOS UsageMetricPresentation.color(for:) 保持一致。 */
-internal fun progressColor(percent: Double?, colors: StatusColors): Color = when {
-    percent == null -> colors.neutral
-    percent >= 80 -> colors.critical
-    percent >= 50 -> colors.warning
+/** 与状态文案同源：显式健康状态优先，未知时按共享 80/95 阈值兜底。 */
+internal fun progressColor(metric: UsageMetric, colors: StatusColors): Color = when (metricHealthTone(metric)) {
+    UsageCardHealth.Critical -> colors.critical
+    UsageCardHealth.Warning -> colors.warning
     else -> colors.brand
 }
 
@@ -496,7 +495,7 @@ private fun MetricCell(metric: UsageMetric, colors: StatusColors, modifier: Modi
 @Composable
 private fun ProgressCell(metric: UsageMetric, colors: StatusColors, modifier: Modifier = Modifier) {
     val percent = progressPercent(metric)
-    val color = progressColor(percent, colors)
+    val color = progressColor(metric, colors)
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(metric.label, style = MyTokenType.label, color = MyTokenThemeTokens.colors.muted, modifier = Modifier.weight(1f))
@@ -562,7 +561,7 @@ internal fun GLMMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modifie
             Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                 row.forEach { metric ->
                     val percent = progressPercent(metric)
-                    val color = progressColor(percent, colors)
+                    val color = progressColor(metric, colors)
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(metric.label, style = MyTokenType.label, color = MyTokenThemeTokens.colors.muted, modifier = Modifier.weight(1f))
@@ -659,7 +658,7 @@ internal fun VolcengineMetrics(metrics: List<UsageMetric>, modifier: Modifier = 
         }
         monthly?.let {
             val percent = progressPercent(it)
-            val color = progressColor(percent, colors)
+            val color = progressColor(it, colors)
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(it.label, style = MyTokenType.label, color = MyTokenThemeTokens.colors.muted, modifier = Modifier.weight(1f))
@@ -694,7 +693,7 @@ internal fun NewAPIMetrics(metrics: List<UsageMetric>, modifier: Modifier = Modi
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         quota?.let {
             val percent = progressPercent(it)
-            val color = progressColor(percent, colors)
+            val color = progressColor(it, colors)
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(it.label, style = MyTokenType.label, color = MyTokenThemeTokens.colors.muted, modifier = Modifier.weight(1f))
@@ -814,7 +813,7 @@ private fun CommandCodeProgressMetric(
         return
     }
     val percent = progressPercent(metric)
-    val color = progressColor(percent, colors)
+    val color = progressColor(metric, colors)
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(metric.label.ifEmpty { fallbackLabel }, style = MyTokenType.label, color = MyTokenThemeTokens.colors.muted, modifier = Modifier.weight(1f))
@@ -842,7 +841,7 @@ private fun CommandCodeMonthlyMetric(
         return
     }
     val percent = progressPercent(metric)
-    val color = progressColor(percent, colors)
+    val color = progressColor(metric, colors)
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(metric.label.ifEmpty { "月" }, style = MyTokenType.label, color = MyTokenThemeTokens.colors.muted, modifier = Modifier.weight(1f))

@@ -2,6 +2,7 @@ package ai.routin.mytoken.provider
 
 import ai.routin.mytoken.domain.model.CredentialKind
 import ai.routin.mytoken.domain.model.Credential
+import ai.routin.mytoken.domain.model.CredentialMetadataKey
 import ai.routin.mytoken.domain.model.CredentialSecret
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
@@ -59,6 +60,19 @@ class DeepSeekUsageProviderTest {
         val models = transport.requests[1]
         assertEquals("https://api.deepseek.com/models", models.url)
         assertEquals("Bearer sk-deepseek-secret", models.headers["Authorization"])
+    }
+
+    @Test
+    fun fetchUsage_appliesPerCredentialBalanceWarningThreshold() = runTest {
+        queueSuccess()
+        val withThreshold = credential().copy(
+            metadata = mapOf(CredentialMetadataKey.BalanceWarningThreshold to "200"),
+        )
+
+        val snapshot = provider.fetchUsage(withThreshold, secret).getOrThrow()
+
+        val balance = snapshot.metrics.first { it.id == "balance" }
+        assertEquals(UsageMetricHealthState.Warning, balance.healthState)
     }
 
     @Test

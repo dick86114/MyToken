@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -26,6 +27,8 @@ class AppPreferencesNotificationSettingsStoreTest {
         // Defaults (single ordered test: the DataStore instance is process-local).
         val defaults = store.settings.first()
         assertTrue(defaults.credentialFailureAlertsEnabled)
+        assertEquals(80, defaults.lowThresholdPercent)
+        assertEquals(95, defaults.highThresholdPercent)
 
         // Writes persist and stay visible through the Task 5 repository (no second DataStore).
         store.setCredentialFailureAlertsEnabled(false)

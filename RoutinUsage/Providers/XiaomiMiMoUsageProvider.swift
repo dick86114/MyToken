@@ -536,14 +536,7 @@ struct XiaomiMiMoUsageProvider: UsageProvider {
     }
 
     private static func percentHealthState(_ percent: Double) -> UsageMetricHealthState {
-        switch percent {
-        case ..<70:
-            return .normal
-        case ..<90:
-            return .warning
-        default:
-            return .critical
-        }
+        UsageHealthThresholds.healthState(forUsedPercent: percent)
     }
 
     private static func parseDate(_ rawValue: String?) -> Date? {

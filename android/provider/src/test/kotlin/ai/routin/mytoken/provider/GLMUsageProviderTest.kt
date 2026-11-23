@@ -265,7 +265,7 @@ class GLMUsageProviderTest {
         transport.responses += ok("""{"data":{"totalUsage":{"totalModelCallCount":1}}}""")
         transport.responses += ok(
             """
-            {"data":{"limits":[{"type":"TOKENS_LIMIT","unit":3,"number":5,"percentage":85}]}}
+            {"data":{"limits":[{"type":"TOKENS_LIMIT","unit":3,"number":5,"percentage":96}]}}
             """.trimIndent()
         )
 
@@ -279,7 +279,7 @@ class GLMUsageProviderTest {
         transport.responses += ok("""{"data":{"totalUsage":{"totalModelCallCount":1}}}""")
         transport.responses += ok(
             """
-            {"data":{"limits":[{"type":"TOKENS_LIMIT","unit":3,"number":5,"percentage":55}]}}
+            {"data":{"limits":[{"type":"TOKENS_LIMIT","unit":3,"number":5,"percentage":85}]}}
             """.trimIndent()
         )
 

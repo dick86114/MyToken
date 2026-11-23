@@ -139,6 +139,33 @@ class OpenCodeUsageProviderTest {
     }
 
     @Test
+    fun `maps used percent to shared 80 and 95 health boundaries`() = runTest {
+        suspend fun healthFor(used: String): UsageMetricHealthState {
+            val provider = OpenCodeUsageProvider(
+                transport(
+                    200,
+                    statusBody(
+                        fiveHourUsed = used,
+                        fiveHourLimit = "10000000000",
+                        weeklyUsed = "0",
+                        monthlyUsed = "0",
+                    ),
+                ),
+                fixedClock,
+            )
+            return provider.fetchUsage(credential(), CredentialSecret.BearerToken("oc_sk_test"))
+                .getOrThrow()
+                .metrics.single { it.id == "fiveHour" }
+                .healthState
+        }
+
+        assertEquals(UsageMetricHealthState.Normal, healthFor("7900000000"))
+        assertEquals(UsageMetricHealthState.Warning, healthFor("8000000000"))
+        assertEquals(UsageMetricHealthState.Warning, healthFor("9400000000"))
+        assertEquals(UsageMetricHealthState.Critical, healthFor("9500000000"))
+    }
+
+    @Test
     fun `rejects null status with provider message`() = runTest {
         val provider = OpenCodeUsageProvider(transport(200, "null"), fixedClock)
 

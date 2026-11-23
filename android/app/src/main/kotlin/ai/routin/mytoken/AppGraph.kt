@@ -30,7 +30,9 @@ class AppGraph(context: Context) {
     private val appContext = context.applicationContext
 
     val database: MyTokenDatabase by lazy {
-        Room.databaseBuilder(appContext, MyTokenDatabase::class.java, MyTokenDatabase.NAME).build()
+        Room.databaseBuilder(appContext, MyTokenDatabase::class.java, MyTokenDatabase.NAME)
+            .addMigrations(MyTokenDatabase.MIGRATION_1_2)
+            .build()
     }
 
     val credentialRepository: CredentialRepositoryImpl by lazy {

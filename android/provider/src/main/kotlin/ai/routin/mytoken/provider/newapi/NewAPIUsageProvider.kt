@@ -82,6 +82,9 @@ class NewAPIUsageProvider(
         requireEnvelopeSuccess(userData, "认证失败")
         val user = userData.objOrNull("data") ?: throw UsageProviderException.InvalidResponse()
         val displayUnit = DisplayUnit.fromStatus(statusData.objOrNull("data"))
+        val warningThreshold = credential.metadata[CredentialMetadataKey.BalanceWarningThreshold]
+            ?.toBigDecimalOrNull()
+            ?.let(displayUnit::convert)
 
         return coroutineScope {
             val todayToken = async { tokenSummary(credential, token, userID, root, todayStart, now) }
@@ -94,7 +97,18 @@ class NewAPIUsageProvider(
             val sevenDay = sevenDayToken.await()
             val thirtyDay = thirtyDayToken.await()
             val stat = minuteStat.await()
-            buildSnapshot(credential.id, now, user, stat, today, oneDay, sevenDay, thirtyDay, displayUnit)
+            buildSnapshot(
+                credential.id,
+                now,
+                user,
+                stat,
+                today,
+                oneDay,
+                sevenDay,
+                thirtyDay,
+                displayUnit,
+                warningThreshold,
+            )
         }
     }
 
@@ -186,12 +200,13 @@ class NewAPIUsageProvider(
         sevenDay: TokenSummary,
         thirtyDay: TokenSummary,
         displayUnit: DisplayUnit,
+        warningThreshold: BigDecimal?,
     ): UsageSnapshot {
         val rawUsed = user.decimalOrNull("used_quota") ?: BigDecimal.ZERO
         val rawRemaining = (user.decimalOrNull("quota") ?: BigDecimal.ZERO).max(BigDecimal.ZERO)
         val rawTotal = rawUsed + rawRemaining
         val remaining = displayUnit.convert(rawRemaining)
-        val health = UsageMetricHealthEvaluator.balanceState(remaining, null, true)
+        val health = UsageMetricHealthEvaluator.balanceState(remaining, warningThreshold, true)
         val userGroup = user.stringOrNull("group")?.trim().orEmpty()
         val planName = if (userGroup.isEmpty()) "New API" else "New API · $userGroup"
 

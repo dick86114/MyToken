@@ -5,7 +5,10 @@ struct AlertThresholds: Codable, Equatable, Sendable {
     let low: Int
     let high: Int
 
-    init(low: Int = 80, high: Int = 95) {
+    init(
+        low: Int = Int(UsageHealthThresholds.warningUsedPercent),
+        high: Int = Int(UsageHealthThresholds.criticalUsedPercent)
+    ) {
         precondition(Self.isValid(low: low, high: high), "通知阈值必须位于 1...100，且低阈值小于高阈值")
         self.low = low
         self.high = high

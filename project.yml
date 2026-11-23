@@ -51,6 +51,7 @@ targets:
       - path: RoutinUsage/WidgetShared/WidgetSharedAppGroup.swift
       - path: RoutinUsage/WidgetShared/WidgetMetricRanker.swift
       - path: RoutinUsage/WidgetShared/WidgetPresentationBuilder.swift
+      - path: RoutinUsage/WidgetShared/UsageHealthThresholds.swift
       - path: RoutinUsage/WidgetShared/WidgetSnapshotStore.swift
       - path: RoutinUsage/WidgetShared/WidgetPresentationState.swift
       - path: RoutinUsage/WidgetShared/WidgetTimelineEntryFactory.swift

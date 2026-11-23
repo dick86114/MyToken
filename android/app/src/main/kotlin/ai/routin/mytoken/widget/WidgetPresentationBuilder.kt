@@ -2,6 +2,7 @@ package ai.routin.mytoken.widget
 
 import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.model.ProviderId
+import ai.routin.mytoken.domain.model.UsageHealthThresholds
 import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
@@ -166,9 +167,11 @@ object WidgetPresentationBuilder {
 
     private fun severity(metric: UsageMetric, percent: Double?): WidgetMetricSeverity = when {
         metric.healthState == UsageMetricHealthState.Unavailable -> WidgetMetricSeverity.Unavailable
-        metric.healthState == UsageMetricHealthState.Critical || (percent ?: 0.0) >= 95 ->
+        metric.healthState == UsageMetricHealthState.Critical ||
+            (percent ?: 0.0) >= UsageHealthThresholds.CRITICAL_USED_PERCENT ->
             WidgetMetricSeverity.Critical
-        metric.healthState == UsageMetricHealthState.Warning || (percent ?: 0.0) >= 80 ->
+        metric.healthState == UsageMetricHealthState.Warning ||
+            (percent ?: 0.0) >= UsageHealthThresholds.WARNING_USED_PERCENT ->
             WidgetMetricSeverity.Warning
         else -> WidgetMetricSeverity.Normal
     }

@@ -36,8 +36,8 @@ struct MenuBarColorRules: Codable, Equatable, Sendable {
     var criticalColor: MenuBarColorComponents
 
     init(
-        warningThreshold: Int = 50,
-        criticalThreshold: Int = 80,
+        warningThreshold: Int = Int(UsageHealthThresholds.warningUsedPercent),
+        criticalThreshold: Int = Int(UsageHealthThresholds.criticalUsedPercent),
         normalColor: MenuBarColorComponents = .standardGreen,
         warningColor: MenuBarColorComponents = .standardOrange,
         criticalColor: MenuBarColorComponents = .standardRed

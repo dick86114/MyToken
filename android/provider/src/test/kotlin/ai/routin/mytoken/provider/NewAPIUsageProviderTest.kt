@@ -5,6 +5,7 @@ import ai.routin.mytoken.domain.model.CredentialKind
 import ai.routin.mytoken.domain.model.CredentialMetadataKey
 import ai.routin.mytoken.domain.model.CredentialSecret
 import ai.routin.mytoken.domain.model.ProviderId
+import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import ai.routin.mytoken.domain.model.UsageMetricSemantic
 import ai.routin.mytoken.domain.model.UsageMetricUnit
@@ -94,6 +95,26 @@ class NewAPIUsageProviderTest {
         assertTrue(paths.contains("api/user/self"))
         assertEquals(4, paths.count { it.startsWith("api/data/self?") })
         assertEquals(1, paths.count { it.startsWith("api/log/self/stat?") })
+    }
+
+    @Test
+    fun fetchUsage_appliesConvertedBalanceWarningThreshold() = runTest {
+        val provider = NewAPIUsageProvider(RoutingTransport(), fixedClock)
+        val withThreshold = credential().copy(
+            metadata = mapOf(
+                CredentialMetadataKey.BaseURL to "https://newapi.example.com",
+                CredentialMetadataKey.UserID to "128",
+                CredentialMetadataKey.BalanceWarningThreshold to "1000000",
+            ),
+        )
+
+        val snapshot = provider.fetchUsage(withThreshold, CredentialSecret.BearerToken("token"))
+            .getOrThrow()
+
+        assertEquals(
+            UsageMetricHealthState.Warning,
+            snapshot.metrics.single { it.id == "quota-progress" }.healthState,
+        )
     }
 
     @Test

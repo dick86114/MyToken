@@ -25,7 +25,8 @@ enum TransferPackageBuilder {
     // Mirrors the allowlist enforced by TransferCredential decoding; keep in
     // sync with the transfer schema v1 metadata contract.
     private static let metadataAllowlist: Set<String> = [
-        "baseURL", "userID", "region", "planType", "usageKind", "websiteURL"
+        "baseURL", "userID", "region", "planType", "usageKind", "websiteURL",
+        "balanceWarningThreshold"
     ]
 
     /// Unpadded URL-safe Base64 (RFC 4648 §5): the lexical contract shared by

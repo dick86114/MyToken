@@ -143,12 +143,31 @@ class CredentialUsageSurfaceStyleTest {
     }
 
     @Test
-    fun `报告在任何健康状态都保持琥珀票面`() {
+    fun `报告票面在所有severity下保持琥珀`() {
         val report = sourceText("HomeHealthReport.kt")
-        // 用户明确覆盖设计稿：全部正常时也不再退回灰色。
+        // 用户明确要求：整块面板不随 Critical 变红，只有折叠行保留严重度颜色。
         assertTrue(report.contains(".background(colors.reportTicket, MyTokenReportTicketShape)"))
+        assertFalse(report.contains("reportTicketCritical"))
         assertFalse(report.contains("reportTicketNormal"))
         assertFalse(report.contains("reportDialTrackNormal"))
+    }
+
+    @Test
+    fun `折叠行与紧凑标题按最差severity着色`() {
+        val report = sourceText("HomeHealthReport.kt")
+        val chrome = sourceText("HomeChrome.kt")
+        val home = sourceText("HomeScreen.kt")
+        // 折叠行百分比必须取触发告警的 metric tone，Critical 时换成报告红。
+        assertTrue(
+            report.contains(
+                "severityAccent(finding.tone, colors.reportAccent, colors.reportCritical)",
+            ),
+        )
+        // 收起标题使用同一个聚合 tone 与红色强调。
+        assertTrue(chrome.contains("summaryTone"))
+        assertTrue(chrome.contains("colors.reportNavCritical"))
+        assertTrue(home.contains("homeReportTone(reportFindings)"))
+        assertTrue(home.contains("homeReportTail(reportFindings)"))
     }
 
     @Test

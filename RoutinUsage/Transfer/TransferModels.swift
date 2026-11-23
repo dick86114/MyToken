@@ -114,7 +114,8 @@ struct TransferCredential: Codable, Equatable, Sendable {
     }
 
     private static let metadataAllowlist: Set<String> = [
-        "baseURL", "userID", "region", "planType", "usageKind", "websiteURL"
+        "baseURL", "userID", "region", "planType", "usageKind", "websiteURL",
+        "balanceWarningThreshold"
     ]
 
     private enum CodingKeys: String, CodingKey {

@@ -88,7 +88,8 @@ class CredentialRepositoryContractTest {
         sortOrder = sortOrder,
         metadata = mapOf(
             CredentialMetadataKey.BaseURL to "https://example.invalid/api",
-            CredentialMetadataKey.PlanType to "personal"
+            CredentialMetadataKey.PlanType to "personal",
+            CredentialMetadataKey.BalanceWarningThreshold to "10"
         )
     )
 

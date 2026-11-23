@@ -12,7 +12,7 @@ import org.junit.Test
 /**
  * Aligned with the macOS CredentialEditorValidation (RoutinUsage/Views/CredentialEditorView.swift)
  * and KeyEditorValidationTests. Only the Android metadata allowlist keys are persisted
- * (baseURL, userID, region, planType, usageKind, websiteURL).
+ * (baseURL, userID, region, planType, usageKind, websiteURL, balanceWarningThreshold).
  */
 class CredentialEditorValidationTest {
 
@@ -27,6 +27,7 @@ class CredentialEditorValidationTest {
         newAPIUserID: String = "",
         xiaomiUsageKind: String = "api",
         websiteURL: String = "",
+        balanceWarningThreshold: String = "",
     ) = CredentialEditorValidation.validate(
         providerId = providerId,
         fields = CredentialEditorValidation.FormFields(
@@ -39,6 +40,7 @@ class CredentialEditorValidationTest {
             newAPIUserID = newAPIUserID,
             xiaomiUsageKind = xiaomiUsageKind,
             websiteURL = websiteURL,
+            balanceWarningThreshold = balanceWarningThreshold,
         ),
     )
 
@@ -53,10 +55,12 @@ class CredentialEditorValidationTest {
         newAPIUserID: String = "",
         xiaomiUsageKind: String = "api",
         websiteURL: String = "",
+        balanceWarningThreshold: String = "",
     ): String = try {
         validate(
             providerId, name, apiKey, accessKeyID, secretAccessKey,
             region, newAPIBaseURL, newAPIUserID, xiaomiUsageKind, websiteURL,
+            balanceWarningThreshold,
         )
         ""
     } catch (error: CredentialValidationException) {
@@ -109,6 +113,56 @@ class CredentialEditorValidationTest {
             websiteURL = "https://routin.ai/pricing",
         )
         assertEquals("https://routin.ai/pricing", input.metadata[CredentialMetadataKey.WebsiteURL])
+    }
+
+    @Test
+    fun balanceWarningThresholdIsStoredForBalanceProvidersOnly() {
+        val deepSeek = validate(
+            ProviderId.DeepSeek, name = "DeepSeek", apiKey = "sk-x", balanceWarningThreshold = " 20 ",
+        )
+        assertEquals("20", deepSeek.metadata[CredentialMetadataKey.BalanceWarningThreshold])
+
+        val glm = validate(
+            ProviderId.Glm, name = "GLM", apiKey = "sk-x", balanceWarningThreshold = "10",
+        )
+        assertEquals("10", glm.metadata[CredentialMetadataKey.BalanceWarningThreshold])
+
+        val newApi = validate(
+            ProviderId.NewAPI,
+            name = "New API",
+            apiKey = "sk-x",
+            newAPIBaseURL = "https://api.example.com",
+            newAPIUserID = "42",
+            balanceWarningThreshold = "1000000",
+        )
+        assertEquals("1000000", newApi.metadata[CredentialMetadataKey.BalanceWarningThreshold])
+
+        val xiaomiApi = validate(
+            ProviderId.Xiaomi, name = "小米", apiKey = "sk-x", balanceWarningThreshold = "5",
+        )
+        assertEquals("5", xiaomiApi.metadata[CredentialMetadataKey.BalanceWarningThreshold])
+
+        val xiaomiPlan = validate(
+            ProviderId.Xiaomi,
+            name = "小米",
+            apiKey = "tp-x",
+            xiaomiUsageKind = "plan",
+            balanceWarningThreshold = "5",
+        )
+        assertFalse(xiaomiPlan.metadata.containsKey(CredentialMetadataKey.BalanceWarningThreshold))
+
+        val openCode = validate(
+            ProviderId.OpenCode, name = "OpenCode", apiKey = "oc_x", balanceWarningThreshold = "5",
+        )
+        assertFalse(openCode.metadata.containsKey(CredentialMetadataKey.BalanceWarningThreshold))
+    }
+
+    @Test
+    fun invalidBalanceWarningThresholdFails() {
+        assertEquals(
+            "请输入有效的低余额预警值",
+            failure(ProviderId.DeepSeek, name = "DeepSeek", apiKey = "sk-x", balanceWarningThreshold = "abc"),
+        )
     }
 
     @Test

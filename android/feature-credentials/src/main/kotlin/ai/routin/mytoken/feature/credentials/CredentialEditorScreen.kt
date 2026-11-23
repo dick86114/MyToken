@@ -93,6 +93,7 @@ fun CredentialEditorScreen(
     onUserIDChange: (String) -> Unit,
     onXiaomiUsageKindChange: (String) -> Unit,
     onWebsiteURLChange: (String) -> Unit,
+    onBalanceWarningThresholdChange: (String) -> Unit = {},
     onToggleSecretVisible: () -> Unit,
     onTestConnection: () -> Unit,
     onSave: () -> Unit,
@@ -276,6 +277,20 @@ fun CredentialEditorScreen(
                                     .testTag("editor_user_id"),
                             )
                         }
+                    }
+                    if (CredentialEditorValidation.supportsBalanceWarningThreshold(
+                            state.providerId,
+                            state.xiaomiUsageKind,
+                        )
+                    ) {
+                        MyTokenTextField(
+                            value = state.balanceWarningThreshold,
+                            onValueChange = onBalanceWarningThresholdChange,
+                            label = "低余额预警值（可选）",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("editor_balance_warning_threshold"),
+                        )
                     }
                     state.validationError?.let { message ->
                         Text(

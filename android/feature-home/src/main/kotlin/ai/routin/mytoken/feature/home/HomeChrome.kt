@@ -103,6 +103,7 @@ internal fun HomeToolbar(
     credentialCount: Int,
     headlineCount: Int,
     summaryTail: String,
+    summaryTone: HomeHealthTone,
     alertProviders: List<ProviderId>,
     collapseProgress: () -> Float,
     onOpenCredentials: () -> Unit,
@@ -216,7 +217,11 @@ internal fun HomeToolbar(
                                 .testTag("home_nav_summary_tail"),
                             style = MyTokenType.caption,
                             fontWeight = FontWeight.Medium,
-                            color = colors.reportTicketMuted,
+                            color = severityAccent(
+                                summaryTone,
+                                colors.reportTicketMuted,
+                                colors.reportNavCritical,
+                            ),
                             maxLines = 1,
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                         )

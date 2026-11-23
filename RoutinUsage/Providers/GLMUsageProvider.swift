@@ -476,10 +476,9 @@ struct GLMUsageProvider: UsageProvider {
     }
 
     private static func healthState(for percentage: Decimal) -> UsageMetricHealthState {
-        let value = NSDecimalNumber(decimal: percentage).doubleValue
-        if value >= 80 { return .critical }
-        if value >= 50 { return .warning }
-        return .normal
+        UsageHealthThresholds.healthState(
+            forUsedPercent: NSDecimalNumber(decimal: percentage).doubleValue
+        )
     }
 
     private static func date(fromMilliseconds value: Decimal?) -> Date? {

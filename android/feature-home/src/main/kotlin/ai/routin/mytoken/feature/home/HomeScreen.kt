@@ -147,11 +147,8 @@ fun HomeScreen(
     // 固定导航收起后展示与报告一致的摘要；报警凭证的供应商 logo 横向跟随。
     val reportFindings = remember(allCards) { homeReportFindings(allCards) }
     val navHeadlineCount = if (reportFindings.isEmpty()) allCards.size else reportFindings.size
-    val navSummaryTail = when {
-        reportFindings.isEmpty() -> "用量正常"
-        reportFindings.any { it.failed } -> "需注意"
-        else -> "接近上限"
-    }
+    val navSummaryTone = remember(reportFindings) { homeReportTone(reportFindings) }
+    val navSummaryTail = remember(reportFindings) { homeReportTail(reportFindings) }
     val navAlertProviders = remember(reportFindings) {
         reportFindings.map { it.providerId }.distinct().take(4)
     }
@@ -637,6 +634,7 @@ fun HomeScreen(
                         credentialCount = state.cards.size,
                         headlineCount = navHeadlineCount,
                         summaryTail = navSummaryTail,
+                        summaryTone = navSummaryTone,
                         alertProviders = navAlertProviders,
                         collapseProgress = collapseProgress,
                         onOpenCredentials = onOpenCredentials,

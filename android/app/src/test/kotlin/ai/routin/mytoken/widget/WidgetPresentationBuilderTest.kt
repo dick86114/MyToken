@@ -56,6 +56,29 @@ class WidgetPresentationBuilderTest {
     }
 
     @Test
+    fun `severity follows shared 80 and 95 thresholds`() {
+        fun severity(percent: Int): WidgetMetricSeverity {
+            val credential = credential(ProviderId.Routin)
+            val snapshot = UsageSnapshot(
+                credentialId = credential.id,
+                fetchedAt = Instant.parse("2026-01-01T00:00:00Z"),
+                metrics = listOf(progress("fiveHour", "5 小时", percent)),
+            )
+            return WidgetPresentationBuilder
+                .makeCredentialPresentation(credential, snapshot, WidgetSizeKind.Standard)
+                .credential
+                ?.primary
+                ?.severity
+                ?: error("missing primary metric")
+        }
+
+        assertEquals(WidgetMetricSeverity.Normal, severity(79))
+        assertEquals(WidgetMetricSeverity.Warning, severity(80))
+        assertEquals(WidgetMetricSeverity.Warning, severity(94))
+        assertEquals(WidgetMetricSeverity.Critical, severity(95))
+    }
+
+    @Test
     fun `value only credentials fall back to their ranked metrics`() {
         val credential = credential(ProviderId.Xiaomi)
         val snapshot = UsageSnapshot(

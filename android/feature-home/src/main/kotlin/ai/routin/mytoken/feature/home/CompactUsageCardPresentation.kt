@@ -1,7 +1,6 @@
 package ai.routin.mytoken.feature.home
 
 import ai.routin.mytoken.domain.model.UsageMetric
-import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
 
 /** 简洁卡片的排布与色调规则。 */
@@ -36,17 +35,12 @@ internal object CompactUsageCardPresentation {
         return if (text.endsWith("%")) text.dropLast(1) else text
     }
 
+    /** 与卡面状态文案共用 [metricHealthTone]，阈值只在共享契约里定义一次。 */
     fun tone(metric: UsageMetric): UsageMetricTone {
         if (metric.presentation != UsageMetricPresentation.Progress) return UsageMetricTone.Normal
-        if (metric.healthState == UsageMetricHealthState.Critical ||
-            metric.healthState == UsageMetricHealthState.Unavailable
-        ) {
-            return UsageMetricTone.Critical
-        }
-        val percent = progressPercent(metric) ?: return UsageMetricTone.Normal
-        return when {
-            percent >= 80.0 -> UsageMetricTone.Critical
-            percent >= 50.0 -> UsageMetricTone.Warning
+        return when (metricHealthTone(metric)) {
+            UsageCardHealth.Critical -> UsageMetricTone.Critical
+            UsageCardHealth.Warning -> UsageMetricTone.Warning
             else -> UsageMetricTone.Normal
         }
     }

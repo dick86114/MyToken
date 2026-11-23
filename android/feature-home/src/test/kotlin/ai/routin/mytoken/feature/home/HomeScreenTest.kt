@@ -2461,7 +2461,8 @@ class HomeScreenTest {
     fun 点击报告风险项会定位到对应凭证卡片() {
         val cards = (1..5).map { index ->
             val item = credential("健康定位 $index")
-            card(item, metrics = listOf(progress(index * 10.0, 100.0)))
+            val used = if (index == 5) 85.0 else index * 10.0
+            card(item, metrics = listOf(progress(used, 100.0)))
         }
         composeRule.setContent {
             MaterialTheme {
@@ -2886,8 +2887,8 @@ class HomeScreenTest {
     fun 顶部展示产品品牌入口与琥珀报告() {
         val cards = listOf(
             card(credential("正常账号"), metrics = listOf(progress(20.0, 100.0))),
-            card(credential("接近上限"), metrics = listOf(progress(60.0, 100.0))),
-            card(credential("超限账号"), metrics = listOf(progress(90.0, 100.0))),
+            card(credential("接近上限"), metrics = listOf(progress(85.0, 100.0))),
+            card(credential("高用量账号"), metrics = listOf(progress(90.0, 100.0))),
         )
         composeRule.setContent {
             MyTokenTheme {
@@ -3379,7 +3380,7 @@ class HomeScreenTest {
         )
         val warningGlm = card(
             credential("报警 GLM", ProviderId.Glm),
-            metrics = listOf(progress(95.0, 100.0)),
+            metrics = listOf(progress(94.0, 100.0)),
         )
         val cards = listOf(warningRoutin, warningGlm) + (1..18).map { index ->
             card(credential("普通 $index"), metrics = listOf(progress(10.0, 100.0)))
@@ -3420,6 +3421,47 @@ class HomeScreenTest {
             .assertIsDisplayed()
         composeRule.onNodeWithTag("home_nav_alert_logo_2", useUnmergedTree = true)
             .assertDoesNotExist()
+    }
+
+    @Test
+    fun 严重告警时报告与收起标题升级为已达上限() {
+        val critical = card(
+            credential("临界 Routin", ProviderId.Routin),
+            metrics = listOf(progress(96.0, 100.0)),
+        )
+        val cards = listOf(critical) + (1..19).map { index ->
+            card(credential("普通 $index"), metrics = listOf(progress(10.0, 100.0)))
+        }
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = cards,
+                        groups = emptyList(),
+                        credentialCount = cards.size,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    usageCardDensity = UsageCardDensity.FULL,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("report_tail").assertTextEquals("已达上限")
+
+        composeRule.onNodeWithTag("home_list_full").performTouchInput {
+            swipeUp(startY = height * 0.75f, endY = height * 0.1f, durationMillis = 300)
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("home_nav_summary_count", useUnmergedTree = true)
+            .assertTextEquals("1个凭证")
+        composeRule.onNodeWithTag("home_nav_summary_tail", useUnmergedTree = true)
+            .assertTextEquals("已达上限")
     }
 
     @Test

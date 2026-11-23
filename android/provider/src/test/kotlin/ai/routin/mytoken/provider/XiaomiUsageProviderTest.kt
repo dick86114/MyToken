@@ -5,6 +5,7 @@ import ai.routin.mytoken.domain.model.CredentialKind
 import ai.routin.mytoken.domain.model.CredentialMetadataKey
 import ai.routin.mytoken.domain.model.CredentialSecret
 import ai.routin.mytoken.domain.model.ProviderId
+import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.usage.UsageProviderException
 import ai.routin.mytoken.provider.http.HttpTransport
 import ai.routin.mytoken.provider.http.ProviderHttpRequest
@@ -46,6 +47,18 @@ class XiaomiUsageProviderTest {
 
         assertEquals("API 按量", snapshot.planName)
         assertEquals(BigDecimal("12.50"), snapshot.metrics.first { it.id == "account-balance" }.value)
+        assertEquals(
+            UsageMetricHealthState.Warning,
+            provider.fetchUsage(
+                credential("api").copy(
+                    metadata = mapOf(
+                        CredentialMetadataKey.UsageKind to "api",
+                        CredentialMetadataKey.BalanceWarningThreshold to "20",
+                    ),
+                ),
+                CredentialSecret.BearerToken("sk-official-key"),
+            ).getOrThrow().metrics.first { it.id == "account-balance" }.healthState,
+        )
         assertEquals(BigDecimal("2.000000"), snapshot.metrics.first { it.id == "total-consumption" }.value)
         assertEquals("近 31 天消费", snapshot.metrics.first { it.id == "total-consumption" }.label)
         assertEquals(BigDecimal("1500"), snapshot.metrics.first { it.id == "total-tokens" }.value)

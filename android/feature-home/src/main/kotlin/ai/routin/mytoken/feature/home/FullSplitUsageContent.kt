@@ -290,7 +290,7 @@ private fun FullHeroFocus(
 ) {
     val colors = MyTokenThemeTokens.colors
     val percent = progressPercent(metric)
-    val tone = splitTone(metric, percent)
+    val tone = splitTone(metric)
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -339,7 +339,7 @@ private fun FullPeriodRow(
 ) {
     val colors = MyTokenThemeTokens.colors
     val percent = progressPercent(metric)
-    val tone = splitTone(metric, percent)
+    val tone = splitTone(metric)
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -878,17 +878,10 @@ private fun isXiaomiApiBalanceCard(card: CredentialCardUi): Boolean {
     return usageKind != "plan"
 }
 
-private fun splitTone(metric: UsageMetric, percent: Double?): SplitTone {
-    if (metric.healthState == UsageMetricHealthState.Unavailable ||
-        metric.healthState == UsageMetricHealthState.Critical ||
-        (percent ?: 0.0) >= 80
-    ) {
-        return SplitTone.Critical
-    }
-    if (metric.healthState == UsageMetricHealthState.Warning || (percent ?: 0.0) >= 50) {
-        return SplitTone.Warning
-    }
-    return SplitTone.Normal
+private fun splitTone(metric: UsageMetric): SplitTone = when (metricHealthTone(metric)) {
+    UsageCardHealth.Critical -> SplitTone.Critical
+    UsageCardHealth.Warning -> SplitTone.Warning
+    else -> SplitTone.Normal
 }
 
 private fun splitToneUsageTone(tone: SplitTone): UsageMetricTone = when (tone) {

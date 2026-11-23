@@ -224,11 +224,20 @@ class VolcengineUsageProviderTest {
 
     @Test
     fun fetchUsage_highUsageMarksCritical() = runTest {
-        queueVolcengine("""{"Result":{"QuotaUsage":[{"Level":"5h","Percent":85}]}}""")
+        queueVolcengine("""{"Result":{"QuotaUsage":[{"Level":"5h","Percent":96}]}}""")
 
         val snapshot = provider.fetchUsage(credential(planType = "coding"), secret).getOrThrow()
 
         assertEquals(UsageMetricHealthState.Critical, snapshot.metrics[0].healthState)
+    }
+
+    @Test
+    fun fetchUsage_usageBelowCriticalMarksWarning() = runTest {
+        queueVolcengine("""{"Result":{"QuotaUsage":[{"Level":"5h","Percent":85}]}}""")
+
+        val snapshot = provider.fetchUsage(credential(planType = "coding"), secret).getOrThrow()
+
+        assertEquals(UsageMetricHealthState.Warning, snapshot.metrics[0].healthState)
     }
 
     @Test

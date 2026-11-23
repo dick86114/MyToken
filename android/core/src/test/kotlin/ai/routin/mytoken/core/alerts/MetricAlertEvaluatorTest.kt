@@ -23,7 +23,7 @@ import org.junit.Test
 
 /**
  * Pure-JVM coverage of the threshold semantics ported from the macOS
- * AlertEvaluator / MetricAlertRuleResolver: 50/80/custom thresholds, per-credential
+ * AlertEvaluator / MetricAlertRuleResolver: shared 80/95 defaults, per-credential
  * overrides, notify-once with re-arm on reset, and invalid-credential alerts.
  */
 class MetricAlertEvaluatorTest {
@@ -78,6 +78,12 @@ class MetricAlertEvaluatorTest {
     // ---- used-percent thresholds --------------------------------------------
 
     @Test
+    fun defaultThresholdsMatchSharedContract() {
+        assertEquals(80, AlertThresholds.DEFAULT.lowPercent)
+        assertEquals(95, AlertThresholds.DEFAULT.highPercent)
+    }
+
+    @Test
     fun usedQuotaBelowLowThresholdProducesNoAlert() {
         val evaluation = evaluator.evaluate(
             credential(),
@@ -92,13 +98,13 @@ class MetricAlertEvaluatorTest {
     fun usedQuotaAtLowThresholdFiresLowAlert() {
         val evaluation = evaluator.evaluate(
             credential(),
-            readyState(quotaMetric(used = BigDecimal("52"), limit = BigDecimal("100"))),
+            readyState(quotaMetric(used = BigDecimal("82"), limit = BigDecimal("100"))),
             MetricAlertSettings(),
             emptyState,
         )
         val alert = evaluation.usageAlerts.single()
         assertEquals(AlertLevel.Low, alert.level)
-        assertEquals(52.0, alert.percent, 0.001)
+        assertEquals(82.0, alert.percent, 0.001)
         assertEquals("日用量", alert.metricLabel)
         assertEquals("测试凭证", alert.credentialName)
         assertEquals(ProviderId.Routin, alert.providerId)
@@ -109,7 +115,7 @@ class MetricAlertEvaluatorTest {
     fun usedQuotaAtHighThresholdFiresHighAlert() {
         val evaluation = evaluator.evaluate(
             credential(),
-            readyState(quotaMetric(used = BigDecimal("85"), limit = BigDecimal("100"))),
+            readyState(quotaMetric(used = BigDecimal("96"), limit = BigDecimal("100"))),
             MetricAlertSettings(),
             emptyState,
         )
@@ -119,18 +125,18 @@ class MetricAlertEvaluatorTest {
 
     @Test
     fun crossingBothThresholdsFiresOnlyTheHighest() {
-        // 0 -> 85 skips past 50 and 80 in one refresh: only the High alert is emitted.
+        // 0 -> 96 skips past 80 and 95 in one refresh: only the High alert is emitted.
         val evaluation = evaluator.evaluate(
             credential(),
-            readyState(quotaMetric(used = BigDecimal("85"), limit = BigDecimal("100"))),
+            readyState(quotaMetric(used = BigDecimal("96"), limit = BigDecimal("100"))),
             MetricAlertSettings(),
             emptyState,
         )
         assertEquals(listOf(AlertLevel.High), evaluation.usageAlerts.map { it.level })
-        // Both windows are marked triggered so a later 60% refresh does not re-notify Low.
+        // Both thresholds are marked triggered so a later 85% refresh does not re-notify Low.
         val second = evaluator.evaluate(
             credential(),
-            readyState(quotaMetric(used = BigDecimal("60"), limit = BigDecimal("100"))),
+            readyState(quotaMetric(used = BigDecimal("85"), limit = BigDecimal("100"))),
             MetricAlertSettings(),
             evaluation.state,
         )
@@ -146,19 +152,19 @@ class MetricAlertEvaluatorTest {
             limit = BigDecimal("100"),
             windowEnd = null,
         )
-        val first = evaluator.evaluate(credential(), readyState(metric("55")), settings, emptyState)
+        val first = evaluator.evaluate(credential(), readyState(metric("85")), settings, emptyState)
         assertEquals(1, first.usageAlerts.size)
 
         // Same window, still above threshold: no repeat notification.
-        val second = evaluator.evaluate(credential(), readyState(metric("70")), settings, first.state)
+        val second = evaluator.evaluate(credential(), readyState(metric("90")), settings, first.state)
         assertTrue(second.usageAlerts.isEmpty())
 
-        // Reset: usage drops back below 50% — the threshold re-arms.
+        // Reset: usage drops back below 80% — the threshold re-arms.
         val reset = evaluator.evaluate(credential(), readyState(metric("20")), settings, second.state)
         assertTrue(reset.usageAlerts.isEmpty())
         assertTrue(reset.state.triggeredWindows.isEmpty())
 
-        val rearmed = evaluator.evaluate(credential(), readyState(metric("60")), settings, reset.state)
+        val rearmed = evaluator.evaluate(credential(), readyState(metric("85")), settings, reset.state)
         assertEquals(1, rearmed.usageAlerts.size)
     }
 
@@ -169,7 +175,7 @@ class MetricAlertEvaluatorTest {
         val windowTwo = Instant.parse("2026-09-08T16:00:00Z")
         val first = evaluator.evaluate(
             credential(),
-            readyState(quotaMetric(used = BigDecimal("90"), limit = BigDecimal("100"), windowEnd = windowOne)),
+            readyState(quotaMetric(used = BigDecimal("96"), limit = BigDecimal("100"), windowEnd = windowOne)),
             settings,
             emptyState,
         )
@@ -178,7 +184,7 @@ class MetricAlertEvaluatorTest {
         // Same window, still above threshold → silent.
         val repeat = evaluator.evaluate(
             credential(),
-            readyState(quotaMetric(used = BigDecimal("95"), limit = BigDecimal("100"), windowEnd = windowOne)),
+            readyState(quotaMetric(used = BigDecimal("97"), limit = BigDecimal("100"), windowEnd = windowOne)),
             settings,
             first.state,
         )
@@ -187,7 +193,7 @@ class MetricAlertEvaluatorTest {
         // Next window: fresh threshold, notifies again.
         val nextWindow = evaluator.evaluate(
             credential(),
-            readyState(quotaMetric(used = BigDecimal("90"), limit = BigDecimal("100"), windowEnd = windowTwo)),
+            readyState(quotaMetric(used = BigDecimal("96"), limit = BigDecimal("100"), windowEnd = windowTwo)),
             settings,
             repeat.state,
         )
@@ -212,7 +218,7 @@ class MetricAlertEvaluatorTest {
             thresholds = AlertThresholds.DEFAULT,
             perCredential = mapOf(credentialId to AlertThresholds(lowPercent = 20, highPercent = 90)),
         )
-        // 30% is below the global low (50) but above the per-credential override (20).
+        // 30% is below the global low (80) but above the per-credential override (20).
         val evaluation = evaluator.evaluate(
             credential(),
             readyState(quotaMetric(used = BigDecimal("30"), limit = BigDecimal("100"))),
@@ -241,13 +247,13 @@ class MetricAlertEvaluatorTest {
 
     @Test
     fun remainingQuotaMirrorsUsedThresholds() {
-        // remaining 45% <= (100 - 50): Low alert with "剩余低于 50%" semantics.
+        // remaining 18% <= (100 - 80): Low alert with "剩余低于 80%" semantics.
         val low = evaluator.evaluate(
             credential(),
             readyState(
                 quotaMetric(
                     id = "m2",
-                    used = BigDecimal("55"),
+                    used = BigDecimal("82"),
                     limit = BigDecimal("100"),
                     semantic = UsageMetricSemantic.RemainingQuota,
                 ),
@@ -258,15 +264,15 @@ class MetricAlertEvaluatorTest {
         val lowAlert = low.usageAlerts.single()
         assertEquals(AlertLevel.Low, lowAlert.level)
         assertEquals(MetricAlertSource.RemainingPercent, lowAlert.source)
-        assertEquals(45.0, lowAlert.percent, 0.001)
+        assertEquals(18.0, lowAlert.percent, 0.001)
 
-        // remaining 15% <= (100 - 80): High alert.
+        // remaining 4% <= (100 - 95): High alert.
         val high = evaluator.evaluate(
             credential(),
             readyState(
                 quotaMetric(
                     id = "m2",
-                    used = BigDecimal("85"),
+                    used = BigDecimal("96"),
                     limit = BigDecimal("100"),
                     semantic = UsageMetricSemantic.RemainingQuota,
                 ),

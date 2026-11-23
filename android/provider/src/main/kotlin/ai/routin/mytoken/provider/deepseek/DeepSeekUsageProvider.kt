@@ -2,6 +2,7 @@ package ai.routin.mytoken.provider.deepseek
 
 import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.model.CredentialKind
+import ai.routin.mytoken.domain.model.CredentialMetadataKey
 import ai.routin.mytoken.domain.model.CredentialSecret
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageMetric
@@ -105,6 +106,8 @@ class DeepSeekUsageProvider(
         // 接口可能同时返回多种币种余额（例如 CNY 与 USD），逐币种生成一组指标，
         // 避免只展示第一个币种而丢失其余账户余额。
         val hasMultipleCurrencies = balanceInfos.size > 1
+        val warningThreshold = credential.metadata[CredentialMetadataKey.BalanceWarningThreshold]
+            ?.toBigDecimalOrNull()
         val metrics = mutableListOf<UsageMetric>()
         balanceInfos.forEachIndexed { index, balanceInfo ->
             val currency = balanceInfo.stringOrNull("currency")?.takeIf { it.isNotEmpty() } ?: "CNY"
@@ -113,7 +116,7 @@ class DeepSeekUsageProvider(
             val toppedUp = balanceInfo.decimalOrNull("topped_up_balance") ?: BigDecimal.ZERO
             val health = UsageMetricHealthEvaluator.balanceState(
                 balance = total,
-                warningThreshold = null,
+                warningThreshold = warningThreshold,
                 isAvailable = isAvailable
             )
             val suffix = if (hasMultipleCurrencies) "-${currency.uppercase()}" else ""

@@ -141,7 +141,8 @@ class CredentialRepositoryImpl(
         region = metadata[CredentialMetadataKey.Region],
         planType = metadata[CredentialMetadataKey.PlanType],
         usageKind = metadata[CredentialMetadataKey.UsageKind],
-        websiteURL = metadata[CredentialMetadataKey.WebsiteURL]
+        websiteURL = metadata[CredentialMetadataKey.WebsiteURL],
+        balanceWarningThreshold = metadata[CredentialMetadataKey.BalanceWarningThreshold]
     )
 
     private fun CredentialEntity.toDomain(): Credential = Credential(
@@ -158,6 +159,7 @@ class CredentialRepositoryImpl(
             planType?.let { put(CredentialMetadataKey.PlanType, it) }
             usageKind?.let { put(CredentialMetadataKey.UsageKind, it) }
             websiteURL?.let { put(CredentialMetadataKey.WebsiteURL, it) }
+            balanceWarningThreshold?.let { put(CredentialMetadataKey.BalanceWarningThreshold, it) }
         }
     )
 }

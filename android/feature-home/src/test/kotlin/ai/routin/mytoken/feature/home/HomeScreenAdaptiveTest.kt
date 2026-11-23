@@ -134,8 +134,8 @@ class HomeScreenAdaptiveTest {
     @Config(qualifiers = "w400dp-h1100dp")
     fun statusRowShowsAttentionCountAndFilterMenu() {
         val routin = sampleCard("Routin 主账号", ProviderId.Routin, used = 20.0)
-        val deepSeek = sampleCard("DeepSeek 主账号", ProviderId.DeepSeek, used = 60.0)
-        val glm = sampleCard("GLM 主账号", ProviderId.Glm, used = 90.0)
+        val deepSeek = sampleCard("DeepSeek 主账号", ProviderId.DeepSeek, used = 85.0)
+        val glm = sampleCard("GLM 主账号", ProviderId.Glm, used = 96.0)
         composeRule.setContent {
             MyTokenTheme {
                 HomeScreen(

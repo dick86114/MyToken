@@ -15,4 +15,8 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    systemProperty(
+        "shared.contracts.dir",
+        rootProject.file("../shared/provider-contracts").absolutePath,
+    )
 }

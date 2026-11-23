@@ -346,6 +346,7 @@ internal fun metadataLabel(key: CredentialMetadataKey): String = when (key) {
     CredentialMetadataKey.PlanType -> "计划类型"
     CredentialMetadataKey.UsageKind -> "用量类型"
     CredentialMetadataKey.WebsiteURL -> "官网地址"
+    CredentialMetadataKey.BalanceWarningThreshold -> "低余额预警值"
 }
 
 internal fun metadataValue(key: CredentialMetadataKey, value: String): String = when (key) {

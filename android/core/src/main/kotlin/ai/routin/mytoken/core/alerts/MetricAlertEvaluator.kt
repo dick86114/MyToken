@@ -3,6 +3,7 @@ package ai.routin.mytoken.core.alerts
 import ai.routin.mytoken.domain.model.AppError
 import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.model.ProviderId
+import ai.routin.mytoken.domain.model.UsageHealthThresholds
 import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricSemantic
@@ -17,10 +18,10 @@ import java.util.UUID
 enum class AlertLevel { Low, High }
 
 /**
- * Global usage alert thresholds (percent of quota). Defaults mirror the macOS
- * 50/80 semantics. Per-credential overrides are supported by [MetricAlertSettings]
- * but remain a pure-evaluator capability on Android: the metadata allowlist has no
- * per-credential threshold key, so overrides would need a separate local store.
+ * Global usage alert thresholds (percent of quota), read from the shared
+ * health-threshold contract: 80% warning / 95% critical. Per-credential overrides
+ * are supported by [MetricAlertSettings]; balance-only credentials also carry a
+ * `balanceWarningThreshold` metadata value for absolute低余额预警.
  */
 data class AlertThresholds(val lowPercent: Int, val highPercent: Int) {
     init {
@@ -32,7 +33,10 @@ data class AlertThresholds(val lowPercent: Int, val highPercent: Int) {
     companion object {
         const val MIN_PERCENT = 1
         const val MAX_PERCENT = 99
-        val DEFAULT = AlertThresholds(lowPercent = 50, highPercent = 80)
+        val DEFAULT = AlertThresholds(
+            lowPercent = UsageHealthThresholds.WARNING_USED_PERCENT,
+            highPercent = UsageHealthThresholds.CRITICAL_USED_PERCENT,
+        )
     }
 }
 

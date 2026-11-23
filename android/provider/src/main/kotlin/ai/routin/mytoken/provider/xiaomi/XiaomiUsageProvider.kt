@@ -6,6 +6,7 @@ import ai.routin.mytoken.domain.model.CredentialMetadataKey
 import ai.routin.mytoken.domain.model.CredentialSecret
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageMetric
+import ai.routin.mytoken.domain.model.UsageHealthThresholds
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import ai.routin.mytoken.domain.model.UsageMetricSemantic
@@ -118,7 +119,8 @@ class XiaomiUsageProvider(
         val isAvailable = balance.boolOrNull("is_available") ?: (availableBalance.signum() > 0)
         val health = UsageMetricHealthEvaluator.balanceState(
             balance = availableBalance,
-            warningThreshold = null,
+            warningThreshold = credential.metadata[CredentialMetadataKey.BalanceWarningThreshold]
+                ?.toBigDecimalOrNull(),
             isAvailable = isAvailable,
         )
 
@@ -323,11 +325,8 @@ class XiaomiUsageProvider(
     private fun percent(used: BigDecimal, limit: BigDecimal): Double =
         if (limit.signum() <= 0) 0.0 else used.divide(limit, MATH_CONTEXT).toDouble() * 100
 
-    private fun percentHealth(percent: Double): UsageMetricHealthState = when {
-        percent < 70 -> UsageMetricHealthState.Normal
-        percent < 90 -> UsageMetricHealthState.Warning
-        else -> UsageMetricHealthState.Critical
-    }
+    private fun percentHealth(percent: Double): UsageMetricHealthState =
+        UsageHealthThresholds.fromUsedPercent(percent)
 
     private fun planName(planCode: String?): String {
         val value = planCode?.takeIf { it.isNotBlank() } ?: return "Token Plan"

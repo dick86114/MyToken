@@ -1,5 +1,6 @@
 package ai.routin.mytoken.provider.health
 
+import ai.routin.mytoken.domain.model.UsageHealthThresholds
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import java.math.BigDecimal
 
@@ -19,9 +20,6 @@ object UsageMetricHealthEvaluator {
         return UsageMetricHealthState.Normal
     }
 
-    fun fromPercent(percent: Double): UsageMetricHealthState = when {
-        percent >= 80 -> UsageMetricHealthState.Critical
-        percent >= 50 -> UsageMetricHealthState.Warning
-        else -> UsageMetricHealthState.Normal
-    }
+    fun fromPercent(percent: Double): UsageMetricHealthState =
+        UsageHealthThresholds.fromUsedPercent(percent)
 }

@@ -34,6 +34,7 @@ data class CredentialEditorUiState(
     val userID: String = "",
     val xiaomiUsageKind: String = "api",
     val websiteURL: String = "",
+    val balanceWarningThreshold: String = "",
     val isSecretVisible: Boolean = false,
     val isSaving: Boolean = false,
     val isTestingConnection: Boolean = false,
@@ -89,6 +90,8 @@ class CredentialEditorViewModel(
                     userID = existing.metadata[CredentialMetadataKey.UserID].orEmpty(),
                     xiaomiUsageKind = existing.metadata[CredentialMetadataKey.UsageKind] ?: "api",
                     websiteURL = existing.metadata[CredentialMetadataKey.WebsiteURL].orEmpty(),
+                    balanceWarningThreshold =
+                        existing.metadata[CredentialMetadataKey.BalanceWarningThreshold].orEmpty(),
                 )
             }
         }
@@ -143,6 +146,8 @@ class CredentialEditorViewModel(
     fun setUserID(value: String) = _state.update { it.copy(userID = value) }
     fun setXiaomiUsageKind(value: String) = _state.update { it.copy(xiaomiUsageKind = value) }
     fun setWebsiteURL(value: String) = _state.update { it.copy(websiteURL = value) }
+    fun setBalanceWarningThreshold(value: String) =
+        _state.update { it.copy(balanceWarningThreshold = value) }
 
     fun toggleSecretVisible() {
         _state.update { it.copy(isSecretVisible = !it.isSecretVisible) }
@@ -237,6 +242,7 @@ class CredentialEditorViewModel(
             newAPIUserID = s.userID,
             xiaomiUsageKind = s.xiaomiUsageKind,
             websiteURL = s.websiteURL,
+            balanceWarningThreshold = s.balanceWarningThreshold,
         )
     }
 

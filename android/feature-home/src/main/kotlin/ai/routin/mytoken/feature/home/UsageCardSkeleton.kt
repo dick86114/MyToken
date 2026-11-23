@@ -11,6 +11,7 @@ import ai.routin.mytoken.core.ui.ProviderLogoPlate
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageCardDensity
 import ai.routin.mytoken.domain.model.UsageMetric
+import ai.routin.mytoken.domain.model.UsageHealthThresholds
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import ai.routin.mytoken.domain.usage.RefreshStatus
@@ -66,7 +67,7 @@ internal fun usageCardHealth(card: CredentialCardUi): UsageCardHealth {
     }
 }
 
-private fun metricHealthTone(metric: UsageMetric): UsageCardHealth? = when (metric.healthState) {
+internal fun metricHealthTone(metric: UsageMetric): UsageCardHealth? = when (metric.healthState) {
     UsageMetricHealthState.Critical,
     UsageMetricHealthState.Unavailable,
     -> UsageCardHealth.Critical
@@ -77,16 +78,15 @@ private fun metricHealthTone(metric: UsageMetric): UsageCardHealth? = when (metr
     UsageMetricHealthState.Stale -> null
 }
 
-/** 接口未给健康状态时按阈值兜底：进度 80%/50%，余额 ≤ 0 视为超限。 */
+/** 接口未给健康状态时按共享阈值兜底：进度 80% 警告、95% 超限，余额 ≤ 0 视为超限。 */
 private fun fallbackHealthTone(metric: UsageMetric): UsageCardHealth? {
     if (metric.presentation == UsageMetricPresentation.Progress) {
         val used = metric.used?.toDouble() ?: return null
         val limit = metric.limit?.toDouble() ?: return null
         if (limit <= 0.0) return UsageCardHealth.Normal
-        val percent = used / limit * 100.0
-        return when {
-            percent >= 80.0 -> UsageCardHealth.Critical
-            percent >= 50.0 -> UsageCardHealth.Warning
+        return when (UsageHealthThresholds.fromUsedPercent(used / limit * 100.0)) {
+            UsageMetricHealthState.Critical -> UsageCardHealth.Critical
+            UsageMetricHealthState.Warning -> UsageCardHealth.Warning
             else -> UsageCardHealth.Normal
         }
     }

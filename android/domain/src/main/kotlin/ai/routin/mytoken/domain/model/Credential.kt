@@ -36,7 +36,8 @@ enum class CredentialMetadataKey(val rawValue: String) {
     Region("region"),
     PlanType("planType"),
     UsageKind("usageKind"),
-    WebsiteURL("websiteURL")
+    WebsiteURL("websiteURL"),
+    BalanceWarningThreshold("balanceWarningThreshold")
 }
 
 data class Credential(

@@ -86,6 +86,7 @@ class CredentialEditorScreenTest {
                     onUserIDChange = viewModel::setUserID,
                     onXiaomiUsageKindChange = viewModel::setXiaomiUsageKind,
                     onWebsiteURLChange = viewModel::setWebsiteURL,
+                    onBalanceWarningThresholdChange = viewModel::setBalanceWarningThreshold,
                     onToggleSecretVisible = viewModel::toggleSecretVisible,
                     onTestConnection = viewModel::testConnection,
                     onSave = viewModel::save,
@@ -94,6 +95,35 @@ class CredentialEditorScreenTest {
         }
         dispatcher.scheduler.advanceUntilIdle()
         composeRule.waitForIdle()
+    }
+
+    @Test
+    fun balanceWarningFieldIsShownOnlyForBalanceProviders() {
+        setContent()
+        composeRule.onNodeWithTag("editor_balance_warning_threshold").assertDoesNotExist()
+
+        viewModel.setProviderId(ProviderId.DeepSeek)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("editor_balance_warning_threshold", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("editor_balance_warning_threshold", useUnmergedTree = true)
+            .performTextInput("20")
+        composeRule.waitForIdle()
+        assertEquals("20", viewModel.state.value.balanceWarningThreshold)
+
+        viewModel.setProviderId(ProviderId.Xiaomi)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("editor_balance_warning_threshold", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        viewModel.setXiaomiUsageKind("plan")
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("editor_balance_warning_threshold").assertDoesNotExist()
+
+        viewModel.setProviderId(ProviderId.OpenCode)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("editor_balance_warning_threshold").assertDoesNotExist()
     }
 
     @Test

@@ -16,5 +16,6 @@ data class CredentialEntity(
     val region: String?,
     val planType: String?,
     val usageKind: String?,
-    val websiteURL: String?
+    val websiteURL: String?,
+    val balanceWarningThreshold: String? = null
 )

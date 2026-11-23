@@ -177,8 +177,8 @@ private enum WidgetMetricFormatter {
         if metric.healthState == .critical { return .critical }
         if metric.healthState == .warning { return .warning }
         if let percent = metric.displayedPercent {
-            if percent >= 95 { return .critical }
-            if percent >= 80 { return .warning }
+            if percent >= UsageHealthThresholds.criticalUsedPercent { return .critical }
+            if percent >= UsageHealthThresholds.warningUsedPercent { return .warning }
         }
         return .normal
     }

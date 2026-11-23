@@ -64,11 +64,11 @@ class UsageCardHealthTest {
         )
         assertEquals(
             UsageCardHealth.Warning,
-            usageCardHealth(card(listOf(progress("a", 20.0, 100.0), progress("b", 60.0, 100.0)))),
+            usageCardHealth(card(listOf(progress("a", 20.0, 100.0), progress("b", 85.0, 100.0)))),
         )
         assertEquals(
             UsageCardHealth.Critical,
-            usageCardHealth(card(listOf(progress("a", 60.0, 100.0), progress("b", 90.0, 100.0)))),
+            usageCardHealth(card(listOf(progress("a", 85.0, 100.0), progress("b", 96.0, 100.0)))),
         )
     }
 
@@ -84,6 +84,14 @@ class UsageCardHealthTest {
         assertNotNull("失败时必须保留上次成功数据", failed.snapshot)
         assertEquals(1, failed.snapshot?.metrics?.size)
         assertEquals("更新失败", usageCardStatusText(UsageCardHealth.Failed))
+    }
+
+    @Test
+    fun fallbackThresholdsUse80And95Boundaries() {
+        assertEquals(UsageCardHealth.Normal, usageCardHealth(card(listOf(progress("a", 79.0, 100.0)))))
+        assertEquals(UsageCardHealth.Warning, usageCardHealth(card(listOf(progress("a", 80.0, 100.0)))))
+        assertEquals(UsageCardHealth.Warning, usageCardHealth(card(listOf(progress("a", 94.0, 100.0)))))
+        assertEquals(UsageCardHealth.Critical, usageCardHealth(card(listOf(progress("a", 95.0, 100.0)))))
     }
 
     @Test

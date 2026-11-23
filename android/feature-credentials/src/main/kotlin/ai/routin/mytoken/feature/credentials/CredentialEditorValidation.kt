@@ -24,9 +24,8 @@ data class ValidatedCredentialInput(
  * - DeepSeek / GLM: raw apiKey.
  * - Volcengine: accessKeyPair with a default region of cn-beijing.
  * - NewAPI: bearerAPIKey plus baseURL + userID metadata.
- *
- * The macOS editor also persists balanceWarningThreshold; that key is not part of the
- * Android metadata allowlist (transfer-schema-v1.json), so it is intentionally dropped.
+ * - DeepSeek / GLM / NewAPI / Xiaomi(api): optional balanceWarningThreshold metadata,
+ *   matching the macOS editor and the transfer schema v1 allowlist.
  */
 object CredentialEditorValidation {
 
@@ -40,6 +39,7 @@ object CredentialEditorValidation {
         val newAPIUserID: String = "",
         val xiaomiUsageKind: String = "api",
         val websiteURL: String = "",
+        val balanceWarningThreshold: String = "",
     )
 
     fun validate(providerId: ProviderId, fields: FormFields): ValidatedCredentialInput {
@@ -48,6 +48,11 @@ object CredentialEditorValidation {
             throw CredentialValidationException("请输入 Key 名称")
         }
         val websiteMetadata = websiteMetadata(fields.websiteURL)
+        val balanceMetadata = balanceWarningMetadata(
+            providerId = providerId,
+            usageKind = fields.xiaomiUsageKind,
+            rawValue = fields.balanceWarningThreshold,
+        )
 
         return when (providerId) {
             ProviderId.Routin -> {
@@ -76,7 +81,7 @@ object CredentialEditorValidation {
                     credentialKind = CredentialKind.ApiKey,
                     name = normalizedName,
                     secret = CredentialSecret.ApiKey(secret),
-                    metadata = websiteMetadata,
+                    metadata = websiteMetadata + balanceMetadata,
                 )
             }
             ProviderId.Volcengine -> {
@@ -111,7 +116,7 @@ object CredentialEditorValidation {
                     metadata = mapOf(
                         CredentialMetadataKey.BaseURL to normalizedURL,
                         CredentialMetadataKey.UserID to userID,
-                    ) + websiteMetadata,
+                    ) + websiteMetadata + balanceMetadata,
                 )
             }
             ProviderId.CommandCode -> {
@@ -151,10 +156,34 @@ object CredentialEditorValidation {
                     credentialKind = CredentialKind.BearerApiKey,
                     name = normalizedName,
                     secret = CredentialSecret.BearerToken(secret),
-                    metadata = mapOf(CredentialMetadataKey.UsageKind to usageKind) + websiteMetadata,
+                    metadata = mapOf(CredentialMetadataKey.UsageKind to usageKind) +
+                        websiteMetadata + balanceMetadata,
                 )
             }
         }
+    }
+
+    /** 与 macOS 编辑器一致：仅余额型/带余额账户暴露低余额预警值。 */
+    internal fun supportsBalanceWarningThreshold(providerId: ProviderId, usageKind: String): Boolean =
+        when (providerId) {
+            ProviderId.DeepSeek, ProviderId.Glm, ProviderId.NewAPI -> true
+            ProviderId.Xiaomi -> usageKind.trim().lowercase() == "api"
+            else -> false
+        }
+
+    private fun balanceWarningMetadata(
+        providerId: ProviderId,
+        usageKind: String,
+        rawValue: String,
+    ): Map<CredentialMetadataKey, String> {
+        val trimmed = rawValue.trim()
+        if (trimmed.isEmpty() || !supportsBalanceWarningThreshold(providerId, usageKind)) {
+            return emptyMap()
+        }
+        if (trimmed.toBigDecimalOrNull() == null) {
+            throw CredentialValidationException("请输入有效的低余额预警值")
+        }
+        return mapOf(CredentialMetadataKey.BalanceWarningThreshold to trimmed)
     }
 
     private fun normalizeNewAPIBaseURL(raw: String): String {

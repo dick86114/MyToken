@@ -42,9 +42,11 @@ data class MyTokenColors(
     val reportMuted: Color,
     val reportLine: Color,
     val reportAccent: Color,
+    val reportCritical: Color,
     val reportTicket: Color,
     val reportTicketInk: Color,
     val reportTicketMuted: Color,
+    val reportNavCritical: Color,
     val reportDialTrack: Color,
 )
 
@@ -75,9 +77,11 @@ internal val MyTokenLightColors = MyTokenColors(
     reportMuted = Color(0xFFB6BCC4),
     reportLine = Color(0xFF4A4F56),
     reportAccent = Color(0xFFFFCE70),
+    reportCritical = Color(0xFFFF7A7D),
     reportTicket = Color(0xFFF3CB73),
     reportTicketInk = Color(0xFF17181A),
     reportTicketMuted = Color(0xFF625126),
+    reportNavCritical = Color(0xFFA3151A),
     reportDialTrack = Color(0xFFB4A071),
 )
 
@@ -107,9 +111,11 @@ internal val MyTokenDarkColors = MyTokenColors(
     reportMuted = Color(0xFF696D73),
     reportLine = Color(0xFFD2D6DC),
     reportAccent = Color(0xFF9A5B00),
+    reportCritical = Color(0xFFC0272D),
     reportTicket = Color(0xFFF3CB73),
     reportTicketInk = Color(0xFF17181A),
     reportTicketMuted = Color(0xFF625126),
+    reportNavCritical = Color(0xFFA3151A),
     reportDialTrack = Color(0xFFB4A071),
 )
 

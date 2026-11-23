@@ -4,6 +4,7 @@ import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.model.CredentialKind
 import ai.routin.mytoken.domain.model.CredentialSecret
 import ai.routin.mytoken.domain.model.ProviderId
+import ai.routin.mytoken.domain.model.UsageHealthThresholds
 import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
@@ -161,10 +162,8 @@ class OpenCodeUsageProvider(
     ): UsageMetricHealthState {
         if (limit <= BigDecimal.ZERO) return UsageMetricHealthState.Unknown
         if (used >= limit) return UsageMetricHealthState.Critical
-        if (used.divide(limit, MathContext.DECIMAL128) >= BigDecimal("0.8")) {
-            return UsageMetricHealthState.Warning
-        }
-        return UsageMetricHealthState.Normal
+        val percent = used.divide(limit, MathContext.DECIMAL128).toDouble() * 100.0
+        return UsageHealthThresholds.fromUsedPercent(percent)
     }
 
     private fun mapHTTPStatus(statusCode: Int): UsageProviderException = when (statusCode) {

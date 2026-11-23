@@ -1,5 +1,9 @@
 {
   "schemaVersion": 1,
+  "healthThresholds": {
+    "warningUsedPercent": 80,
+    "criticalUsedPercent": 95
+  },
   "providers": [
     { "providerId": "routin", "credentialKinds": ["bearerAPIKey"], "capabilities": { "fiveHour": true, "weekly": true, "balance": false, "remainingQuota": true, "resetTime": true } },
     { "providerId": "deepseek", "credentialKinds": ["apiKey"], "capabilities": { "fiveHour": false, "weekly": false, "balance": true, "remainingQuota": false, "resetTime": false } },

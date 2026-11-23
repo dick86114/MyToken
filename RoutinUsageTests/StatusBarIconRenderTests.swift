@@ -7,7 +7,7 @@ final class StatusBarIconRenderTests: XCTestCase {
         let indicators = [
             MenuBarIndicatorModel(
                 shortCode: "GLM",
-                percent: 60,
+                percent: 85,
                 healthState: .normal,
                 accessibilityLabel: "GLM"
             )

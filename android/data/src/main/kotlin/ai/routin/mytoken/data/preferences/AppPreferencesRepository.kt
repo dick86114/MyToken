@@ -1,5 +1,6 @@
 package ai.routin.mytoken.data.preferences
 
+import ai.routin.mytoken.domain.model.UsageHealthThresholds
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -19,15 +20,15 @@ data class AppPreferences(
     val openAppRefresh: Boolean = true,
     val retryOnFailure: Boolean = true,
     val notificationsEnabled: Boolean = true,
-    val alertLowThresholdPercent: Int = 50,
-    val alertHighThresholdPercent: Int = 80,
+    val alertLowThresholdPercent: Int = DEFAULT_ALERT_LOW_THRESHOLD_PERCENT,
+    val alertHighThresholdPercent: Int = DEFAULT_ALERT_HIGH_THRESHOLD_PERCENT,
     val credentialFailureAlertsEnabled: Boolean = true
 ) {
     companion object {
         const val DEFAULT_REFRESH_INTERVAL_MINUTES = 15
         val ALLOWED_REFRESH_INTERVAL_MINUTES = setOf(1, 5, 15, 30)
-        const val DEFAULT_ALERT_LOW_THRESHOLD_PERCENT = 50
-        const val DEFAULT_ALERT_HIGH_THRESHOLD_PERCENT = 80
+        val DEFAULT_ALERT_LOW_THRESHOLD_PERCENT = UsageHealthThresholds.WARNING_USED_PERCENT
+        val DEFAULT_ALERT_HIGH_THRESHOLD_PERCENT = UsageHealthThresholds.CRITICAL_USED_PERCENT
     }
 }
 

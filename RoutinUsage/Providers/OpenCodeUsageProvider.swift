@@ -152,8 +152,8 @@ struct OpenCodeUsageProvider: UsageProvider {
     private static func healthState(used: Decimal, limit: Decimal) -> UsageMetricHealthState {
         guard limit > 0 else { return .unknown }
         if used >= limit { return .critical }
-        if used / limit >= 0.8 { return .warning }
-        return .normal
+        let percent = NSDecimalNumber(decimal: used / limit).doubleValue * 100
+        return UsageHealthThresholds.healthState(forUsedPercent: percent)
     }
 
     private static func capability(

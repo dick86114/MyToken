@@ -34,7 +34,8 @@
             "region": { "type": "string" },
             "planType": { "enum": ["personal", "coding"] },
             "usageKind": { "enum": ["periodic", "tokenPack", "api", "plan"] },
-            "websiteURL": { "type": "string", "format": "uri" }
+            "websiteURL": { "type": "string", "format": "uri" },
+            "balanceWarningThreshold": { "type": "string" }
           }
         }
       }

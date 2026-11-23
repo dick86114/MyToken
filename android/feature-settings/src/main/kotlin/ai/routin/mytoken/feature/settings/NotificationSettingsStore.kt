@@ -1,14 +1,14 @@
 package ai.routin.mytoken.feature.settings
 
 import ai.routin.mytoken.data.preferences.AppPreferencesRepository
+import ai.routin.mytoken.domain.model.UsageHealthThresholds
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 /**
- * Notification preferences. Thresholds are global settings (the Android metadata
- * allowlist has no per-credential threshold key — Task 9 confirmed), mirroring the
- * macOS default 50/80 semantics; per-credential overrides remain a pure-evaluator
- * capability without persistence.
+ * Notification preferences. Percent thresholds are global settings sourced from
+ * the shared health-threshold contract (80% warning / 95% critical); balance-only
+ * credentials additionally honor their `balanceWarningThreshold` metadata value.
  */
 data class NotificationSettings(
     val notificationsEnabled: Boolean = true,
@@ -17,8 +17,8 @@ data class NotificationSettings(
     val credentialFailureAlertsEnabled: Boolean = true,
 ) {
     companion object {
-        const val DEFAULT_LOW_THRESHOLD_PERCENT = 50
-        const val DEFAULT_HIGH_THRESHOLD_PERCENT = 80
+        val DEFAULT_LOW_THRESHOLD_PERCENT = UsageHealthThresholds.WARNING_USED_PERCENT
+        val DEFAULT_HIGH_THRESHOLD_PERCENT = UsageHealthThresholds.CRITICAL_USED_PERCENT
         const val MIN_THRESHOLD_PERCENT = 1
         const val MAX_THRESHOLD_PERCENT = 99
     }

@@ -10,8 +10,9 @@ final class UsageMetricPresentationTests: XCTestCase {
     }
 
     func test图形化用量使用统一风险色阶() {
-        XCTAssertEqual(UsageMetricPresentation.tone(for: 49.9), .normal)
-        XCTAssertEqual(UsageMetricPresentation.tone(for: 50), .warning)
-        XCTAssertEqual(UsageMetricPresentation.tone(for: 80), .critical)
+        XCTAssertEqual(UsageMetricPresentation.tone(for: 79.9), .normal)
+        XCTAssertEqual(UsageMetricPresentation.tone(for: 80), .warning)
+        XCTAssertEqual(UsageMetricPresentation.tone(for: 94.9), .warning)
+        XCTAssertEqual(UsageMetricPresentation.tone(for: 95), .critical)
     }
 }

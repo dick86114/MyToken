@@ -7,8 +7,11 @@ import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.ProviderLogoPlate
 import ai.routin.mytoken.core.ui.rememberMyTokenMotionEnabled
 import ai.routin.mytoken.domain.model.ProviderId
+import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
+import ai.routin.mytoken.domain.model.UsageMetricSemantic
 import ai.routin.mytoken.domain.usage.RefreshStatus
+import java.math.BigDecimal
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -37,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -68,12 +72,12 @@ internal fun homeReportFindings(cards: List<CredentialCardUi>): List<HomeReportF
         val tone = homeHealthTone(card)
         if (tone == HomeHealthTone.Normal) return@mapNotNull null
 
-        val metric = card.snapshot?.metrics?.firstOrNull()
+        val metric = alertingMetric(card)
         val failed = card.status == RefreshStatus.Failed || card.snapshot == null
         val value = when {
             failed -> "失败"
             metric?.presentation == UsageMetricPresentation.Progress ->
-                progressPercent(metric)?.let { "${(100.0 - it).roundToInt()}%" } ?: "—"
+                displayedPercent(metric)?.let { "${it.roundToInt()}%" } ?: "—"
 
             metric?.presentation == UsageMetricPresentation.Balance ->
                 formatCurrency(metric.value, metric.currencyCode)
@@ -82,7 +86,8 @@ internal fun homeReportFindings(cards: List<CredentialCardUi>): List<HomeReportF
         }
         val valueLabel = when {
             failed -> ""
-            metric?.presentation == UsageMetricPresentation.Progress -> "剩余"
+            metric?.presentation == UsageMetricPresentation.Progress ->
+                if (metric.semantic == UsageMetricSemantic.RemainingQuota) "剩余" else "已用"
             metric?.presentation == UsageMetricPresentation.Balance -> "余额"
             else -> "状态"
         }
@@ -104,7 +109,51 @@ internal fun homeReportFindings(cards: List<CredentialCardUi>): List<HomeReportF
         )
     }
 
-/** 琥珀报告：固定在上方，左右滑动卡片时保持不动。 */
+/**
+ * 行文案必须指向真正触发告警的窗口：先取 Critical，再取 Warning，最后才回退首个指标。
+ * 与 macOS CredentialManagementModel.attention 的选择顺序一致。
+ */
+private fun alertingMetric(card: CredentialCardUi): UsageMetric? {
+    val metrics = card.snapshot?.metrics.orEmpty()
+    return metrics.firstOrNull { metricHealthTone(it) == UsageCardHealth.Critical }
+        ?: metrics.firstOrNull { metricHealthTone(it) == UsageCardHealth.Warning }
+        ?: metrics.firstOrNull()
+}
+
+/** 报告整体 tone 取最差 severity：任一 Critical（含失败/不可用）即升级。 */
+internal fun homeReportTone(findings: List<HomeReportFinding>): HomeHealthTone = when {
+    findings.isEmpty() -> HomeHealthTone.Normal
+    findings.any { it.tone == HomeHealthTone.Critical } -> HomeHealthTone.Critical
+    else -> HomeHealthTone.Warning
+}
+
+/** 报告标题文案与卡片状态词保持一致；失败仍用「需注意」提示处理。 */
+internal fun homeReportTail(findings: List<HomeReportFinding>): String = when {
+    findings.isEmpty() -> "用量正常"
+    findings.any { it.failed } -> "需注意"
+    findings.any { it.tone == HomeHealthTone.Critical } -> "已达上限"
+    else -> "接近上限"
+}
+
+/** 根据 severity 取颜色：Critical 用高对比红，其余沿用琥珀/次级墨色。 */
+internal fun severityAccent(
+    tone: HomeHealthTone,
+    warningColor: Color,
+    criticalColor: Color,
+): Color = if (tone == HomeHealthTone.Critical) criticalColor else warningColor
+
+/** 与卡片同一方向：RemainingQuota 显示剩余百分比，其余显示已用百分比。 */
+private fun displayedPercent(metric: UsageMetric): Double? {
+    val limit = metric.limit ?: return null
+    if (limit.compareTo(BigDecimal.ZERO) == 0) return null
+    val amount = when (metric.semantic) {
+        UsageMetricSemantic.RemainingQuota -> metric.remaining
+        else -> metric.used
+    } ?: return null
+    return amount.toDouble() / limit.toDouble() * 100.0
+}
+
+/** 风险报告：票面始终保持琥珀；只有行内百分比与收起标题按 severity 着色。 */
 @Composable
 internal fun HomeHealthReport(
     cards: List<CredentialCardUi>,
@@ -129,11 +178,7 @@ internal fun HomeHealthReport(
     val normal = total - attention
     val isNormal = attention == 0
     val headlineCount = if (isNormal) total else attention
-    val tail = when {
-        isNormal -> "用量正常"
-        findings.any { it.failed } -> "需注意"
-        else -> "接近上限"
-    }
+    val tail = remember(findings) { homeReportTail(findings) }
     val syncLabel = syncText
         .removeSuffix("更新")
         .removeSuffix("同步")
@@ -298,7 +343,7 @@ private fun ReportFindingRow(
                 text = finding.value,
                 modifier = Modifier.alignByBaseline(),
                 style = MyTokenType.section,
-                color = colors.reportAccent,
+                color = severityAccent(finding.tone, colors.reportAccent, colors.reportCritical),
                 maxLines = 1,
             )
             Spacer(modifier = Modifier.size(2.dp))

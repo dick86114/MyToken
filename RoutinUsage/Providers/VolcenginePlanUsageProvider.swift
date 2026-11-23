@@ -94,7 +94,7 @@ struct VolcenginePlanUsageProvider: UsageProvider {
             ]
             var metrics = windows.compactMap { id, label, window -> NormalizedUsageMetric? in
                 guard let window, window.quota > 0 else { return nil }
-                let percent = (window.used / window.quota) * 100
+                let percent = NSDecimalNumber(decimal: (window.used / window.quota) * 100).doubleValue
                 return NormalizedUsageMetric(
                     id: id,
                     label: label,
@@ -105,7 +105,7 @@ struct VolcenginePlanUsageProvider: UsageProvider {
                     windowEnd: window.resetTime,
                     presentation: .progress,
                     semantic: .usedQuota,
-                    healthState: percent >= 80 ? .critical : (percent >= 50 ? .warning : .normal)
+                    healthState: UsageHealthThresholds.healthState(forUsedPercent: percent)
                 )
             }
             if metrics.isEmpty, !result.quotaUsage.isEmpty {
@@ -121,7 +121,7 @@ struct VolcenginePlanUsageProvider: UsageProvider {
                         windowEnd: item.resetTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) },
                         presentation: .progress,
                         semantic: .usedQuota,
-                        healthState: percent >= 80 ? .critical : (percent >= 50 ? .warning : .normal)
+                        healthState: UsageHealthThresholds.healthState(forUsedPercent: percent)
                     )
                 }
             }

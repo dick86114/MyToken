@@ -617,6 +617,7 @@ private fun CredentialEditorRoute(
         onUserIDChange = editorViewModel::setUserID,
         onXiaomiUsageKindChange = editorViewModel::setXiaomiUsageKind,
         onWebsiteURLChange = editorViewModel::setWebsiteURL,
+        onBalanceWarningThresholdChange = editorViewModel::setBalanceWarningThreshold,
         onToggleSecretVisible = editorViewModel::toggleSecretVisible,
         onTestConnection = editorViewModel::testConnection,
         onSave = editorViewModel::save,
