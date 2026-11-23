@@ -21,8 +21,14 @@ class CredentialListViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private lateinit var repository: FakeCredentialRepository
     private lateinit var orderStore: FakeCredentialOrderStore
+    private lateinit var alertThresholdStore: FakeCredentialAlertThresholdStore
 
-    @Before fun setUp() { Dispatchers.setMain(dispatcher); repository = FakeCredentialRepository(); orderStore = FakeCredentialOrderStore() }
+    @Before fun setUp() {
+        Dispatchers.setMain(dispatcher)
+        repository = FakeCredentialRepository()
+        orderStore = FakeCredentialOrderStore()
+        alertThresholdStore = FakeCredentialAlertThresholdStore()
+    }
     @After fun tearDown() { Dispatchers.resetMain() }
 
     private fun credential(id: String, name: String) = Credential(
@@ -36,10 +42,26 @@ class CredentialListViewModelTest {
     fun globalMovePersistsOrder() = runTest(dispatcher) {
         val a = credential("1", "A"); val b = credential("2", "B")
         repository.credentials.value = listOf(a, b)
-        val vm = CredentialListViewModel(repository, orderStore)
+        val vm = CredentialListViewModel(repository, orderStore, alertThresholdStore)
         advanceUntilIdle()
         vm.move(0, 1); advanceUntilIdle()
         assertEquals(listOf("B", "A"), vm.state.value.items.map { it.name })
         assertEquals(1, orderStore.savedOrders)
+    }
+
+    @Test
+    fun deletingCredentialClearsItsAlertThresholdOverride() = runTest(dispatcher) {
+        val target = credential("1", "A")
+        repository.credentials.value = listOf(target)
+        alertThresholdStore.setOverride(target.id, ai.routin.mytoken.core.alerts.AlertThresholds(70, 90))
+        val vm = CredentialListViewModel(repository, orderStore, alertThresholdStore)
+        advanceUntilIdle()
+
+        vm.requestDelete(target)
+        vm.confirmDelete()
+        advanceUntilIdle()
+
+        assertEquals(listOf(target.id), repository.deletedIds.value)
+        assertEquals(emptyMap<java.util.UUID, ai.routin.mytoken.core.alerts.AlertThresholds>(), alertThresholdStore.state.value)
     }
 }

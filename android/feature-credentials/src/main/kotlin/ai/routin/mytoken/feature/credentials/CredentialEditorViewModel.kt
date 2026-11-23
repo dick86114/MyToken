@@ -1,5 +1,7 @@
 package ai.routin.mytoken.feature.credentials
 
+import ai.routin.mytoken.core.alerts.AlertThresholds
+import ai.routin.mytoken.core.alerts.CredentialAlertThresholdStore
 import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.model.CredentialKind
 import ai.routin.mytoken.domain.model.CredentialMetadataKey
@@ -35,6 +37,11 @@ data class CredentialEditorUiState(
     val xiaomiUsageKind: String = "api",
     val websiteURL: String = "",
     val balanceWarningThreshold: String = "",
+    val customAlertThresholdEnabled: Boolean = false,
+    val alertThresholdLowPercent: Int = AlertThresholds.DEFAULT.lowPercent,
+    val alertThresholdHighPercent: Int = AlertThresholds.DEFAULT.highPercent,
+    val globalAlertThresholdLowPercent: Int = AlertThresholds.DEFAULT.lowPercent,
+    val globalAlertThresholdHighPercent: Int = AlertThresholds.DEFAULT.highPercent,
     val isSecretVisible: Boolean = false,
     val isSaving: Boolean = false,
     val isTestingConnection: Boolean = false,
@@ -52,10 +59,19 @@ data class CredentialEditorUiState(
 class CredentialEditorViewModel(
     private val repository: CredentialRepository,
     private val providers: Map<ProviderId, UsageProvider>,
+    private val alertThresholdStore: CredentialAlertThresholdStore,
+    private val globalAlertThresholds: AlertThresholds = AlertThresholds.DEFAULT,
     private val credentialId: UUID? = null,
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(CredentialEditorUiState())
+    private val _state = MutableStateFlow(
+        CredentialEditorUiState(
+            alertThresholdLowPercent = globalAlertThresholds.lowPercent,
+            alertThresholdHighPercent = globalAlertThresholds.highPercent,
+            globalAlertThresholdLowPercent = globalAlertThresholds.lowPercent,
+            globalAlertThresholdHighPercent = globalAlertThresholds.highPercent,
+        ),
+    )
     val state: StateFlow<CredentialEditorUiState> = _state.asStateFlow()
 
     init {
@@ -74,6 +90,22 @@ class CredentialEditorViewModel(
             } catch (_: Throwable) {
                 null
             }
+            val usageKind = existing.metadata[CredentialMetadataKey.UsageKind] ?: "api"
+            val supportsAlertThreshold = CredentialEditorValidation.supportsPercentAlertThreshold(
+                existing.providerId,
+                usageKind,
+            )
+            val alertThreshold = if (supportsAlertThreshold) {
+                try {
+                    alertThresholdStore.overrides.first()[existing.id]
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (_: Throwable) {
+                    null
+                }
+            } else {
+                null
+            }
             val prefill = prefilledSecret(existing.credentialKind, secret)
             _state.update { current ->
                 current.copy(
@@ -88,10 +120,15 @@ class CredentialEditorViewModel(
                     region = existing.metadata[CredentialMetadataKey.Region].orEmpty(),
                     baseURL = existing.metadata[CredentialMetadataKey.BaseURL].orEmpty(),
                     userID = existing.metadata[CredentialMetadataKey.UserID].orEmpty(),
-                    xiaomiUsageKind = existing.metadata[CredentialMetadataKey.UsageKind] ?: "api",
+                    xiaomiUsageKind = usageKind,
                     websiteURL = existing.metadata[CredentialMetadataKey.WebsiteURL].orEmpty(),
                     balanceWarningThreshold =
                         existing.metadata[CredentialMetadataKey.BalanceWarningThreshold].orEmpty(),
+                    customAlertThresholdEnabled = alertThreshold != null,
+                    alertThresholdLowPercent =
+                        alertThreshold?.lowPercent ?: globalAlertThresholds.lowPercent,
+                    alertThresholdHighPercent =
+                        alertThreshold?.highPercent ?: globalAlertThresholds.highPercent,
                 )
             }
         }
@@ -149,6 +186,24 @@ class CredentialEditorViewModel(
     fun setBalanceWarningThreshold(value: String) =
         _state.update { it.copy(balanceWarningThreshold = value) }
 
+    fun setCustomAlertThresholdEnabled(enabled: Boolean) =
+        _state.update { it.copy(customAlertThresholdEnabled = enabled) }
+
+    /** Normalizes to 1..99 with a one-point gap; the slider is the only input source. */
+    fun setAlertThresholdRange(lowPercent: Int, highPercent: Int) {
+        val low = lowPercent.coerceIn(
+            AlertThresholds.MIN_PERCENT,
+            AlertThresholds.MAX_PERCENT - 1,
+        )
+        val high = highPercent.coerceIn(low + 1, AlertThresholds.MAX_PERCENT)
+        _state.update {
+            it.copy(
+                alertThresholdLowPercent = low,
+                alertThresholdHighPercent = high,
+            )
+        }
+    }
+
     fun toggleSecretVisible() {
         _state.update { it.copy(isSecretVisible = !it.isSecretVisible) }
     }
@@ -162,6 +217,23 @@ class CredentialEditorViewModel(
             } catch (error: CredentialValidationException) {
                 _state.update { it.copy(isSaving = false, validationError = requireNotNull(error.message)) }
                 return@launch
+            }
+            val state = _state.value
+            val supportsThresholds = CredentialEditorValidation.supportsPercentAlertThreshold(
+                providerId = state.providerId,
+                usageKind = state.xiaomiUsageKind,
+            )
+            // Slider inputs are already normalized; switching custom off (or a
+            // provider without percent metrics) clears the override.
+            val alertThresholds = if (supportsThresholds && state.customAlertThresholdEnabled) {
+                runCatching {
+                    AlertThresholds(
+                        lowPercent = state.alertThresholdLowPercent,
+                        highPercent = state.alertThresholdHighPercent,
+                    )
+                }.getOrNull()
+            } else {
+                null
             }
             try {
                 val existing = credentialId?.let { id ->
@@ -180,12 +252,32 @@ class CredentialEditorViewModel(
                     metadata = validated.metadata,
                 )
                 repository.save(credential, validated.secret)
+                persistAlertThresholds(id, alertThresholds)
                 _state.update { it.copy(isSaving = false, saveCompleted = true) }
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Throwable) {
                 _state.update { it.copy(isSaving = false, validationError = "保存失败，请重试") }
             }
+        }
+    }
+
+    /**
+     * Thresholds are notification-only: a local persistence hiccup must not turn a
+     * successful credential save into a visible failure, so this step is best-effort.
+     * Custom off (or providers without percent metrics) clears any stale override.
+     */
+    private suspend fun persistAlertThresholds(credentialId: UUID, thresholds: AlertThresholds?) {
+        try {
+            if (thresholds != null) {
+                alertThresholdStore.setOverride(credentialId, thresholds)
+            } else {
+                alertThresholdStore.clearOverride(credentialId)
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Throwable) {
+            // Non-fatal: the credential itself is already saved.
         }
     }
 

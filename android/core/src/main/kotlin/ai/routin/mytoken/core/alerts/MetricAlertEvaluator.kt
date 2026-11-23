@@ -18,10 +18,10 @@ import java.util.UUID
 enum class AlertLevel { Low, High }
 
 /**
- * Global usage alert thresholds (percent of quota), read from the shared
- * health-threshold contract: 80% warning / 95% critical. Per-credential overrides
- * are supported by [MetricAlertSettings]; balance-only credentials also carry a
- * `balanceWarningThreshold` metadata value for absolute低余额预警.
+ * Notification thresholds (percent of quota). Defaults mirror the shared health
+ * contract (80% warning / 95% critical), but the Settings screen may override them
+ * independently of the home-screen colors. Per-credential overrides are supported
+ * by [MetricAlertSettings].
  */
 data class AlertThresholds(val lowPercent: Int, val highPercent: Int) {
     init {
@@ -106,24 +106,46 @@ data class MetricAlert(
     val windowEnd: Instant?,
     val currencyCode: String?,
 ) {
+    /** Notification title: severity for quota alerts, balance/status wording for health alerts. */
+    val notificationTitle: String
+        get() = when {
+            isBalanceHealthAlert ->
+                if (level == AlertLevel.High) "余额已用尽" else "余额偏低"
+            source == MetricAlertSource.HealthState -> "凭证状态异常"
+            level == AlertLevel.High -> "用量已达上限"
+            else -> "用量接近上限"
+        }
+
     fun notificationBody(timeZone: ZoneId = ZoneId.systemDefault()): String {
-        val provider = providerDisplayName(providerId)
         val base = when (source) {
             MetricAlertSource.UsedPercent ->
-                "「$credentialName」($provider) · ${metricLabel}用量已达 ${formattedPercent()}%"
+                "$credentialName · $metricLabel · ${formattedPercent()}% 已用"
             MetricAlertSource.RemainingPercent ->
-                "「$credentialName」($provider) · ${metricLabel}剩余低于 ${formattedPercent()}%"
+                "$credentialName · $metricLabel · 剩余 ${formattedPercent()}%"
             MetricAlertSource.HealthState ->
-                "「$credentialName」($provider) · ${metricLabel}状态异常"
+                if (isBalanceHealthAlert) {
+                    "$credentialName · " +
+                        if (level == AlertLevel.High) "余额已用尽" else "余额偏低"
+                } else {
+                    "$credentialName · ${metricLabel}状态异常"
+                }
         }
-        if (source != MetricAlertSource.UsedPercent || windowEnd == null) return base
+        if (source == MetricAlertSource.HealthState || windowEnd == null) return base
         val formatter = DateTimeFormatter.ofPattern("HH:mm").withZone(timeZone)
         return "$base，窗口将在 ${formatter.format(windowEnd)} 重置"
     }
 
+    private val isBalanceHealthAlert: Boolean
+        get() = source == MetricAlertSource.HealthState &&
+            (currencyCode != null || metricLabel.contains("余额"))
+
     private fun formattedPercent(): String {
         val rounded = percent.toInt()
-        return if (percent - rounded == 0.0) rounded.toString() else String.format("%.1f", percent)
+        return if (percent - rounded == 0.0) {
+            rounded.toString()
+        } else {
+            String.format(java.util.Locale.US, "%.1f", percent)
+        }
     }
 }
 
@@ -150,8 +172,8 @@ data class MetricAlertEvaluation(
 /**
  * Pure threshold evaluation ported from the macOS `AlertEvaluator` (simplified to
  * the Android metric model):
- * - usedQuota → percent ≥ 50/80 (or custom / per-credential override)
- * - remainingQuota → mirrored percent ≤ (100 − 50)/(100 − 80)
+ * - usedQuota → percent ≥ the configured low/high thresholds (default 80/95)
+ * - remainingQuota → mirrored percent ≤ (100 − low)/(100 − high)
  * - balance / status metrics → health-state (warning/critical/unavailable) alerts
  * - authentication failures → invalid-credential alerts (once, re-armed on recovery);
  *   the notify-once marker is only written when the user's

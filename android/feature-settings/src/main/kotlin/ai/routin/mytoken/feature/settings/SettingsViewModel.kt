@@ -100,6 +100,12 @@ class SettingsViewModel(
 
     fun setShowResetTime(enabled: Boolean) = launch { displayStore.setShowResetTime(enabled) }
 
+    fun setNotificationsEnabled(enabled: Boolean) =
+        launch { notificationStore.setNotificationsEnabled(enabled) }
+
+    fun setAlertThresholds(lowPercent: Int, highPercent: Int) =
+        launch { notificationStore.setThresholds(lowPercent, highPercent) }
+
     fun setCredentialFailureAlertsEnabled(enabled: Boolean) =
         launch { notificationStore.setCredentialFailureAlertsEnabled(enabled) }
 

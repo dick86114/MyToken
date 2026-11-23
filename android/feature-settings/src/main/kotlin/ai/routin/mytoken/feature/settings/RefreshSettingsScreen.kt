@@ -47,6 +47,7 @@ internal fun SettingSwitchRow(
     iconContent: (@Composable () -> Unit)? = null,
     iconTint: androidx.compose.ui.graphics.Color = ai.routin.mytoken.core.ui.MyTokenThemeTokens.colors.muted,
     iconSize: androidx.compose.ui.unit.Dp? = null,
+    enabled: Boolean = true,
 ) {
     SettingRow(
         title = label,
@@ -60,6 +61,7 @@ internal fun SettingSwitchRow(
                 checked = checked,
                 onCheckedChange = onChange,
                 contentDescription = label,
+                enabled = enabled,
             )
         },
     )

@@ -48,6 +48,12 @@ class FakeNotificationSettingsStore(
     val state = MutableStateFlow(initial)
     override val settings: Flow<NotificationSettings> = state
 
+    override suspend fun setNotificationsEnabled(enabled: Boolean) =
+        state.update { it.copy(notificationsEnabled = enabled) }
+
+    override suspend fun setThresholds(lowPercent: Int, highPercent: Int) =
+        state.update { it.copy(lowThresholdPercent = lowPercent, highThresholdPercent = highPercent) }
+
     override suspend fun setCredentialFailureAlertsEnabled(enabled: Boolean) =
         state.update { it.copy(credentialFailureAlertsEnabled = enabled) }
 }

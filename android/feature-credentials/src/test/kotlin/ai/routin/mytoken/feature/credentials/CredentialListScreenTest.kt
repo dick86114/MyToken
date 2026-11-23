@@ -56,7 +56,11 @@ class CredentialListScreenTest {
         Dispatchers.setMain(dispatcher)
         repository = FakeCredentialRepository()
         orderStore = FakeCredentialOrderStore()
-        viewModel = CredentialListViewModel(repository, orderStore)
+        viewModel = CredentialListViewModel(
+            repository = repository,
+            orderStore = orderStore,
+            alertThresholdStore = FakeCredentialAlertThresholdStore(),
+        )
     }
 
     @After

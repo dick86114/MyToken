@@ -1,8 +1,10 @@
 package ai.routin.mytoken.feature.credentials
 
+import ai.routin.mytoken.core.alerts.AlertThresholds
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -42,6 +44,7 @@ class CredentialEditorScreenTest {
     private val dispatcher = StandardTestDispatcher()
     private lateinit var repository: StaticCredentialRepository
     private lateinit var providers: Map<ai.routin.mytoken.domain.model.ProviderId, ai.routin.mytoken.domain.usage.UsageProvider>
+    private lateinit var alertThresholdStore: FakeCredentialAlertThresholdStore
     private lateinit var viewModel: CredentialEditorViewModel
 
     @Before
@@ -52,7 +55,13 @@ class CredentialEditorScreenTest {
             ai.routin.mytoken.domain.model.ProviderId.Routin to
                 FakeUsageProvider(ai.routin.mytoken.domain.model.ProviderId.Routin),
         )
-        viewModel = CredentialEditorViewModel(repository, providers, credentialId = null)
+        alertThresholdStore = FakeCredentialAlertThresholdStore()
+        viewModel = CredentialEditorViewModel(
+            repository = repository,
+            providers = providers,
+            alertThresholdStore = alertThresholdStore,
+            credentialId = null,
+        )
     }
 
     @After
@@ -67,6 +76,13 @@ class CredentialEditorScreenTest {
             composeRule.waitForIdle()
             condition()
         }
+    }
+
+    private fun setSliderProgress(index: Int, value: Float) {
+        val hasSetProgress = SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress)
+        composeRule.onAllNodes(hasSetProgress)[index]
+            .performSemanticsAction(SemanticsActions.SetProgress) { it(value) }
+        composeRule.waitForIdle()
     }
 
     private fun setContent() {
@@ -87,6 +103,8 @@ class CredentialEditorScreenTest {
                     onXiaomiUsageKindChange = viewModel::setXiaomiUsageKind,
                     onWebsiteURLChange = viewModel::setWebsiteURL,
                     onBalanceWarningThresholdChange = viewModel::setBalanceWarningThreshold,
+                    onCustomAlertThresholdChange = viewModel::setCustomAlertThresholdEnabled,
+                    onAlertThresholdRangeChange = viewModel::setAlertThresholdRange,
                     onToggleSecretVisible = viewModel::toggleSecretVisible,
                     onTestConnection = viewModel::testConnection,
                     onSave = viewModel::save,
@@ -98,7 +116,7 @@ class CredentialEditorScreenTest {
     }
 
     @Test
-    fun balanceWarningFieldIsShownOnlyForBalanceProviders() {
+    fun balanceWarningSliderIsShownOnlyForBalanceProvidersAndWritesIntegers() {
         setContent()
         composeRule.onNodeWithTag("editor_balance_warning_threshold").assertDoesNotExist()
 
@@ -107,10 +125,17 @@ class CredentialEditorScreenTest {
         composeRule.onNodeWithTag("editor_balance_warning_threshold", useUnmergedTree = true)
             .performScrollTo()
             .assertIsDisplayed()
-        composeRule.onNodeWithTag("editor_balance_warning_threshold", useUnmergedTree = true)
-            .performTextInput("20")
-        composeRule.waitForIdle()
+
+        setSliderProgress(
+            index = 0,
+            value = BalanceWarningThreshold.sliderModel("20").selectedIndex.toFloat(),
+        )
         assertEquals("20", viewModel.state.value.balanceWarningThreshold)
+        composeRule.onNodeWithText("余额低于 20 时提醒").assertExists()
+
+        setSliderProgress(index = 0, value = 0f)
+        assertEquals("", viewModel.state.value.balanceWarningThreshold)
+        composeRule.onNodeWithText("不提醒").assertExists()
 
         viewModel.setProviderId(ProviderId.Xiaomi)
         composeRule.waitForIdle()
@@ -124,6 +149,85 @@ class CredentialEditorScreenTest {
         viewModel.setProviderId(ProviderId.OpenCode)
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("editor_balance_warning_threshold").assertDoesNotExist()
+    }
+
+    @Test
+    fun alertThresholdSectionIsShownOnlyForPercentMetricProviders() {
+        setContent()
+        composeRule.onNodeWithTag("editor_alert_threshold_global", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("跟随全局 80% / 95%").assertExists()
+        composeRule.onNodeWithTag("editor_alert_threshold_range").assertDoesNotExist()
+
+        viewModel.setProviderId(ProviderId.DeepSeek)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("editor_alert_threshold_global").assertDoesNotExist()
+
+        viewModel.setProviderId(ProviderId.Xiaomi)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("editor_alert_threshold_global").assertDoesNotExist()
+
+        viewModel.setXiaomiUsageKind("plan")
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("editor_alert_threshold_global", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+
+        viewModel.setProviderId(ProviderId.Glm)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithContentDescription("自定义提醒阈值")
+            .performScrollTo()
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun customThresholdToggleRevealsSliderAndSavesOverride() {
+        setContent()
+
+        composeRule.onNodeWithTag("editor_name").performTextInput("主账号")
+        composeRule.onNodeWithTag("editor_api_key").performTextInput("plan-main-8F2A")
+        composeRule.onNodeWithContentDescription("自定义提醒阈值")
+            .performScrollTo()
+            .performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("editor_alert_threshold_range", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        setSliderProgress(index = 0, value = 70f)
+        setSliderProgress(index = 1, value = 90f)
+
+        assertEquals(70, viewModel.state.value.alertThresholdLowPercent)
+        assertEquals(90, viewModel.state.value.alertThresholdHighPercent)
+        composeRule.onNodeWithText("低 70% · 高 90%").assertExists()
+
+        composeRule.onNodeWithText("保存").performClick()
+        waitUntilVm { viewModel.state.value.saveCompleted }
+        val saved = repository.saved.value.single().first
+        assertEquals(AlertThresholds(70, 90), alertThresholdStore.state.value[saved.id])
+    }
+
+    @Test
+    fun customThresholdSwitchOffReturnsToGlobalHint() {
+        setContent()
+
+        composeRule.onNodeWithContentDescription("自定义提醒阈值")
+            .performScrollTo()
+            .performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("editor_alert_threshold_range", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+
+        composeRule.onNodeWithContentDescription("自定义提醒阈值")
+            .performScrollTo()
+            .performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("editor_alert_threshold_range").assertDoesNotExist()
+        composeRule.onNodeWithTag("editor_alert_threshold_global", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
     }
 
     @Test
@@ -252,7 +356,7 @@ class CredentialEditorScreenTest {
         composeRule.waitForIdle()
 
         composeRule.onNodeWithTag("editor_test_result", useUnmergedTree = true).assertExists()
-        composeRule.onNodeWithText("连接成功", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("连接成功", substring = true).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("✓", substring = true).assertDoesNotExist()
     }
 }

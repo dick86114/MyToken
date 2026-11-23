@@ -171,6 +171,17 @@ object CredentialEditorValidation {
             else -> false
         }
 
+    /**
+     * 每凭证提醒阈值仅对会产生百分比指标（usedQuota / remainingQuota）的凭证显示。
+     * 纯余额凭证（DeepSeek，以及小米的 API 按量模式）没有百分比指标，因此隐藏。
+     */
+    internal fun supportsPercentAlertThreshold(providerId: ProviderId, usageKind: String): Boolean =
+        when (providerId) {
+            ProviderId.DeepSeek -> false
+            ProviderId.Xiaomi -> usageKind.trim().lowercase() == "plan"
+            else -> true
+        }
+
     private fun balanceWarningMetadata(
         providerId: ProviderId,
         usageKind: String,
@@ -180,9 +191,10 @@ object CredentialEditorValidation {
         if (trimmed.isEmpty() || !supportsBalanceWarningThreshold(providerId, usageKind)) {
             return emptyMap()
         }
-        if (trimmed.toBigDecimalOrNull() == null) {
-            throw CredentialValidationException("请输入有效的低余额预警值")
-        }
+        val amount = trimmed.toBigDecimalOrNull()
+            ?: throw CredentialValidationException("请输入有效的低余额预警值")
+        // Slider position 0 means "no reminder", so zero/negative values remove the metadata.
+        if (amount <= java.math.BigDecimal.ZERO) return emptyMap()
         return mapOf(CredentialMetadataKey.BalanceWarningThreshold to trimmed)
     }
 

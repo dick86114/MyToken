@@ -2,6 +2,7 @@ package ai.routin.mytoken
 
 import ai.routin.mytoken.core.security.AndroidKeystoreSecretStore
 import ai.routin.mytoken.data.alerts.DataStoreAlertStateStore
+import ai.routin.mytoken.data.alerts.DataStoreCredentialAlertThresholdStore
 import ai.routin.mytoken.data.local.MyTokenDatabase
 import ai.routin.mytoken.data.preferences.AppPreferencesRepository
 import ai.routin.mytoken.data.refresh.DataStoreRefreshStatusStore
@@ -84,6 +85,10 @@ class AppGraph(context: Context) {
         DataStoreAlertStateStore(appContext)
     }
 
+    val credentialAlertThresholdStore: DataStoreCredentialAlertThresholdStore by lazy {
+        DataStoreCredentialAlertThresholdStore(appContext)
+    }
+
     val usageAlertDispatcher: UsageAlertDispatcher by lazy {
         UsageAlertDispatcher(
             context = appContext,
@@ -91,6 +96,7 @@ class AppGraph(context: Context) {
             states = refreshUseCase.states,
             alertStateStore = alertStateStore,
             notificationSettingsStore = notificationSettingsStore,
+            credentialAlertThresholdStore = credentialAlertThresholdStore,
         )
     }
 

@@ -312,6 +312,8 @@ class SettingsScreenTest {
         // 设计稿为开关行补了说明文案；两行行高不再显得空旷。
         composeRule.onNodeWithText("启动后立即拉取一次用量").assertIsDisplayed()
         composeRule.onNodeWithText("网络波动时静默重试一次").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_list")
+            .performScrollToNode(hasText("Key 失效或权限不足时通知"))
         composeRule.onNodeWithText("Key 失效或权限不足时通知").assertIsDisplayed()
 
         val header = composeRule.onNodeWithTag("settings_header").getUnclippedBoundsInRoot()

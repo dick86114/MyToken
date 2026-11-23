@@ -113,7 +113,10 @@ class SettingsViewModelTest {
         advanceUntilIdle()
 
         val notifications = vm.state.value.notifications
+        assertTrue(notifications.notificationsEnabled)
         assertTrue(notifications.credentialFailureAlertsEnabled)
+        assertEquals(80, notifications.lowThresholdPercent)
+        assertEquals(95, notifications.highThresholdPercent)
     }
 
     @Test
@@ -121,10 +124,16 @@ class SettingsViewModelTest {
         val vm = viewModel()
         advanceUntilIdle()
 
+        vm.setNotificationsEnabled(false)
+        vm.setAlertThresholds(70, 90)
         vm.setCredentialFailureAlertsEnabled(false)
         advanceUntilIdle()
 
-        assertFalse(notificationStore.state.value.credentialFailureAlertsEnabled)
+        val settings = notificationStore.state.value
+        assertFalse(settings.notificationsEnabled)
+        assertEquals(70, settings.lowThresholdPercent)
+        assertEquals(90, settings.highThresholdPercent)
+        assertFalse(settings.credentialFailureAlertsEnabled)
     }
 
     @Test

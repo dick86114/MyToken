@@ -26,15 +26,23 @@ class AppPreferencesNotificationSettingsStoreTest {
     fun defaultsThenPersistedChangesFlowThroughAppPreferencesRepository() = runTest {
         // Defaults (single ordered test: the DataStore instance is process-local).
         val defaults = store.settings.first()
+        assertTrue(defaults.notificationsEnabled)
         assertTrue(defaults.credentialFailureAlertsEnabled)
         assertEquals(80, defaults.lowThresholdPercent)
         assertEquals(95, defaults.highThresholdPercent)
 
         // Writes persist and stay visible through the Task 5 repository (no second DataStore).
+        store.setNotificationsEnabled(false)
+        store.setThresholds(70, 90)
         store.setCredentialFailureAlertsEnabled(false)
 
         val settings = store.settings.first()
+        assertFalse(settings.notificationsEnabled)
         assertFalse(settings.credentialFailureAlertsEnabled)
+        assertEquals(70, settings.lowThresholdPercent)
+        assertEquals(90, settings.highThresholdPercent)
+        assertEquals(70, repository.preferences.first().alertLowThresholdPercent)
+        assertEquals(90, repository.preferences.first().alertHighThresholdPercent)
     }
 
 }

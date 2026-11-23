@@ -28,24 +28,33 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.RangeSlider
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -140,6 +149,7 @@ fun MyTokenSwitch(
     onCheckedChange: ((Boolean) -> Unit)?,
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
+    enabled: Boolean = true,
 ) {
     val colors = MyTokenThemeTokens.colors
     val darkTheme = LocalMyTokenDarkTheme.current
@@ -158,9 +168,11 @@ fun MyTokenSwitch(
     Box(
         modifier = modifier
             .size(MyTokenSize.touch)
+            .alpha(if (enabled) 1f else 0.45f)
             .toggleable(
                 value = checked,
                 role = Role.Switch,
+                enabled = enabled,
                 onValueChange = { onCheckedChange?.invoke(it) },
             )
             .semantics { contentDescription?.let { this.contentDescription = it } },
@@ -183,6 +195,139 @@ fun MyTokenSwitch(
             )
         }
     }
+}
+
+/**
+ * 单值滑块：主题黄色轨道/滑块，触摸高度沿用 [MyTokenSize.touch]。
+ * 容器补充用途与当前值语义，滑块自身的 ProgressBarRangeInfo 仍由 Material 提供。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MyTokenSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    steps: Int = 0,
+    valueDescription: String? = null,
+    enabled: Boolean = true,
+    onValueChangeFinished: (() -> Unit)? = null,
+) {
+    val colors = MyTokenThemeTokens.colors
+    val sliderColors = SliderDefaults.colors(
+        thumbColor = colors.actionFill,
+        activeTrackColor = colors.actionFill,
+        activeTickColor = colors.actionFill,
+        inactiveTrackColor = colors.line,
+        inactiveTickColor = colors.line,
+        disabledThumbColor = colors.actionFill,
+        disabledActiveTrackColor = colors.actionFill,
+        disabledInactiveTrackColor = colors.line,
+        disabledActiveTickColor = colors.actionFill,
+        disabledInactiveTickColor = colors.line,
+    )
+    val interactionSource = remember { MutableInteractionSource() }
+    Slider(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier
+            .heightIn(min = MyTokenSize.touch)
+            .alpha(if (enabled) 1f else 0.45f)
+            .semantics {
+                this.contentDescription = contentDescription
+                valueDescription?.let { this.stateDescription = it }
+                if (!enabled) disabled()
+            },
+        enabled = enabled,
+        valueRange = valueRange,
+        steps = steps,
+        onValueChangeFinished = onValueChangeFinished,
+        colors = sliderColors,
+        interactionSource = interactionSource,
+        thumb = {
+            SliderDefaults.Thumb(
+                interactionSource = interactionSource,
+                modifier = Modifier.semantics {
+                    this.contentDescription = "$contentDescription 当前值"
+                },
+                colors = sliderColors,
+                enabled = enabled,
+            )
+        },
+    )
+}
+
+/**
+ * 双滑块：用于低/高阈值等区间配置。低值始终小于等于高值由调用方归一化。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MyTokenRangeSlider(
+    value: ClosedFloatingPointRange<Float>,
+    onValueChange: (ClosedFloatingPointRange<Float>) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    steps: Int = 0,
+    valueDescription: String? = null,
+    enabled: Boolean = true,
+    onValueChangeFinished: (() -> Unit)? = null,
+) {
+    val colors = MyTokenThemeTokens.colors
+    val sliderColors = SliderDefaults.colors(
+        thumbColor = colors.actionFill,
+        activeTrackColor = colors.actionFill,
+        activeTickColor = colors.actionFill,
+        inactiveTrackColor = colors.line,
+        inactiveTickColor = colors.line,
+        disabledThumbColor = colors.actionFill,
+        disabledActiveTrackColor = colors.actionFill,
+        disabledInactiveTrackColor = colors.line,
+        disabledActiveTickColor = colors.actionFill,
+        disabledInactiveTickColor = colors.line,
+    )
+    val startInteractionSource = remember { MutableInteractionSource() }
+    val endInteractionSource = remember { MutableInteractionSource() }
+    RangeSlider(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier
+            .heightIn(min = MyTokenSize.touch)
+            .alpha(if (enabled) 1f else 0.45f)
+            .semantics {
+                this.contentDescription = contentDescription
+                valueDescription?.let { this.stateDescription = it }
+                if (!enabled) disabled()
+            },
+        enabled = enabled,
+        valueRange = valueRange,
+        steps = steps,
+        onValueChangeFinished = onValueChangeFinished,
+        colors = sliderColors,
+        startInteractionSource = startInteractionSource,
+        endInteractionSource = endInteractionSource,
+        startThumb = {
+            SliderDefaults.Thumb(
+                interactionSource = startInteractionSource,
+                modifier = Modifier.semantics {
+                    this.contentDescription = "$contentDescription 低值"
+                },
+                colors = sliderColors,
+                enabled = enabled,
+            )
+        },
+        endThumb = {
+            SliderDefaults.Thumb(
+                interactionSource = endInteractionSource,
+                modifier = Modifier.semantics {
+                    this.contentDescription = "$contentDescription 高值"
+                },
+                colors = sliderColors,
+                enabled = enabled,
+            )
+        },
+    )
 }
 
 /** 筛选 chip：未选中 subtle，选中 ink；不使用强调色底。 */
@@ -219,6 +364,8 @@ fun MyTokenTextField(
     visualTransformation: VisualTransformation = VisualTransformation.None,
     trailingIcon: @Composable (() -> Unit)? = null,
     supportingText: String? = null,
+    enabled: Boolean = true,
+    keyboardType: KeyboardType = KeyboardType.Text,
 ) {
     val colors = MyTokenThemeTokens.colors
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -233,7 +380,9 @@ fun MyTokenTextField(
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
+            enabled = enabled,
             singleLine = singleLine,
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             visualTransformation = visualTransformation,
             trailingIcon = trailingIcon,
             shape = RoundedCornerShape(MyTokenRadius.inner),

@@ -134,6 +134,8 @@ fun SettingsScreen(
     onThemeModeChange: (AppThemeMode) -> Unit,
     onOpenTransfer: () -> Unit,
     onCredentialFailureAlertsChange: (Boolean) -> Unit = {},
+    onNotificationsEnabledChange: (Boolean) -> Unit = {},
+    onAlertThresholdsChange: (Int, Int) -> Unit = { _, _ -> },
     notificationPermissionGranted: Boolean = true,
     onRequestNotificationPermission: () -> Unit = {},
     onCheckForUpdates: () -> Unit = {},
@@ -271,6 +273,8 @@ fun SettingsScreen(
                     permissionGranted = notificationPermissionGranted,
                     onRequestPermission = onRequestNotificationPermission,
                     onCredentialFailureAlertsChange = onCredentialFailureAlertsChange,
+                    onNotificationsEnabledChange = onNotificationsEnabledChange,
+                    onThresholdsChange = onAlertThresholdsChange,
                 )
             }
             item(key = "data") {

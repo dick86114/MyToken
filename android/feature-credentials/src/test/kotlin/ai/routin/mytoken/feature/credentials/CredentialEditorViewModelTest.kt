@@ -1,5 +1,6 @@
 package ai.routin.mytoken.feature.credentials
 
+import ai.routin.mytoken.core.alerts.AlertThresholds
 import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.model.CredentialKind
 import ai.routin.mytoken.domain.model.CredentialMetadataKey
@@ -31,6 +32,7 @@ class CredentialEditorViewModelTest {
     private lateinit var repository: StaticCredentialRepository
     private lateinit var routinProvider: FakeUsageProvider
     private lateinit var providers: MutableMap<ProviderId, UsageProvider>
+    private lateinit var alertThresholdStore: FakeCredentialAlertThresholdStore
 
     @Before
     fun setUp() {
@@ -38,6 +40,7 @@ class CredentialEditorViewModelTest {
         repository = StaticCredentialRepository()
         routinProvider = FakeUsageProvider(ProviderId.Routin)
         providers = mutableMapOf(ProviderId.Routin to routinProvider)
+        alertThresholdStore = FakeCredentialAlertThresholdStore()
     }
 
     @After
@@ -64,7 +67,12 @@ class CredentialEditorViewModelTest {
     }
 
     private fun newViewModel(providers: Map<ProviderId, UsageProvider> = this.providers) =
-        CredentialEditorViewModel(repository = repository, providers = providers, credentialId = null)
+        CredentialEditorViewModel(
+            repository = repository,
+            providers = providers,
+            alertThresholdStore = alertThresholdStore,
+            credentialId = null,
+        )
 
     @Test
     fun newEditorDefaultsToRoutinAndNotSaving() = runTest(dispatcher) {
@@ -133,6 +141,7 @@ class CredentialEditorViewModelTest {
         val vm = CredentialEditorViewModel(
             repository = repository,
             providers = providers,
+            alertThresholdStore = alertThresholdStore,
             credentialId = existing.id,
         )
         advanceUntilIdle()
@@ -160,6 +169,7 @@ class CredentialEditorViewModelTest {
         val vm = CredentialEditorViewModel(
             repository = repository,
             providers = providers,
+            alertThresholdStore = alertThresholdStore,
             credentialId = repository.credentials.value.single().id,
         )
         advanceUntilIdle()
@@ -256,5 +266,166 @@ class CredentialEditorViewModelTest {
         assertEquals(CredentialKind.AccessKeyPair, state.credentialKind)
         assertNull(state.testResultMessage)
         assertNull(state.testSucceeded)
+    }
+
+    @Test
+    fun editPrefillsCustomThresholdSwitchAndRangeFromOverride() = runTest(dispatcher) {
+        val existing = existingCredential()
+        alertThresholdStore.state.value = mapOf(existing.id to AlertThresholds(70, 90))
+
+        val vm = CredentialEditorViewModel(
+            repository = repository,
+            providers = providers,
+            alertThresholdStore = alertThresholdStore,
+            credentialId = existing.id,
+        )
+        advanceUntilIdle()
+
+        val state = vm.state.value
+        assertTrue(state.customAlertThresholdEnabled)
+        assertEquals(70, state.alertThresholdLowPercent)
+        assertEquals(90, state.alertThresholdHighPercent)
+    }
+
+    @Test
+    fun newCredentialDefaultsToGlobalThresholdsWithCustomOff() = runTest(dispatcher) {
+        val vm = CredentialEditorViewModel(
+            repository = repository,
+            providers = providers,
+            alertThresholdStore = alertThresholdStore,
+            globalAlertThresholds = AlertThresholds(60, 85),
+            credentialId = null,
+        )
+        advanceUntilIdle()
+
+        val state = vm.state.value
+        assertFalse(state.customAlertThresholdEnabled)
+        assertEquals(60, state.alertThresholdLowPercent)
+        assertEquals(85, state.alertThresholdHighPercent)
+        assertEquals(60, state.globalAlertThresholdLowPercent)
+        assertEquals(85, state.globalAlertThresholdHighPercent)
+    }
+
+    @Test
+    fun savePersistsCustomThresholdRangeForNewCredential() = runTest(dispatcher) {
+        val vm = newViewModel()
+        advanceUntilIdle()
+
+        vm.setName("主账号")
+        vm.setApiKey("plan-main-8F2A")
+        vm.setCustomAlertThresholdEnabled(true)
+        vm.setAlertThresholdRange(75, 92)
+        vm.save()
+        advanceUntilIdle()
+
+        assertTrue(vm.state.value.saveCompleted)
+        val saved = repository.saved.value.single().first
+        assertEquals(AlertThresholds(75, 92), alertThresholdStore.state.value[saved.id])
+    }
+
+    @Test
+    fun thresholdRangeSetterKeepsLowBelowHigh() = runTest(dispatcher) {
+        val vm = newViewModel()
+        advanceUntilIdle()
+
+        vm.setCustomAlertThresholdEnabled(true)
+        vm.setAlertThresholdRange(95, 95)
+        assertEquals(95, vm.state.value.alertThresholdLowPercent)
+        assertEquals(96, vm.state.value.alertThresholdHighPercent)
+
+        vm.setAlertThresholdRange(99, 99)
+        assertEquals(98, vm.state.value.alertThresholdLowPercent)
+        assertEquals(99, vm.state.value.alertThresholdHighPercent)
+    }
+
+    @Test
+    fun customOffClearsExistingOverrideOnSave() = runTest(dispatcher) {
+        val existing = existingCredential()
+        alertThresholdStore.state.value = mapOf(existing.id to AlertThresholds(70, 90))
+        val vm = CredentialEditorViewModel(
+            repository = repository,
+            providers = providers,
+            alertThresholdStore = alertThresholdStore,
+            credentialId = existing.id,
+        )
+        advanceUntilIdle()
+
+        vm.setCustomAlertThresholdEnabled(false)
+        vm.save()
+        advanceUntilIdle()
+
+        assertTrue(vm.state.value.saveCompleted)
+        assertTrue(alertThresholdStore.state.value.isEmpty())
+    }
+
+    @Test
+    fun editingBalanceCredentialPreservesDecimalUntilSliderMoves() = runTest(dispatcher) {
+        val existing = Credential(
+            id = UUID.randomUUID(),
+            providerId = ProviderId.DeepSeek,
+            credentialKind = CredentialKind.ApiKey,
+            name = "DeepSeek",
+            metadata = mapOf(CredentialMetadataKey.BalanceWarningThreshold to "8.5"),
+        )
+        repository = StaticCredentialRepository(
+            listOf(existing),
+            mapOf(existing.id to CredentialSecret.ApiKey("sk-deepseek")),
+        )
+        val vm = CredentialEditorViewModel(
+            repository = repository,
+            providers = providers,
+            alertThresholdStore = alertThresholdStore,
+            credentialId = existing.id,
+        )
+        advanceUntilIdle()
+
+        assertEquals("8.5", vm.state.value.balanceWarningThreshold)
+        vm.save()
+        advanceUntilIdle()
+        assertEquals(
+            "8.5",
+            repository.saved.value.single().first
+                .metadata[CredentialMetadataKey.BalanceWarningThreshold],
+        )
+
+        // Slider position 0 removes the metadata on the next save.
+        vm.setBalanceWarningThreshold("")
+        vm.save()
+        advanceUntilIdle()
+        assertFalse(
+            repository.saved.value.last().first
+                .metadata.containsKey(CredentialMetadataKey.BalanceWarningThreshold),
+        )
+    }
+
+    @Test
+    fun balanceOnlyProviderIgnoresHiddenThresholdsAndClearsOverride() = runTest(dispatcher) {
+        val existing = existingCredential(
+            provider = ProviderId.DeepSeek,
+            kind = CredentialKind.ApiKey,
+            secret = CredentialSecret.ApiKey("sk-deepseek"),
+        )
+        alertThresholdStore.state.value = mapOf(existing.id to AlertThresholds(70, 90))
+        val vm = CredentialEditorViewModel(
+            repository = repository,
+            providers = providers,
+            alertThresholdStore = alertThresholdStore,
+            globalAlertThresholds = AlertThresholds(60, 85),
+            credentialId = existing.id,
+        )
+        advanceUntilIdle()
+
+        // Balance-only credentials do not surface custom thresholds, nor prefill a stale override.
+        val state = vm.state.value
+        assertFalse(state.customAlertThresholdEnabled)
+        assertEquals(60, state.alertThresholdLowPercent)
+        assertEquals(85, state.alertThresholdHighPercent)
+
+        vm.setCustomAlertThresholdEnabled(true)
+        vm.save()
+        advanceUntilIdle()
+
+        assertTrue(vm.state.value.saveCompleted)
+        assertTrue(alertThresholdStore.state.value.isEmpty())
     }
 }

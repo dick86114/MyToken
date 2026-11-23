@@ -1,5 +1,6 @@
 package ai.routin.mytoken
 
+import ai.routin.mytoken.core.alerts.AlertThresholds
 import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.model.UsageCardDensity
 import ai.routin.mytoken.feature.credentials.CredentialEditorScreen
@@ -81,8 +82,10 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.util.UUID
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** 首页 + 详情/编辑/迁移的轻量返回栈。 */
 sealed interface AppScreen {
@@ -160,6 +163,13 @@ fun MyTokenApp(
                     graph.displaySettingsStore.setUsageCardDensity(density)
                 },
                 refreshOnStart = false,
+                // Foreground refresh is the only live trigger today (no periodic
+                // WorkManager scheduling yet); dispatch after its states settle.
+                onRefreshCompleted = {
+                    withContext(Dispatchers.IO) {
+                        graph.usageAlertDispatcher.dispatchAfterRefresh()
+                    }
+                },
             )
     }
 
@@ -181,7 +191,11 @@ fun MyTokenApp(
     }
 
     val credentialListViewModel = remember {
-        CredentialListViewModel(graph.credentialRepository, graph.credentialOrderStore)
+        CredentialListViewModel(
+            repository = graph.credentialRepository,
+            orderStore = graph.credentialOrderStore,
+            alertThresholdStore = graph.credentialAlertThresholdStore,
+        )
     }
     val settingsViewModel = remember {
         SettingsViewModel(
@@ -301,6 +315,8 @@ fun MyTokenApp(
                         onThemeModeChange = settingsViewModel::setThemeMode,
                         onOpenTransfer = { navigate(AppScreen.Transfer) },
                         onCredentialFailureAlertsChange = settingsViewModel::setCredentialFailureAlertsEnabled,
+                        onNotificationsEnabledChange = settingsViewModel::setNotificationsEnabled,
+                        onAlertThresholdsChange = settingsViewModel::setAlertThresholds,
                         notificationPermissionGranted = notificationPermissionGranted,
                         onRequestNotificationPermission = onRequestNotificationPermission,
                         onCheckForUpdates = settingsViewModel::checkForUpdates,
@@ -435,6 +451,10 @@ fun MyTokenApp(
             CredentialEditorRoute(
                 graph = graph,
                 credentialId = current.credentialId,
+                globalAlertThresholds = AlertThresholds(
+                    lowPercent = settingsState.notifications.lowThresholdPercent,
+                    highPercent = settingsState.notifications.highThresholdPercent,
+                ),
                 layoutMode = layoutMode,
                 topBarStatusPadding = true,
                 onBack = { goBack() },
@@ -503,6 +523,10 @@ fun MyTokenApp(
             CredentialEditorRoute(
                 graph = graph,
                 credentialId = null,
+                globalAlertThresholds = AlertThresholds(
+                    lowPercent = settingsState.notifications.lowThresholdPercent,
+                    highPercent = settingsState.notifications.highThresholdPercent,
+                ),
                 layoutMode = layoutMode,
                 topBarStatusPadding = false,
                 onBack = { dismiss { } },
@@ -589,6 +613,7 @@ private fun HomeCredentialSheet(
 private fun CredentialEditorRoute(
     graph: AppGraph,
     credentialId: UUID?,
+    globalAlertThresholds: AlertThresholds,
     layoutMode: MyTokenLayoutMode,
     topBarStatusPadding: Boolean,
     onBack: () -> Unit,
@@ -598,6 +623,8 @@ private fun CredentialEditorRoute(
         CredentialEditorViewModel(
             repository = graph.credentialRepository,
             providers = graph.providers,
+            alertThresholdStore = graph.credentialAlertThresholdStore,
+            globalAlertThresholds = globalAlertThresholds,
             credentialId = credentialId,
         )
     }
@@ -618,6 +645,8 @@ private fun CredentialEditorRoute(
         onXiaomiUsageKindChange = editorViewModel::setXiaomiUsageKind,
         onWebsiteURLChange = editorViewModel::setWebsiteURL,
         onBalanceWarningThresholdChange = editorViewModel::setBalanceWarningThreshold,
+        onCustomAlertThresholdChange = editorViewModel::setCustomAlertThresholdEnabled,
+        onAlertThresholdRangeChange = editorViewModel::setAlertThresholdRange,
         onToggleSecretVisible = editorViewModel::toggleSecretVisible,
         onTestConnection = editorViewModel::testConnection,
         onSave = editorViewModel::save,

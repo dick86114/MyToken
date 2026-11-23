@@ -1,14 +1,18 @@
 package ai.routin.mytoken.feature.credentials
 
+import ai.routin.mytoken.core.alerts.PercentThresholdRange
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenButton
 import ai.routin.mytoken.core.ui.MyTokenButtonTone
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.MyTokenRadius
+import ai.routin.mytoken.core.ui.MyTokenRangeSlider
 import ai.routin.mytoken.core.ui.MyTokenSegmented
 import ai.routin.mytoken.core.ui.MyTokenSection
 import ai.routin.mytoken.core.ui.MyTokenSize
+import ai.routin.mytoken.core.ui.MyTokenSlider
 import ai.routin.mytoken.core.ui.MyTokenSurface
+import ai.routin.mytoken.core.ui.MyTokenSwitch
 import ai.routin.mytoken.core.ui.MyTokenTextField
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
@@ -94,6 +98,8 @@ fun CredentialEditorScreen(
     onXiaomiUsageKindChange: (String) -> Unit,
     onWebsiteURLChange: (String) -> Unit,
     onBalanceWarningThresholdChange: (String) -> Unit = {},
+    onCustomAlertThresholdChange: (Boolean) -> Unit = {},
+    onAlertThresholdRangeChange: (Int, Int) -> Unit = { _, _ -> },
     onToggleSecretVisible: () -> Unit,
     onTestConnection: () -> Unit,
     onSave: () -> Unit,
@@ -283,14 +289,43 @@ fun CredentialEditorScreen(
                             state.xiaomiUsageKind,
                         )
                     ) {
-                        MyTokenTextField(
-                            value = state.balanceWarningThreshold,
-                            onValueChange = onBalanceWarningThresholdChange,
-                            label = "低余额预警值（可选）",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("editor_balance_warning_threshold"),
-                        )
+                        val balanceWarning = state.balanceWarningThreshold
+                        val balanceModel = BalanceWarningThreshold.sliderModel(balanceWarning)
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = "低余额预警值（可选）",
+                                    modifier = Modifier.weight(1f),
+                                    style = MyTokenType.label,
+                                    color = colors.muted,
+                                )
+                                Text(
+                                    text = BalanceWarningThreshold.label(balanceWarning),
+                                    modifier = Modifier.testTag("editor_balance_warning_value"),
+                                    style = MyTokenType.label,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = colors.ink,
+                                )
+                            }
+                            MyTokenSlider(
+                                value = balanceModel.selectedIndex.toFloat(),
+                                onValueChange = { value ->
+                                    onBalanceWarningThresholdChange(
+                                        BalanceWarningThreshold.onValueChanged(balanceModel, value),
+                                    )
+                                },
+                                valueRange = 0f..balanceModel.maxIndex.toFloat(),
+                                steps = balanceModel.steps,
+                                contentDescription = "低余额预警值",
+                                valueDescription = BalanceWarningThreshold.label(balanceWarning),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("editor_balance_warning_threshold"),
+                            )
+                        }
                     }
                     state.validationError?.let { message ->
                         Text(
@@ -310,6 +345,79 @@ fun CredentialEditorScreen(
                             .fillMaxWidth()
                             .testTag("editor_website_url"),
                     )
+                }
+
+                if (CredentialEditorValidation.supportsPercentAlertThreshold(
+                        state.providerId,
+                        state.xiaomiUsageKind,
+                    )
+                ) {
+                    MyTokenSection(title = "提醒阈值（可选）") {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "自定义提醒阈值",
+                                    style = MyTokenType.body,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = colors.ink,
+                                )
+                                Text(
+                                    text = "仅影响用量通知，不改变首页配色",
+                                    style = MyTokenType.caption,
+                                    color = colors.muted,
+                                )
+                            }
+                            MyTokenSwitch(
+                                checked = state.customAlertThresholdEnabled,
+                                onCheckedChange = onCustomAlertThresholdChange,
+                                contentDescription = "自定义提醒阈值",
+                            )
+                        }
+                        if (state.customAlertThresholdEnabled) {
+                            Text(
+                                text = PercentThresholdRange.label(
+                                    state.alertThresholdLowPercent,
+                                    state.alertThresholdHighPercent,
+                                ),
+                                modifier = Modifier.testTag("editor_alert_threshold_values"),
+                                style = MyTokenType.label,
+                                fontWeight = FontWeight.SemiBold,
+                                color = colors.ink,
+                            )
+                            MyTokenRangeSlider(
+                                value = state.alertThresholdLowPercent.toFloat()..
+                                    state.alertThresholdHighPercent.toFloat(),
+                                onValueChange = { proposed ->
+                                    val normalized = PercentThresholdRange.normalize(
+                                        previous = state.alertThresholdLowPercent.toFloat()..
+                                            state.alertThresholdHighPercent.toFloat(),
+                                        proposed = proposed,
+                                    )
+                                    onAlertThresholdRangeChange(normalized.first, normalized.last)
+                                },
+                                valueRange = PercentThresholdRange.VALUE_RANGE,
+                                contentDescription = "用量提醒阈值",
+                                valueDescription = PercentThresholdRange.label(
+                                    state.alertThresholdLowPercent,
+                                    state.alertThresholdHighPercent,
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("editor_alert_threshold_range"),
+                            )
+                        } else {
+                            Text(
+                                text = "跟随全局 ${state.globalAlertThresholdLowPercent}% / " +
+                                    "${state.globalAlertThresholdHighPercent}%",
+                                modifier = Modifier.testTag("editor_alert_threshold_global"),
+                                style = MyTokenType.caption,
+                                color = colors.muted,
+                            )
+                        }
+                    }
                 }
 
                 MyTokenSection(title = "安全说明") {

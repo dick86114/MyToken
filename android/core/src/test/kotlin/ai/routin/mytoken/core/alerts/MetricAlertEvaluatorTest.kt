@@ -465,7 +465,7 @@ class MetricAlertEvaluatorTest {
     // ---- notification text ---------------------------------------------------
 
     @Test
-    fun notificationBodyContainsOnlyAliasProviderAndRedactedMetrics() {
+    fun notificationBodyContainsOnlyAliasMetricAndRedactedPercent() {
         val alert = MetricAlert(
             credentialId = credentialId,
             credentialName = "测试凭证",
@@ -478,14 +478,31 @@ class MetricAlertEvaluatorTest {
             windowEnd = Instant.parse("2026-09-07T16:00:00Z"),
             currencyCode = "USD",
         )
-        val body = alert.notificationBody()
-        assertTrue(body.contains("测试凭证"))
-        assertTrue(body.contains("Routin"))
-        assertTrue(body.contains("85%"))
+        val body = alert.notificationBody(java.time.ZoneId.of("UTC"))
+        assertEquals("测试凭证 · 日用量 · 85% 已用，窗口将在 16:00 重置", body)
         // No secret-bearing material can appear: the alert model has no such field,
         // but pin the redaction contract against accidental schema growth.
         assertFalse(body.contains("sk-"))
         assertFalse(body.contains("Bearer"))
+    }
+
+    @Test
+    fun quotaAlertTitlesDescribeWarningVersusLimit() {
+        fun alert(level: AlertLevel) = MetricAlert(
+            credentialId = credentialId,
+            credentialName = "GLM Coding",
+            providerId = ProviderId.Glm,
+            metricId = "m1",
+            metricLabel = "5 小时用量",
+            source = MetricAlertSource.UsedPercent,
+            level = level,
+            percent = 83.0,
+            windowEnd = null,
+            currencyCode = null,
+        )
+        assertEquals("用量接近上限", alert(AlertLevel.Low).notificationTitle)
+        assertEquals("用量已达上限", alert(AlertLevel.High).notificationTitle)
+        assertEquals("GLM Coding · 5 小时用量 · 83% 已用", alert(AlertLevel.Low).notificationBody())
     }
 
     @Test
@@ -519,24 +536,45 @@ class MetricAlertEvaluatorTest {
             windowEnd = null,
             currencyCode = null,
         )
-        assertTrue(alert.notificationBody().contains("剩余低于"))
+        assertTrue(alert.notificationBody().contains("剩余 45%"))
     }
 
     @Test
-    fun healthStateBodyUsesStatusWording() {
-        val alert = MetricAlert(
+    fun balanceHealthAlertUsesBalanceWording() {
+        fun alert(level: AlertLevel) = MetricAlert(
             credentialId = credentialId,
             credentialName = "测试凭证",
             providerId = ProviderId.Glm,
             metricId = "balance",
             metricLabel = "余额",
             source = MetricAlertSource.HealthState,
-            level = AlertLevel.Low,
+            level = level,
             percent = 0.0,
             windowEnd = null,
             currencyCode = "CNY",
         )
-        assertTrue(alert.notificationBody().contains("状态异常"))
+        assertEquals("余额偏低", alert(AlertLevel.Low).notificationTitle)
+        assertEquals("测试凭证 · 余额偏低", alert(AlertLevel.Low).notificationBody())
+        assertEquals("余额已用尽", alert(AlertLevel.High).notificationTitle)
+        assertEquals("测试凭证 · 余额已用尽", alert(AlertLevel.High).notificationBody())
+    }
+
+    @Test
+    fun statusHealthAlertUsesStatusWording() {
+        val alert = MetricAlert(
+            credentialId = credentialId,
+            credentialName = "测试凭证",
+            providerId = ProviderId.Glm,
+            metricId = "status",
+            metricLabel = "订阅",
+            source = MetricAlertSource.HealthState,
+            level = AlertLevel.Low,
+            percent = 0.0,
+            windowEnd = null,
+            currencyCode = null,
+        )
+        assertEquals("凭证状态异常", alert.notificationTitle)
+        assertEquals("测试凭证 · 订阅状态异常", alert.notificationBody())
     }
 
     // ---- window key encoding --------------------------------------------------

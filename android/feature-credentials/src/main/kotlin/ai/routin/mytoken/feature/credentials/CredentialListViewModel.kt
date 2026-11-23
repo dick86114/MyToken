@@ -1,10 +1,12 @@
 package ai.routin.mytoken.feature.credentials
 
+import ai.routin.mytoken.core.alerts.CredentialAlertThresholdStore
 import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.model.ProviderId
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +25,7 @@ data class CredentialListUiState(
 class CredentialListViewModel(
     private val repository: ai.routin.mytoken.domain.repository.CredentialRepository,
     private val orderStore: CredentialOrderStore,
+    private val alertThresholdStore: CredentialAlertThresholdStore,
 ) : ViewModel() {
 
     private val pendingDeletion = MutableStateFlow<Credential?>(null)
@@ -69,11 +72,23 @@ class CredentialListViewModel(
             try {
                 repository.delete(target.id)
                 orderStore.pruneCredential(target.id)
-            } catch (error: kotlinx.coroutines.CancellationException) {
+                clearAlertThreshold(target.id)
+            } catch (error: CancellationException) {
                 throw error
             } catch (_: Throwable) {
                 errorMessage.value = "删除失败，请重试"
             }
+        }
+    }
+
+    /** Deletion already succeeded, so a stale override prune failure stays silent. */
+    private suspend fun clearAlertThreshold(credentialId: java.util.UUID) {
+        try {
+            alertThresholdStore.clearOverride(credentialId)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Throwable) {
+            // Non-fatal: an orphan UUID-keyed override is never surfaced to the user.
         }
     }
 

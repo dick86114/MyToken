@@ -16,6 +16,7 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
@@ -105,6 +106,13 @@ class HomeViewModel(
     private val clock: Clock = Clock.systemUTC(),
     refreshOnStart: Boolean = true,
     private val retryOnFailure: Boolean = false,
+    /**
+     * Runs once after a foreground refresh pass has settled (states already
+     * updated). The app layer wires this to notification dispatch; keeping it a
+     * callback avoids a feature -> app dependency. Failures are swallowed so
+     * notification delivery can never break the refresh UI.
+     */
+    private val onRefreshCompleted: suspend () -> Unit = {},
     private val nowTickIntervalMillis: Long? = DEFAULT_NOW_TICK_MILLIS,
     // Ticking happens off the main dispatcher: an infinite delay loop on the
     // main looper keeps Robolectric/Compose idle detection from ever settling.
@@ -256,6 +264,9 @@ class HomeViewModel(
             } finally {
                 isRefreshingAll.value = false
             }
+            // All credential refreshes inside coroutineScope have settled here,
+            // so the dispatcher sees the final per-credential states.
+            notifyRefreshCompleted()
         }
     }
 
@@ -302,6 +313,19 @@ class HomeViewModel(
             } finally {
                 endRefresh(credential.id)
             }
+            // notify-once in the evaluator deduplicates overlapping credential passes.
+            notifyRefreshCompleted()
+        }
+    }
+
+    /** Notification dispatch is best-effort; it must never surface as a refresh failure. */
+    private suspend fun notifyRefreshCompleted() {
+        try {
+            onRefreshCompleted()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Throwable) {
+            // Non-fatal: the refresh itself already updated the UI.
         }
     }
 

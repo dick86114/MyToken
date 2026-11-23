@@ -12,6 +12,7 @@ import ai.routin.mytoken.domain.model.UsageMetricSemantic
 import ai.routin.mytoken.domain.model.UsageMetricUnit
 import ai.routin.mytoken.domain.model.UsageSnapshot
 import ai.routin.mytoken.domain.repository.CredentialRepository
+import ai.routin.mytoken.domain.usage.CredentialUsageState
 import ai.routin.mytoken.domain.usage.RefreshCredentialsUseCase
 import ai.routin.mytoken.domain.usage.RefreshStatus
 import ai.routin.mytoken.domain.usage.UsageProvider
@@ -70,6 +71,7 @@ class HomeViewModelTest {
         refreshOnStart: Boolean = false,
         retryOnFailure: Boolean = false,
         credentialOrderIds: Flow<List<String>> = MutableStateFlow(emptyList()),
+        onRefreshCompleted: suspend () -> Unit = {},
     ) = HomeViewModel(
         repository = repository,
         refreshUseCase = RefreshCredentialsUseCase(repository, providers, clock),
@@ -78,6 +80,7 @@ class HomeViewModelTest {
         refreshOnStart = refreshOnStart,
         retryOnFailure = retryOnFailure,
         nowTickIntervalMillis = null,
+        onRefreshCompleted = onRefreshCompleted,
     )
 
     private fun credential(
@@ -227,6 +230,106 @@ class HomeViewModelTest {
         assertFalse(card.isStale)
         assertNull(card.error)
         assertEquals("刚刚更新", card.freshness.text)
+    }
+
+    @Test
+    fun `completed refreshAll triggers notification callback after states settle`() = runTest {
+        val rt = credential("RT-1", ProviderId.Routin)
+        val ds = credential("DS-1", ProviderId.DeepSeek)
+        addCredential(rt)
+        addCredential(ds)
+        val gate = CompletableDeferred<Unit>()
+        providers[ProviderId.Routin] = GatedUsageProvider(ProviderId.Routin, gate, now)
+        providers[ProviderId.DeepSeek] = FakeUsageProvider(
+            ProviderId.DeepSeek,
+            Result.success(snapshot(ds.id, balanceMetric(12.0))),
+        )
+        val useCase = RefreshCredentialsUseCase(repository, providers, clock)
+        var callbackCount = 0
+        var statesAtCallback: Map<UUID, CredentialUsageState>? = null
+        val vm = HomeViewModel(
+            repository = repository,
+            refreshUseCase = useCase,
+            clock = clock,
+            refreshOnStart = false,
+            nowTickIntervalMillis = null,
+            onRefreshCompleted = {
+                callbackCount += 1
+                statesAtCallback = useCase.states.value
+            },
+        )
+        backgroundScope.launch { vm.state.collect {} }
+
+        vm.refreshAll()
+        advanceUntilIdle()
+        // One credential is still gated: the callback must not fire early.
+        assertEquals(0, callbackCount)
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(1, callbackCount)
+        val states = statesAtCallback!!
+        assertEquals(RefreshStatus.Ready, states[rt.id]?.status)
+        assertEquals(RefreshStatus.Ready, states[ds.id]?.status)
+        assertNotNull(states[rt.id]?.snapshot)
+        assertNotNull(states[ds.id]?.snapshot)
+    }
+
+    @Test
+    fun `completed single credential refresh triggers notification callback`() = runTest {
+        val rt = credential("RT-1", ProviderId.Routin)
+        addCredential(rt)
+        providers[ProviderId.Routin] = FakeUsageProvider(
+            ProviderId.Routin,
+            Result.success(snapshot(rt.id, balanceMetric(8.0))),
+        )
+        val useCase = RefreshCredentialsUseCase(repository, providers, clock)
+        var callbackCount = 0
+        var statusAtCallback: RefreshStatus? = null
+        val vm = HomeViewModel(
+            repository = repository,
+            refreshUseCase = useCase,
+            clock = clock,
+            refreshOnStart = false,
+            nowTickIntervalMillis = null,
+            onRefreshCompleted = {
+                callbackCount += 1
+                statusAtCallback = useCase.states.value[rt.id]?.status
+            },
+        )
+        backgroundScope.launch { vm.state.collect {} }
+
+        vm.refreshCredential(rt)
+        advanceUntilIdle()
+
+        assertEquals(1, callbackCount)
+        assertEquals(RefreshStatus.Ready, statusAtCallback)
+    }
+
+    @Test
+    fun `notification callback failure does not fail the refresh`() = runTest {
+        val rt = credential("RT-1", ProviderId.Routin)
+        addCredential(rt)
+        providers[ProviderId.Routin] = FakeUsageProvider(
+            ProviderId.Routin,
+            Result.success(snapshot(rt.id, balanceMetric(8.0))),
+        )
+        var callbackCount = 0
+        val vm = viewModel(
+            onRefreshCompleted = {
+                callbackCount += 1
+                error("notification dispatch exploded")
+            },
+        )
+        backgroundScope.launch { vm.state.collect {} }
+
+        vm.refreshAll()
+        advanceUntilIdle()
+
+        assertEquals(1, callbackCount)
+        assertEquals(RefreshStatus.Ready, vm.state.value.groups.single().cards.single().status)
+        assertNotNull(vm.state.value.groups.single().cards.single().snapshot)
     }
 
     @Test

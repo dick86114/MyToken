@@ -288,4 +288,59 @@ class CredentialEditorValidationTest {
         assertEquals("oc_sk_test", (input.secret as CredentialSecret.BearerToken).token)
         assertEquals("https://opencode.ai/", input.metadata[CredentialMetadataKey.WebsiteURL])
     }
+
+    // ---- per-credential alert thresholds ---------------------------------------
+
+    @Test
+    fun percentAlertThresholdsOnlyForProvidersWithQuotaMetrics() {
+        // Providers whose snapshots contain usedQuota / remainingQuota metrics.
+        listOf(
+            ProviderId.Routin,
+            ProviderId.Glm,
+            ProviderId.Volcengine,
+            ProviderId.NewAPI,
+            ProviderId.CommandCode,
+            ProviderId.OpenCode,
+        ).forEach { provider ->
+            assertTrue(
+                "expected percent metrics for $provider",
+                CredentialEditorValidation.supportsPercentAlertThreshold(provider, "api"),
+            )
+        }
+        // Balance-only: DeepSeek always, Xiaomi API 按量.
+        assertFalse(CredentialEditorValidation.supportsPercentAlertThreshold(ProviderId.DeepSeek, "api"))
+        assertFalse(CredentialEditorValidation.supportsPercentAlertThreshold(ProviderId.DeepSeek, "plan"))
+        assertFalse(CredentialEditorValidation.supportsPercentAlertThreshold(ProviderId.Xiaomi, "api"))
+        assertTrue(CredentialEditorValidation.supportsPercentAlertThreshold(ProviderId.Xiaomi, "plan"))
+    }
+
+    @Test
+    fun zeroBalanceWarningThresholdMeansNoReminder() {
+        val input = validate(
+            ProviderId.DeepSeek,
+            name = "DeepSeek",
+            apiKey = "sk-x",
+            balanceWarningThreshold = "0",
+        )
+        assertFalse(input.metadata.containsKey(CredentialMetadataKey.BalanceWarningThreshold))
+
+        val negative = validate(
+            ProviderId.DeepSeek,
+            name = "DeepSeek",
+            apiKey = "sk-x",
+            balanceWarningThreshold = "-5",
+        )
+        assertFalse(negative.metadata.containsKey(CredentialMetadataKey.BalanceWarningThreshold))
+    }
+
+    @Test
+    fun decimalBalanceWarningThresholdIsPreservedUntilSliderMoves() {
+        val input = validate(
+            ProviderId.DeepSeek,
+            name = "DeepSeek",
+            apiKey = "sk-x",
+            balanceWarningThreshold = "8.5",
+        )
+        assertEquals("8.5", input.metadata[CredentialMetadataKey.BalanceWarningThreshold])
+    }
 }

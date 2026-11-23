@@ -1,13 +1,20 @@
 package ai.routin.mytoken.feature.settings
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -15,34 +22,60 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** Robolectric Compose rendering of the 通知 settings section (Task 10). */
+/** Robolectric Compose rendering of the 通知 settings section. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [34], qualifiers = "w400dp-h1100dp")
 class NotificationSettingsSectionTest {
 
     @get:Rule
     val composeRule = createComposeRule()
 
-    @Test
-    fun rendersTogglesAndDefaultThresholds() {
+    private var failureAlerts: Boolean? = null
+    private var notificationsEnabled: Boolean? = null
+    private var savedThresholds: Pair<Int, Int>? = null
+
+    private fun setContent(
+        settings: NotificationSettings = NotificationSettings(),
+        permissionGranted: Boolean = true,
+    ) {
         composeRule.setContent {
             MaterialTheme {
                 NotificationSettingsSection(
-                    settings = NotificationSettings(),
-                    permissionGranted = true,
+                    settings = settings,
+                    permissionGranted = permissionGranted,
                     onRequestPermission = {},
-                    onCredentialFailureAlertsChange = {},
+                    onCredentialFailureAlertsChange = { failureAlerts = it },
+                    onNotificationsEnabledChange = { notificationsEnabled = it },
+                    onThresholdsChange = { low, high -> savedThresholds = low to high },
                 )
             }
         }
+    }
+
+    private fun setRange(low: Float, high: Float) {
+        val hasSetProgress = SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress)
+        composeRule.onAllNodes(hasSetProgress)[0]
+            .performSemanticsAction(SemanticsActions.SetProgress) { it(low) }
+        composeRule.waitForIdle()
+        composeRule.onAllNodes(hasSetProgress)[1]
+            .performSemanticsAction(SemanticsActions.SetProgress) { it(high) }
+        composeRule.waitForIdle()
+    }
+
+    @Test
+    fun rendersMasterToggleRangeSliderAndPermission() {
+        setContent()
 
         composeRule.onNodeWithText("通知").assertIsDisplayed()
+        composeRule.onNodeWithText("启用通知").assertIsDisplayed()
         composeRule.onNodeWithText("启用提醒").assertDoesNotExist()
-        composeRule.onNodeWithText("用量提醒低阈值").assertDoesNotExist()
-        composeRule.onNodeWithText("用量提醒高阈值").assertDoesNotExist()
+        composeRule.onNodeWithText("用量提醒阈值").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_alert_threshold_range").assertIsDisplayed()
+        composeRule.onNodeWithText("低 80% · 高 95%").assertIsDisplayed()
         composeRule.onNodeWithText("凭证失效提醒").assertIsDisplayed()
         composeRule.onNodeWithText("已允许").assertIsDisplayed()
         composeRule.onNodeWithText("去授权").assertDoesNotExist()
+        composeRule.onNodeWithText("保存阈值").assertDoesNotExist()
     }
 
     @Test
@@ -66,19 +99,47 @@ class NotificationSettingsSectionTest {
 
     @Test
     fun togglesEmitChanges() {
-        var failureAlerts: Boolean? = null
-        composeRule.setContent {
-            MaterialTheme {
-                NotificationSettingsSection(
-                    settings = NotificationSettings(),
-                    permissionGranted = true,
-                    onRequestPermission = {},
-                    onCredentialFailureAlertsChange = { failureAlerts = it },
-                )
-            }
-        }
+        setContent()
 
         composeRule.onNodeWithContentDescription("凭证失效提醒").performClick()
         assertFalse(failureAlerts!!)
+
+        composeRule.onNodeWithContentDescription("启用通知").performClick()
+        assertFalse(notificationsEnabled!!)
+    }
+
+    @Test
+    fun rangeSliderUpdatesLabelAndAutoSavesOnRelease() {
+        setContent()
+
+        setRange(low = 70f, high = 95f)
+        composeRule.onNodeWithText("低 70% · 高 95%").assertIsDisplayed()
+        assertEquals(70 to 95, savedThresholds)
+
+        setRange(low = 70f, high = 90f)
+        composeRule.onNodeWithText("低 70% · 高 90%").assertIsDisplayed()
+        assertEquals(70 to 90, savedThresholds)
+    }
+
+    @Test
+    fun rangeSliderKeepsAtLeastOnePointBetweenThumbs() {
+        setContent()
+
+        // Drag the low thumb onto the high thumb; the range normalizes to 94/95.
+        setRange(low = 95f, high = 95f)
+
+        composeRule.onNodeWithText("低 94% · 高 95%").assertIsDisplayed()
+        assertEquals(94 to 95, savedThresholds)
+    }
+
+    @Test
+    fun masterSwitchOffDisablesRangeAndOtherChildren() {
+        setContent(settings = NotificationSettings(notificationsEnabled = false))
+
+        composeRule.onNodeWithContentDescription("启用通知").assertIsEnabled()
+        composeRule.onNodeWithContentDescription("凭证失效提醒").assertIsNotEnabled()
+        composeRule.onNodeWithTag("settings_alert_threshold_range").assertIsNotEnabled()
+        composeRule.onNodeWithText("低 80% · 高 95%").assertIsDisplayed()
+        assertNull(savedThresholds)
     }
 }
