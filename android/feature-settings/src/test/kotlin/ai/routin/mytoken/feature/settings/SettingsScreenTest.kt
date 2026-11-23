@@ -1,10 +1,12 @@
 package ai.routin.mytoken.feature.settings
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -16,6 +18,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -452,6 +455,62 @@ class SettingsScreenTest {
             .performClick()
 
         assertTrue(downloaded)
+    }
+
+    @Test
+    fun draggingThresholdSliderDoesNotScrollPageUntilRelease() {
+        setContent()
+        composeRule.onNodeWithTag("settings_list")
+            .performScrollToNode(hasTestTag("settings_alert_threshold_range"))
+        composeRule.waitForIdle()
+
+        fun thresholdLabelTop() = composeRule
+            .onNodeWithText("用量提醒阈值", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+            .top
+            .value
+
+        val topBeforeDrag = thresholdLabelTop()
+        composeRule.onNodeWithText("低 80% · 高 95%", useUnmergedTree = true).assertExists()
+
+        composeRule.onNodeWithContentDescription(
+            "用量提醒阈值 低值",
+            useUnmergedTree = true,
+        ).performTouchInput {
+            down(center)
+            moveBy(Offset(-80f, -120f))
+            moveBy(Offset(-40f, -120f))
+            up()
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(
+            "拖动滑块不应带动设置页滚动",
+            topBeforeDrag,
+            thresholdLabelTop(),
+            0.5f,
+        )
+        composeRule.onNodeWithText("低 80% · 高 95%", useUnmergedTree = true)
+            .assertDoesNotExist()
+
+        // 先滚到底部，确保有向上滚动的空间，再从非滑块区域拖动。
+        composeRule.onNodeWithTag("settings_list")
+            .performScrollToNode(hasText("关于"))
+        composeRule.waitForIdle()
+        fun aboutTop() = composeRule
+            .onNodeWithText("关于", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+            .top
+            .value
+        val topBeforeSwipe = aboutTop()
+        composeRule.onNodeWithText("关于", useUnmergedTree = true)
+            .performTouchInput { swipeDown() }
+        composeRule.waitForIdle()
+
+        assertTrue(
+            "松手后从非滑块区域拖动应恢复页面滚动",
+            aboutTop() > topBeforeSwipe,
+        )
     }
 
     private fun scrollToAbout() {

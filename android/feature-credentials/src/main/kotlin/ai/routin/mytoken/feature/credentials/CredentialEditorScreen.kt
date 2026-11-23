@@ -108,6 +108,9 @@ fun CredentialEditorScreen(
 ) {
     val colors = MyTokenThemeTokens.colors
     var providerSheetOpen by remember { mutableStateOf(false) }
+    // 按住任一滑块时不滚动表单；使用同一 ScrollState，恢复滚动时位置不跳变。
+    var sliderDragging by remember { mutableStateOf(false) }
+    val formScrollState = rememberScrollState()
     Scaffold(
         topBar = {
             EditorTopBar(
@@ -157,7 +160,7 @@ fun CredentialEditorScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(formScrollState, enabled = !sliderDragging)
                     .padding(vertical = 8.dp)
                     .testTag("editor_form"),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -321,6 +324,7 @@ fun CredentialEditorScreen(
                                 steps = balanceModel.steps,
                                 contentDescription = "低余额预警值",
                                 valueDescription = BalanceWarningThreshold.label(balanceWarning),
+                                onDraggingChanged = { sliderDragging = it },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .testTag("editor_balance_warning_threshold"),
@@ -404,6 +408,7 @@ fun CredentialEditorScreen(
                                     state.alertThresholdLowPercent,
                                     state.alertThresholdHighPercent,
                                 ),
+                                onDraggingChanged = { sliderDragging = it },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .testTag("editor_alert_threshold_range"),

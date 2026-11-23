@@ -4,15 +4,19 @@ import ai.routin.mytoken.core.alerts.AlertThresholds
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.platform.testTag
 import ai.routin.mytoken.domain.model.ProviderId
 import androidx.compose.ui.test.onNodeWithTag
@@ -359,5 +363,109 @@ class CredentialEditorScreenTest {
         composeRule.onNodeWithTag("editor_test_result", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithText("连接成功", substring = true).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("✓", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun draggingCustomThresholdSliderDoesNotScrollEditorUntilRelease() {
+        setContent()
+        composeRule.onNodeWithContentDescription("自定义提醒阈值")
+            .performScrollTo()
+            .performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("editor_alert_threshold_range", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+
+        fun sectionTop() = composeRule
+            .onNodeWithText("提醒阈值（可选）", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+            .top
+            .value
+
+        val topBeforeDrag = sectionTop()
+        composeRule.onNodeWithContentDescription(
+            "用量提醒阈值 低值",
+            useUnmergedTree = true,
+        ).performTouchInput {
+            down(center)
+            moveBy(Offset(-80f, -140f))
+            moveBy(Offset(-40f, -140f))
+            up()
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(
+            "拖动每凭证阈值滑块不应带动编辑页滚动",
+            topBeforeDrag,
+            sectionTop(),
+            0.5f,
+        )
+        assertTrue(viewModel.state.value.alertThresholdLowPercent < 80)
+
+        composeRule.onNodeWithText("提醒阈值（可选）", useUnmergedTree = true)
+            .performScrollTo()
+        val topBeforeSwipe = sectionTop()
+        composeRule.onNodeWithText("提醒阈值（可选）", useUnmergedTree = true)
+            .performTouchInput { swipeDown() }
+        composeRule.waitForIdle()
+
+        assertTrue(
+            "松手后从非滑块区域拖动应恢复编辑页滚动",
+            sectionTop() > topBeforeSwipe,
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h600dp")
+    fun draggingBalanceSliderDoesNotScrollEditorUntilRelease() {
+        setContent()
+        viewModel.setProviderId(ProviderId.DeepSeek)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("editor_balance_warning_threshold", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+
+        fun balanceLabelTop() = composeRule
+            .onNodeWithText("低余额预警值（可选）", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+            .top
+            .value
+
+        val topBeforeDrag = balanceLabelTop()
+        composeRule.onNodeWithContentDescription(
+            "低余额预警值 当前值",
+            useUnmergedTree = true,
+        ).performTouchInput {
+            down(center)
+            moveBy(Offset(140f, 0f))
+            moveBy(Offset(0f, -140f))
+            up()
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(
+            "拖动低余额滑块不应带动编辑页滚动",
+            topBeforeDrag,
+            balanceLabelTop(),
+            0.5f,
+        )
+        assertTrue(viewModel.state.value.balanceWarningThreshold.isNotEmpty())
+
+        composeRule.onNodeWithText("官网地址（可选）", useUnmergedTree = true)
+            .performScrollTo()
+        fun moreSectionTop() = composeRule
+            .onNodeWithText("更多（可选）", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+            .top
+            .value
+        val topBeforeSwipe = moreSectionTop()
+        composeRule.onNodeWithText("更多（可选）", useUnmergedTree = true)
+            .performTouchInput { swipeDown() }
+        composeRule.waitForIdle()
+
+        assertTrue(
+            "松手后从非滑块区域拖动应恢复编辑页滚动",
+            moreSectionTop() > topBeforeSwipe,
+        )
     }
 }

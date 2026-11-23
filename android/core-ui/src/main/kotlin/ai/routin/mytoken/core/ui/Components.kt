@@ -6,6 +6,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,8 +41,10 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -48,6 +52,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
@@ -198,6 +204,51 @@ fun MyTokenSwitch(
 }
 
 /**
+ * Reports when a finger is engaged with the slider so a scrollable host can disable
+ * page scrolling while the user drags a thumb, and consumes leftover movement before
+ * ancestors see it so the page cannot steal the gesture in the same frame.
+ *
+ * Reporting starts on pointer-down instead of drag-slop confirmation: otherwise the
+ * first vertical movement can still scroll the page before drag start is observed.
+ * It resets on up/cancel and when the slider leaves composition (e.g. a lazy item).
+ */
+@Composable
+private fun rememberSliderDragReporter(
+    onDraggingChanged: ((Boolean) -> Unit)?,
+): Modifier {
+    val callback by rememberUpdatedState(onDraggingChanged)
+    DisposableEffect(Unit) {
+        onDispose { callback?.invoke(false) }
+    }
+    if (callback == null) return Modifier
+    return Modifier.pointerInput(Unit) {
+        awaitEachGesture {
+            val down = awaitFirstDown(
+                requireUnconsumed = false,
+                pass = PointerEventPass.Initial,
+            )
+            callback?.invoke(true)
+            try {
+                do {
+                    // Main runs child → parent: the slider's own drag detector has
+                    // already seen this event, and consuming the remainder keeps the
+                    // scrollable ancestor from stealing the gesture even before the
+                    // host applies the disabled-scroll state.
+                    val event = awaitPointerEvent(PointerEventPass.Main)
+                    event.changes.forEach { change ->
+                        if (change.pressed && change.position != change.previousPosition) {
+                            change.consume()
+                        }
+                    }
+                } while (event.changes.any { it.id == down.id && it.pressed })
+            } finally {
+                callback?.invoke(false)
+            }
+        }
+    }
+}
+
+/**
  * 单值滑块：主题黄色轨道/滑块，触摸高度沿用 [MyTokenSize.touch]。
  * 容器补充用途与当前值语义，滑块自身的 ProgressBarRangeInfo 仍由 Material 提供。
  */
@@ -213,6 +264,7 @@ fun MyTokenSlider(
     valueDescription: String? = null,
     enabled: Boolean = true,
     onValueChangeFinished: (() -> Unit)? = null,
+    onDraggingChanged: ((Boolean) -> Unit)? = null,
 ) {
     val colors = MyTokenThemeTokens.colors
     val sliderColors = SliderDefaults.colors(
@@ -228,12 +280,16 @@ fun MyTokenSlider(
         disabledInactiveTickColor = colors.line,
     )
     val interactionSource = remember { MutableInteractionSource() }
+    val dragReporter = rememberSliderDragReporter(
+        if (enabled) onDraggingChanged else null,
+    )
     Slider(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier
             .heightIn(min = MyTokenSize.touch)
             .alpha(if (enabled) 1f else 0.45f)
+            .then(dragReporter)
             .semantics {
                 this.contentDescription = contentDescription
                 valueDescription?.let { this.stateDescription = it }
@@ -273,6 +329,7 @@ fun MyTokenRangeSlider(
     valueDescription: String? = null,
     enabled: Boolean = true,
     onValueChangeFinished: (() -> Unit)? = null,
+    onDraggingChanged: ((Boolean) -> Unit)? = null,
 ) {
     val colors = MyTokenThemeTokens.colors
     val sliderColors = SliderDefaults.colors(
@@ -289,12 +346,16 @@ fun MyTokenRangeSlider(
     )
     val startInteractionSource = remember { MutableInteractionSource() }
     val endInteractionSource = remember { MutableInteractionSource() }
+    val dragReporter = rememberSliderDragReporter(
+        if (enabled) onDraggingChanged else null,
+    )
     RangeSlider(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier
             .heightIn(min = MyTokenSize.touch)
             .alpha(if (enabled) 1f else 0.45f)
+            .then(dragReporter)
             .semantics {
                 this.contentDescription = contentDescription
                 valueDescription?.let { this.stateDescription = it }

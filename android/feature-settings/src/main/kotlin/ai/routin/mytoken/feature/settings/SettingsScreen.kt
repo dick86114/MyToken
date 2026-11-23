@@ -158,6 +158,8 @@ fun SettingsScreen(
     var showReleaseHistory by remember { mutableStateOf(false) }
     var showUpdateSettings by remember { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf(false) }
+    // 拖动阈值滑块时暂停页面滚动；松手或滑块销毁后自动恢复。
+    var alertThresholdSliderDragging by remember { mutableStateOf(false) }
     val versionScale = remember { androidx.compose.animation.core.Animatable(1f) }
     val versionScope = androidx.compose.runtime.rememberCoroutineScope()
     LogExportDialog(
@@ -233,6 +235,7 @@ fun SettingsScreen(
             ),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(MyTokenSpacing.settingsSectionCompact),
+            userScrollEnabled = !alertThresholdSliderDragging,
         ) {
             item(
                 key = "settings_header",
@@ -275,6 +278,7 @@ fun SettingsScreen(
                     onCredentialFailureAlertsChange = onCredentialFailureAlertsChange,
                     onNotificationsEnabledChange = onNotificationsEnabledChange,
                     onThresholdsChange = onAlertThresholdsChange,
+                    onAlertThresholdDraggingChange = { alertThresholdSliderDragging = it },
                 )
             }
             item(key = "data") {

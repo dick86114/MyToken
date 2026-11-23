@@ -47,6 +47,7 @@ fun NotificationSettingsSection(
     onCredentialFailureAlertsChange: (Boolean) -> Unit,
     onNotificationsEnabledChange: (Boolean) -> Unit = {},
     onThresholdsChange: (Int, Int) -> Unit = { _, _ -> },
+    onAlertThresholdDraggingChange: (Boolean) -> Unit = {},
 ) {
     val colors = MyTokenThemeTokens.colors
     var thresholdRange by remember(settings.lowThresholdPercent, settings.highThresholdPercent) {
@@ -124,6 +125,7 @@ fun NotificationSettingsSection(
                         )
                     }
                 },
+                onDraggingChanged = onAlertThresholdDraggingChange,
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("settings_alert_threshold_range"),
