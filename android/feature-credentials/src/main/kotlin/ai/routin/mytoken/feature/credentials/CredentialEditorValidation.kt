@@ -25,7 +25,7 @@ data class ValidatedCredentialInput(
  * - DeepSeek / GLM: raw apiKey.
  * - Volcengine: accessKeyPair with a default region of cn-beijing.
  * - NewAPI: bearerAPIKey plus baseURL + userID metadata.
- * - DeepSeek / GLM / NewAPI / Xiaomi(api): optional balanceWarningThreshold metadata,
+ * - DeepSeek / NewAPI / Xiaomi(api): optional balanceWarningThreshold metadata,
  *   matching the macOS editor and the transfer schema v1 allowlist.
  */
 object CredentialEditorValidation {

@@ -87,6 +87,54 @@ final class ProviderModelsTests: XCTestCase {
         XCTAssertNil(result.metadata["websiteURL"])
     }
 
+    func testGLM凭证不保存低余额预警值而DeepSeek保留() throws {
+        let glm = try CredentialEditorValidation.validate(
+            providerID: .glm,
+            name: "GLM",
+            apiKey: "key",
+            accessKeyID: "",
+            secretAccessKey: "",
+            region: "",
+            balanceWarningThreshold: "12.5"
+        )
+        XCTAssertNil(glm.metadata["balanceWarningThreshold"])
+
+        let deepSeek = try CredentialEditorValidation.validate(
+            providerID: .deepseek,
+            name: "DeepSeek",
+            apiKey: "key",
+            accessKeyID: "",
+            secretAccessKey: "",
+            region: "",
+            balanceWarningThreshold: "12.5"
+        )
+        XCTAssertEqual(deepSeek.metadata["balanceWarningThreshold"], "12.5")
+    }
+
+    func test低余额预警能力仅覆盖余额型凭证() {
+        XCTAssertTrue(
+            CredentialEditorValidation.supportsBalanceWarningThreshold(providerID: .deepseek)
+        )
+        XCTAssertTrue(
+            CredentialEditorValidation.supportsBalanceWarningThreshold(providerID: .newAPI)
+        )
+        XCTAssertTrue(
+            CredentialEditorValidation.supportsBalanceWarningThreshold(providerID: .xiaomi)
+        )
+        XCTAssertFalse(
+            CredentialEditorValidation.supportsBalanceWarningThreshold(
+                providerID: .xiaomi,
+                xiaomiUsageKind: "plan"
+            )
+        )
+        XCTAssertFalse(
+            CredentialEditorValidation.supportsBalanceWarningThreshold(providerID: .glm)
+        )
+        XCTAssertFalse(
+            CredentialEditorValidation.supportsBalanceWarningThreshold(providerID: .commandCode)
+        )
+    }
+
     func test每个供应商使用独立主题色() {
         let colors = ProviderID.allCases.map { ProviderTheme.accentColor(for: $0) }
         XCTAssertEqual(Set(colors).count, ProviderID.allCases.count)

@@ -399,6 +399,37 @@ class CredentialEditorViewModelTest {
     }
 
     @Test
+    fun editingGlmDropsLegacyBalanceWarningOnSave() = runTest(dispatcher) {
+        val existing = Credential(
+            id = UUID.randomUUID(),
+            providerId = ProviderId.Glm,
+            credentialKind = CredentialKind.ApiKey,
+            name = "GLM",
+            metadata = mapOf(CredentialMetadataKey.BalanceWarningThreshold to "10"),
+        )
+        repository = StaticCredentialRepository(
+            listOf(existing),
+            mapOf(existing.id to CredentialSecret.ApiKey("sk-glm")),
+        )
+        val vm = CredentialEditorViewModel(
+            repository = repository,
+            providers = providers,
+            alertThresholdStore = alertThresholdStore,
+            credentialId = existing.id,
+        )
+        advanceUntilIdle()
+
+        vm.save()
+        advanceUntilIdle()
+
+        assertTrue(vm.state.value.saveCompleted)
+        assertFalse(
+            repository.saved.value.single().first
+                .metadata.containsKey(CredentialMetadataKey.BalanceWarningThreshold),
+        )
+    }
+
+    @Test
     fun balanceOnlyProviderIgnoresHiddenThresholdsAndClearsOverride() = runTest(dispatcher) {
         val existing = existingCredential(
             provider = ProviderId.DeepSeek,

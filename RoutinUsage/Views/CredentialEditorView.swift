@@ -49,7 +49,7 @@ enum CredentialEditorValidation {
                 secret: apiKey,
                 metadata: ["planType": planType].merging(websiteMetadata) { current, _ in current }
             )
-        case .deepseek, .glm:
+        case .deepseek:
             let secret = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !secret.isEmpty else { throw UsageStoreError.invalidSecret }
             var metadata: [String: String] = [:]
@@ -65,6 +65,16 @@ enum CredentialEditorValidation {
                 name: normalizedName,
                 secret: secret,
                 metadata: metadata.merging(websiteMetadata) { current, _ in current }
+            )
+        case .glm:
+            let secret = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !secret.isEmpty else { throw UsageStoreError.invalidSecret }
+            return ValidatedCredentialInput(
+                providerID: .glm,
+                credentialKind: .apiKey,
+                name: normalizedName,
+                secret: secret,
+                metadata: websiteMetadata
             )
         case .volcengine:
             let accessKey = accessKeyID.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -173,6 +183,23 @@ enum CredentialEditorValidation {
                 secret: secret,
                 metadata: metadata.merging(websiteMetadata) { current, _ in current }
             )
+        }
+    }
+
+    /// Absolute balance warnings only apply to providers that expose a balance metric.
+    static func supportsBalanceWarningThreshold(
+        providerID: ProviderID,
+        xiaomiUsageKind: String = "api"
+    ) -> Bool {
+        switch providerID {
+        case .deepseek, .newAPI:
+            return true
+        case .xiaomi:
+            return xiaomiUsageKind
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased() == "api"
+        default:
+            return false
         }
     }
 
@@ -706,10 +733,10 @@ struct CredentialEditorView: View {
 
         let threshold = balanceWarningThreshold
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let showsBalanceThreshold = providerID == .deepseek
-            || providerID == .glm
-            || providerID == .newAPI
-            || (providerID == .xiaomi && xiaomiUsageKind == "api")
+        let showsBalanceThreshold = CredentialEditorValidation.supportsBalanceWarningThreshold(
+            providerID: providerID,
+            xiaomiUsageKind: xiaomiUsageKind
+        )
         if showsBalanceThreshold, !threshold.isEmpty, Decimal(string: threshold) == nil {
             errors[.balanceWarningThreshold] = "请输入有效数字"
         }

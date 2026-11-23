@@ -43,17 +43,23 @@ class CredentialAlertCapabilitiesTest {
     }
 
     @Test
-    fun `glm and newapi expose both settings`() {
-        listOf(ProviderId.Glm, ProviderId.NewAPI).forEach { providerId ->
-            assertTrue(
-                CredentialAlertCapabilities.supportsPercentAlertThreshold(providerId, "api"),
-                "$providerId should support percent thresholds",
-            )
-            assertTrue(
-                CredentialAlertCapabilities.supportsBalanceWarningThreshold(providerId, "api"),
-                "$providerId should support balance warnings",
-            )
-        }
+    fun `glm exposes percent thresholds but hides balance warnings`() {
+        assertTrue(
+            CredentialAlertCapabilities.supportsPercentAlertThreshold(ProviderId.Glm, "api")
+        )
+        assertFalse(
+            CredentialAlertCapabilities.supportsBalanceWarningThreshold(ProviderId.Glm, "api")
+        )
+    }
+
+    @Test
+    fun `newapi exposes both settings`() {
+        assertTrue(
+            CredentialAlertCapabilities.supportsPercentAlertThreshold(ProviderId.NewAPI, "api")
+        )
+        assertTrue(
+            CredentialAlertCapabilities.supportsBalanceWarningThreshold(ProviderId.NewAPI, "api")
+        )
     }
 
     @Test

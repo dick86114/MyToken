@@ -19,7 +19,6 @@ object CredentialAlertCapabilities {
     fun supportsBalanceWarningThreshold(providerId: ProviderId, usageKind: String?): Boolean =
         when (providerId) {
             ProviderId.DeepSeek,
-            ProviderId.Glm,
             ProviderId.NewAPI,
             -> true
             ProviderId.Xiaomi -> usageKind?.trim()?.lowercase() == "api"

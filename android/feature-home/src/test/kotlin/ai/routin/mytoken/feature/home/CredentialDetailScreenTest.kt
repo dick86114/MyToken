@@ -599,7 +599,7 @@ class CredentialDetailScreenTest {
     fun configShowsConfiguredBalanceWarningValue() {
         setConfigDetail(
             credential = credential(
-                ProviderId.Glm,
+                ProviderId.DeepSeek,
                 metadata = mapOf(CredentialMetadataKey.BalanceWarningThreshold to "40"),
             ),
         )
@@ -612,13 +612,27 @@ class CredentialDetailScreenTest {
 
     @Test
     fun configShowsNoReminderWhenBalanceWarningIsUnset() {
-        setConfigDetail(credential = credential(ProviderId.Glm))
+        setConfigDetail(credential = credential(ProviderId.DeepSeek))
 
         composeRule.onNodeWithTag("detail_balance_warning", useUnmergedTree = true)
             .performScrollTo()
             .assertIsDisplayed()
         composeRule.onNodeWithTag("detail_balance_warning_value", useUnmergedTree = true)
             .assertTextEquals("不提醒")
+    }
+
+    @Test
+    fun configHidesGlmLegacyBalanceWarning() {
+        setConfigDetail(
+            credential = credential(
+                ProviderId.Glm,
+                metadata = mapOf(CredentialMetadataKey.BalanceWarningThreshold to "40"),
+            ),
+        )
+
+        composeRule.onNodeWithTag("detail_balance_warning", useUnmergedTree = true)
+            .assertDoesNotExist()
+        composeRule.onNodeWithText("低余额预警值", useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test

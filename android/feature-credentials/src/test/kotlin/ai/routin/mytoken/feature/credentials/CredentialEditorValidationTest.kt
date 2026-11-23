@@ -125,7 +125,14 @@ class CredentialEditorValidationTest {
         val glm = validate(
             ProviderId.Glm, name = "GLM", apiKey = "sk-x", balanceWarningThreshold = "10",
         )
-        assertEquals("10", glm.metadata[CredentialMetadataKey.BalanceWarningThreshold])
+        assertFalse(glm.metadata.containsKey(CredentialMetadataKey.BalanceWarningThreshold))
+
+        val glmInvalidValue = validate(
+            ProviderId.Glm, name = "GLM", apiKey = "sk-x", balanceWarningThreshold = "abc",
+        )
+        assertFalse(
+            glmInvalidValue.metadata.containsKey(CredentialMetadataKey.BalanceWarningThreshold)
+        )
 
         val newApi = validate(
             ProviderId.NewAPI,

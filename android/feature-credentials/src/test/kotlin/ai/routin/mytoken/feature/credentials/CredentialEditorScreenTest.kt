@@ -153,6 +153,10 @@ class CredentialEditorScreenTest {
         viewModel.setProviderId(ProviderId.OpenCode)
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("editor_balance_warning_threshold").assertDoesNotExist()
+
+        viewModel.setProviderId(ProviderId.Glm)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("editor_balance_warning_threshold").assertDoesNotExist()
     }
 
     @Test

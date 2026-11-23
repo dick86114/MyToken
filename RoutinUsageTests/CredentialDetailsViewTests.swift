@@ -85,6 +85,20 @@ final class CredentialDetailsViewTests: XCTestCase {
         XCTAssertTrue(source.contains("title: \"凭证与模型\""))
     }
 
+    func test详情按能力隐藏不支持的旧低余额元数据() throws {
+        let source = try TestSourceReader.read([
+            "RoutinUsage",
+            "Views",
+            "Settings",
+            "CredentialDetailsView.swift"
+        ])
+
+        XCTAssertTrue(
+            source.contains("CredentialEditorValidation.supportsBalanceWarningThreshold(")
+        )
+        XCTAssertTrue(source.contains("isHiddenLegacyBalanceThreshold"))
+    }
+
     func test详情状态使用语义色区分正常刷新失败和过期() throws {
         let source = try TestSourceReader.read([
             "RoutinUsage",

@@ -466,7 +466,13 @@ struct CredentialDetailsView: View {
     }
 
     private var configurationRows: [ConfigurationRow] {
-        state.configuration.metadata
+        let usageKind = state.configuration.metadata["usageKind"] ?? "api"
+        let supportsBalanceWarningThreshold =
+            CredentialEditorValidation.supportsBalanceWarningThreshold(
+                providerID: state.configuration.providerID,
+                xiaomiUsageKind: usageKind
+            )
+        return state.configuration.metadata
             .filter { key, _ in
                 let isSecretField = [
                     "accessKeyID",
@@ -476,9 +482,9 @@ struct CredentialDetailsView: View {
                     "password",
                     "cookie"
                 ].contains(key)
-                let isLegacyCommandCodeThreshold = state.configuration.providerID == .commandCode
-                    && key == "balanceWarningThreshold"
-                return !isSecretField && !isLegacyCommandCodeThreshold
+                let isHiddenLegacyBalanceThreshold = key == "balanceWarningThreshold"
+                    && !supportsBalanceWarningThreshold
+                return !isSecretField && !isHiddenLegacyBalanceThreshold
             }
             .sorted { $0.key < $1.key }
             .map { ConfigurationRow(key: $0.key, value: $0.value) }
