@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.map
  * Notification preferences. The master switch pauses every in-app notification
  * (usage alerts and credential failures). Percent thresholds default to the shared
  * health contract (80% warning / 95% critical) but are independently configurable
- * here; they only affect notification evaluation, not the home-screen colors.
+ * here; they drive both notification evaluation and the home-screen health colors.
  */
 data class NotificationSettings(
     val notificationsEnabled: Boolean = true,

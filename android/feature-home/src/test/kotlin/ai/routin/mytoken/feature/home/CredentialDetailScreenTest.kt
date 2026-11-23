@@ -1,5 +1,6 @@
 package ai.routin.mytoken.feature.home
 
+import ai.routin.mytoken.core.alerts.AlertThresholds
 import ai.routin.mytoken.core.ui.MyTokenTheme
 import android.content.ClipboardManager
 import android.content.Context
@@ -17,6 +18,9 @@ import ai.routin.mytoken.domain.model.UsageMetricUnit
 import ai.routin.mytoken.domain.model.UsageResetCard
 import ai.routin.mytoken.domain.model.UsageSnapshot
 import ai.routin.mytoken.domain.usage.RefreshStatus
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
@@ -514,6 +518,201 @@ class CredentialDetailScreenTest {
         composeRule.onNodeWithContentDescription("复制模型 ID glm-5.3-air")
             .performScrollTo()
             .assertIsDisplayed()
+    }
+
+    private fun setConfigDetail(
+        credential: Credential,
+        globalAlertThresholds: AlertThresholds = AlertThresholds.DEFAULT,
+        alertThresholdOverride: AlertThresholds? = null,
+    ) {
+        composeRule.setContent {
+            MyTokenTheme {
+                CredentialDetailScreen(
+                    card = card(credential = credential),
+                    globalAlertThresholds = globalAlertThresholds,
+                    alertThresholdOverride = alertThresholdOverride,
+                    onBack = {},
+                    onRefresh = {},
+                    onEdit = {},
+                    onDelete = {},
+                )
+            }
+        }
+    }
+
+    @Test
+    fun configShowsCustomAlertThresholds() {
+        setConfigDetail(
+            credential = credential(ProviderId.Routin),
+            globalAlertThresholds = AlertThresholds(55, 95),
+            alertThresholdOverride = AlertThresholds(10, 20),
+        )
+
+        composeRule.onNodeWithTag("detail_alert_threshold", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("detail_alert_threshold_value", useUnmergedTree = true)
+            .assertTextEquals("低 10% · 高 20%（自定义）")
+    }
+
+    @Test
+    fun configFallsBackToGlobalAlertThresholds() {
+        setConfigDetail(
+            credential = credential(ProviderId.Routin),
+            globalAlertThresholds = AlertThresholds(55, 95),
+        )
+
+        composeRule.onNodeWithTag("detail_alert_threshold", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("detail_alert_threshold_value", useUnmergedTree = true)
+            .assertTextEquals("低 55% · 高 95%（跟随全局）")
+    }
+
+    @Test
+    fun configUpdatesWhenOverrideChanges() {
+        var override by mutableStateOf<AlertThresholds?>(null)
+        composeRule.setContent {
+            MyTokenTheme {
+                CredentialDetailScreen(
+                    card = card(credential = credential(ProviderId.Routin)),
+                    globalAlertThresholds = AlertThresholds(55, 95),
+                    alertThresholdOverride = override,
+                    onBack = {},
+                    onRefresh = {},
+                    onEdit = {},
+                    onDelete = {},
+                )
+            }
+        }
+        composeRule.onNodeWithTag("detail_alert_threshold_value", useUnmergedTree = true)
+            .assertTextEquals("低 55% · 高 95%（跟随全局）")
+
+        override = AlertThresholds(10, 20)
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("detail_alert_threshold_value", useUnmergedTree = true)
+            .assertTextEquals("低 10% · 高 20%（自定义）")
+    }
+
+    @Test
+    fun configShowsConfiguredBalanceWarningValue() {
+        setConfigDetail(
+            credential = credential(
+                ProviderId.Glm,
+                metadata = mapOf(CredentialMetadataKey.BalanceWarningThreshold to "40"),
+            ),
+        )
+        composeRule.onNodeWithTag("detail_balance_warning", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("detail_balance_warning_value", useUnmergedTree = true)
+            .assertTextEquals("40")
+    }
+
+    @Test
+    fun configShowsNoReminderWhenBalanceWarningIsUnset() {
+        setConfigDetail(credential = credential(ProviderId.Glm))
+
+        composeRule.onNodeWithTag("detail_balance_warning", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("detail_balance_warning_value", useUnmergedTree = true)
+            .assertTextEquals("不提醒")
+    }
+
+    @Test
+    fun configKeepsOtherMetadataRows() {
+        val baseURL = "https://api.example.com"
+        setConfigDetail(
+            credential = credential(
+                ProviderId.NewAPI,
+                metadata = mapOf(
+                    CredentialMetadataKey.BaseURL to baseURL,
+                    CredentialMetadataKey.UserID to "42",
+                    CredentialMetadataKey.BalanceWarningThreshold to "10",
+                ),
+            ),
+        )
+
+        composeRule.onNodeWithText("接口地址", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(baseURL, useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("用户 ID", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("42", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("低余额预警值", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun configShowsEncryptedSecretPlaceholder() {
+        setConfigDetail(credential = credential(ProviderId.Routin))
+
+        composeRule.onNodeWithTag("detail_secret", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("凭证密钥", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("已加密保存", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun deepSeekConfigShowsBalanceWarningButNoAlertThresholdsOrOldRow() {
+        setConfigDetail(
+            credential = credential(
+                ProviderId.DeepSeek,
+                metadata = mapOf(CredentialMetadataKey.BalanceWarningThreshold to "80"),
+            ),
+            globalAlertThresholds = AlertThresholds(55, 95),
+        )
+
+        composeRule.onNodeWithTag("detail_alert_threshold", useUnmergedTree = true)
+            .assertDoesNotExist()
+        composeRule.onNodeWithText("低额度预警值", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithTag("detail_balance_warning", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("detail_balance_warning_value", useUnmergedTree = true)
+            .assertTextEquals("80")
+    }
+
+    @Test
+    fun xiaomiApiConfigShowsBalanceButNotAlertThresholds() {
+        setConfigDetail(
+            credential = credential(
+                ProviderId.Xiaomi,
+                metadata = mapOf(
+                    CredentialMetadataKey.UsageKind to "api",
+                    CredentialMetadataKey.BalanceWarningThreshold to "12.5",
+                ),
+            ),
+        )
+
+        composeRule.onNodeWithTag("detail_alert_threshold", useUnmergedTree = true)
+            .assertDoesNotExist()
+        composeRule.onNodeWithTag("detail_balance_warning", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("detail_balance_warning_value", useUnmergedTree = true)
+            .assertTextEquals("12.5")
+    }
+
+    @Test
+    fun xiaomiPlanConfigShowsAlertThresholdsButNotBalanceWarning() {
+        setConfigDetail(
+            credential = credential(
+                ProviderId.Xiaomi,
+                metadata = mapOf(
+                    CredentialMetadataKey.UsageKind to "plan",
+                    CredentialMetadataKey.BalanceWarningThreshold to "12.5",
+                ),
+            ),
+        )
+
+        composeRule.onNodeWithTag("detail_alert_threshold", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("detail_balance_warning", useUnmergedTree = true)
+            .assertDoesNotExist()
     }
 
     @Test

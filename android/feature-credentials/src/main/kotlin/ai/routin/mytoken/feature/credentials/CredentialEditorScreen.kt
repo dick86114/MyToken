@@ -365,7 +365,7 @@ fun CredentialEditorScreen(
                                     color = colors.ink,
                                 )
                                 Text(
-                                    text = "仅影响用量通知，不改变首页配色",
+                                    text = "同时影响此凭证的首页状态与通知",
                                     style = MyTokenType.caption,
                                     color = colors.muted,
                                 )

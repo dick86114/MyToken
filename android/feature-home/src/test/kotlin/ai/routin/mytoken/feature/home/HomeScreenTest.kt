@@ -7,6 +7,7 @@ import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.model.CredentialKind
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageCardDensity
+import ai.routin.mytoken.domain.model.UsageHealthThresholdConfig
 import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
@@ -99,7 +100,8 @@ class HomeScreenTest {
         presentation = UsageMetricPresentation.Progress,
         semantic = UsageMetricSemantic.UsedQuota,
         currencyCode = "USD",
-        healthState = UsageMetricHealthState.Unknown,
+        healthState = UsageHealthThresholdConfig.DEFAULT
+            .stateForUsedPercent(if (limit > 0) used / limit * 100 else null),
     )
 
     private fun balance(value: Double) = UsageMetric(

@@ -70,6 +70,7 @@ class NotificationSettingsSectionTest {
         composeRule.onNodeWithText("启用通知").assertIsDisplayed()
         composeRule.onNodeWithText("启用提醒").assertDoesNotExist()
         composeRule.onNodeWithText("用量提醒阈值").assertIsDisplayed()
+        composeRule.onNodeWithText("同时影响首页状态与通知").assertIsDisplayed()
         composeRule.onNodeWithTag("settings_alert_threshold_range").assertIsDisplayed()
         composeRule.onNodeWithText("低 80% · 高 95%").assertIsDisplayed()
         composeRule.onNodeWithText("凭证失效提醒").assertIsDisplayed()

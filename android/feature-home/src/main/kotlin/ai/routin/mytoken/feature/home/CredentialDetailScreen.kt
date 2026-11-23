@@ -1,5 +1,6 @@
 package ai.routin.mytoken.feature.home
 
+import ai.routin.mytoken.core.alerts.AlertThresholds
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenButton
 import ai.routin.mytoken.core.ui.MyTokenButtonTone
@@ -76,7 +77,8 @@ internal fun credentialKindLabel(kind: CredentialKind, provider: ProviderId): St
 @Composable
 fun CredentialDetailScreen(
     card: CredentialCardUi?,
-    lowThresholdPercent: Int? = null,
+    globalAlertThresholds: AlertThresholds = AlertThresholds.DEFAULT,
+    alertThresholdOverride: AlertThresholds? = null,
     layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
     nextRefreshAt: Instant? = null,
     onBack: () -> Unit,
@@ -163,7 +165,8 @@ fun CredentialDetailScreen(
                     metadata = card.credential.metadata,
                     providerId = card.credential.providerId,
                     credentialKind = card.credential.credentialKind,
-                    lowThresholdPercent = lowThresholdPercent,
+                    globalAlertThresholds = globalAlertThresholds,
+                    alertThresholdOverride = alertThresholdOverride,
                 )
             }
         }

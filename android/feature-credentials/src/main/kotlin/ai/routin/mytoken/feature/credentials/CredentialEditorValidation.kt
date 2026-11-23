@@ -1,5 +1,6 @@
 package ai.routin.mytoken.feature.credentials
 
+import ai.routin.mytoken.domain.model.CredentialAlertCapabilities
 import ai.routin.mytoken.domain.model.CredentialKind
 import ai.routin.mytoken.domain.model.CredentialMetadataKey
 import ai.routin.mytoken.domain.model.CredentialSecret
@@ -163,24 +164,16 @@ object CredentialEditorValidation {
         }
     }
 
-    /** 与 macOS 编辑器一致：仅余额型/带余额账户暴露低余额预警值。 */
+    /** 与详情页共用 [CredentialAlertCapabilities]，避免两处可见性规则漂移。 */
     internal fun supportsBalanceWarningThreshold(providerId: ProviderId, usageKind: String): Boolean =
-        when (providerId) {
-            ProviderId.DeepSeek, ProviderId.Glm, ProviderId.NewAPI -> true
-            ProviderId.Xiaomi -> usageKind.trim().lowercase() == "api"
-            else -> false
-        }
+        CredentialAlertCapabilities.supportsBalanceWarningThreshold(providerId, usageKind)
 
     /**
      * 每凭证提醒阈值仅对会产生百分比指标（usedQuota / remainingQuota）的凭证显示。
      * 纯余额凭证（DeepSeek，以及小米的 API 按量模式）没有百分比指标，因此隐藏。
      */
     internal fun supportsPercentAlertThreshold(providerId: ProviderId, usageKind: String): Boolean =
-        when (providerId) {
-            ProviderId.DeepSeek -> false
-            ProviderId.Xiaomi -> usageKind.trim().lowercase() == "plan"
-            else -> true
-        }
+        CredentialAlertCapabilities.supportsPercentAlertThreshold(providerId, usageKind)
 
     private fun balanceWarningMetadata(
         providerId: ProviderId,

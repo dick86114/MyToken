@@ -158,6 +158,7 @@ class CredentialEditorScreenTest {
             .performScrollTo()
             .assertIsDisplayed()
         composeRule.onNodeWithText("跟随全局 80% / 95%").assertExists()
+        composeRule.onNodeWithText("同时影响此凭证的首页状态与通知").assertExists()
         composeRule.onNodeWithTag("editor_alert_threshold_range").assertDoesNotExist()
 
         viewModel.setProviderId(ProviderId.DeepSeek)

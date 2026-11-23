@@ -2,7 +2,6 @@ package ai.routin.mytoken.widget
 
 import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.model.ProviderId
-import ai.routin.mytoken.domain.model.UsageHealthThresholds
 import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
@@ -109,7 +108,7 @@ object WidgetPresentationBuilder {
             resetText = resetAt?.let { "重置 " + RESET_CLOCK_FORMAT.format(it) },
             resetClockText = resetAt?.let(RESET_CLOCK_FORMAT::format),
             progressPercent = percent?.roundToInt()?.coerceIn(0, 100),
-            severity = severity(metric, percent),
+            severity = severity(metric),
         )
     }
 
@@ -165,14 +164,11 @@ object WidgetPresentationBuilder {
             .toDouble()
     }
 
-    private fun severity(metric: UsageMetric, percent: Double?): WidgetMetricSeverity = when {
-        metric.healthState == UsageMetricHealthState.Unavailable -> WidgetMetricSeverity.Unavailable
-        metric.healthState == UsageMetricHealthState.Critical ||
-            (percent ?: 0.0) >= UsageHealthThresholds.CRITICAL_USED_PERCENT ->
-            WidgetMetricSeverity.Critical
-        metric.healthState == UsageMetricHealthState.Warning ||
-            (percent ?: 0.0) >= UsageHealthThresholds.WARNING_USED_PERCENT ->
-            WidgetMetricSeverity.Warning
+    /** Severity is authoritative from the normalized metric healthState, not percentages. */
+    private fun severity(metric: UsageMetric): WidgetMetricSeverity = when (metric.healthState) {
+        UsageMetricHealthState.Unavailable -> WidgetMetricSeverity.Unavailable
+        UsageMetricHealthState.Critical -> WidgetMetricSeverity.Critical
+        UsageMetricHealthState.Warning -> WidgetMetricSeverity.Warning
         else -> WidgetMetricSeverity.Normal
     }
 

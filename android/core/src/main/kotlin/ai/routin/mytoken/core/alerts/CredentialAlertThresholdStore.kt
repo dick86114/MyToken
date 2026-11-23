@@ -4,9 +4,9 @@ import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Per-credential percentage-threshold overrides used only for notification
- * evaluation (the home screen keeps the shared 80/95 health colors). Empty means
- * the credential follows the global thresholds; DataStore-backed in :data.
+ * Per-credential percentage-threshold overrides used for notification evaluation
+ * and for the credential's home-screen health colors. Empty means the credential
+ * follows the global thresholds; DataStore-backed in :data.
  */
 interface CredentialAlertThresholdStore {
     val overrides: Flow<Map<UUID, AlertThresholds>>

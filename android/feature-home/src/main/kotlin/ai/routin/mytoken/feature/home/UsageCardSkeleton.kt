@@ -11,7 +11,6 @@ import ai.routin.mytoken.core.ui.ProviderLogoPlate
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageCardDensity
 import ai.routin.mytoken.domain.model.UsageMetric
-import ai.routin.mytoken.domain.model.UsageHealthThresholds
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import ai.routin.mytoken.domain.usage.RefreshStatus
@@ -74,30 +73,11 @@ internal fun metricHealthTone(metric: UsageMetric): UsageCardHealth? = when (met
 
     UsageMetricHealthState.Warning -> UsageCardHealth.Warning
     UsageMetricHealthState.Normal -> UsageCardHealth.Normal
-    UsageMetricHealthState.Unknown -> fallbackHealthTone(metric)
-    UsageMetricHealthState.Stale -> null
-}
-
-/** 接口未给健康状态时按共享阈值兜底：进度 80% 警告、95% 超限，余额 ≤ 0 视为超限。 */
-private fun fallbackHealthTone(metric: UsageMetric): UsageCardHealth? {
-    if (metric.presentation == UsageMetricPresentation.Progress) {
-        val used = metric.used?.toDouble() ?: return null
-        val limit = metric.limit?.toDouble() ?: return null
-        if (limit <= 0.0) return UsageCardHealth.Normal
-        return when (UsageHealthThresholds.fromUsedPercent(used / limit * 100.0)) {
-            UsageMetricHealthState.Critical -> UsageCardHealth.Critical
-            UsageMetricHealthState.Warning -> UsageCardHealth.Warning
-            else -> UsageCardHealth.Normal
-        }
-    }
-    if (metric.presentation == UsageMetricPresentation.Balance) {
-        return if ((metric.value ?: return null) <= java.math.BigDecimal.ZERO) {
-            UsageCardHealth.Critical
-        } else {
-            UsageCardHealth.Normal
-        }
-    }
-    return null
+    // Health is normalized from the user's thresholds before it reaches the UI;
+    // Unknown stays neutral instead of falling back to fixed 80/95 boundaries.
+    UsageMetricHealthState.Unknown,
+    UsageMetricHealthState.Stale,
+    -> null
 }
 
 internal fun usageCardStatusText(health: UsageCardHealth): String = when (health) {

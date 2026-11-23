@@ -44,10 +44,17 @@ class AppGraph(context: Context) {
         defaultUsageProviders()
     }
 
+    /**
+     * Live source of the user's health thresholds (global + per-credential overrides).
+     * [MyTokenApplication] keeps it in sync with the settings DataStore flows.
+     */
+    val healthThresholdSource: AppUsageHealthThresholdSource = AppUsageHealthThresholdSource()
+
     val refreshUseCase: RefreshCredentialsUseCase by lazy {
         RefreshCredentialsUseCase(
             repository = credentialRepository,
             providers = providers,
+            healthThresholdSource = healthThresholdSource,
         )
     }
 

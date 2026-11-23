@@ -6,6 +6,7 @@ import ai.routin.mytoken.core.diagnostics.AppLog
 import ai.routin.mytoken.core.diagnostics.AppLogLevel
 import ai.routin.mytoken.widget.syncWidgetsOnUsageChanges
 import android.app.Application
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -48,6 +49,23 @@ class MyTokenApplication : Application() {
         )
         appScope.launch {
             runCatching { RefreshScheduling.apply(this@MyTokenApplication, null) }
+        }
+        // 提醒阈值同时也是首页健康度阈值：设置变化后更新实时阈值源，并立即
+        // 用现有快照重算状态（不触发网络刷新）。首页与组件会随 states 自动重绘。
+        appScope.launch {
+            observeUsageHealthThresholdChanges(
+                settings = graph.notificationSettingsStore.settings,
+                overrides = graph.credentialAlertThresholdStore.overrides,
+            ) { thresholds ->
+                graph.healthThresholdSource.update(thresholds)
+                try {
+                    graph.refreshUseCase.reapplyHealthThresholds()
+                } catch (cause: CancellationException) {
+                    throw cause
+                } catch (_: Throwable) {
+                    // 阈值重算失败不应影响应用其余部分；下次刷新会重新归一化。
+                }
+            }
         }
         // 主应用刷新完成后同步重绘组件；组件自身的手动刷新仍走 WorkManager。
         appScope.syncWidgetsOnUsageChanges(

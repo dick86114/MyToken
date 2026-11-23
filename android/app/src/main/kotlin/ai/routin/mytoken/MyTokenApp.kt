@@ -212,6 +212,9 @@ fun MyTokenApp(
     val usageCardDensity by homeViewModel.usageCardDensity.collectAsStateWithLifecycle()
     val listState by credentialListViewModel.state.collectAsStateWithLifecycle()
     val settingsState by settingsViewModel.state.collectAsStateWithLifecycle()
+    // 详情页实时展示每凭证阈值覆盖；DataStore flow 变化会直接触发重组。
+    val alertThresholdOverrides by graph.credentialAlertThresholdStore.overrides
+        .collectAsStateWithLifecycle(initialValue = emptyMap<UUID, AlertThresholds>())
     val updateState by settingsViewModel.updateState.collectAsStateWithLifecycle()
     val releaseHistoryState by settingsViewModel.releaseHistoryState.collectAsStateWithLifecycle()
     val pendingUpdateVersion = when (val update = updateState) {
@@ -389,7 +392,11 @@ fun MyTokenApp(
             }
             CredentialDetailScreen(
                 card = card,
-                lowThresholdPercent = settingsState.notifications.lowThresholdPercent,
+                globalAlertThresholds = AlertThresholds(
+                    lowPercent = settingsState.notifications.lowThresholdPercent,
+                    highPercent = settingsState.notifications.highThresholdPercent,
+                ),
+                alertThresholdOverride = alertThresholdOverrides[current.credentialId],
                 onBack = { goBack() },
                 onRefresh = { card?.let { homeViewModel.refreshCredential(it.credential) } },
                 onEdit = { navigate(AppScreen.Editor(current.credentialId)) },

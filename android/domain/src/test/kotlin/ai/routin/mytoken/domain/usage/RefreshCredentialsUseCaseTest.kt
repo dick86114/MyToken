@@ -6,6 +6,8 @@ import ai.routin.mytoken.domain.model.CredentialKind
 import ai.routin.mytoken.domain.model.CredentialSecret
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageMetric
+import ai.routin.mytoken.domain.model.UsageHealthThresholdConfig
+import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import ai.routin.mytoken.domain.model.UsageMetricSemantic
 import ai.routin.mytoken.domain.model.UsageMetricUnit
@@ -85,7 +87,20 @@ class RefreshCredentialsUseCaseTest {
         }
     }
 
-    private fun snapshot(credentialId: UUID, used: Int = 1): UsageSnapshot = UsageSnapshot(
+    private class MutableHealthThresholdSource(
+        var global: UsageHealthThresholdConfig = UsageHealthThresholdConfig.DEFAULT,
+    ) : UsageHealthThresholdSource {
+        val perCredential = mutableMapOf<UUID, UsageHealthThresholdConfig>()
+        override fun thresholdsFor(credentialId: UUID): UsageHealthThresholdConfig =
+            perCredential[credentialId] ?: global
+    }
+
+    private fun snapshot(
+        credentialId: UUID,
+        used: Int = 1,
+        healthState: UsageMetricHealthState =
+            UsageHealthThresholdConfig.DEFAULT.stateForUsedPercent(used.toDouble()),
+    ): UsageSnapshot = UsageSnapshot(
         credentialId = credentialId,
         fetchedAt = Instant.parse("2026-09-07T04:00:00Z"),
         metrics = listOf(
@@ -97,16 +112,22 @@ class RefreshCredentialsUseCaseTest {
                 remaining = (100 - used).toBigDecimal(),
                 unit = UsageMetricUnit.Currency,
                 presentation = UsageMetricPresentation.Progress,
-                semantic = UsageMetricSemantic.UsedQuota
+                semantic = UsageMetricSemantic.UsedQuota,
+                healthState = healthState,
             )
         )
     )
 
-    private fun credential(id: String, providerId: ProviderId, enabled: Boolean = true) = Credential(
+    private fun credential(
+        id: String,
+        providerId: ProviderId,
+        enabled: Boolean = true,
+        name: String = "示例",
+    ) = Credential(
         id = UUID.fromString(id),
         providerId = providerId,
         credentialKind = CredentialKind.BearerApiKey,
-        name = "示例",
+        name = name,
         isEnabled = enabled
     )
 
@@ -527,5 +548,239 @@ class RefreshCredentialsUseCaseTest {
 
         assertEquals(1, provider.calls.get())
         assertEquals(snapshot(cred.id, used = 7), useCase.states.value.getValue(cred.id).snapshot)
+    }
+
+    @Test
+    fun refreshAll_appliesCurrentGlobalThresholdsToQuotaHealth() = runTest {
+        val normal = credential(
+            "11111111-1111-4111-8111-111111111111", ProviderId.Routin, name = "84"
+        )
+        val warning = credential(
+            "22222222-2222-4222-8222-222222222222", ProviderId.Routin, name = "85"
+        )
+        val thresholds = MutableHealthThresholdSource(
+            global = UsageHealthThresholdConfig(lowPercent = 85, highPercent = 95)
+        )
+        val provider = FakeProvider(ProviderId.Routin) { cred ->
+            val used = if (cred.name == "84") 84 else 85
+            Result.success(
+                snapshot(cred.id, used = used, healthState = UsageMetricHealthState.Unknown)
+            )
+        }
+        val useCase = RefreshCredentialsUseCase(
+            repository = FakeCredentialRepository(
+                listOf(normal, warning),
+                mapOf(
+                    normal.id to CredentialSecret.BearerToken("t"),
+                    warning.id to CredentialSecret.BearerToken("t"),
+                ),
+            ),
+            providers = mapOf(ProviderId.Routin to provider),
+            healthThresholdSource = thresholds,
+        )
+
+        useCase.refreshAll()
+
+        assertEquals(
+            UsageMetricHealthState.Normal,
+            useCase.states.value.getValue(normal.id).snapshot!!.metrics.single().healthState,
+        )
+        assertEquals(
+            UsageMetricHealthState.Warning,
+            useCase.states.value.getValue(warning.id).snapshot!!.metrics.single().healthState,
+        )
+    }
+
+    @Test
+    fun refreshAll_appliesPerCredentialOverrideBeforeGlobalThresholds() = runTest {
+        val overridden = credential(
+            "11111111-1111-4111-8111-111111111111", ProviderId.Routin
+        )
+        val global = credential(
+            "22222222-2222-4222-8222-222222222222", ProviderId.Routin
+        )
+        val thresholds = MutableHealthThresholdSource().apply {
+            perCredential[overridden.id] =
+                UsageHealthThresholdConfig(lowPercent = 90, highPercent = 97)
+        }
+        val provider = FakeProvider(ProviderId.Routin) { cred ->
+            Result.success(
+                snapshot(cred.id, used = 84, healthState = UsageMetricHealthState.Unknown)
+            )
+        }
+        val useCase = RefreshCredentialsUseCase(
+            repository = FakeCredentialRepository(
+                listOf(overridden, global),
+                mapOf(
+                    overridden.id to CredentialSecret.BearerToken("t"),
+                    global.id to CredentialSecret.BearerToken("t"),
+                ),
+            ),
+            providers = mapOf(ProviderId.Routin to provider),
+            healthThresholdSource = thresholds,
+        )
+
+        useCase.refreshAll()
+
+        assertEquals(
+            UsageMetricHealthState.Normal,
+            useCase.states.value.getValue(overridden.id).snapshot!!.metrics.single().healthState,
+        )
+        assertEquals(
+            UsageMetricHealthState.Warning,
+            useCase.states.value.getValue(global.id).snapshot!!.metrics.single().healthState,
+        )
+    }
+
+    @Test
+    fun refreshAll_readsThresholdsAtFetchTimeNotConstructionTime() = runTest {
+        val cred = credential("11111111-1111-4111-8111-111111111111", ProviderId.Routin)
+        val thresholds = MutableHealthThresholdSource(
+            global = UsageHealthThresholdConfig(lowPercent = 85, highPercent = 95)
+        )
+        val provider = FakeProvider(ProviderId.Routin) {
+            Result.success(
+                snapshot(cred.id, used = 84, healthState = UsageMetricHealthState.Unknown)
+            )
+        }
+        val useCase = RefreshCredentialsUseCase(
+            repository = FakeCredentialRepository(
+                listOf(cred),
+                mapOf(cred.id to CredentialSecret.BearerToken("t")),
+            ),
+            providers = mapOf(ProviderId.Routin to provider),
+            healthThresholdSource = thresholds,
+        )
+
+        useCase.refreshAll()
+        assertEquals(
+            UsageMetricHealthState.Normal,
+            useCase.states.value.getValue(cred.id).snapshot!!.metrics.single().healthState,
+        )
+
+        thresholds.global = UsageHealthThresholdConfig(lowPercent = 80, highPercent = 95)
+        useCase.refreshAll()
+
+        assertEquals(
+            UsageMetricHealthState.Warning,
+            useCase.states.value.getValue(cred.id).snapshot!!.metrics.single().healthState,
+        )
+    }
+
+    @Test
+    fun restoreFromCache_normalizesWithCurrentThresholds() = runTest {
+        val cred = credential("11111111-1111-4111-8111-111111111111", ProviderId.Routin)
+        val repository = FakeCredentialRepository(listOf(cred))
+        repository.cachedSnapshots[cred.id] =
+            snapshot(cred.id, used = 84, healthState = UsageMetricHealthState.Warning)
+        val useCase = RefreshCredentialsUseCase(
+            repository = repository,
+            providers = emptyMap(),
+            healthThresholdSource = MutableHealthThresholdSource(
+                global = UsageHealthThresholdConfig(lowPercent = 85, highPercent = 95)
+            ),
+        )
+
+        useCase.restoreFromCache()
+
+        val state = useCase.states.value.getValue(cred.id)
+        assertTrue(state.isStale)
+        assertEquals(
+            UsageMetricHealthState.Normal,
+            state.snapshot!!.metrics.single().healthState,
+        )
+    }
+
+    @Test
+    fun reapplyHealthThresholds_updatesStateAndCacheWithoutRefetching() = runTest {
+        val cred = credential("11111111-1111-4111-8111-111111111111", ProviderId.Routin)
+        val thresholds = MutableHealthThresholdSource()
+        val provider = FakeProvider(ProviderId.Routin) {
+            Result.success(
+                snapshot(cred.id, used = 84, healthState = UsageMetricHealthState.Unknown)
+            )
+        }
+        val repository = FakeCredentialRepository(
+            listOf(cred),
+            mapOf(cred.id to CredentialSecret.BearerToken("t")),
+        )
+        val useCase = RefreshCredentialsUseCase(
+            repository = repository,
+            providers = mapOf(ProviderId.Routin to provider),
+            healthThresholdSource = thresholds,
+        )
+        useCase.refreshAll()
+        val before = useCase.states.value.getValue(cred.id)
+        assertEquals(UsageMetricHealthState.Warning, before.snapshot!!.metrics.single().healthState)
+        assertEquals(1, repository.cacheCalls)
+
+        thresholds.global = UsageHealthThresholdConfig(lowPercent = 85, highPercent = 95)
+        useCase.reapplyHealthThresholds()
+
+        val after = useCase.states.value.getValue(cred.id)
+        assertEquals(RefreshStatus.Ready, after.status)
+        assertFalse(after.isStale)
+        assertEquals(before.snapshot!!.fetchedAt, after.snapshot!!.fetchedAt)
+        assertEquals(
+            UsageMetricHealthState.Normal,
+            after.snapshot!!.metrics.single().healthState,
+        )
+        assertEquals(1, provider.calls.get())
+        assertEquals(2, repository.cacheCalls)
+        assertEquals(after.snapshot, repository.cachedSnapshots[cred.id])
+    }
+
+    @Test
+    fun reapplyHealthThresholds_skipsCacheWritesWhenNothingChanged() = runTest {
+        val cred = credential("11111111-1111-4111-8111-111111111111", ProviderId.Routin)
+        val repository = FakeCredentialRepository(
+            listOf(cred),
+            mapOf(cred.id to CredentialSecret.BearerToken("t")),
+        )
+        val useCase = RefreshCredentialsUseCase(
+            repository = repository,
+            providers = mapOf(
+                ProviderId.Routin to FakeProvider(ProviderId.Routin) {
+                    Result.success(snapshot(cred.id, used = 10))
+                }
+            ),
+        )
+        useCase.refreshAll()
+        assertEquals(1, repository.cacheCalls)
+
+        useCase.reapplyHealthThresholds()
+
+        assertEquals(1, repository.cacheCalls)
+    }
+
+    @Test
+    fun reapplyHealthThresholds_ignoresCacheWriteFailures() = runTest {
+        val cred = credential("11111111-1111-4111-8111-111111111111", ProviderId.Routin)
+        val thresholds = MutableHealthThresholdSource()
+        val repository = FakeCredentialRepository(
+            listOf(cred),
+            mapOf(cred.id to CredentialSecret.BearerToken("t")),
+        )
+        val useCase = RefreshCredentialsUseCase(
+            repository = repository,
+            providers = mapOf(
+                ProviderId.Routin to FakeProvider(ProviderId.Routin) {
+                    Result.success(
+                        snapshot(cred.id, used = 84, healthState = UsageMetricHealthState.Unknown)
+                    )
+                }
+            ),
+            healthThresholdSource = thresholds,
+        )
+        useCase.refreshAll()
+        repository.failCacheWrites = true
+
+        thresholds.global = UsageHealthThresholdConfig(lowPercent = 85, highPercent = 95)
+        useCase.reapplyHealthThresholds()
+
+        assertEquals(
+            UsageMetricHealthState.Normal,
+            useCase.states.value.getValue(cred.id).snapshot!!.metrics.single().healthState,
+        )
     }
 }

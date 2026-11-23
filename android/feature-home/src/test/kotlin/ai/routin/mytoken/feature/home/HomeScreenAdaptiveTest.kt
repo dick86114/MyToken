@@ -6,8 +6,8 @@ import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.model.CredentialKind
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageCardDensity
+import ai.routin.mytoken.domain.model.UsageHealthThresholdConfig
 import ai.routin.mytoken.domain.model.UsageMetric
-import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
 import ai.routin.mytoken.domain.model.UsageMetricSemantic
 import ai.routin.mytoken.domain.model.UsageMetricUnit
@@ -188,7 +188,7 @@ internal fun sampleCard(
         presentation = UsageMetricPresentation.Progress,
         semantic = UsageMetricSemantic.UsedQuota,
         currencyCode = "USD",
-        healthState = UsageMetricHealthState.Unknown,
+        healthState = UsageHealthThresholdConfig.DEFAULT.stateForUsedPercent(used),
     )
     return CredentialCardUi(
         credential = credential,

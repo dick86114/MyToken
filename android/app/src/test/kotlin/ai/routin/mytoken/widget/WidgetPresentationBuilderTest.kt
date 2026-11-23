@@ -56,13 +56,18 @@ class WidgetPresentationBuilderTest {
     }
 
     @Test
-    fun `severity follows shared 80 and 95 thresholds`() {
-        fun severity(percent: Int): WidgetMetricSeverity {
+    fun `severity follows the normalized health state not raw percent`() {
+        fun severity(
+            percent: Int,
+            state: UsageMetricHealthState,
+        ): WidgetMetricSeverity {
             val credential = credential(ProviderId.Routin)
             val snapshot = UsageSnapshot(
                 credentialId = credential.id,
                 fetchedAt = Instant.parse("2026-01-01T00:00:00Z"),
-                metrics = listOf(progress("fiveHour", "5 小时", percent)),
+                metrics = listOf(
+                    progress("fiveHour", "5 小时", percent).copy(healthState = state),
+                ),
             )
             return WidgetPresentationBuilder
                 .makeCredentialPresentation(credential, snapshot, WidgetSizeKind.Standard)
@@ -72,10 +77,24 @@ class WidgetPresentationBuilderTest {
                 ?: error("missing primary metric")
         }
 
-        assertEquals(WidgetMetricSeverity.Normal, severity(79))
-        assertEquals(WidgetMetricSeverity.Warning, severity(80))
-        assertEquals(WidgetMetricSeverity.Warning, severity(94))
-        assertEquals(WidgetMetricSeverity.Critical, severity(95))
+        // 84% is Normal under a custom 85/95 threshold even though the shared
+        // contract would call it Warning; the widget must trust the state.
+        assertEquals(
+            WidgetMetricSeverity.Normal,
+            severity(84, UsageMetricHealthState.Normal),
+        )
+        assertEquals(
+            WidgetMetricSeverity.Warning,
+            severity(85, UsageMetricHealthState.Warning),
+        )
+        assertEquals(
+            WidgetMetricSeverity.Critical,
+            severity(95, UsageMetricHealthState.Critical),
+        )
+        assertEquals(
+            WidgetMetricSeverity.Unavailable,
+            severity(95, UsageMetricHealthState.Unavailable),
+        )
     }
 
     @Test

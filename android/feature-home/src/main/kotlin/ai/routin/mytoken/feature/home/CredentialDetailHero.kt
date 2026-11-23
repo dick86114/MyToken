@@ -1,5 +1,6 @@
 package ai.routin.mytoken.feature.home
 
+import ai.routin.mytoken.core.alerts.AlertThresholds
 import ai.routin.mytoken.core.ui.MyTokenRadius
 import ai.routin.mytoken.core.ui.MyTokenReportBodyShape
 import ai.routin.mytoken.core.ui.MyTokenRow
@@ -11,6 +12,8 @@ import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.MyTokenVisualPolicy
 import ai.routin.mytoken.core.ui.ProviderLogoPlate
+import ai.routin.mytoken.domain.model.CredentialAlertCapabilities
+import ai.routin.mytoken.domain.model.CredentialKind
 import ai.routin.mytoken.domain.model.CredentialMetadataKey
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageMetric
@@ -633,21 +636,35 @@ private fun FactGrid(rows: List<Pair<String, String>>) {
     }
 }
 
-/** 配置：官网链接、凭证类型与低额度预警值。 */
+/** 配置：凭证类型、生效提醒阈值、低余额预警值、加密密钥与其余元数据。 */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun DetailConfigSection(
     metadata: Map<CredentialMetadataKey, String>,
     providerId: ProviderId,
-    credentialKind: ai.routin.mytoken.domain.model.CredentialKind,
-    lowThresholdPercent: Int?,
+    credentialKind: CredentialKind,
+    globalAlertThresholds: AlertThresholds = AlertThresholds.DEFAULT,
+    alertThresholdOverride: AlertThresholds? = null,
 ) {
-    val showThreshold = providerId == ProviderId.DeepSeek && lowThresholdPercent != null
-    if (metadata.isEmpty() && !showThreshold) return
     val colors = MyTokenThemeTokens.colors
     val uriHandler = LocalUriHandler.current
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
+    // 与编辑器一致：历史小米凭证缺少用量类型时按 API 按量处理。
+    val usageKind = metadata[CredentialMetadataKey.UsageKind] ?: "api"
+    val showAlertThreshold = CredentialAlertCapabilities.supportsPercentAlertThreshold(
+        providerId = providerId,
+        usageKind = usageKind,
+    )
+    val showBalanceWarning = CredentialAlertCapabilities.supportsBalanceWarningThreshold(
+        providerId = providerId,
+        usageKind = usageKind,
+    )
+    val visibleMetadata = metadata
+        .filterKeys { it != CredentialMetadataKey.BalanceWarningThreshold }
+        .entries
+        .sortedBy { it.key.rawValue }
+
     MyTokenSection(
         title = "配置",
         modifier = Modifier.testTag("detail_config"),
@@ -661,7 +678,52 @@ internal fun DetailConfigSection(
                 color = colors.ink,
             )
         }
-        metadata.entries.sortedBy { it.key.rawValue }.forEach { (key, value) ->
+        if (showAlertThreshold) {
+            Row(
+                modifier = Modifier.testTag("detail_alert_threshold"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(text = "提醒阈值", style = MyTokenType.caption, color = colors.muted)
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = alertThresholdDisplay(globalAlertThresholds, alertThresholdOverride),
+                    modifier = Modifier.testTag("detail_alert_threshold_value"),
+                    style = MyTokenType.caption,
+                    color = colors.ink,
+                    textAlign = TextAlign.End,
+                )
+            }
+        }
+        if (showBalanceWarning) {
+            Row(
+                modifier = Modifier.testTag("detail_balance_warning"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(text = "低余额预警值", style = MyTokenType.caption, color = colors.muted)
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = balanceWarningDisplay(metadata),
+                    modifier = Modifier.testTag("detail_balance_warning_value"),
+                    style = MyTokenType.caption,
+                    color = colors.ink,
+                    textAlign = TextAlign.End,
+                )
+            }
+        }
+        Row(
+            modifier = Modifier.testTag("detail_secret"),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(text = "凭证密钥", style = MyTokenType.caption, color = colors.muted)
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = "已加密保存",
+                style = MyTokenType.caption,
+                color = colors.ink,
+                textAlign = TextAlign.End,
+            )
+        }
+        visibleMetadata.forEach { (key, value) ->
             if (key == CredentialMetadataKey.WebsiteURL) {
                 Row(verticalAlignment = Alignment.Top) {
                     Text(
@@ -712,13 +774,27 @@ internal fun DetailConfigSection(
                 }
             }
         }
-        if (showThreshold) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "低额度预警值", style = MyTokenType.caption, color = colors.muted)
-                Spacer(modifier = Modifier.weight(1f))
-                Text(text = "$lowThresholdPercent", style = MyTokenType.caption, color = colors.ink)
-            }
-        }
+    }
+}
+
+/** 生效阈值摘要，明确区分每凭证覆盖与跟随全局。 */
+internal fun alertThresholdDisplay(
+    globalAlertThresholds: AlertThresholds,
+    alertThresholdOverride: AlertThresholds?,
+): String {
+    val effective = alertThresholdOverride ?: globalAlertThresholds
+    val source = if (alertThresholdOverride != null) "自定义" else "跟随全局"
+    return "低 ${effective.lowPercent}% · 高 ${effective.highPercent}%（$source）"
+}
+
+/** 低余额预警值沿用编辑器语义：缺省/非正数显示“不提醒”。 */
+internal fun balanceWarningDisplay(metadata: Map<CredentialMetadataKey, String>): String {
+    val raw = metadata[CredentialMetadataKey.BalanceWarningThreshold]?.trim().orEmpty()
+    val amount = raw.toBigDecimalOrNull() ?: return "不提醒"
+    return if (amount > BigDecimal.ZERO) {
+        amount.stripTrailingZeros().toPlainString()
+    } else {
+        "不提醒"
     }
 }
 

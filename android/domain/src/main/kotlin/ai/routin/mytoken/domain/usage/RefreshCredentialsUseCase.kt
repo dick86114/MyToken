@@ -44,6 +44,7 @@ class RefreshCredentialsUseCase(
     private val providers: Map<ProviderId, UsageProvider>,
     private val clock: Clock = Clock.systemUTC(),
     private val maxConcurrency: Int = DEFAULT_MAX_CONCURRENCY,
+    private val healthThresholdSource: UsageHealthThresholdSource = DefaultUsageHealthThresholdSource,
 ) {
     init {
         require(maxConcurrency >= 1) { "maxConcurrency must be positive" }
@@ -91,16 +92,61 @@ class RefreshCredentialsUseCase(
                 if (cause is CancellationException) throw cause
                 null
             } ?: return@forEach
+            val normalized = normalize(credential.id, cached)
             update(credential.id) { previous ->
                 if (previous.snapshot == null) {
                     CredentialUsageState(
                         status = RefreshStatus.Ready,
-                        snapshot = cached,
+                        snapshot = normalized,
                         isStale = true
                     )
                 } else {
                     previous
                 }
+            }
+        }
+    }
+
+    /**
+     * Recomputes health states for every already-loaded snapshot using the source's
+     * current thresholds, without another network refresh. Status, stale flags and
+     * fetchedAt are preserved; changed snapshots are written back to the cache
+     * (best-effort) so a cold start keeps the same colors.
+     */
+    suspend fun reapplyHealthThresholds() {
+        val credentials = try {
+            repository.observeCredentials().first()
+        } catch (cause: Throwable) {
+            if (cause is CancellationException) throw cause
+            return
+        }
+        if (credentials.isEmpty()) return
+        val credentialsById = credentials.associateBy { it.id }
+        val changed = mutableMapOf<UUID, UsageSnapshot>()
+
+        _states.update { current ->
+            changed.clear()
+            if (current.isEmpty()) return@update current
+            current.mapValues { (id, state) ->
+                val snapshot = state.snapshot ?: return@mapValues state
+                val credential = credentialsById[id] ?: return@mapValues state
+                val normalized = normalize(credential.id, snapshot)
+                if (normalized == snapshot) {
+                    state
+                } else {
+                    changed[id] = normalized
+                    state.copy(snapshot = normalized)
+                }
+            }
+        }
+
+        for ((id, snapshot) in changed) {
+            try {
+                repository.cacheSnapshot(snapshot)
+            } catch (cause: CancellationException) {
+                throw cause
+            } catch (_: Throwable) {
+                // Non-fatal: the in-memory state is already correct for this session.
             }
         }
     }
@@ -151,7 +197,10 @@ class RefreshCredentialsUseCase(
                     )
                 val secret = repository.readSecret(credential.id)
                     ?: throw AppError.Storage("凭证密钥缺失，请重新导入")
-                val snapshot = provider.fetchUsage(credential, secret).getOrThrow()
+                val snapshot = normalize(
+                    credential.id,
+                    provider.fetchUsage(credential, secret).getOrThrow(),
+                )
                 // Best-effort cache write: a failed cache write must not turn a
                 // successful provider fetch into a refresh failure.
                 try {
@@ -182,6 +231,9 @@ class RefreshCredentialsUseCase(
             }
         }
     }
+
+    private fun normalize(credentialId: UUID, snapshot: UsageSnapshot): UsageSnapshot =
+        UsageHealthNormalizer.normalize(snapshot, healthThresholdSource.thresholdsFor(credentialId))
 
     private fun setDisabled(id: UUID) {
         update(id) { CredentialUsageState(status = RefreshStatus.Disabled) }

@@ -4,6 +4,7 @@ import ai.routin.mytoken.domain.model.AppError
 import ai.routin.mytoken.domain.model.Credential
 import ai.routin.mytoken.domain.model.CredentialKind
 import ai.routin.mytoken.domain.model.ProviderId
+import ai.routin.mytoken.domain.model.UsageHealthThresholdConfig
 import ai.routin.mytoken.domain.model.UsageMetric
 import ai.routin.mytoken.domain.model.UsageMetricHealthState
 import ai.routin.mytoken.domain.model.UsageMetricPresentation
@@ -19,7 +20,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** 卡片健康映射与边界值：失败优先、阈值兜底、0 限额不产生 NaN。 */
+/** 卡片健康映射与边界值：失败优先、沿用上游归一化状态、0 限额不产生 NaN。 */
 class UsageCardHealthTest {
 
     private fun progress(id: String, used: Double, limit: Double, state: UsageMetricHealthState = UsageMetricHealthState.Unknown) =
@@ -60,15 +61,31 @@ class UsageCardHealthTest {
     fun warningAndCriticalOutrankNormal() {
         assertEquals(
             UsageCardHealth.Normal,
-            usageCardHealth(card(listOf(progress("a", 20.0, 100.0)))),
+            usageCardHealth(
+                card(listOf(progress("a", 20.0, 100.0, UsageMetricHealthState.Normal)))
+            ),
         )
         assertEquals(
             UsageCardHealth.Warning,
-            usageCardHealth(card(listOf(progress("a", 20.0, 100.0), progress("b", 85.0, 100.0)))),
+            usageCardHealth(
+                card(
+                    listOf(
+                        progress("a", 20.0, 100.0, UsageMetricHealthState.Normal),
+                        progress("b", 85.0, 100.0, UsageMetricHealthState.Warning),
+                    )
+                )
+            ),
         )
         assertEquals(
             UsageCardHealth.Critical,
-            usageCardHealth(card(listOf(progress("a", 85.0, 100.0), progress("b", 96.0, 100.0)))),
+            usageCardHealth(
+                card(
+                    listOf(
+                        progress("a", 85.0, 100.0, UsageMetricHealthState.Warning),
+                        progress("b", 96.0, 100.0, UsageMetricHealthState.Critical),
+                    )
+                )
+            ),
         )
     }
 
@@ -87,11 +104,18 @@ class UsageCardHealthTest {
     }
 
     @Test
-    fun fallbackThresholdsUse80And95Boundaries() {
-        assertEquals(UsageCardHealth.Normal, usageCardHealth(card(listOf(progress("a", 79.0, 100.0)))))
-        assertEquals(UsageCardHealth.Warning, usageCardHealth(card(listOf(progress("a", 80.0, 100.0)))))
-        assertEquals(UsageCardHealth.Warning, usageCardHealth(card(listOf(progress("a", 94.0, 100.0)))))
-        assertEquals(UsageCardHealth.Critical, usageCardHealth(card(listOf(progress("a", 95.0, 100.0)))))
+    fun normalizedHealthStatesDriveCardHealthAtThresholdBoundaries() {
+        fun normalized(percent: Double) = progress(
+            "a",
+            percent,
+            100.0,
+            UsageHealthThresholdConfig.DEFAULT.stateForUsedPercent(percent),
+        )
+
+        assertEquals(UsageCardHealth.Normal, usageCardHealth(card(listOf(normalized(79.0)))))
+        assertEquals(UsageCardHealth.Warning, usageCardHealth(card(listOf(normalized(80.0)))))
+        assertEquals(UsageCardHealth.Warning, usageCardHealth(card(listOf(normalized(94.0)))))
+        assertEquals(UsageCardHealth.Critical, usageCardHealth(card(listOf(normalized(95.0)))))
     }
 
     @Test
