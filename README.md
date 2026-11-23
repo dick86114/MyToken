@@ -77,7 +77,25 @@
 
 ### Android
 
-Android 客户端要求 Android 10 及以上，通过「迁移到 Android」扫码接收 Mac 上的配置。
+Android 客户端要求 **Android 10（API 29）及以上**。
+
+1. 从 [Releases](https://github.com/dick86114/MyToken/releases) 下载 `MyToken-<版本>-android.apk`。
+   想尝鲜可以装 `-android-preview.<n>.apk` 预览版（不参与应用内更新）。
+2. 安装后打开应用，在 Mac 端「设置 → 迁移到 Android」生成二维码，用手机扫码接收凭证。
+3. 也可以跳过迁移，在凭证抽屉里手动添加单个供应商。
+
+<p align="center">
+  <img src="docs/android/screenshots/home-grid-light.png" width="300" alt="Android 首页网格视图">
+  <img src="docs/android/screenshots/home-list-light.png" width="300" alt="Android 首页列表视图">
+  <img src="docs/android/screenshots/home-grid-dark.png" width="300" alt="Android 首页深色模式">
+</p>
+<p align="center">
+  <sub>截图由 6.1.0 Debug 版实际渲染，数据为演示用模拟数据。</sub>
+</p>
+
+Android 端覆盖首页用量面板、凭证列表与编辑器、卡片详情、设置和单凭证桌面小组件，
+支持列表 / 网格两种密度、深浅色主题和 8 家供应商。图文操作说明见
+[`docs/android/使用手册.md`](docs/android/使用手册.md)，
 构建与模块结构见 [`docs/android/README.md`](docs/android/README.md)。
 
 ## 使用
