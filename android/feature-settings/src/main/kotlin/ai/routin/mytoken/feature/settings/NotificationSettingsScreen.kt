@@ -9,25 +9,22 @@ import ai.routin.mytoken.core.ui.MyTokenDialogTone
 import ai.routin.mytoken.core.ui.MyTokenRadius
 import ai.routin.mytoken.core.ui.MyTokenRangeSlider
 import ai.routin.mytoken.core.ui.MyTokenRow
-import ai.routin.mytoken.core.ui.MyTokenSize
 import ai.routin.mytoken.core.ui.MyTokenStatus
 import ai.routin.mytoken.core.ui.MyTokenStatusTone
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.CreditCard
-import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -87,53 +84,28 @@ fun NotificationSettingsSection(
         )
 
         if (settings.notificationsEnabled) {
-            Row(
+            MyTokenRow(
+                icon = Icons.Outlined.Timer,
+                title = "用量提醒阈值",
+                supportingText = PercentThresholdRange.label(lowPercent, highPercent),
+                iconTint = colors.actionFill,
+                iconSize = 22.dp,
+                onClick = {
+                    draftRange = thresholdRange
+                    showThresholdDialog = true
+                },
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("settings_alert_thresholds"),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "用量提醒阈值",
-                        style = MyTokenType.body,
-                        fontWeight = FontWeight.SemiBold,
-                        color = colors.ink,
-                    )
-                    Text(
-                        text = "同时影响首页状态与通知",
-                        style = MyTokenType.caption,
-                        color = colors.muted,
-                    )
-                }
-                Text(
-                    text = PercentThresholdRange.label(lowPercent, highPercent),
-                    modifier = Modifier.testTag("settings_alert_threshold_values"),
-                    style = MyTokenType.label,
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.ink,
-                )
-                Box(
-                    modifier = Modifier
-                        .size(MyTokenSize.touch)
-                        .clip(RoundedCornerShape(MyTokenRadius.pill))
-                        .clickable(role = Role.Button) {
-                            draftRange = thresholdRange
-                            showThresholdDialog = true
-                        }
-                        .semantics { contentDescription = "编辑用量提醒阈值" }
-                        .testTag("settings_alert_threshold_edit"),
-                    contentAlignment = Alignment.Center,
-                ) {
+                    .testTag("settings_alert_threshold_edit")
+                    .semantics { contentDescription = "编辑用量提醒阈值" },
+                trailing = {
                     Icon(
-                        imageVector = Icons.Outlined.Edit,
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                         contentDescription = null,
-                        tint = colors.actionText,
+                        tint = colors.muted,
                         modifier = Modifier.size(18.dp),
                     )
-                }
-            }
+                },
+            )
         }
 
         SettingSwitchRow(
@@ -151,33 +123,16 @@ fun NotificationSettingsSection(
             onChange = onCredentialFailureAlertsChange,
             enabled = settings.notificationsEnabled,
         )
-        MyTokenRow(
-            icon = null,
-            title = "系统通知",
-            trailing = {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    if (permissionGranted) {
-                        Row(
-                            modifier = Modifier.testTag("settings_permission_status"),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Check,
-                                contentDescription = null,
-                                tint = colors.muted,
-                                modifier = Modifier.size(12.dp),
-                            )
-                            Text(
-                                text = "已允许",
-                                style = MyTokenType.caption,
-                                color = colors.muted,
-                            )
-                        }
-                    } else {
+        // 权限已授予时不再占用设置项；只有需要用户处理时才显示。
+        if (!permissionGranted) {
+            MyTokenRow(
+                icon = null,
+                title = "系统通知",
+                trailing = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
                         MyTokenStatus(
                             text = "未授予",
                             tone = MyTokenStatusTone.Warning,
@@ -193,9 +148,9 @@ fun NotificationSettingsSection(
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
                         )
                     }
-                }
-            },
-        )
+                },
+            )
+        }
     }
 
     if (showThresholdDialog) {

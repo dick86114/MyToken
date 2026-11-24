@@ -82,18 +82,31 @@ class NotificationSettingsSectionTest {
         composeRule.onNodeWithText("启用通知").assertIsDisplayed()
         composeRule.onNodeWithText("启用提醒").assertDoesNotExist()
         composeRule.onNodeWithText("用量提醒阈值").assertIsDisplayed()
-        composeRule.onNodeWithText("同时影响首页状态与通知").assertIsDisplayed()
+        // 收起时小字直接展示当前阈值范围。
+        composeRule.onNodeWithText("同时影响首页状态与通知").assertDoesNotExist()
         composeRule.onNodeWithText("低 80% · 高 95%").assertIsDisplayed()
         composeRule.onNodeWithTag("settings_alert_threshold_edit").assertIsDisplayed()
         composeRule.onNodeWithTag("settings_alert_threshold_range").assertDoesNotExist()
         composeRule.onNodeWithText("凭证失效提醒").assertIsDisplayed()
-        composeRule.onNodeWithText("已允许").assertIsDisplayed()
+        // 已授权时系统通知行整体隐藏。
+        composeRule.onNodeWithText("系统通知").assertDoesNotExist()
+        composeRule.onNodeWithText("已允许").assertDoesNotExist()
         composeRule.onNodeWithText("去授权").assertDoesNotExist()
 
         openThresholdDialog()
         composeRule.onNodeWithTag("settings_threshold_dialog").assertIsDisplayed()
+        composeRule.onNodeWithText("同时影响首页状态与通知").assertIsDisplayed()
         composeRule.onNodeWithTag("settings_alert_threshold_range").assertIsDisplayed()
         composeRule.onNodeWithText("保存").assertIsDisplayed()
+    }
+
+    @Test
+    fun grantedPermissionHidesSystemNotificationEntry() {
+        setContent(permissionGranted = true)
+
+        composeRule.onNodeWithText("系统通知").assertDoesNotExist()
+        composeRule.onNodeWithText("已允许").assertDoesNotExist()
+        composeRule.onNodeWithText("去授权").assertDoesNotExist()
     }
 
     @Test
@@ -110,6 +123,7 @@ class NotificationSettingsSectionTest {
             }
         }
 
+        composeRule.onNodeWithText("系统通知").assertIsDisplayed()
         composeRule.onNodeWithText("未授予").assertIsDisplayed()
         composeRule.onNodeWithText("去授权").performClick()
         assertEquals(1, requested)

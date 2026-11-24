@@ -20,10 +20,9 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /**
- * The Settings page notification-permission status must be reactive: toggling
- * notification availability (what a POST_NOTIFICATIONS revocation causes on real
- * devices) and returning to the app (ON_STOP → ON_RESTART → ON_RESUME, no activity
- * recreation) updates the visible status.
+ * The Settings page only surfaces the system-notification row while permission is
+ * missing. Granting/revoking (what a POST_NOTIFICATIONS change causes on real devices)
+ * and returning to the app (no activity recreation) must update it reactively.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "w400dp-h1100dp")
@@ -49,31 +48,36 @@ class MainActivityNotificationPermissionTest {
         scenario.moveToState(Lifecycle.State.RESUMED)
     }
 
-    private fun openSettingsAndScrollToPermissionStatus() {
+    private fun openSettingsAndScrollTo(text: String) {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("home_open_settings").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("settings_drawer_content").performScrollToNode(
-            hasText("已允许"),
+            hasText(text),
         )
     }
 
     @Test
-    fun permissionStatusUpdatesOnLifecycleResume() {
+    fun systemNotificationRowOnlyVisibleWhileNotGranted() {
         composeRule.activityRule.scenario.onActivity { toggleNotifications(it, enabled = true) }
-        openSettingsAndScrollToPermissionStatus()
-        composeRule.onNodeWithText("已允许").assertIsDisplayed()
+        openSettingsAndScrollTo("凭证失效提醒")
+        composeRule.onNodeWithText("系统通知").assertDoesNotExist()
+        composeRule.onNodeWithText("已允许").assertDoesNotExist()
 
         // Simulate revocation in system settings + return to the app.
         composeRule.activityRule.scenario.onActivity { toggleNotifications(it, enabled = false) }
         relaunchThroughLifecycle()
         composeRule.waitForIdle()
+        composeRule.onNodeWithTag("settings_drawer_content")
+            .performScrollToNode(hasText("系统通知"))
+        composeRule.onNodeWithText("系统通知").assertIsDisplayed()
         composeRule.onNodeWithText("未授予").assertIsDisplayed()
 
-        // Re-granting reflects again on the next resume.
+        // Re-granting hides the row again on the next resume.
         composeRule.activityRule.scenario.onActivity { toggleNotifications(it, enabled = true) }
         relaunchThroughLifecycle()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("已允许").assertIsDisplayed()
+        composeRule.onNodeWithText("系统通知").assertDoesNotExist()
+        composeRule.onNodeWithText("未授予").assertDoesNotExist()
     }
 }
