@@ -4,7 +4,6 @@ import ai.routin.mytoken.core.ui.MyTokenMotion
 import ai.routin.mytoken.core.ui.MyTokenReportBodyShape
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
-import ai.routin.mytoken.core.ui.ProviderLogoPlate
 import ai.routin.mytoken.core.ui.rememberMyTokenMotionEnabled
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
@@ -38,7 +37,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -49,9 +47,10 @@ import androidx.compose.ui.unit.dp
 import java.util.UUID
 
 /**
- * 大屏报告：内容与手机版完全一致（数量 / 结论 / 表盘 / 告警行 / 最近同步），
+ * 大屏报告：字段与手机版一致（数量 / 结论 / 表盘 / 告警行 / 最近同步），
  * 只按窗口比例切换横排与竖排。
  *
+ * - 告警行不再重复供应商 logo（左轨已承担识别），保留名称、详情、数值/单位与 ›。
  * - 无告警：80dp 短票；琥珀头 + 墨色一行，不留空的发现区。
  * - 有告警：16:9 横排固定 110dp，其余比例随告警行数自然增长。
  */
@@ -395,7 +394,7 @@ private fun NormalCheckBadge(size: Dp) {
     }
 }
 
-/** 横排告警行保持与手机报告相同的字段：logo、名称、详情、数值 + 单位、›。 */
+/** 大屏告警行：名称、详情、数值 + 单位、›；供应商 logo 已由左轨承担。 */
 @Composable
 private fun WideReportFindingRow(
     finding: HomeReportFinding,
@@ -430,14 +429,6 @@ private fun WideReportFindingRow(
             .testTag("health_finding_${finding.credentialId}"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ProviderLogoPlate(
-            painter = painterResource(ProviderCatalog.logoRes(finding.providerId)),
-            contentDescription = null,
-            size = 22.dp,
-            shape = RoundedCornerShape(6.dp),
-            contentPadding = 2.5.dp,
-        )
-        Spacer(modifier = Modifier.size(7.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = finding.name,
