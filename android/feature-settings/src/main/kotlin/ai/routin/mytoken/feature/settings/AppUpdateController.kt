@@ -16,7 +16,7 @@ sealed interface AppUpdateUiState {
         val downloadUrl: String,
     ) : AppUpdateUiState
 
-    data class Downloading(val progress: Float?) : AppUpdateUiState
+    data class Downloading(val version: String, val progress: Float?) : AppUpdateUiState
 
     data class ReadyToInstall(val version: String) : AppUpdateUiState
 

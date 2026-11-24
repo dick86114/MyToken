@@ -212,22 +212,27 @@ fun MyTokenSwitch(
  * first vertical movement can still scroll the page before drag start is observed.
  * It resets on up/cancel and when the slider leaves composition (e.g. a lazy item).
  */
+/**
+ * 在滑块所在的整块设置区域上拦截拖动：手指落在滑块边缘、标题或数值上时，
+ * 父级滚动容器也不会抢走手势。松手后立即恢复页面滚动。
+ */
 @Composable
-private fun rememberSliderDragReporter(
-    onDraggingChanged: ((Boolean) -> Unit)?,
+fun rememberSliderGestureGuard(
+    enabled: Boolean = true,
+    onDraggingChanged: (Boolean) -> Unit = {},
 ): Modifier {
     val callback by rememberUpdatedState(onDraggingChanged)
     DisposableEffect(Unit) {
-        onDispose { callback?.invoke(false) }
+        onDispose { callback(false) }
     }
-    if (callback == null) return Modifier
+    if (!enabled) return Modifier
     return Modifier.pointerInput(Unit) {
         awaitEachGesture {
             val down = awaitFirstDown(
                 requireUnconsumed = false,
                 pass = PointerEventPass.Initial,
             )
-            callback?.invoke(true)
+            callback(true)
             try {
                 do {
                     // Main runs child → parent: the slider's own drag detector has
@@ -242,10 +247,18 @@ private fun rememberSliderDragReporter(
                     }
                 } while (event.changes.any { it.id == down.id && it.pressed })
             } finally {
-                callback?.invoke(false)
+                callback(false)
             }
         }
     }
+}
+
+@Composable
+private fun rememberSliderDragReporter(
+    onDraggingChanged: ((Boolean) -> Unit)?,
+): Modifier {
+    if (onDraggingChanged == null) return Modifier
+    return rememberSliderGestureGuard(onDraggingChanged = onDraggingChanged)
 }
 
 /**

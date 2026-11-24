@@ -122,6 +122,9 @@ fun HomeScreen(
     updateVersion: String? = null,
     updateReleaseNotes: String? = null,
     updateConfirmLabel: String = "下载并安装",
+    isUpdateDownloading: Boolean = false,
+    updateDownloadProgress: Float? = null,
+    isUpdateReadyToInstall: Boolean = false,
     onConfirmUpdate: () -> Unit = onOpenSettings,
     layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
     usageCardDensity: UsageCardDensity = UsageCardDensity.FULL,
@@ -166,7 +169,23 @@ fun HomeScreen(
     var pullSettleJob by remember { mutableStateOf<Job?>(null) }
     var pendingLocateId by remember { mutableStateOf<UUID?>(null) }
     var showUpdateDialog by remember { mutableStateOf(false) }
+    var updateDownloadStarted by remember { mutableStateOf(false) }
+    var shownUpdateVersion by remember { mutableStateOf<String?>(null) }
     var pagerHasUserInput by remember { mutableStateOf(false) }
+
+    // 下载期间保持弹窗打开并展示进度；下载结束（成功或失败）后自动收起。
+    LaunchedEffect(showUpdateDialog, isUpdateDownloading) {
+        if (!showUpdateDialog) {
+            updateDownloadStarted = false
+            return@LaunchedEffect
+        }
+        if (isUpdateDownloading) {
+            updateDownloadStarted = true
+        } else if (updateDownloadStarted) {
+            showUpdateDialog = false
+            updateDownloadStarted = false
+        }
+    }
 
     val density = LocalDensity.current
     val topNavHeightPx = with(density) { 60.dp.toPx() }
@@ -792,7 +811,10 @@ fun HomeScreen(
                                 if (hasUpdateAvailable) {
                                     HomeUpdateBanner(
                                         version = updateVersion,
-                                        onOpenUpdate = { showUpdateDialog = true },
+                                        onOpenUpdate = {
+                                            shownUpdateVersion = updateVersion
+                                            showUpdateDialog = true
+                                        },
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
                                 }
@@ -853,14 +875,16 @@ fun HomeScreen(
 
     if (showUpdateDialog) {
         MyTokenUpdateDialog(
-            version = updateVersion,
+            version = shownUpdateVersion ?: updateVersion,
             releaseNotes = updateReleaseNotes,
             confirmLabel = updateConfirmLabel,
+            downloading = isUpdateDownloading,
+            downloadProgress = updateDownloadProgress,
             onConfirm = {
-                showUpdateDialog = false
                 onConfirmUpdate()
+                if (isUpdateReadyToInstall) showUpdateDialog = false
             },
-            onDismiss = { showUpdateDialog = false },
+            onDismiss = { if (!isUpdateDownloading) showUpdateDialog = false },
             modifier = Modifier.testTag("home_update_dialog"),
             confirmTag = "home_update_confirm",
         )

@@ -134,13 +134,14 @@ class NotificationSettingsSectionTest {
     }
 
     @Test
-    fun masterSwitchOffDisablesRangeAndOtherChildren() {
+    fun masterSwitchOffHidesThresholdSettings() {
         setContent(settings = NotificationSettings(notificationsEnabled = false))
 
         composeRule.onNodeWithContentDescription("启用通知").assertIsEnabled()
         composeRule.onNodeWithContentDescription("凭证失效提醒").assertIsNotEnabled()
-        composeRule.onNodeWithTag("settings_alert_threshold_range").assertIsNotEnabled()
-        composeRule.onNodeWithText("低 80% · 高 95%").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_alert_threshold_range").assertDoesNotExist()
+        composeRule.onNodeWithText("用量提醒阈值").assertDoesNotExist()
+        composeRule.onNodeWithText("低 80% · 高 95%").assertDoesNotExist()
         assertNull(savedThresholds)
     }
 }

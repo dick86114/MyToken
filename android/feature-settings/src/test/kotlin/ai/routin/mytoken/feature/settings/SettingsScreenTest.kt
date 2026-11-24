@@ -513,6 +513,36 @@ class SettingsScreenTest {
         )
     }
 
+    @Test
+    fun draggingThresholdBlockDoesNotScrollPage() {
+        setContent()
+        composeRule.onNodeWithTag("settings_list")
+            .performScrollToNode(hasTestTag("settings_alert_threshold_range"))
+        composeRule.waitForIdle()
+
+        fun thresholdLabelTop() = composeRule
+            .onNodeWithText("用量提醒阈值", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+            .top
+            .value
+
+        val topBeforeDrag = thresholdLabelTop()
+        composeRule.onNodeWithText("用量提醒阈值", useUnmergedTree = true).performTouchInput {
+            down(center)
+            moveBy(Offset(0f, -120f))
+            moveBy(Offset(0f, -120f))
+            up()
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(
+            "在阈值设置块内拖动不应带动设置页滚动",
+            topBeforeDrag,
+            thresholdLabelTop(),
+            0.5f,
+        )
+    }
+
     private fun scrollToAbout() {
         composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText("关于"))
         composeRule.waitForIdle()

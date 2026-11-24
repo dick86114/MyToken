@@ -352,6 +352,12 @@ private fun Modifier.drawerSwipeToDismiss(
                         canceled = true
                         break
                     }
+                    // 子级手势（滑块、卡片内拖动等）已经消费事件时，抽屉不再争抢，
+                    // 否则横向拖动设置里的滑块会误触「滑动关闭设置」。
+                    if (change.isConsumed) {
+                        if (started) canceled = true else aborted = true
+                        break
+                    }
                     val dx = change.position.x - change.previousPosition.x
                     val dy = change.position.y - change.previousPosition.y
                     totalX += dx

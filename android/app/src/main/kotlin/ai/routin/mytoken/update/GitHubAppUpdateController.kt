@@ -179,7 +179,7 @@ class GitHubAppUpdateController(
     }
 
     private suspend fun downloadAndInstall(update: AvailableRelease) {
-        _state.update { AppUpdateUiState.Downloading(progress = null) }
+        _state.update { AppUpdateUiState.Downloading(version = update.version, progress = null) }
         val file = download(update)
         downloadedUpdate = DownloadedUpdate(version = update.version, file = file)
 
@@ -224,7 +224,10 @@ class GitHubAppUpdateController(
                             if (progress.toLong() != lastReported) {
                                 lastReported = progress.toLong()
                                 _state.update {
-                                    AppUpdateUiState.Downloading(progress = progress / 100f)
+                                    AppUpdateUiState.Downloading(
+                                        version = update.version,
+                                        progress = progress / 100f,
+                                    )
                                 }
                             }
                         }

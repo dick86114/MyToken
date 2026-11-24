@@ -3714,6 +3714,8 @@ class HomeScreenTest {
     fun 有可用更新时报告上方显示星星提示条并弹窗确认更新() {
         var openedSettings = 0
         var confirmedUpdates = 0
+        var downloading by mutableStateOf(false)
+        var downloadProgress by mutableStateOf<Float?>(null)
         composeRule.setContent {
             MaterialTheme {
                 HomeScreen(
@@ -3732,7 +3734,13 @@ class HomeScreenTest {
                     hasUpdateAvailable = true,
                     updateVersion = "6.1.0",
                     updateReleaseNotes = "## 本次更新\n- 修复快速滑动卡顿\n- 更新提示支持星星光效",
-                    onConfirmUpdate = { confirmedUpdates++ },
+                    isUpdateDownloading = downloading,
+                    updateDownloadProgress = downloadProgress,
+                    onConfirmUpdate = {
+                        confirmedUpdates++
+                        downloading = true
+                        downloadProgress = 0.42f
+                    },
                 )
             }
         }
@@ -3767,6 +3775,13 @@ class HomeScreenTest {
         composeRule.onNodeWithTag("home_update_confirm").performClick()
         assertEquals(1, confirmedUpdates)
         assertEquals(0, openedSettings)
+        // 确认后弹窗保持打开，展示下载进度；下载结束后自动收起。
+        composeRule.onNodeWithTag("home_update_dialog").assertIsDisplayed()
+        composeRule.onNodeWithTag("update_download_progress").assertExists()
+        composeRule.onNodeWithText("42%", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag("home_update_confirm").assertDoesNotExist()
+        composeRule.runOnIdle { downloading = false }
+        composeRule.waitForIdle()
         composeRule.onNodeWithTag("home_update_dialog").assertDoesNotExist()
         composeRule.onNodeWithTag("home_open_settings").performClick()
         assertEquals(1, openedSettings)

@@ -219,11 +219,17 @@ fun MyTokenApp(
     val releaseHistoryState by settingsViewModel.releaseHistoryState.collectAsStateWithLifecycle()
     val pendingUpdateVersion = when (val update = updateState) {
         is AppUpdateUiState.Available -> update.version
+        is AppUpdateUiState.Downloading -> update.version
         is AppUpdateUiState.NeedsInstallPermission -> update.version
         is AppUpdateUiState.ReadyToInstall -> update.version
         else -> null
     }
     val pendingUpdateNotes = (updateState as? AppUpdateUiState.Available)?.releaseNotes
+    val isUpdateDownloading = updateState is AppUpdateUiState.Downloading
+    val updateDownloadProgress = (updateState as? AppUpdateUiState.Downloading)?.progress
+    val isUpdateReadyToInstall =
+        updateState is AppUpdateUiState.ReadyToInstall ||
+            updateState is AppUpdateUiState.NeedsInstallPermission
     val pendingUpdateConfirmLabel = when (updateState) {
         is AppUpdateUiState.ReadyToInstall,
         is AppUpdateUiState.NeedsInstallPermission,
@@ -378,6 +384,9 @@ fun MyTokenApp(
                     updateVersion = pendingUpdateVersion,
                     updateReleaseNotes = pendingUpdateNotes,
                     updateConfirmLabel = pendingUpdateConfirmLabel,
+                    isUpdateDownloading = isUpdateDownloading,
+                    updateDownloadProgress = updateDownloadProgress,
+                    isUpdateReadyToInstall = isUpdateReadyToInstall,
                     onConfirmUpdate = confirmPendingUpdate,
                     homeScrollStates = homeScrollStates,
                 )            }
