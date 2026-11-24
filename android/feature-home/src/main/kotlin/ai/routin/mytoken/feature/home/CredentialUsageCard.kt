@@ -38,6 +38,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -230,7 +231,10 @@ fun CredentialUsageCard(
         } else if (compact) {
             CompactUsageCardBody(card = card, health = health)
         } else {
-            FullUsageCardBody(card = card)
+            // 大屏完整卡不改成上下排版，保持手机竖屏的左右分栏。
+            CompositionLocalProvider(LocalForcePhoneFullCardLayout provides wide) {
+                FullUsageCardBody(card = card)
+            }
         }
     }
 

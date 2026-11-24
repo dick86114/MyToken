@@ -12,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -35,6 +36,12 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import java.math.BigDecimal
 import java.time.Instant
+
+/**
+ * 大屏完整卡强制使用手机竖屏的左右分栏，不再按卡片宽度自动改成上下堆叠。
+ * 手机 compact 不提供该值，保留原有的窄卡自适应。
+ */
+internal val LocalForcePhoneFullCardLayout = staticCompositionLocalOf { false }
 
 private enum class SplitTone { Normal, Warning, Critical }
 
@@ -183,17 +190,28 @@ private fun FullSplitLayout(
     left: @Composable () -> Unit,
     right: @Composable () -> Unit,
 ) {
+    val forcePhoneLayout = LocalForcePhoneFullCardLayout.current
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        // 窄卡或大字体会让 40/60 分栏挤成一列字，改为上下堆叠且不加分割线。
-        if (maxWidth < 280.dp || LocalDensity.current.fontScale >= 1.3f) {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        // 手机：窄卡或大字体会让 40/60 分栏挤成一列字，改为上下堆叠且不加分割线。
+        // 大屏完整卡：强制保持手机竖屏的左右分栏，只收紧栏间距。
+        if (!forcePhoneLayout && (
+                maxWidth < 280.dp || LocalDensity.current.fontScale >= 1.3f
+                )
+        ) {
+            Column(
+                modifier = Modifier.testTag("full_split_column"),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
                 left()
                 right()
             }
         } else {
+            val gap = if (maxWidth < 300.dp) 12.dp else 18.dp
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(18.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("full_split_row"),
+                horizontalArrangement = Arrangement.spacedBy(gap),
             ) {
                 Box(modifier = Modifier.weight(0.4f)) { left() }
                 Box(modifier = Modifier.weight(0.6f)) { right() }

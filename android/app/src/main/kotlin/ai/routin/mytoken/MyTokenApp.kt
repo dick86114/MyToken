@@ -593,7 +593,7 @@ private fun HomeCredentialSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = colors.canvas,
+        containerColor = colors.overlay,
         shape = RoundedCornerShape(
             topStart = MyTokenRadius.sheetTop,
             topEnd = MyTokenRadius.sheetTop,

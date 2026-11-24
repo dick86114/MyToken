@@ -221,7 +221,7 @@ internal fun UsageShareDialog(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = colors.canvas,
+        containerColor = colors.overlay,
         contentColor = colors.ink,
     ) {
         if (layoutMode == MyTokenLayoutMode.Compact) {

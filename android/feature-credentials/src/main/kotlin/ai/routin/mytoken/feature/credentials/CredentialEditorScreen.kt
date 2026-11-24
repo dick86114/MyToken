@@ -582,7 +582,7 @@ private fun ProviderPickerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = colors.surface,
+        containerColor = colors.overlay,
         shape = RoundedCornerShape(topStart = MyTokenRadius.sheetTop, topEnd = MyTokenRadius.sheetTop),
         dragHandle = {
             Box(modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)) {

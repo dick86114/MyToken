@@ -61,9 +61,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.ArrowCircleUp
 import androidx.compose.material.icons.outlined.CreditCard
-import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -91,6 +92,7 @@ import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -107,6 +109,8 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
@@ -197,6 +201,12 @@ internal fun WideHomeScreen(
     val chromeVisible = !state.isLoading && allCards.isNotEmpty()
     val latestDensity by rememberUpdatedState(usageCardDensity)
     val latestToggleDensity by rememberUpdatedState(onToggleUsageCardDensity)
+    // 收起后的一行短票与手机竖屏导航摘要同口径：报告包含全部凭证。
+    val reportFindings = remember(allCards) { homeReportFindings(allCards) }
+    val collapsedHeadline = if (reportFindings.isEmpty()) allCards.size else reportFindings.size
+    val collapsedTail = remember(reportFindings) { homeReportTail(reportFindings) }
+    val collapsedTone = remember(reportFindings) { homeReportTone(reportFindings) }
+    val syncLabel = state.lastUpdatedText ?: "刚刚同步"
 
     fun pageDensity(page: Int): UsageCardDensity =
         if (page == 0) UsageCardDensity.COMPACT else UsageCardDensity.FULL
@@ -362,24 +372,50 @@ internal fun WideHomeScreen(
         // 状态栏图标深浅跟随状态栏后面的渐变颜色；只在跨过明暗阈值时写一次。
         snapshotFlow {
             if (latestDetailId != null) {
-                // 详情遮罩把整窗压暗，状态栏改用浅色图标。
-                false
+                // 详情遮罩把整窗压暗，系统栏改用浅色图标。
+                Triple(false, false, false)
             } else {
                 val p = collapseProgressState.value
-                lerp(colors.canvas, colors.reportTicket, p).luminance() > 0.5f
+                val statusDark = lerp(colors.canvas, colors.reportTicket, p).luminance() > 0.5f
+                // 收合后底部也会铺琥珀色，导航栏图标随底切换为深色。
+                val navAmber = p > 0.5f
+                val navDark = navAmber || colors.canvas.luminance() > 0.5f
+                Triple(statusDark, navDark, navAmber)
             }
         }
             .distinctUntilChanged()
-            .collect { darkIcons ->
-                WindowCompat.getInsetsController(window, view)
-                    .isAppearanceLightStatusBars = darkIcons
+            .collect { (statusDark, navDark, navAmber) ->
+                val controller = WindowCompat.getInsetsController(window, view)
+                controller.isAppearanceLightStatusBars = statusDark
+                controller.isAppearanceLightNavigationBars = navDark
+                // 三键导航的系统栏由 SystemUI 绘制，应用内背景铺不进去；
+                // 直接给导航栏上色，收合后与琥珀沉浸状态栏连成一体。
+                window.navigationBarColor = when {
+                    latestDetailId != null -> colors.scrim.toArgb()
+                    navAmber -> colors.reportTicket.toArgb()
+                    else -> colors.canvas.toArgb()
+                }
             }
     }
     DisposableEffect(activity, view) {
+        val window = activity?.window
+        // 三键导航默认会给透明导航栏加一层对比度遮罩，会盖住收合后的琥珀色。
+        // 大屏自己保证背景对比度，因此关闭这层系统遮罩。
+        val previousContrast = window?.isNavigationBarContrastEnforced
+        val previousNavColor = window?.navigationBarColor
+        window?.isNavigationBarContrastEnforced = false
         onDispose {
-            val window = activity?.window ?: return@onDispose
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars =
-                colors.canvas.luminance() > 0.5f
+            if (window == null) return@onDispose
+            val controller = WindowCompat.getInsetsController(window, view)
+            val canvasDark = colors.canvas.luminance() > 0.5f
+            controller.isAppearanceLightStatusBars = canvasDark
+            controller.isAppearanceLightNavigationBars = canvasDark
+            if (previousContrast != null) {
+                window.isNavigationBarContrastEnforced = previousContrast
+            }
+            if (previousNavColor != null) {
+                window.navigationBarColor = previousNavColor
+            }
         }
     }
 
@@ -522,6 +558,7 @@ internal fun WideHomeScreen(
                 onOpenCredentials = onOpenCredentials,
                 onUpdateClick = onOpenUpdate,
                 railWidth = railWidth,
+                collapseProgress = collapseProgress,
             )
             Box(
                 modifier = Modifier
@@ -675,6 +712,65 @@ internal fun WideHomeScreen(
                         }
                     }
                 }
+            }
+        }
+
+        if (chromeVisible) {
+            // 收合后系统栏变成不透明琥珀色，滚动内容不会从状态栏/导航栏透出。
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(systemBarTopDp)
+                    .drawBehind {
+                        drawRect(
+                            color = colors.reportTicket,
+                            alpha = collapseProgress(),
+                        )
+                    }
+                    .testTag("home_wide_status_bar_tint"),
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(systemBarBottomDp)
+                    .drawBehind {
+                        drawRect(
+                            color = colors.reportTicket,
+                            alpha = collapseProgress(),
+                        )
+                    }
+                    .testTag("home_wide_nav_bar_tint"),
+            )
+            // 报告收成一行短票，与左轨品牌 logo 同一行对齐。
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(
+                        start = railWidth + 16.dp,
+                        // 与左轨 48dp 品牌行同高同起点，收合后两行中心线完全齐平。
+                        top = systemBarTopDp,
+                        end = 16.dp + systemBarEndDp,
+                    )
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .graphicsLayer {
+                        val p = collapseProgress()
+                        val visible = ((p - 0.45f) / 0.55f).coerceIn(0f, 1f)
+                        alpha = visible
+                        translationY = (1f - visible) * 4.dp.toPx()
+                    }
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(colors.reportTicket)
+                    .testTag("home_wide_collapsed_ticket"),
+            ) {
+                WideCollapsedReportTicket(
+                    headlineCount = collapsedHeadline,
+                    tail = collapsedTail,
+                    tone = collapsedTone,
+                    syncText = syncLabel,
+                )
             }
         }
 
@@ -880,6 +976,51 @@ private fun WideReportHeader(
     }
 }
 
+/** 收起后的单行短票：数量 + 结论 + 最近同步，与左轨 logo 行齐平。 */
+@Composable
+private fun WideCollapsedReportTicket(
+    headlineCount: Int,
+    tail: String,
+    tone: HomeHealthTone,
+    syncText: String,
+) {
+    val colors = MyTokenThemeTokens.colors
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "$headlineCount 个凭证",
+            style = MyTokenType.label,
+            fontWeight = FontWeight.SemiBold,
+            color = colors.reportTicketInk,
+            maxLines = 1,
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = tail,
+            style = MyTokenType.caption,
+            fontWeight = FontWeight.Medium,
+            color = severityAccent(
+                tone,
+                colors.reportTicketMuted,
+                colors.reportNavCritical,
+            ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(modifier = Modifier.weight(1f))
+        Text(
+            text = "最近同步 ${reportSyncLabel(syncText)}",
+            style = MyTokenType.caption,
+            color = colors.reportTicketMuted,
+            maxLines = 1,
+        )
+    }
+}
+
 /** 左侧 64/72dp 图标轨：品牌、全部、供应商，底部固定刷新/设置/凭证管理。 */
 @Composable
 private fun WideProviderRail(
@@ -895,8 +1036,10 @@ private fun WideProviderRail(
     onOpenCredentials: () -> Unit,
     onUpdateClick: () -> Unit,
     railWidth: Dp,
+    collapseProgress: () -> Float,
 ) {
     val colors = MyTokenThemeTokens.colors
+    val darkTheme = colors.canvas.luminance() < 0.5f
     val motionEnabled = rememberMyTokenMotionEnabled()
     // 只有刷新时才启动旋转动画，避免静止时还有一个无限动画在跑。
     val spin = if (isRefreshing && motionEnabled) {
@@ -915,15 +1058,7 @@ private fun WideProviderRail(
         modifier = Modifier
             .width(railWidth)
             .fillMaxHeight()
-            // 背景透明，让整窗渐变一直铺到左轨；只在右缘画一条发丝线。
-            .drawBehind {
-                drawLine(
-                    color = colors.line,
-                    start = Offset(size.width - 0.5f, 0f),
-                    end = Offset(size.width - 0.5f, size.height),
-                    strokeWidth = 1.dp.toPx(),
-                )
-            }
+            // 背景透明，让整窗渐变一直铺到左轨；与内容之间不再画竖向分割线。
             .windowInsetsPadding(
                 WindowInsets.systemBars.only(
                     WindowInsetsSides.Start +
@@ -943,7 +1078,29 @@ private fun WideProviderRail(
                 .testTag("home_open_credentials"),
             contentAlignment = Alignment.Center,
         ) {
-            MyTokenBrandMark(size = 30.dp)
+            Box(modifier = Modifier.size(30.dp)) {
+                if (darkTheme) {
+                    MyTokenBrandMark(
+                        size = 30.dp,
+                        modifier = Modifier
+                            .graphicsLayer { alpha = 1f - collapseProgress() }
+                            .testTag("home_wide_rail_brand"),
+                    )
+                    // 琥珀底上用深色标，保证收起后仍可读。
+                    MyTokenBrandMark(
+                        size = 30.dp,
+                        darkTheme = false,
+                        modifier = Modifier
+                            .graphicsLayer { alpha = collapseProgress() }
+                            .testTag("home_wide_rail_brand_amber"),
+                    )
+                } else {
+                    MyTokenBrandMark(
+                        size = 30.dp,
+                        modifier = Modifier.testTag("home_wide_rail_brand"),
+                    )
+                }
+            }
         }
         Spacer(modifier = Modifier.height(4.dp))
         Box(
@@ -1068,7 +1225,7 @@ private fun AllProvidersGlyph(
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            imageVector = Icons.Outlined.GridView,
+            imageVector = Icons.Filled.GridView,
             contentDescription = null,
             tint = if (selected) colors.ink else colors.muted,
             modifier = Modifier

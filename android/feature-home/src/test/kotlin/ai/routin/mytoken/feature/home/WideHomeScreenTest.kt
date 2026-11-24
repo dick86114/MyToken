@@ -179,6 +179,39 @@ class WideHomeScreenTest {
     }
 
     @Test
+    @Config(qualifiers = "w720dp-h1280dp")
+    fun 竖屏完整卡保持手机左右分栏() {
+        val base = sampleCard("Routin 双窗口", ProviderId.Routin, used = 42.0)
+        val snapshot = requireNotNull(base.snapshot)
+        val first = snapshot.metrics.first()
+        val weekly = first.copy(id = "weekly", label = "周")
+        val card = base.copy(snapshot = snapshot.copy(metrics = listOf(first, weekly)))
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = listOf(card),
+                        groups = emptyList(),
+                        credentialCount = 1,
+                    ),
+                    layoutMode = MyTokenLayoutMode.Medium,
+                    usageCardDensity = UsageCardDensity.FULL,
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                )
+            }
+        }
+        composeRule.onAllNodesWithTag("full_split_row", useUnmergedTree = true)
+            .assertCountEquals(1)
+        composeRule.onAllNodesWithTag("full_split_column", useUnmergedTree = true)
+            .assertCountEquals(0)
+    }
+
+    @Test
     @Config(qualifiers = "w1280dp-h720dp")
     fun 有更新时箭头在左轨刷新上方且报告内无重复提示() {
         setContent(hasUpdate = true)
@@ -287,6 +320,26 @@ class WideHomeScreenTest {
             "报告应随上滑收起，before.top=${before.top} after.top=${after.top}",
             after.top.value < before.top.value,
         )
+
+        // 收起后：一行短票与左轨 brand 同一行，系统栏有琥珀沉浸层。
+        val ticket = composeRule.onNodeWithTag(
+            "home_wide_collapsed_ticket",
+            useUnmergedTree = true,
+        ).getUnclippedBoundsInRoot()
+        val brand = composeRule.onNodeWithTag(
+            "home_wide_rail_brand",
+            useUnmergedTree = true,
+        ).getUnclippedBoundsInRoot()
+        assertEquals(
+            "短票中心应与左轨 logo 中心齐平",
+            (brand.top.value + brand.bottom.value) / 2f,
+            (ticket.top.value + ticket.bottom.value) / 2f,
+            2f,
+        )
+        composeRule.onNodeWithTag("home_wide_status_bar_tint", useUnmergedTree = true)
+            .assertExists()
+        composeRule.onNodeWithTag("home_wide_nav_bar_tint", useUnmergedTree = true)
+            .assertExists()
     }
 
     @Test

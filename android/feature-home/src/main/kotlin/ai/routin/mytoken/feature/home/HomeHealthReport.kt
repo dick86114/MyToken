@@ -378,6 +378,8 @@ internal fun ReportDial(
     showCaption: Boolean = true,
 ) {
     val colors = MyTokenThemeTokens.colors
+    // 小尺寸只画环：22sp 计数会溢出 42dp 圆环并盖住票面文字。
+    val showCount = diameter >= 56.dp
     Box(
         modifier = modifier
             .size(diameter)
@@ -410,29 +412,31 @@ internal fun ReportDial(
                 )
             }
         }
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    text = normal.toString(),
-                    style = MyTokenType.title,
-                    color = colors.reportTicketInk,
-                )
-                Text(
-                    text = " / $total",
-                    modifier = Modifier.padding(bottom = 2.dp),
-                    style = MyTokenType.caption,
-                    color = colors.reportTicketMuted,
-                )
-            }
-            if (showCaption) {
-                Text(
-                    text = "用量正常",
-                    style = MyTokenType.caption,
-                    color = colors.reportTicketMuted,
-                )
+        if (showCount) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = normal.toString(),
+                        style = MyTokenType.title,
+                        color = colors.reportTicketInk,
+                    )
+                    Text(
+                        text = " / $total",
+                        modifier = Modifier.padding(bottom = 2.dp),
+                        style = MyTokenType.caption,
+                        color = colors.reportTicketMuted,
+                    )
+                }
+                if (showCaption) {
+                    Text(
+                        text = "用量正常",
+                        style = MyTokenType.caption,
+                        color = colors.reportTicketMuted,
+                    )
+                }
             }
         }
     }

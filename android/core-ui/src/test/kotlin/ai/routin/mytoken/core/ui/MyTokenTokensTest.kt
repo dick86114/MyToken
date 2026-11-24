@@ -1,6 +1,7 @@
 package ai.routin.mytoken.core.ui
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -14,6 +15,7 @@ class MyTokenTokensTest {
     fun `light tokens match approved design`() {
         assertEquals(Color(0xFFEEF0F2), MyTokenLightColors.canvas)
         assertEquals(Color(0xFFFFFFFF), MyTokenLightColors.surface)
+        assertEquals(Color(0xFFFFFFFF), MyTokenLightColors.overlay)
         assertEquals(Color(0xFFF6F7F9), MyTokenLightColors.subtle)
         assertEquals(Color(0xFFE5E7EB), MyTokenLightColors.line)
         assertEquals(Color(0xFF17181A), MyTokenLightColors.ink)
@@ -47,27 +49,40 @@ class MyTokenTokensTest {
         assertEquals(Color(0xFF061326), MyTokenDarkColors.onAction)
         assertEquals(Color(0xFFF3CB73), MyTokenDarkColors.actionFill)
         assertEquals(Color(0xFFF3CB73), MyTokenDarkColors.actionText)
-        assertEquals(Color(0xFF16181C), MyTokenDarkColors.surface)
-        assertEquals(Color(0xFF0D0F12), MyTokenDarkColors.canvas)
-        assertEquals(Color(0xFF1D2025), MyTokenDarkColors.subtle)
-        assertEquals(Color(0xFF292D33), MyTokenDarkColors.line)
-        assertEquals(Color(0xFFF5F6F7), MyTokenDarkColors.ink)
-        assertEquals(Color(0xFF9BA1A8), MyTokenDarkColors.muted)
+        assertEquals(Color(0xFF1B1E24), MyTokenDarkColors.surface)
+        assertEquals(Color(0xFF252931), MyTokenDarkColors.overlay)
+        assertEquals(Color(0xFF121418), MyTokenDarkColors.canvas)
+        assertEquals(Color(0xFF252931), MyTokenDarkColors.subtle)
+        assertEquals(Color(0xFF2E333C), MyTokenDarkColors.line)
+        assertEquals(Color(0xFFE6E8EC), MyTokenDarkColors.ink)
+        assertEquals(Color(0xFFA7ADB7), MyTokenDarkColors.muted)
         assertEquals(Color(0xFF35D399), MyTokenDarkColors.positiveFill)
         assertEquals(Color(0xFF5BE0AC), MyTokenDarkColors.positiveText)
         assertEquals(Color(0xFFFFB340), MyTokenDarkColors.warningFill)
         assertEquals(Color(0xFFFFC266), MyTokenDarkColors.warningText)
         assertEquals(Color(0xFFFF6369), MyTokenDarkColors.criticalFill)
         assertEquals(Color(0xFFFF8A8E), MyTokenDarkColors.criticalText)
-        assertEquals(Color(0xFFE8EAED), MyTokenDarkColors.cat1)
-        assertEquals(Color(0xFF9BA1A8), MyTokenDarkColors.cat2)
+        assertEquals(Color(0xFFE6E8EC), MyTokenDarkColors.cat1)
+        assertEquals(Color(0xFFA7ADB7), MyTokenDarkColors.cat2)
         assertEquals(Color(0xFF4A4F56), MyTokenDarkColors.cat3)
-        assertEquals(Color(0xFF2A2E34), MyTokenDarkColors.track)
-        assertEquals(Color(0xFF2A2E34), MyTokenDarkColors.controlTrack)
-        assertEquals(Color(0xFF6B7076), MyTokenDarkColors.statusDotNormal)
+        assertEquals(Color(0xFF2A2F38), MyTokenDarkColors.track)
+        assertEquals(Color(0xFF2A2F38), MyTokenDarkColors.controlTrack)
+        assertEquals(Color(0xFF8A909A), MyTokenDarkColors.statusDotNormal)
         // 深色外观下报告正文是浅色纸面，Critical 百分比改用深红保证对比度。
         assertEquals(Color(0xFFC0272D), MyTokenDarkColors.reportCritical)
         assertEquals(Color(0xFFA3151A), MyTokenDarkColors.reportNavCritical)
+    }
+
+    @Test
+    fun `dark body text reaches fifteen to one on canvas`() {
+        fun ratio(fg: Color, bg: Color): Float {
+            val lighter = maxOf(fg.luminance(), bg.luminance())
+            val darker = minOf(fg.luminance(), bg.luminance())
+            return (lighter + 0.05f) / (darker + 0.05f)
+        }
+        assertTrue(ratio(MyTokenDarkColors.ink, MyTokenDarkColors.canvas) >= 15f)
+        assertTrue(ratio(MyTokenDarkColors.ink, MyTokenDarkColors.surface) >= 12f)
+        assertTrue(ratio(MyTokenDarkColors.ink, MyTokenDarkColors.overlay) >= 10f)
     }
 
     @Test

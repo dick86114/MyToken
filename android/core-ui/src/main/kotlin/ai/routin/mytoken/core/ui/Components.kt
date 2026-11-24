@@ -602,8 +602,9 @@ fun MyTokenSurface(
         MyTokenVisualPolicy.SurfaceRole.Window,
         MyTokenVisualPolicy.SurfaceRole.Card,
         MyTokenVisualPolicy.SurfaceRole.FloatingCard,
-        MyTokenVisualPolicy.SurfaceRole.Modal,
         -> colors.surface
+
+        MyTokenVisualPolicy.SurfaceRole.Modal -> colors.overlay
 
         MyTokenVisualPolicy.SurfaceRole.Control,
         MyTokenVisualPolicy.SurfaceRole.Metric,
