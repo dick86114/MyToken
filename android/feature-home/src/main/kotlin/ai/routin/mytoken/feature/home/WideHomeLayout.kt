@@ -749,19 +749,20 @@ internal fun WideHomeScreen(
                     .align(Alignment.TopStart)
                     .padding(
                         start = railWidth + 16.dp,
-                        // 与左轨 48dp 品牌行同高同起点，收合后两行中心线完全齐平。
-                        top = systemBarTopDp,
+                        // 32dp 票高与左轨 30dp logo 同高、同中心：顶边、底边和中心线都齐平，
+                        // 不只是行起点对齐。上下各留 8dp，让票面与琥珀状态栏有清晰分界。
+                        top = systemBarTopDp + 8.dp,
                         end = 16.dp + systemBarEndDp,
                     )
                     .fillMaxWidth()
-                    .height(48.dp)
+                    .height(32.dp)
                     .graphicsLayer {
                         val p = collapseProgress()
                         val visible = ((p - 0.45f) / 0.55f).coerceIn(0f, 1f)
                         alpha = visible
                         translationY = (1f - visible) * 4.dp.toPx()
                     }
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(10.dp))
                     .background(colors.reportTicket)
                     .testTag("home_wide_collapsed_ticket"),
             ) {

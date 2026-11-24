@@ -336,6 +336,19 @@ class WideHomeScreenTest {
             (ticket.top.value + ticket.bottom.value) / 2f,
             2f,
         )
+        // 不只是中心线：短票顶/底边也要贴住 logo 的可见上下边，避免视觉上票面偏高。
+        assertEquals(
+            "短票顶边应与 logo 顶边齐平",
+            brand.top.value,
+            ticket.top.value,
+            2f,
+        )
+        assertEquals(
+            "短票底边应与 logo 底边齐平",
+            brand.bottom.value,
+            ticket.bottom.value,
+            2f,
+        )
         composeRule.onNodeWithTag("home_wide_status_bar_tint", useUnmergedTree = true)
             .assertExists()
         composeRule.onNodeWithTag("home_wide_nav_bar_tint", useUnmergedTree = true)
