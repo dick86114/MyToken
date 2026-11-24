@@ -12,8 +12,8 @@ android {
         applicationId = "ai.routin.mytoken"
         minSdk = 29
         targetSdk = 34
-        versionCode = 616
-        versionName = "6.1.6"
+        versionCode = 617
+        versionName = "6.1.7"
 
         // 只保留真机使用的 ARM 架构；x86/x86_64 仅模拟器需要，不再进入安装包。
         // 注意：Apple Silicon 模拟器是 arm64，不受影响；Intel Mac 的 x86 模拟器需临时移除该过滤。
