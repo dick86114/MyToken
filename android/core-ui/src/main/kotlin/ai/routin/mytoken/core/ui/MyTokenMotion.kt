@@ -18,9 +18,21 @@ object MyTokenMotion {
     const val locateMillis = 300
     const val starMillis = 2400
 
+    /** 大屏三栏：详情挤入 / 退出、中间重排、筛选与报告高度。 */
+    const val detailOpenMillis = 260
+    const val detailCloseMillis = 240
+    const val detailReflowMillis = 200
+    const val filterMillis = 160
+    const val reportResizeMillis = 220
+
     fun ringDurationMillis(enabled: Boolean): Int = if (enabled) ringMillis else 0
     fun locateDurationMillis(enabled: Boolean): Int = if (enabled) locateMillis else 0
     fun modeSwitchDurationMillis(enabled: Boolean): Int = if (enabled) modeSwitchMillis else 0
+    fun detailOpenDurationMillis(enabled: Boolean): Int = if (enabled) detailOpenMillis else 0
+    fun detailCloseDurationMillis(enabled: Boolean): Int = if (enabled) detailCloseMillis else 0
+    fun detailReflowDurationMillis(enabled: Boolean): Int = if (enabled) detailReflowMillis else 0
+    fun filterDurationMillis(enabled: Boolean): Int = if (enabled) filterMillis else 0
+    fun reportResizeDurationMillis(enabled: Boolean): Int = if (enabled) reportResizeMillis else 0
 }
 
 /** 读取系统“移除动画/减少动态”开关。 */

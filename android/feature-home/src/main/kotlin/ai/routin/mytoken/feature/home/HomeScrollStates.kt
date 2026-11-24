@@ -83,7 +83,7 @@ internal suspend fun locateCard(
     }
 }
 
-private suspend fun locateInStaggeredGrid(
+internal suspend fun locateInStaggeredGrid(
     state: LazyStaggeredGridState,
     index: Int,
     centerBiasPx: Float,

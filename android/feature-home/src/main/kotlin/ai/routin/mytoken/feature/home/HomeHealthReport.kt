@@ -51,6 +51,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import java.util.UUID
 import kotlin.math.roundToInt
@@ -142,6 +143,13 @@ internal fun severityAccent(
     criticalColor: Color,
 ): Color = if (tone == HomeHealthTone.Critical) criticalColor else warningColor
 
+/** 报告页脚的同步文案：去掉「更新/同步」后缀，只留下时间。 */
+internal fun reportSyncLabel(syncText: String): String = syncText
+    .removeSuffix("更新")
+    .removeSuffix("同步")
+    .trim()
+    .ifBlank { syncText }
+
 /** 与卡片同一方向：RemainingQuota 显示剩余百分比，其余显示已用百分比。 */
 private fun displayedPercent(metric: UsageMetric): Double? {
     val limit = metric.limit ?: return null
@@ -179,11 +187,7 @@ internal fun HomeHealthReport(
     val isNormal = attention == 0
     val headlineCount = if (isNormal) total else attention
     val tail = remember(findings) { homeReportTail(findings) }
-    val syncLabel = syncText
-        .removeSuffix("更新")
-        .removeSuffix("同步")
-        .trim()
-        .ifBlank { syncText }
+    val syncLabel = reportSyncLabel(syncText)
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -365,16 +369,18 @@ private fun ReportFindingRow(
 }
 
 @Composable
-private fun ReportDial(
+internal fun ReportDial(
     tones: List<HomeHealthTone>,
     normal: Int,
     total: Int,
     modifier: Modifier = Modifier,
+    diameter: Dp = 88.dp,
+    showCaption: Boolean = true,
 ) {
     val colors = MyTokenThemeTokens.colors
     Box(
         modifier = modifier
-            .size(88.dp)
+            .size(diameter)
             .testTag("report_dial")
             .semantics {
                 contentDescription = "$total 个凭证，$normal 个正常，${total - normal} 个需注意"
@@ -421,11 +427,13 @@ private fun ReportDial(
                     color = colors.reportTicketMuted,
                 )
             }
-            Text(
-                text = "用量正常",
-                style = MyTokenType.caption,
-                color = colors.reportTicketMuted,
-            )
+            if (showCaption) {
+                Text(
+                    text = "用量正常",
+                    style = MyTokenType.caption,
+                    color = colors.reportTicketMuted,
+                )
+            }
         }
     }
 }

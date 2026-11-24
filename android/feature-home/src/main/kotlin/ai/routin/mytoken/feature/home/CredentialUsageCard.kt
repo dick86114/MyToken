@@ -8,6 +8,7 @@ import ai.routin.mytoken.core.ui.MyTokenDialogSection
 import ai.routin.mytoken.core.ui.MyTokenDialogStatus
 import ai.routin.mytoken.core.ui.MyTokenDialogTone
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
+import ai.routin.mytoken.core.ui.MyTokenRadius
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.domain.model.ProviderId
@@ -21,6 +22,7 @@ import androidx.compose.animation.core.tween
 import ai.routin.mytoken.core.ui.MyTokenMotion
 import ai.routin.mytoken.core.ui.rememberMyTokenMotionEnabled
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -31,6 +33,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Text
@@ -92,6 +95,7 @@ fun CredentialUsageCard(
     layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
     usageCardDensity: UsageCardDensity = UsageCardDensity.FULL,
     highlightSignal: Int = 0,
+    selected: Boolean = false,
 ) {
     val compact = usageCardDensity.isCompact()
     var showsFailureDetails by remember(card.credential.id) { mutableStateOf(false) }
@@ -136,10 +140,20 @@ fun CredentialUsageCard(
         primaryText.takeIf { it.isNotBlank() },
     ).joinToString("，")
 
+    val selectionModifier = if (selected) {
+        Modifier.border(
+            width = 2.dp,
+            color = MyTokenThemeTokens.colors.ink,
+            shape = RoundedCornerShape(MyTokenRadius.card),
+        )
+    } else {
+        Modifier
+    }
     UsageCardFrame(
         density = usageCardDensity,
         onClick = onOpen,
         modifier = modifier
+            .then(selectionModifier)
             .then(locateBounceModifier)
             .semantics { contentDescription = cardDescription }
             .testTag("credential_card_${card.credential.id}"),

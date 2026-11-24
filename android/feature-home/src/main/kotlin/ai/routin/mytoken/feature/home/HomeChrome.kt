@@ -393,7 +393,7 @@ internal fun HomeProviderToolbar(
 }
 
 @Composable
-private fun ProviderFilter(
+internal fun ProviderFilter(
     selectedProvider: ProviderId?,
     providers: List<ProviderId>,
     counts: Map<ProviderId, Int>,
@@ -680,7 +680,7 @@ private object DensitySwitchSpec {
 }
 
 @Composable
-private fun DensityModeSwitch(
+internal fun DensityModeSwitch(
     density: UsageCardDensity,
     onToggle: () -> Unit,
     progress: () -> Float,

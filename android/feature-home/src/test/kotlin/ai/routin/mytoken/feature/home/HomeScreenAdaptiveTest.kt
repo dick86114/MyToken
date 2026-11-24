@@ -72,16 +72,27 @@ class HomeScreenAdaptiveTest {
 
     @Test
     @Config(qualifiers = "w700dp-h1100dp")
-    fun 阔折叠简洁模式使用三列首页() {
+    fun 阔折叠简洁模式使用两列瀑布流首页() {
         setContent()
-        composeRule.onNodeWithTag("home_grid_3_columns").assertExists()
+        composeRule.onNodeWithTag("home_grid_2_columns").assertExists()
+        composeRule.onNodeWithTag("home_wide_rail").assertExists()
+        composeRule.onNodeWithTag("home_pager").assertDoesNotExist()
     }
 
     @Test
     @Config(qualifiers = "w1000dp-h1100dp")
-    fun 平板简洁模式使用四列首页() {
+    fun 平板简洁模式使用三列瀑布流首页() {
         setContent()
-        composeRule.onNodeWithTag("home_grid_4_columns").assertExists()
+        composeRule.onNodeWithTag("home_grid_3_columns").assertExists()
+        composeRule.onNodeWithTag("home_wide_rail").assertExists()
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h1100dp")
+    fun 普通手机保持现有分页首页不启用三栏() {
+        setContent()
+        composeRule.onNodeWithTag("home_wide_rail").assertDoesNotExist()
+        composeRule.onNodeWithTag("home_pager").assertExists()
     }
 
     @Test

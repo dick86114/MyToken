@@ -1,5 +1,6 @@
 package ai.routin.mytoken.feature.home
 
+import ai.routin.mytoken.core.alerts.AlertThresholds
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenBrandMark
 import ai.routin.mytoken.core.ui.MyTokenButton
@@ -69,6 +70,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -131,6 +133,10 @@ fun HomeScreen(
     usageCardDensity: UsageCardDensity = UsageCardDensity.FULL,
     onToggleUsageCardDensity: () -> Unit = {},
     homeScrollStates: HomeScrollStates = rememberHomeScrollStates(),
+    globalAlertThresholds: AlertThresholds = AlertThresholds.DEFAULT,
+    alertThresholdOverrides: Map<UUID, AlertThresholds> = emptyMap(),
+    onEditCredential: (UUID) -> Unit = {},
+    onDeleteCredential: (UUID) -> Unit = {},
 ) {
     val colors = MyTokenThemeTokens.colors
     var selectedProvider by remember { mutableStateOf<ProviderId?>(null) }
@@ -173,6 +179,8 @@ fun HomeScreen(
     var updateDownloadStarted by remember { mutableStateOf(false) }
     var shownUpdateVersion by remember { mutableStateOf<String?>(null) }
     var pagerHasUserInput by remember { mutableStateOf(false) }
+    // 大屏右侧详情的选中项；折叠/旋转后仍保留，切回 compact 时交给现有整页详情。
+    var wideDetailId by rememberSaveable { mutableStateOf<UUID?>(null) }
 
     // 下载期间保持弹窗打开并展示进度；下载结束（成功或失败）后自动收起，
     // 但缺安装权限时保留弹窗，引导用户去系统授权。
@@ -189,6 +197,72 @@ fun HomeScreen(
             }
             updateDownloadStarted = false
         }
+    }
+
+    // 折叠或旋转回普通手机宽度时，把已打开的侧栏详情交还给整页详情导航。
+    LaunchedEffect(layoutMode, wideDetailId) {
+        val id = wideDetailId
+        if (layoutMode == MyTokenLayoutMode.Compact && id != null) {
+            wideDetailId = null
+            onOpenCredential(id)
+        }
+    }
+
+    if (layoutMode != MyTokenLayoutMode.Compact) {
+        Scaffold(containerColor = colors.canvas) { padding ->
+            WideHomeScreen(
+                state = state,
+                allCards = allCards,
+                visibleCards = visibleCards,
+                providers = visibleProviders,
+                providerCounts = providerCounts,
+                selectedProvider = selectedProvider,
+                onSelectProvider = {
+                    pendingLocateId = null
+                    selectedProvider = it
+                },
+                usageCardDensity = usageCardDensity,
+                onToggleUsageCardDensity = onToggleUsageCardDensity,
+                layoutMode = layoutMode,
+                selectedDetailId = wideDetailId,
+                onSelectDetail = { wideDetailId = it },
+                onRefreshAll = onRefreshAll,
+                onRefreshCredential = onRefreshCredential,
+                onRetryCredential = onRetryCredential,
+                onOpenCredentials = onOpenCredentials,
+                onManageCredentials = onManageCredentials,
+                onOpenSettings = onOpenSettings,
+                onImportFromMac = onImportFromMac,
+                onAddManually = onAddManually,
+                globalAlertThresholds = globalAlertThresholds,
+                alertThresholdOverrides = alertThresholdOverrides,
+                onEditCredential = onEditCredential,
+                onDeleteCredential = onDeleteCredential,
+                hasUpdateAvailable = hasUpdateAvailable,
+                updateVersion = updateVersion,
+                onOpenUpdate = {
+                    shownUpdateVersion = updateVersion
+                    showUpdateDialog = true
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+            )
+        }
+        HomeUpdateDialogHost(
+            show = showUpdateDialog,
+            shownVersion = shownUpdateVersion,
+            updateVersion = updateVersion,
+            releaseNotes = updateReleaseNotes,
+            confirmLabel = updateConfirmLabel,
+            downloading = isUpdateDownloading,
+            progress = updateDownloadProgress,
+            readyToInstall = isUpdateReadyToInstall,
+            needsInstallPermission = isUpdateNeedsInstallPermission,
+            onConfirmUpdate = onConfirmUpdate,
+            onDismiss = { if (!isUpdateDownloading) showUpdateDialog = false },
+        )
+        return
     }
 
     val density = LocalDensity.current
@@ -877,23 +951,52 @@ fun HomeScreen(
         }
     }
 
-    if (showUpdateDialog) {
-        MyTokenUpdateDialog(
-            version = shownUpdateVersion ?: updateVersion,
-            releaseNotes = updateReleaseNotes,
-            confirmLabel = updateConfirmLabel,
-            downloading = isUpdateDownloading,
-            downloadProgress = updateDownloadProgress,
-            needsInstallPermission = isUpdateNeedsInstallPermission,
-            onConfirm = {
-                onConfirmUpdate()
-                if (isUpdateReadyToInstall) showUpdateDialog = false
-            },
-            onDismiss = { if (!isUpdateDownloading) showUpdateDialog = false },
-            modifier = Modifier.testTag("home_update_dialog"),
-            confirmTag = "home_update_confirm",
-        )
-    }
+    HomeUpdateDialogHost(
+        show = showUpdateDialog,
+        shownVersion = shownUpdateVersion,
+        updateVersion = updateVersion,
+        releaseNotes = updateReleaseNotes,
+        confirmLabel = updateConfirmLabel,
+        downloading = isUpdateDownloading,
+        progress = updateDownloadProgress,
+        readyToInstall = isUpdateReadyToInstall,
+        needsInstallPermission = isUpdateNeedsInstallPermission,
+        onConfirmUpdate = onConfirmUpdate,
+        onDismiss = { if (!isUpdateDownloading) showUpdateDialog = false },
+    )
+}
+
+/** 手机与大屏共用的更新弹窗；下载结束后的收起规则保持一致。 */
+@Composable
+private fun HomeUpdateDialogHost(
+    show: Boolean,
+    shownVersion: String?,
+    updateVersion: String?,
+    releaseNotes: String?,
+    confirmLabel: String,
+    downloading: Boolean,
+    progress: Float?,
+    readyToInstall: Boolean,
+    needsInstallPermission: Boolean,
+    onConfirmUpdate: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    if (!show) return
+    MyTokenUpdateDialog(
+        version = shownVersion ?: updateVersion,
+        releaseNotes = releaseNotes,
+        confirmLabel = confirmLabel,
+        downloading = downloading,
+        downloadProgress = progress,
+        needsInstallPermission = needsInstallPermission,
+        onConfirm = {
+            onConfirmUpdate()
+            if (readyToInstall) onDismiss()
+        },
+        onDismiss = onDismiss,
+        modifier = Modifier.testTag("home_update_dialog"),
+        confirmTag = "home_update_confirm",
+    )
 }
 
 /** 下拉刷新指示器：透明图标直接出现在报告上方，不铺整行底色。 */
@@ -945,7 +1048,7 @@ private fun HomePullIndicator(
 
 /** 卡片末尾的小胶囊入口：集中管理已有凭证。 */
 @Composable
-private fun CredentialEndActions(
+internal fun CredentialEndActions(
     onManage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -987,7 +1090,7 @@ private fun CredentialEndActions(
 }
 
 @Composable
-private fun EmptyState(
+internal fun EmptyState(
     modifier: Modifier = Modifier,
     onImportFromMac: () -> Unit,
     onAddManually: () -> Unit,

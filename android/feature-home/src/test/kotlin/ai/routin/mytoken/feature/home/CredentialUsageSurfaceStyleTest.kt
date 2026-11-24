@@ -202,7 +202,7 @@ class CredentialUsageSurfaceStyleTest {
         val home = sourceText("HomeScreen.kt")
         val pullBody = home
             .substringAfter("private fun HomePullIndicator")
-            .substringBefore("@Composable\nprivate fun CredentialEndActions")
+            .substringBefore("@Composable\ninternal fun CredentialEndActions")
 
         assertTrue(pullBody.contains("ReportRefreshGlyph"))
         assertFalse("下拉指示器本身不应铺整行或圆形底色", pullBody.contains(".background("))
