@@ -1,26 +1,32 @@
 package ai.routin.mytoken.feature.home
 
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
-import ai.routin.mytoken.core.ui.adaptiveGridColumns
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.math.ceil
 
-/** 报告的两种排布：16:9 横排，其余比例竖排。 */
+/** 报告排布：横屏（宽 > 高）左右横排，竖屏（含 1:1）竖排。 */
 internal enum class WideReportOrientation { Horizontal, Vertical }
 
 /**
  * 大屏三栏的尺寸单一来源。
  *
- * 宽度按 [MyTokenLayoutMode] 与窗口宽高比推导，不按设备型号硬编码：
+ * 详情宽度按窗口宽高比推导，不按设备型号硬编码：
  * 16:9 → 380dp，1:1 → 360dp，其余（4:3 / 3:4 / 9:16）→ 340dp。
+ *
+ * 卡片宽度以手机竖屏两档卡片为基准（简洁 176dp / 完整 360dp），
+ * 只允许最多 12% 的拉伸来铺满行，避免大屏卡片被拉得过宽。
  */
 internal object WideHomeSpec {
     val railWidthMedium = 64.dp
     val railWidthExpanded = 72.dp
 
-    val cardMinWidth = 250.dp
-    val cardSpacing = 10.dp
-    const val maxCardColumns = 6
+    val compactBaseCardWidth = 176.dp
+    val fullBaseCardWidth = 360.dp
+    val compactCardSpacing = 8.dp
+    val fullCardSpacing = 12.dp
+    const val maxCardStretch = 1.12f
+    const val maxCardColumns = 8
 
     val detailWidthWide = 380.dp
     val detailWidthSquare = 360.dp
@@ -42,24 +48,44 @@ internal object WideHomeSpec {
         else -> detailWidthNarrow
     }
 
-    fun reportOrientation(aspectRatio: Float): WideReportOrientation =
-        if (aspectRatio >= wideRatio) {
-            WideReportOrientation.Horizontal
-        } else {
-            WideReportOrientation.Vertical
-        }
+    fun reportOrientation(isLandscape: Boolean): WideReportOrientation =
+        if (isLandscape) WideReportOrientation.Horizontal else WideReportOrientation.Vertical
+
+    /** “全部供应商”合成图标的列数：1 个居中；2–4 个 2×2；更多 3 列自适应行数。 */
+    fun allProviderLogoColumns(count: Int): Int = when {
+        count <= 1 -> 1
+        count <= 4 -> 2
+        else -> 3
+    }
 
     /**
-     * 卡片列宽不低于 250dp，列数随中间栏可用宽度自适应。
-     * 动态字体放大到 1.3× 时退回单列，和手机首页的规则一致。
+     * 以手机竖屏卡宽为基准，按可用宽度选列数；最多拉伸 12% 来铺满整行。
+     * 动态字体放大时基准卡宽同步放大，避免大字号下文字被压缩。
      */
-    fun columnCount(availableWidth: Dp, fontScale: Float): Int {
-        if (fontScale >= 1.3f) return 1
-        return adaptiveGridColumns(
-            availableWidth = availableWidth,
-            maxColumns = maxCardColumns,
-            minItemWidth = cardMinWidth,
-            spacing = cardSpacing,
-        )
+    fun columnCount(
+        availableWidth: Dp,
+        baseWidth: Dp,
+        spacing: Dp,
+        fontScale: Float,
+    ): Int {
+        if (availableWidth <= 0.dp || baseWidth <= 0.dp) return 1
+        val scaledBase = baseWidth * fontScale.coerceAtLeast(1f)
+        val maxWidth = scaledBase * maxCardStretch
+        val columns = ceil(((availableWidth + spacing) / (maxWidth + spacing)).toFloat()).toInt()
+        return columns.coerceIn(1, maxCardColumns)
     }
+
+    fun compactColumns(availableWidth: Dp, fontScale: Float): Int = columnCount(
+        availableWidth = availableWidth,
+        baseWidth = compactBaseCardWidth,
+        spacing = compactCardSpacing,
+        fontScale = fontScale,
+    )
+
+    fun fullColumns(availableWidth: Dp, fontScale: Float): Int = columnCount(
+        availableWidth = availableWidth,
+        baseWidth = fullBaseCardWidth,
+        spacing = fullCardSpacing,
+        fontScale = fontScale,
+    )
 }

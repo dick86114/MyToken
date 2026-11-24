@@ -16,6 +16,7 @@ import ai.routin.mytoken.core.ui.rememberMyTokenMotionEnabled
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageCardDensity
 import ai.routin.mytoken.domain.usage.RefreshStatus
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
@@ -209,6 +210,10 @@ fun HomeScreen(
     }
 
     if (layoutMode != MyTokenLayoutMode.Compact) {
+        // 右侧详情是浮层，系统返回先收起它，不离开首页。
+        BackHandler(enabled = wideDetailId != null) {
+            wideDetailId = null
+        }
         Scaffold(containerColor = colors.canvas) { padding ->
             WideHomeScreen(
                 state = state,
@@ -239,11 +244,11 @@ fun HomeScreen(
                 onEditCredential = onEditCredential,
                 onDeleteCredential = onDeleteCredential,
                 hasUpdateAvailable = hasUpdateAvailable,
-                updateVersion = updateVersion,
                 onOpenUpdate = {
                     shownUpdateVersion = updateVersion
                     showUpdateDialog = true
                 },
+                homeScrollStates = homeScrollStates,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),

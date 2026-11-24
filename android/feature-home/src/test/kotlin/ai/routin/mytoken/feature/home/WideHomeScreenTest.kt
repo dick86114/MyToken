@@ -4,21 +4,27 @@ import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.MyTokenTheme
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageCardDensity
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertContentDescriptionContains
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
+import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -31,6 +37,9 @@ class WideHomeScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    private var density by mutableStateOf(UsageCardDensity.COMPACT)
+    private var densityChanges = 0
+
     private fun cards(used: List<Double> = listOf(20.0, 20.0, 20.0)): List<CredentialCardUi> =
         listOf(
             sampleCard("Routin 主账号", ProviderId.Routin, used = used[0]),
@@ -41,7 +50,11 @@ class WideHomeScreenTest {
     private fun setContent(
         layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Expanded,
         used: List<Double> = listOf(20.0, 20.0, 20.0),
+        initialDensity: UsageCardDensity = UsageCardDensity.COMPACT,
+        hasUpdate: Boolean = false,
     ): List<CredentialCardUi> {
+        density = initialDensity
+        densityChanges = 0
         val all = cards(used)
         composeRule.setContent {
             MyTokenTheme {
@@ -57,7 +70,18 @@ class WideHomeScreenTest {
                         credentialCount = all.size,
                     ),
                     layoutMode = layoutMode,
-                    usageCardDensity = UsageCardDensity.COMPACT,
+                    usageCardDensity = density,
+                    onToggleUsageCardDensity = {
+                        densityChanges += 1
+                        density = if (density == UsageCardDensity.COMPACT) {
+                            UsageCardDensity.FULL
+                        } else {
+                            UsageCardDensity.COMPACT
+                        }
+                    },
+                    hasUpdateAvailable = hasUpdate,
+                    updateVersion = if (hasUpdate) "6.2.0" else null,
+                    onConfirmUpdate = {},
                     onRefreshAll = {},
                     onRefreshCredential = {},
                     onOpenCredential = {},
@@ -71,14 +95,34 @@ class WideHomeScreenTest {
 
     @Test
     @Config(qualifiers = "w1280dp-h720dp")
-    fun 三栏包含左轨报告分区行与瀑布流且不再使用分页() {
+    fun 大屏使用左轨报告与手机同款分页卡片区() {
         setContent()
         composeRule.onNodeWithTag("home_wide_rail").assertIsDisplayed()
         composeRule.onNodeWithTag("home_wide_report").assertIsDisplayed()
-        composeRule.onNodeWithTag("home_provider_toolbar").assertIsDisplayed()
-        composeRule.onNodeWithTag("home_grid_4_columns").assertExists()
-        composeRule.onNodeWithTag("home_pager").assertDoesNotExist()
+        composeRule.onNodeWithTag("home_pager").assertIsDisplayed()
+        composeRule.onNodeWithTag("home_page_active").assertExists()
+        composeRule.onNodeWithTag("home_grid_6_columns").assertExists()
+        // 大屏不再出现“全部供应商”筛选行，也不再放大屏更新条。
+        composeRule.onNodeWithTag("home_provider_toolbar").assertDoesNotExist()
         composeRule.onNodeWithTag("home_toolbar").assertDoesNotExist()
+        composeRule.onNodeWithTag("home_update_banner").assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 全部供应商图标包含当前供应商小标识() {
+        setContent()
+        composeRule.onNodeWithTag("home_wide_rail_all_icon", useUnmergedTree = true)
+            .assertExists()
+        composeRule.onNodeWithTag("home_wide_rail_all_logo_routin", useUnmergedTree = true)
+            .assertExists()
+        composeRule.onNodeWithTag("home_wide_rail_all_logo_glm", useUnmergedTree = true)
+            .assertExists()
+        composeRule.onNodeWithTag("home_wide_rail_all_logo_deepseek", useUnmergedTree = true)
+            .assertExists()
+        val bounds = composeRule.onNodeWithTag("home_wide_rail_all_icon", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        assertEquals(30.dp, bounds.right - bounds.left)
     }
 
     @Test
@@ -105,16 +149,160 @@ class WideHomeScreenTest {
     }
 
     @Test
+    @Config(qualifiers = "w1024dp-h768dp")
+    fun 四比三横屏报告横排且密度竖排在报告右侧() {
+        val all = setContent(used = listOf(20.0, 90.0, 96.0))
+        val report = composeRule.onNodeWithTag("home_wide_report").getUnclippedBoundsInRoot()
+        val toggle = composeRule.onNodeWithTag("usage_density_toggle").getUnclippedBoundsInRoot()
+        assertEquals(110.dp, report.bottom - report.top)
+        assertTrue(
+            "横屏密度切换器应位于报告右侧，report.right=${report.right} toggle.left=${toggle.left}",
+            toggle.left.value >= report.right.value,
+        )
+        assertEquals(74.dp, toggle.bottom - toggle.top)
+        composeRule.onNodeWithTag("home_grid_5_columns").assertExists()
+        composeRule.onNodeWithTag("health_finding_${all[1].credential.id}").assertExists()
+    }
+
+    @Test
+    @Config(qualifiers = "w768dp-h1024dp")
+    fun 竖屏报告在上控制条在下() {
+        setContent(layoutMode = MyTokenLayoutMode.Medium)
+        val report = composeRule.onNodeWithTag("home_wide_report").getUnclippedBoundsInRoot()
+        val toggle = composeRule.onNodeWithTag("usage_density_toggle").getUnclippedBoundsInRoot()
+        assertTrue(
+            "竖屏控制条应在报告下方，report.bottom=${report.bottom} toggle.top=${toggle.top}",
+            toggle.top.value >= report.bottom.value,
+        )
+        composeRule.onNodeWithTag("home_grid_4_columns").assertExists()
+    }
+
+    @Test
     @Config(qualifiers = "w1280dp-h720dp")
-    fun 点卡片打开三百八十宽详情再次点击或关闭按钮收起() {
+    fun 有更新时更新胶囊在横排密度切换上方且无重复提示() {
+        setContent(hasUpdate = true)
+        composeRule.onNodeWithTag("home_update_banner").assertDoesNotExist()
+        composeRule.onNodeWithTag("home_wide_update_hint").assertIsDisplayed()
+        val hint = composeRule.onNodeWithTag("home_wide_update_hint").getUnclippedBoundsInRoot()
+        val toggle = composeRule.onNodeWithTag("usage_density_toggle").getUnclippedBoundsInRoot()
+        assertTrue("更新提示应在密度切换上方", hint.bottom.value <= toggle.top.value + 1f)
+        assertEquals("有更新时密度切换改横排（高 32dp）", 32.dp, toggle.bottom - toggle.top)
+
+        composeRule.onNodeWithTag("home_wide_update_hint").performClick()
+        composeRule.onNodeWithTag("home_update_dialog").assertExists()
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 密度切换器驱动分页并在落页后写回模式() {
+        setContent()
+        composeRule.onNodeWithTag("home_grid_6_columns").assertExists()
+        composeRule.onNodeWithTag("usage_density_option_full").performClick()
+        composeRule.waitForIdle()
+
+        assertEquals(UsageCardDensity.FULL, density)
+        assertEquals(1, densityChanges)
+        composeRule.onNodeWithTag("home_grid_3_columns").assertExists()
+        composeRule.onNodeWithTag("home_grid_6_columns").assertDoesNotExist()
+
+        composeRule.onNodeWithTag("usage_density_option_compact").performClick()
+        composeRule.waitForIdle()
+        assertEquals(UsageCardDensity.COMPACT, density)
+        assertEquals(2, densityChanges)
+        composeRule.onNodeWithTag("home_grid_6_columns").assertExists()
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 卡片宽度以手机竖屏卡宽为基准且不超百分之十二拉伸() {
+        val all = setContent()
+        val compactWidth = composeRule
+            .onNodeWithTag("credential_card_${all[0].credential.id}")
+            .getUnclippedBoundsInRoot()
+            .let { it.right - it.left }
+        assertTrue(
+            "1280 简洁页卡宽 $compactWidth 应接近 176dp",
+            compactWidth.value >= 176f * 0.9f && compactWidth.value <= 176f * 1.12f + 0.1f,
+        )
+
+        composeRule.onNodeWithTag("usage_density_option_full").performClick()
+        composeRule.waitForIdle()
+        val fullWidth = composeRule
+            .onNodeWithTag("credential_card_${all[0].credential.id}")
+            .getUnclippedBoundsInRoot()
+            .let { it.right - it.left }
+        assertTrue(
+            "1280 完整页卡宽 $fullWidth 应接近 360dp",
+            fullWidth.value >= 360f * 0.9f && fullWidth.value <= 360f * 1.12f + 0.1f,
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 上滑网格后报告跟随收起() {
+        // 18 张卡确保列表可滚，头部有足够的收起空间。
+        val all = (1..6).flatMap { cards() }
+        density = UsageCardDensity.COMPACT
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = all,
+                        groups = emptyList(),
+                        credentialCount = all.size,
+                    ),
+                    layoutMode = MyTokenLayoutMode.Expanded,
+                    usageCardDensity = density,
+                    onToggleUsageCardDensity = {
+                        density = if (density == UsageCardDensity.COMPACT) {
+                            UsageCardDensity.FULL
+                        } else {
+                            UsageCardDensity.COMPACT
+                        }
+                    },
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                )
+            }
+        }
+        val before = composeRule.onNodeWithTag("home_wide_report").getUnclippedBoundsInRoot()
+        composeRule.onNodeWithTag("home_grid_6_columns").performTouchInput { swipeUp() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("home_scroll_edge").assertExists()
+        val after = composeRule.onNodeWithTag("home_wide_report").getUnclippedBoundsInRoot()
+        assertTrue(
+            "报告应随上滑收起，before.top=${before.top} after.top=${after.top}",
+            after.top.value < before.top.value,
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 点卡片打开三百八十宽浮层且首页不变形() {
         val all = setContent()
         val cardTag = "credential_card_${all[0].credential.id}"
+        val gridBefore = composeRule.onNodeWithTag("home_grid_6_columns").getUnclippedBoundsInRoot()
+        val reportBefore = composeRule.onNodeWithTag("home_wide_report").getUnclippedBoundsInRoot()
         composeRule.onNodeWithTag(cardTag).performClick()
         composeRule.onNodeWithTag("home_wide_detail").assertIsDisplayed()
         val width = composeRule.onNodeWithTag("home_wide_detail")
             .getUnclippedBoundsInRoot()
             .let { it.right - it.left }
         assertEquals(380.dp, width)
+        // 浮层是覆盖层：首页不缩窄、不位移。
+        assertEquals(
+            gridBefore,
+            composeRule.onNodeWithTag("home_grid_6_columns").getUnclippedBoundsInRoot(),
+        )
+        assertEquals(
+            reportBefore,
+            composeRule.onNodeWithTag("home_wide_report").getUnclippedBoundsInRoot(),
+        )
+
         composeRule.onNodeWithTag("home_wide_detail_close").performClick()
         composeRule.onNodeWithTag("home_wide_detail").assertDoesNotExist()
 
@@ -257,5 +445,33 @@ class WideHomeScreenTest {
         composeRule.onNodeWithTag("home_wide_detail")
             .assertContentDescriptionContains("GLM 主账号", substring = true)
         composeRule.onAllNodesWithTag("home_wide_detail").assertCountEquals(1)
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 下拉详情顶部手柄关闭浮层() {
+        val all = setContent()
+        composeRule.onNodeWithTag("credential_card_${all[0].credential.id}").performClick()
+        composeRule.onNodeWithTag("home_wide_detail").assertIsDisplayed()
+        composeRule.onNodeWithTag("home_wide_detail_handle").performTouchInput {
+            swipe(
+                start = center,
+                end = Offset(center.x, center.y + 160.dp.toPx()),
+                durationMillis = 400,
+            )
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("home_wide_detail").assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 右滑详情浮层关闭() {
+        val all = setContent()
+        composeRule.onNodeWithTag("credential_card_${all[0].credential.id}").performClick()
+        composeRule.onNodeWithTag("home_wide_detail").assertIsDisplayed()
+        composeRule.onNodeWithTag("home_wide_detail").performTouchInput { swipeRight() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("home_wide_detail").assertDoesNotExist()
     }
 }

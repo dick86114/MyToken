@@ -102,6 +102,10 @@ fun MyTokenApp(
     onRequestNotificationPermission: () -> Unit = {},
     openCredentialId: UUID? = null,
     onOpenCredentialConsumed: () -> Unit = {},
+    /** 仅 debug 包使用：通过 adb extra 强制展示更新提示，便于截图与验收。 */
+    debugForceUpdate: Boolean = false,
+    /** 仅 debug 包使用：屏蔽真实更新检查，便于截取“无更新”状态。 */
+    debugSuppressUpdate: Boolean = false,
 ) {
     var screen by remember { mutableStateOf<AppScreen>(AppScreen.Home) }
     var drawerSide by remember { mutableStateOf<MyTokenEdgeDrawerSide?>(null) }
@@ -215,6 +219,12 @@ fun MyTokenApp(
         is AppUpdateUiState.NeedsInstallPermission -> update.version
         is AppUpdateUiState.ReadyToInstall -> update.version
         else -> null
+    }
+    val debugUpdateVersion = if (debugForceUpdate) "9.9.9" else null
+    val effectiveUpdateVersion = when {
+        debugSuppressUpdate -> null
+        debugUpdateVersion != null -> debugUpdateVersion
+        else -> pendingUpdateVersion
     }
     val pendingUpdateNotes = (updateState as? AppUpdateUiState.Available)?.releaseNotes
     val isUpdateDownloading = updateState is AppUpdateUiState.Downloading
@@ -384,8 +394,8 @@ fun MyTokenApp(
                     onOpenCredentials = { drawerSide = MyTokenEdgeDrawerSide.Start },
                     onManageCredentials = { homeSheet = HomeCredentialSheet.Manage },
                     onOpenSettings = { drawerSide = MyTokenEdgeDrawerSide.End },
-                    hasUpdateAvailable = pendingUpdateVersion != null,
-                    updateVersion = pendingUpdateVersion,
+                    hasUpdateAvailable = effectiveUpdateVersion != null,
+                    updateVersion = effectiveUpdateVersion,
                     updateReleaseNotes = pendingUpdateNotes,
                     updateConfirmLabel = pendingUpdateConfirmLabel,
                     isUpdateDownloading = isUpdateDownloading,

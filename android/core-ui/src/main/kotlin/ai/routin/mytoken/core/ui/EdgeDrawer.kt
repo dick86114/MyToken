@@ -237,7 +237,7 @@ fun MyTokenEdgeDrawerHost(
                     )
                     .width(drawerWidth)
                     .fillMaxHeight()
-                    .drawerSwipeToDismiss(
+                    .myTokenDrawerSwipeToDismiss(
                         enabled = drawerSide != null,
                         side = activeSide,
                         drawerWidthPx = drawerWidthPx,
@@ -321,7 +321,7 @@ fun MyTokenEdgeDrawerHost(
     }
 }
 
-private fun Modifier.drawerSwipeToDismiss(
+fun Modifier.myTokenDrawerSwipeToDismiss(
     enabled: Boolean,
     side: MyTokenEdgeDrawerSide,
     drawerWidthPx: Float,

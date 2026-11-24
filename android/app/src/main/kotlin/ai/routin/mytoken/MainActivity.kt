@@ -2,6 +2,7 @@ package ai.routin.mytoken
 
 import android.Manifest
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -33,6 +34,8 @@ import java.util.UUID
 class MainActivity : ComponentActivity() {
 
     private val pendingCredentialId = mutableStateOf<UUID?>(null)
+    private val debugForceUpdate = mutableStateOf(false)
+    private val debugSuppressUpdate = mutableStateOf(false)
 
     private val requestNotificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* silent: status is visible in Settings */ }
@@ -60,6 +63,8 @@ class MainActivity : ComponentActivity() {
         val graph = (application as MyTokenApplication).graph
         graph.appUpdateController.checkForUpdatesOnLaunch()
         pendingCredentialId.value = intent?.getStringExtra(EXTRA_CREDENTIAL_ID)?.let(UUID::fromString)
+        debugForceUpdate.value = readDebugForceUpdate(intent)
+        debugSuppressUpdate.value = readDebugSuppressUpdate(intent)
         val appVersion = try {
             packageManager.getPackageInfo(packageName, 0).versionName ?: "0.1.0"
         } catch (_: Exception) {
@@ -86,6 +91,8 @@ class MainActivity : ComponentActivity() {
                         openCredentialId = pendingCredentialId.value,
                         onOpenCredentialConsumed = { pendingCredentialId.value = null },
                         notificationPermissionGranted = notificationPermissionGranted.value,
+                        debugForceUpdate = debugForceUpdate.value,
+                        debugSuppressUpdate = debugSuppressUpdate.value,
                         onRequestNotificationPermission = {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                 requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -101,10 +108,25 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         pendingCredentialId.value = intent.getStringExtra(EXTRA_CREDENTIAL_ID)?.let(UUID::fromString)
+        debugForceUpdate.value = readDebugForceUpdate(intent)
+        debugSuppressUpdate.value = readDebugSuppressUpdate(intent)
+    }
+
+    /** 只有 debuggable 包接受该 extra，release 包即使被传入也不会显示假更新。 */
+    private fun readDebugForceUpdate(intent: Intent?): Boolean {
+        val debuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        return debuggable && intent?.getBooleanExtra(EXTRA_DEBUG_FORCE_UPDATE, false) == true
+    }
+
+    private fun readDebugSuppressUpdate(intent: Intent?): Boolean {
+        val debuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        return debuggable && intent?.getBooleanExtra(EXTRA_DEBUG_SUPPRESS_UPDATE, false) == true
     }
 
     companion object {
         const val ACTION_OPEN_CREDENTIAL = "ai.routin.mytoken.action.OPEN_CREDENTIAL"
         const val EXTRA_CREDENTIAL_ID = "credentialId"
+        const val EXTRA_DEBUG_FORCE_UPDATE = "debugForceUpdate"
+        const val EXTRA_DEBUG_SUPPRESS_UPDATE = "debugSuppressUpdate"
     }
 }

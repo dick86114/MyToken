@@ -12,6 +12,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -144,67 +145,71 @@ private fun HorizontalReport(
     onLocate: (UUID) -> Unit,
 ) {
     val colors = MyTokenThemeTokens.colors
-    Row(modifier = Modifier.fillMaxSize()) {
-        ReportTicketHead(
-            headlineCount = headlineCount,
-            tail = tail,
-            normal = normal,
-            total = total,
-            tones = tones,
-            dialDiameter = 72.dp,
-            modifier = Modifier
-                .width(300.dp)
-                .fillMaxHeight(),
-        )
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 6.dp),
-        ) {
-            if (isNormal) {
-                NormalSummaryLine(
-                    total = total,
-                    syncLabel = syncLabel,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                )
-            } else {
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    findings.chunked(2).forEach { rowFindings ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            rowFindings.forEach { finding ->
-                                WideReportFindingRow(
-                                    finding = finding,
-                                    onClick = { onLocate(finding.credentialId) },
-                                    modifier = Modifier.weight(1f),
-                                    highlightedBackground = true,
-                                )
-                            }
-                            if (rowFindings.size == 1) {
-                                Spacer(modifier = Modifier.weight(1f))
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        // 票头最多 300dp；窄横屏（如 4:3 折叠展开）按 40% 收窄，给告警行留出空间。
+        val headWidth = minOf(300.dp, maxWidth * 0.4f)
+        Row(modifier = Modifier.fillMaxSize()) {
+            ReportTicketHead(
+                headlineCount = headlineCount,
+                tail = tail,
+                normal = normal,
+                total = total,
+                tones = tones,
+                dialDiameter = 72.dp,
+                modifier = Modifier
+                    .width(headWidth)
+                    .fillMaxHeight(),
+            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 6.dp),
+            ) {
+                if (isNormal) {
+                    NormalSummaryLine(
+                        total = total,
+                        syncLabel = syncLabel,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                    )
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        findings.chunked(2).forEach { rowFindings ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                rowFindings.forEach { finding ->
+                                    WideReportFindingRow(
+                                        finding = finding,
+                                        onClick = { onLocate(finding.credentialId) },
+                                        modifier = Modifier.weight(1f),
+                                        highlightedBackground = true,
+                                    )
+                                }
+                                if (rowFindings.size == 1) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
                             }
                         }
                     }
+                    Text(
+                        text = "最近同步 $syncLabel",
+                        modifier = Modifier.padding(start = 4.dp, top = 2.dp),
+                        style = MyTokenType.micro,
+                        fontWeight = FontWeight.Medium,
+                        color = colors.reportMuted,
+                        maxLines = 1,
+                    )
                 }
-                Text(
-                    text = "最近同步 $syncLabel",
-                    modifier = Modifier.padding(start = 4.dp, top = 2.dp),
-                    style = MyTokenType.micro,
-                    fontWeight = FontWeight.Medium,
-                    color = colors.reportMuted,
-                    maxLines = 1,
-                )
             }
         }
     }
