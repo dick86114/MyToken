@@ -10,6 +10,9 @@ import ai.routin.mytoken.core.ui.ProviderLogoPlate
 import ai.routin.mytoken.core.ui.rememberMyTokenMotionEnabled
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageCardDensity
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -30,15 +33,17 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -53,14 +58,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.ArrowCircleUp
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -77,12 +82,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Canvas
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -91,6 +99,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
@@ -98,11 +107,12 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 import java.util.UUID
-import kotlin.math.ceil
 import kotlin.math.min
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -163,11 +173,14 @@ internal fun WideHomeScreen(
     val windowHeightDp = configuration.screenHeightDp + with(density) {
         (systemBars.getTop(this) + systemBars.getBottom(this)).toDp().value
     }
-    val aspectRatio = if (windowHeightDp > 0f) windowWidthDp / windowHeightDp else 1f
     val isLandscape = windowWidthDp > windowHeightDp
     val railWidth = WideHomeSpec.railWidth(layoutMode)
-    val detailPanelWidth = WideHomeSpec.detailWidth(aspectRatio)
     val reportOrientation = WideHomeSpec.reportOrientation(isLandscape)
+    val systemBarTopDp = with(density) { systemBars.getTop(density).toDp() }
+    val systemBarBottomDp = with(density) { systemBars.getBottom(density).toDp() }
+    val systemBarEndDp = with(density) {
+        systemBars.getRight(density, layoutDirection).toDp()
+    }
 
     val pagerState = rememberPagerState(
         initialPage = if (usageCardDensity == UsageCardDensity.COMPACT) 0 else 1,
@@ -333,6 +346,43 @@ internal fun WideHomeScreen(
     }
     val collapseProgress: () -> Float = { collapseProgressState.value }
 
+    // 全窗背景：画布色 + 随收合进度淡入的票面黄渐变。Brush 只创建一次，
+    // 滚动时 drawBehind 只读状态并画一个整窗矩形，不重组、不逐帧新建 shader。
+    val canvasGradient = remember(colors.canvas, colors.reportTicket) {
+        Brush.verticalGradient(0f to colors.reportTicket, 1f to colors.canvas)
+    }
+    val gradientCache = remember(colors.canvas, colors.reportTicket) {
+        WideGradientBitmapCache()
+    }
+    val view = LocalView.current
+    val activity = remember(view) { view.context.findActivity() }
+    val latestDetailId by rememberUpdatedState(selectedDetailId)
+    LaunchedEffect(activity, view, colors.canvas, colors.reportTicket) {
+        val window = activity?.window ?: return@LaunchedEffect
+        // 状态栏图标深浅跟随状态栏后面的渐变颜色；只在跨过明暗阈值时写一次。
+        snapshotFlow {
+            if (latestDetailId != null) {
+                // 详情遮罩把整窗压暗，状态栏改用浅色图标。
+                false
+            } else {
+                val p = collapseProgressState.value
+                lerp(colors.canvas, colors.reportTicket, p).luminance() > 0.5f
+            }
+        }
+            .distinctUntilChanged()
+            .collect { darkIcons ->
+                WindowCompat.getInsetsController(window, view)
+                    .isAppearanceLightStatusBars = darkIcons
+            }
+    }
+    DisposableEffect(activity, view) {
+        onDispose {
+            val window = activity?.window ?: return@onDispose
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars =
+                colors.canvas.luminance() > 0.5f
+        }
+    }
+
     fun toggleDensity() {
         val target = if (pagerState.currentPage == 0) 1 else 0
         scope.launch {
@@ -377,7 +427,12 @@ internal fun WideHomeScreen(
             collapsedPx = collapseTargetFromList()
             highlightedCredentialId = id
             flashTick += 1
-            delay(1_000)
+            delay(
+                MyTokenMotion.locateHighlightWindowMillis(
+                    enabled = motionEnabled,
+                    pulses = MyTokenMotion.wideLocatePulseCount,
+                ).toLong(),
+            )
             if (highlightedCredentialId == id) {
                 highlightedCredentialId = null
             }
@@ -413,19 +468,39 @@ internal fun WideHomeScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            // 顶部导航底色随收起进度从黄色渐变到画布色；深色主题即黄到黑。
-            // 静止时纯色；滚动时渐变只覆盖头部下方一段，避免全屏着色在低端 GPU 上掉帧。
+            // 整窗统一背景：左轨、卡片区和系统栏后面都是同一层画布 + 票面黄渐变。
+            // Brush 只创建一次；滚动时 drawBehind 只画一个整窗矩形，不重组。
+            .background(colors.canvas)
             .drawBehind {
-                drawRect(colors.canvas)
                 val p = collapseProgress()
                 if (p > 0.001f) {
-                    val bandHeight = (headerHeightPx + 320.dp.toPx()).coerceAtMost(size.height)
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            0f to lerp(colors.canvas, colors.reportTicket, p),
-                            1f to colors.canvas,
-                        ),
-                        size = Size(size.width, bandHeight),
+                    // 全窗渐变预渲染成一张位图，逐帧只做一次带 alpha 的贴图；
+                    // 直接在 draw 阶段铺整屏渐变 shader 会明显拉高绘制耗时。
+                    val target = IntSize(
+                        size.width.toInt().coerceAtLeast(1),
+                        size.height.toInt().coerceAtLeast(1),
+                    )
+                    val cached = gradientCache.bitmap
+                    val bitmap = if (cached != null && gradientCache.size == target) {
+                        cached
+                    } else {
+                        val created = ImageBitmap(target.width, target.height)
+                        CanvasDrawScope().draw(
+                            density = this,
+                            layoutDirection = layoutDirection,
+                            canvas = Canvas(created),
+                            size = Size(target.width.toFloat(), target.height.toFloat()),
+                        ) {
+                            drawRect(brush = canvasGradient)
+                        }
+                        gradientCache.bitmap = created
+                        gradientCache.size = target
+                        created
+                    }
+                    drawImage(
+                        image = bitmap,
+                        dstSize = target,
+                        alpha = p,
                     )
                 }
             },
@@ -445,6 +520,7 @@ internal fun WideHomeScreen(
                 onRefreshAll = onRefreshAll,
                 onOpenSettings = onOpenSettings,
                 onOpenCredentials = onOpenCredentials,
+                onUpdateClick = onOpenUpdate,
                 railWidth = railWidth,
             )
             Box(
@@ -471,7 +547,10 @@ internal fun WideHomeScreen(
                         BoxWithConstraints(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                                .padding(
+                                    start = 16.dp,
+                                    end = 16.dp + systemBarEndDp,
+                                ),
                         ) {
                             val compactColumns = remember(maxWidth, fontScale) {
                                 WideHomeSpec.compactColumns(maxWidth, fontScale)
@@ -517,6 +596,7 @@ internal fun WideHomeScreen(
                                         highlightedCredentialId = highlightedCredentialId,
                                         flashTick = flashTick,
                                         headerHeightDp = headerHeightDp,
+                                        bottomInset = systemBarBottomDp,
                                         scrollStates = homeScrollStates,
                                         onOpenCard = { id ->
                                             onSelectDetail(if (selectedDetailId == id) null else id)
@@ -529,31 +609,24 @@ internal fun WideHomeScreen(
                             }
 
                             if (chromeVisible) {
-                                // 底衬单独一层：收起时只让这层画一条纯色，报告内容仍留在
-                                // graphicsLayer 的缓存里随位移移动，滚动时不必逐帧重录报告。
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(headerHeightDp)
-                                        .graphicsLayer {
-                                            translationY = -headerHeightPx * collapseProgress()
-                                        }
-                                        .drawBehind {
-                                            val p = collapseProgress()
-                                            if (p > 0.001f) {
-                                                drawRect(lerp(colors.canvas, colors.reportTicket, p))
-                                            }
-                                        }
-                                        .testTag("home_wide_header_backdrop"),
-                                )
                                 // 报告和工具条是覆盖层：只做图层位移，不改变分页区高度。
+                                // 背景统一由整窗渐变承担，这里不再额外叠一层底衬。
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        // 先量完整高度（含状态栏避让），卡片顶部留白才能
+                                        // 与报告 + 控制条的真实底部对齐。
+                                        .onSizeChanged { headerHeightPx = it.height }
+                                        // 状态栏后面的背景由整窗渐变负责；内容避开状态栏，
+                                        // 收起后卡片可以继续滚到状态栏后面。
+                                        .windowInsetsPadding(
+                                            WindowInsets.systemBars.only(
+                                                WindowInsetsSides.Top,
+                                            ),
+                                        )
                                         .graphicsLayer {
                                             translationY = -headerHeightPx * collapseProgress()
                                         }
-                                        .onSizeChanged { headerHeightPx = it.height }
                                         // 报告本身不可滚动：在头部直接上/下拖也驱动当前列表滚动。
                                         .pointerInput(Unit) {
                                             detectVerticalDragGestures { change, dragAmount ->
@@ -596,9 +669,6 @@ internal fun WideHomeScreen(
                                         density = usageCardDensity,
                                         onToggleDensity = ::toggleDensity,
                                         densityProgress = densityProgress,
-                                        updateAvailable = hasUpdateAvailable,
-                                        onOpenUpdate = onOpenUpdate,
-                                        motionEnabled = motionEnabled,
                                     )
                                 }
                             }
@@ -611,7 +681,6 @@ internal fun WideHomeScreen(
         WideDetailDrawer(
             selectedCard = requestedDetailCard,
             layoutMode = layoutMode,
-            panelWidth = detailPanelWidth,
             globalAlertThresholds = globalAlertThresholds,
             alertThresholdOverrides = alertThresholdOverrides,
             onClose = { onSelectDetail(null) },
@@ -644,6 +713,7 @@ private fun WideCardsPage(
     highlightedCredentialId: UUID?,
     flashTick: Int,
     headerHeightDp: Dp,
+    bottomInset: Dp,
     scrollStates: HomeScrollStates,
     onOpenCard: (UUID) -> Unit,
     onRefreshCard: (UUID) -> Unit,
@@ -671,7 +741,10 @@ private fun WideCardsPage(
             }
         }
     }
-    val contentPadding = PaddingValues(top = headerHeightDp + 2.dp, bottom = 12.dp)
+    val contentPadding = PaddingValues(
+        top = headerHeightDp + 2.dp,
+        bottom = 12.dp + bottomInset,
+    )
     Box(modifier = Modifier.fillMaxSize()) {
         when (mode) {
             HomeScrollMode.CompactGrid -> LazyVerticalStaggeredGrid(
@@ -697,6 +770,7 @@ private fun WideCardsPage(
                         selected = selectedDetailId == card.credential.id,
                         highlightSignal =
                             if (highlightedCredentialId == card.credential.id) flashTick else 0,
+                        flat = true,
                         onOpen = { onOpenCard(card.credential.id) },
                         onRefresh = { onRefreshCard(card.credential.id) },
                         onRetry = { onRetryCard(card.credential.id) },
@@ -734,6 +808,7 @@ private fun WideCardsPage(
                         selected = selectedDetailId == card.credential.id,
                         highlightSignal =
                             if (highlightedCredentialId == card.credential.id) flashTick else 0,
+                        flat = true,
                         onOpen = { onOpenCard(card.credential.id) },
                         onRefresh = { onRefreshCard(card.credential.id) },
                         onRetry = { onRetryCard(card.credential.id) },
@@ -767,7 +842,10 @@ private fun WideCardsPage(
     }
 }
 
-/** 报告 + 更新/密度控制：横屏左右排，竖屏上下排。 */
+/**
+ * 报告 + 密度控制条：报告在上，控制条在报告与卡片之间、右对齐。
+ * 横屏/竖屏使用同一结构，密度开关始终横排，不再随更新状态改变方向。
+ */
 @Composable
 private fun WideReportHeader(
     cards: List<CredentialCardUi>,
@@ -777,152 +855,28 @@ private fun WideReportHeader(
     density: UsageCardDensity,
     onToggleDensity: () -> Unit,
     densityProgress: () -> Float,
-    updateAvailable: Boolean,
-    onOpenUpdate: () -> Unit,
-    motionEnabled: Boolean,
 ) {
-    when (orientation) {
-        WideReportOrientation.Horizontal -> Row(
+    Column(modifier = Modifier.fillMaxWidth()) {
+        WideHomeHealthReport(
+            cards = cards,
+            syncText = syncText,
+            orientation = orientation,
+            onLocate = onLocate,
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            WideHomeHealthReport(
-                cards = cards,
-                syncText = syncText,
-                orientation = orientation,
-                onLocate = onLocate,
-                modifier = Modifier.weight(1f),
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            LandscapeReportControls(
-                density = density,
-                onToggleDensity = onToggleDensity,
-                densityProgress = densityProgress,
-                updateAvailable = updateAvailable,
-                onOpenUpdate = onOpenUpdate,
-                motionEnabled = motionEnabled,
-            )
-        }
-
-        WideReportOrientation.Vertical -> Column(modifier = Modifier.fillMaxWidth()) {
-            WideHomeHealthReport(
-                cards = cards,
-                syncText = syncText,
-                orientation = orientation,
-                onLocate = onLocate,
-            )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 44.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.End,
-            ) {
-                if (updateAvailable) {
-                    WideUpdateHint(
-                        onClick = onOpenUpdate,
-                        motionEnabled = motionEnabled,
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-                DensityModeSwitch(
-                    density = density,
-                    onToggle = onToggleDensity,
-                    progress = densityProgress,
-                )
-            }
-        }
-    }
-}
-
-/** 横屏报告右侧：默认竖排密度；有更新时切横排并在上方放更新提示。 */
-@Composable
-private fun LandscapeReportControls(
-    density: UsageCardDensity,
-    onToggleDensity: () -> Unit,
-    densityProgress: () -> Float,
-    updateAvailable: Boolean,
-    onOpenUpdate: () -> Unit,
-    motionEnabled: Boolean,
-) {
-    Column(
-        modifier = Modifier.width(84.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        if (updateAvailable) {
-            WideUpdateHint(
-                onClick = onOpenUpdate,
-                motionEnabled = motionEnabled,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-        }
-        DensityModeSwitch(
-            density = density,
-            onToggle = onToggleDensity,
-            progress = densityProgress,
-            orientation = if (updateAvailable) {
-                DensitySwitchOrientation.Horizontal
-            } else {
-                DensitySwitchOrientation.Vertical
-            },
         )
-    }
-}
-
-/** 小更新提示：只有箭头做呼吸动画，文字与整块保持稳定。 */
-@Composable
-private fun WideUpdateHint(
-    onClick: () -> Unit,
-    motionEnabled: Boolean,
-) {
-    val colors = MyTokenThemeTokens.colors
-    val pulse = if (motionEnabled) {
-        val transition = rememberInfiniteTransition(label = "wide-update-breath")
-        transition.animateFloat(
-            initialValue = 0.82f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 900, easing = LinearEasing),
-                repeatMode = RepeatMode.Reverse,
-            ),
-            label = "wide-update-arrow",
-        )
-    } else {
-        null
-    }
-    Row(
-        modifier = Modifier
-            .height(28.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(colors.reportTicket)
-            .clickable(role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = "有可用更新，查看更新" }
-            .padding(horizontal = 9.dp)
-            .testTag("home_wide_update_hint"),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        Icon(
-            imageVector = Icons.Filled.KeyboardArrowUp,
-            contentDescription = null,
-            tint = colors.reportTicketInk,
+        Row(
             modifier = Modifier
-                .size(16.dp)
-                .graphicsLayer {
-                    val p = pulse?.value ?: 1f
-                    scaleX = p
-                    scaleY = p
-                    alpha = 0.55f + 0.45f * p
-                },
-        )
-        Text(
-            text = "更新",
-            style = MyTokenType.caption,
-            fontWeight = FontWeight.SemiBold,
-            color = colors.reportTicketInk,
-            maxLines = 1,
-        )
+                .fillMaxWidth()
+                .height(WideHomeSpec.reportControlsHeight),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.End,
+        ) {
+            DensityModeSwitch(
+                density = density,
+                onToggle = onToggleDensity,
+                progress = densityProgress,
+            )
+        }
     }
 }
 
@@ -939,6 +893,7 @@ private fun WideProviderRail(
     onRefreshAll: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenCredentials: () -> Unit,
+    onUpdateClick: () -> Unit,
     railWidth: Dp,
 ) {
     val colors = MyTokenThemeTokens.colors
@@ -960,7 +915,7 @@ private fun WideProviderRail(
         modifier = Modifier
             .width(railWidth)
             .fillMaxHeight()
-            .background(colors.surface)
+            // 背景透明，让整窗渐变一直铺到左轨；只在右缘画一条发丝线。
             .drawBehind {
                 drawLine(
                     color = colors.line,
@@ -969,6 +924,13 @@ private fun WideProviderRail(
                     strokeWidth = 1.dp.toPx(),
                 )
             }
+            .windowInsetsPadding(
+                WindowInsets.systemBars.only(
+                    WindowInsetsSides.Start +
+                        WindowInsetsSides.Top +
+                        WindowInsetsSides.Bottom,
+                ),
+            )
             .testTag("home_wide_rail"),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -983,7 +945,15 @@ private fun WideProviderRail(
         ) {
             MyTokenBrandMark(size = 30.dp)
         }
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(4.dp))
+        Box(
+            modifier = Modifier
+                .width(28.dp)
+                .height(1.dp)
+                .background(colors.line)
+                .testTag("home_wide_rail_brand_divider"),
+        )
+        Spacer(modifier = Modifier.height(4.dp))
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -998,10 +968,7 @@ private fun WideProviderRail(
                 tag = "home_wide_rail_all",
                 onClick = { onSelectProvider(null) },
             ) {
-                AllProvidersGlyph(
-                    providers = providers,
-                    selected = selectedProvider == null,
-                )
+                AllProvidersGlyph(selected = selectedProvider == null)
             }
             providers.forEach { provider ->
                 RailSelectionButton(
@@ -1030,6 +997,20 @@ private fun WideProviderRail(
                 .background(colors.line),
         )
         Spacer(modifier = Modifier.height(6.dp))
+        if (hasUpdateAvailable) {
+            // 更新提示移到左轨刷新按钮上方，只有小箭头做呼吸动画。
+            RailActionButton(
+                contentDescription = "有新版本，查看更新",
+                tag = "home_wide_rail_update",
+                onClick = onUpdateClick,
+            ) {
+                BreathingUpdateArrow(
+                    tint = colors.actionFill,
+                    modifier = Modifier.size(20.dp),
+                    motionEnabled = motionEnabled,
+                )
+            }
+        }
         RailActionButton(
             contentDescription = if (isRefreshing) "正在刷新全部凭证" else "刷新全部凭证",
             tag = "home_wide_rail_refresh",
@@ -1043,11 +1024,7 @@ private fun WideProviderRail(
             )
         }
         RailActionButton(
-            contentDescription = if (hasUpdateAvailable) {
-                "打开设置，有可用更新"
-            } else {
-                "打开设置"
-            },
+            contentDescription = "打开设置",
             tag = "home_open_settings",
             onClick = onOpenSettings,
         ) {
@@ -1074,13 +1051,9 @@ private fun WideProviderRail(
     }
 }
 
-/**
- * “全部供应商”图标：30dp 白色 plate 内铺当前供应商小 logo。
- * 1 个居中；2–4 个 2 列；5–6 个 3×2；更多 3 列自适应行数。
- */
+/** “全部供应商”图标：30dp plate 内放 2×2 网格图标（app.grid.2x2）。 */
 @Composable
 private fun AllProvidersGlyph(
-    providers: List<ProviderId>,
     selected: Boolean,
 ) {
     val colors = MyTokenThemeTokens.colors
@@ -1091,66 +1064,53 @@ private fun AllProvidersGlyph(
             .clip(shape)
             .background(colors.controlHandle)
             .border(1.dp, colors.line, shape)
-            .testTag("home_wide_rail_all_icon")
-            .padding(1.dp),
+            .testTag("home_wide_rail_all_icon"),
         contentAlignment = Alignment.Center,
     ) {
-        if (providers.isEmpty()) {
-            Icon(
-                imageVector = Icons.Outlined.GridView,
-                contentDescription = null,
-                tint = if (selected) colors.ink else colors.muted,
-                modifier = Modifier.size(17.dp),
-            )
-            return@Box
-        }
-        if (providers.size == 1) {
-            ProviderLogoPlate(
-                painter = painterResource(ProviderCatalog.logoRes(providers.first())),
-                contentDescription = null,
-                size = 20.dp,
-                modifier = Modifier.testTag(
-                    "home_wide_rail_all_logo_${providers.first().rawValue}",
-                ),
-                shape = RoundedCornerShape(6.dp),
-                contentPadding = 0.dp,
-            )
-            return@Box
-        }
-        val columns = WideHomeSpec.allProviderLogoColumns(providers.size)
-        val rows = ceil(providers.size / columns.toFloat()).toInt()
-        val gap = 1.dp
-        val cell = minOf(
-            (28.dp - gap * (columns - 1)) / columns,
-            (28.dp - gap * (rows - 1)) / rows,
+        Icon(
+            imageVector = Icons.Outlined.GridView,
+            contentDescription = null,
+            tint = if (selected) colors.ink else colors.muted,
+            modifier = Modifier
+                .size(17.dp)
+                .testTag("home_wide_rail_all_grid_icon"),
         )
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(gap),
-        ) {
-            providers.chunked(columns).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-                    row.forEach { provider ->
-                        ProviderLogoPlate(
-                            painter = painterResource(
-                                ProviderCatalog.logoRes(provider),
-                            ),
-                            contentDescription = null,
-                            size = cell,
-                            modifier = Modifier.testTag(
-                                "home_wide_rail_all_logo_${provider.rawValue}",
-                            ),
-                            shape = RoundedCornerShape(2.dp),
-                            contentPadding = 0.dp,
-                        )
-                    }
-                    repeat(columns - row.size) {
-                        Spacer(modifier = Modifier.size(cell))
-                    }
-                }
-            }
-        }
     }
+}
+
+/** 更新图标：与设置页“检测更新”的 ArrowCircleUp 一致，只让图标呼吸。 */
+@Composable
+private fun BreathingUpdateArrow(
+    tint: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier,
+    motionEnabled: Boolean,
+) {
+    val pulse = if (motionEnabled) {
+        val transition = rememberInfiniteTransition(label = "wide-rail-update-breath")
+        transition.animateFloat(
+            initialValue = 0.4f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1_400, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "wide-rail-update-arrow",
+        )
+    } else {
+        null
+    }
+    Icon(
+        imageVector = Icons.Outlined.ArrowCircleUp,
+        contentDescription = null,
+        tint = tint,
+        modifier = modifier.graphicsLayer {
+            val p = pulse?.value ?: 1f
+            alpha = 0.45f + 0.55f * p
+            val scale = 0.9f + 0.1f * p
+            scaleX = scale
+            scaleY = scale
+        },
+    )
 }
 
 @Composable
@@ -1208,4 +1168,17 @@ private fun RailActionButton(
     ) {
         content()
     }
+}
+
+/** 从 Compose 的 LocalView context 找到宿主 Activity，用于状态栏图标明暗。 */
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+/** 全窗渐变的位图缓存；只在窗口尺寸变化时重建。 */
+private class WideGradientBitmapCache {
+    var bitmap: ImageBitmap? = null
+    var size: IntSize = IntSize.Zero
 }

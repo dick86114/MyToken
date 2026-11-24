@@ -110,15 +110,15 @@ class WideHomeScreenTest {
 
     @Test
     @Config(qualifiers = "w1280dp-h720dp")
-    fun 全部供应商图标包含当前供应商小标识() {
+    fun 全部供应商图标是二乘二网格且品牌下方有分隔线() {
         setContent()
         composeRule.onNodeWithTag("home_wide_rail_all_icon", useUnmergedTree = true)
             .assertExists()
+        composeRule.onNodeWithTag("home_wide_rail_all_grid_icon", useUnmergedTree = true)
+            .assertExists()
         composeRule.onNodeWithTag("home_wide_rail_all_logo_routin", useUnmergedTree = true)
-            .assertExists()
-        composeRule.onNodeWithTag("home_wide_rail_all_logo_glm", useUnmergedTree = true)
-            .assertExists()
-        composeRule.onNodeWithTag("home_wide_rail_all_logo_deepseek", useUnmergedTree = true)
+            .assertDoesNotExist()
+        composeRule.onNodeWithTag("home_wide_rail_brand_divider", useUnmergedTree = true)
             .assertExists()
         val bounds = composeRule.onNodeWithTag("home_wide_rail_all_icon", useUnmergedTree = true)
             .getUnclippedBoundsInRoot()
@@ -150,16 +150,17 @@ class WideHomeScreenTest {
 
     @Test
     @Config(qualifiers = "w1024dp-h768dp")
-    fun 四比三横屏报告横排且密度竖排在报告右侧() {
+    fun 四比三横屏报告仍横排且密度横排位于报告下方右侧() {
         val all = setContent(used = listOf(20.0, 90.0, 96.0))
         val report = composeRule.onNodeWithTag("home_wide_report").getUnclippedBoundsInRoot()
         val toggle = composeRule.onNodeWithTag("usage_density_toggle").getUnclippedBoundsInRoot()
         assertEquals(110.dp, report.bottom - report.top)
         assertTrue(
-            "横屏密度切换器应位于报告右侧，report.right=${report.right} toggle.left=${toggle.left}",
-            toggle.left.value >= report.right.value,
+            "密度切换器应在报告下方，report.bottom=${report.bottom} toggle.top=${toggle.top}",
+            toggle.top.value >= report.bottom.value,
         )
-        assertEquals(74.dp, toggle.bottom - toggle.top)
+        assertEquals("密度切换器始终横排", 32.dp, toggle.bottom - toggle.top)
+        assertEquals("密度切换器右对齐", report.right, toggle.right)
         composeRule.onNodeWithTag("home_grid_5_columns").assertExists()
         composeRule.onNodeWithTag("health_finding_${all[1].credential.id}").assertExists()
     }
@@ -179,16 +180,24 @@ class WideHomeScreenTest {
 
     @Test
     @Config(qualifiers = "w1280dp-h720dp")
-    fun 有更新时更新胶囊在横排密度切换上方且无重复提示() {
+    fun 有更新时箭头在左轨刷新上方且报告内无重复提示() {
         setContent(hasUpdate = true)
         composeRule.onNodeWithTag("home_update_banner").assertDoesNotExist()
-        composeRule.onNodeWithTag("home_wide_update_hint").assertIsDisplayed()
-        val hint = composeRule.onNodeWithTag("home_wide_update_hint").getUnclippedBoundsInRoot()
-        val toggle = composeRule.onNodeWithTag("usage_density_toggle").getUnclippedBoundsInRoot()
-        assertTrue("更新提示应在密度切换上方", hint.bottom.value <= toggle.top.value + 1f)
-        assertEquals("有更新时密度切换改横排（高 32dp）", 32.dp, toggle.bottom - toggle.top)
+        composeRule.onNodeWithTag("home_wide_update_hint").assertDoesNotExist()
 
-        composeRule.onNodeWithTag("home_wide_update_hint").performClick()
+        val update = composeRule.onNodeWithTag("home_wide_rail_update", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val refresh = composeRule.onNodeWithTag("home_wide_rail_refresh", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        assertTrue(
+            "更新箭头应在刷新按钮上方，update.bottom=${update.bottom} refresh.top=${refresh.top}",
+            update.bottom.value <= refresh.top.value + 1f,
+        )
+        val toggle = composeRule.onNodeWithTag("usage_density_toggle").getUnclippedBoundsInRoot()
+        assertEquals("密度切换始终横排（高 32dp）", 32.dp, toggle.bottom - toggle.top)
+
+        composeRule.onNodeWithTag("home_wide_rail_update", useUnmergedTree = true)
+            .performClick()
         composeRule.onNodeWithTag("home_update_dialog").assertExists()
     }
 
@@ -282,7 +291,7 @@ class WideHomeScreenTest {
 
     @Test
     @Config(qualifiers = "w1280dp-h720dp")
-    fun 点卡片打开三百八十宽浮层且首页不变形() {
+    fun 点卡片打开与设置同宽浮层且首页不变形() {
         val all = setContent()
         val cardTag = "credential_card_${all[0].credential.id}"
         val gridBefore = composeRule.onNodeWithTag("home_grid_6_columns").getUnclippedBoundsInRoot()
@@ -292,7 +301,7 @@ class WideHomeScreenTest {
         val width = composeRule.onNodeWithTag("home_wide_detail")
             .getUnclippedBoundsInRoot()
             .let { it.right - it.left }
-        assertEquals(380.dp, width)
+        assertEquals(420.dp, width)
         // 浮层是覆盖层：首页不缩窄、不位移。
         assertEquals(
             gridBefore,
@@ -314,24 +323,24 @@ class WideHomeScreenTest {
 
     @Test
     @Config(qualifiers = "w1024dp-h1024dp")
-    fun 方形窗口详情使用三百六十宽() {
+    fun 方形窗口详情同样使用四百二十宽() {
         val all = setContent()
         composeRule.onNodeWithTag("credential_card_${all[0].credential.id}").performClick()
         val width = composeRule.onNodeWithTag("home_wide_detail")
             .getUnclippedBoundsInRoot()
             .let { it.right - it.left }
-        assertEquals(360.dp, width)
+        assertEquals(420.dp, width)
     }
 
     @Test
     @Config(qualifiers = "w768dp-h1024dp")
-    fun 竖屏折叠详情使用三百四十宽() {
+    fun 竖屏折叠详情与设置抽屉同宽四百二十() {
         val all = setContent(layoutMode = MyTokenLayoutMode.Medium)
         composeRule.onNodeWithTag("credential_card_${all[0].credential.id}").performClick()
         val width = composeRule.onNodeWithTag("home_wide_detail")
             .getUnclippedBoundsInRoot()
             .let { it.right - it.left }
-        assertEquals(340.dp, width)
+        assertEquals(420.dp, width)
     }
 
     @Test
@@ -437,14 +446,14 @@ class WideHomeScreenTest {
 
     @Test
     @Config(qualifiers = "w1280dp-h720dp")
-    fun 点另一张卡片直接替换详情内容() {
+    fun 点击浮层外遮罩关闭详情() {
         val all = setContent()
         composeRule.onNodeWithTag("credential_card_${all[0].credential.id}").performClick()
         composeRule.onNodeWithTag("home_wide_detail").assertIsDisplayed()
-        composeRule.onNodeWithTag("credential_card_${all[1].credential.id}").performClick()
-        composeRule.onNodeWithTag("home_wide_detail")
-            .assertContentDescriptionContains("GLM 主账号", substring = true)
-        composeRule.onAllNodesWithTag("home_wide_detail").assertCountEquals(1)
+        composeRule.onNodeWithTag("home_wide_detail_scrim").assertIsDisplayed()
+        composeRule.onNodeWithTag("home_wide_detail_scrim").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("home_wide_detail").assertDoesNotExist()
     }
 
     @Test

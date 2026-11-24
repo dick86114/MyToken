@@ -214,46 +214,44 @@ fun HomeScreen(
         BackHandler(enabled = wideDetailId != null) {
             wideDetailId = null
         }
-        Scaffold(containerColor = colors.canvas) { padding ->
-            WideHomeScreen(
-                state = state,
-                allCards = allCards,
-                visibleCards = visibleCards,
-                providers = visibleProviders,
-                providerCounts = providerCounts,
-                selectedProvider = selectedProvider,
-                onSelectProvider = {
-                    pendingLocateId = null
-                    selectedProvider = it
-                },
-                usageCardDensity = usageCardDensity,
-                onToggleUsageCardDensity = onToggleUsageCardDensity,
-                layoutMode = layoutMode,
-                selectedDetailId = wideDetailId,
-                onSelectDetail = { wideDetailId = it },
-                onRefreshAll = onRefreshAll,
-                onRefreshCredential = onRefreshCredential,
-                onRetryCredential = onRetryCredential,
-                onOpenCredentials = onOpenCredentials,
-                onManageCredentials = onManageCredentials,
-                onOpenSettings = onOpenSettings,
-                onImportFromMac = onImportFromMac,
-                onAddManually = onAddManually,
-                globalAlertThresholds = globalAlertThresholds,
-                alertThresholdOverrides = alertThresholdOverrides,
-                onEditCredential = onEditCredential,
-                onDeleteCredential = onDeleteCredential,
-                hasUpdateAvailable = hasUpdateAvailable,
-                onOpenUpdate = {
-                    shownUpdateVersion = updateVersion
-                    showUpdateDialog = true
-                },
-                homeScrollStates = homeScrollStates,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-            )
-        }
+        // 大屏不再套 Scaffold：整窗渐变要画到状态栏、导航栏和左轨后面。
+        // 系统栏避让由 WideHomeScreen 内部的 insets 处理。
+        WideHomeScreen(
+            state = state,
+            allCards = allCards,
+            visibleCards = visibleCards,
+            providers = visibleProviders,
+            providerCounts = providerCounts,
+            selectedProvider = selectedProvider,
+            onSelectProvider = {
+                pendingLocateId = null
+                selectedProvider = it
+            },
+            usageCardDensity = usageCardDensity,
+            onToggleUsageCardDensity = onToggleUsageCardDensity,
+            layoutMode = layoutMode,
+            selectedDetailId = wideDetailId,
+            onSelectDetail = { wideDetailId = it },
+            onRefreshAll = onRefreshAll,
+            onRefreshCredential = onRefreshCredential,
+            onRetryCredential = onRetryCredential,
+            onOpenCredentials = onOpenCredentials,
+            onManageCredentials = onManageCredentials,
+            onOpenSettings = onOpenSettings,
+            onImportFromMac = onImportFromMac,
+            onAddManually = onAddManually,
+            globalAlertThresholds = globalAlertThresholds,
+            alertThresholdOverrides = alertThresholdOverrides,
+            onEditCredential = onEditCredential,
+            onDeleteCredential = onDeleteCredential,
+            hasUpdateAvailable = hasUpdateAvailable,
+            onOpenUpdate = {
+                shownUpdateVersion = updateVersion
+                showUpdateDialog = true
+            },
+            homeScrollStates = homeScrollStates,
+            modifier = Modifier.fillMaxSize(),
+        )
         HomeUpdateDialogHost(
             show = showUpdateDialog,
             shownVersion = shownUpdateVersion,

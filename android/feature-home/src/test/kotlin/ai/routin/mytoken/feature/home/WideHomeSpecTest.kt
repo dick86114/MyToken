@@ -14,14 +14,12 @@ class WideHomeSpecTest {
     }
 
     @Test
-    fun 详情宽度按窗口比例选择() {
-        assertEquals(380.dp, WideHomeSpec.detailWidth(1280f / 720f))
-        assertEquals(380.dp, WideHomeSpec.detailWidth(1.6f))
-        assertEquals(360.dp, WideHomeSpec.detailWidth(1f))
-        assertEquals(360.dp, WideHomeSpec.detailWidth(1.05f))
-        assertEquals(340.dp, WideHomeSpec.detailWidth(4f / 3f))
-        assertEquals(340.dp, WideHomeSpec.detailWidth(3f / 4f))
-        assertEquals(340.dp, WideHomeSpec.detailWidth(9f / 16f))
+    fun 详情抽屉与设置抽屉同宽且上限四百二十() {
+        assertEquals(420.dp, WideHomeSpec.drawerWidth(1280.dp))
+        assertEquals(420.dp, WideHomeSpec.drawerWidth(1024.dp))
+        assertEquals(420.dp, WideHomeSpec.drawerWidth(768.dp))
+        // 窄窗口按 88% 收窄，和设置抽屉的公式一致。
+        assertEquals(352.dp, WideHomeSpec.drawerWidth(400.dp))
     }
 
     @Test
@@ -72,13 +70,8 @@ class WideHomeSpecTest {
     }
 
     @Test
-    fun 全部供应商合成图标按数量分列() {
-        assertEquals(1, WideHomeSpec.allProviderLogoColumns(1))
-        assertEquals(2, WideHomeSpec.allProviderLogoColumns(2))
-        assertEquals(2, WideHomeSpec.allProviderLogoColumns(4))
-        assertEquals(3, WideHomeSpec.allProviderLogoColumns(5))
-        assertEquals(3, WideHomeSpec.allProviderLogoColumns(6))
-        assertEquals(3, WideHomeSpec.allProviderLogoColumns(9))
+    fun 报告控制条高度为四十四() {
+        assertEquals(44.dp, WideHomeSpec.reportControlsHeight)
     }
 
     @Test

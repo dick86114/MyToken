@@ -45,6 +45,8 @@ data class MyTokenColors(
     val controlHandle: Color,
     /** 浮起表面与滑块手柄的阴影色，alpha 表示“很轻”的一层。 */
     val cardShadow: Color,
+    /** 侧栏 / 详情浮层后面的遮罩底色；透明度由调用方按主题决定。 */
+    val scrim: Color,
     val statusDotNormal: Color,
     // 首页琥珀报告：正文区随主题反相，票据主区固定为琥珀纸色。
     val reportSurface: Color,
@@ -86,6 +88,7 @@ internal val MyTokenLightColors = MyTokenColors(
     controlBorder = Color(0xFFD4D7DE),
     controlHandle = Color(0xFFFFFFFF),
     cardShadow = Color(0x0B000000),
+    scrim = Color(0xFF17222C),
     statusDotNormal = Color(0xFFA3A9B0),
     reportSurface = Color(0xFF17181A),
     reportInk = Color(0xFFF5F6F7),
@@ -125,6 +128,7 @@ internal val MyTokenDarkColors = MyTokenColors(
     controlBorder = Color(0xFF3A3F46),
     controlHandle = Color(0xFFFFFFFF),
     cardShadow = Color(0x40000000),
+    scrim = Color(0xFF000000),
     statusDotNormal = Color(0xFF6B7076),
     reportSurface = Color(0xFFF5F6F7),
     reportInk = Color(0xFF17181A),

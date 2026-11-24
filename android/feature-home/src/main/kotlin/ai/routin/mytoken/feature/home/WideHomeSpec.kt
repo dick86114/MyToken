@@ -11,8 +11,7 @@ internal enum class WideReportOrientation { Horizontal, Vertical }
 /**
  * 大屏三栏的尺寸单一来源。
  *
- * 详情宽度按窗口宽高比推导，不按设备型号硬编码：
- * 16:9 → 380dp，1:1 → 360dp，其余（4:3 / 3:4 / 9:16）→ 340dp。
+ * 详情抽屉与设置页共用同一套宽度规则：窗口宽度的 88%，上限 420dp。
  *
  * 卡片宽度以手机竖屏两档卡片为基准（简洁 176dp / 完整 360dp），
  * 只允许最多 12% 的拉伸来铺满行，避免大屏卡片被拉得过宽。
@@ -28,35 +27,24 @@ internal object WideHomeSpec {
     const val maxCardStretch = 1.12f
     const val maxCardColumns = 8
 
-    val detailWidthWide = 380.dp
-    val detailWidthSquare = 360.dp
-    val detailWidthNarrow = 340.dp
+    /** 与 `MyTokenEdgeDrawerHost` 的设置/凭证抽屉保持一致。 */
+    val maxDrawerWidth = 420.dp
+    const val drawerWidthFraction = 0.88f
 
     val normalReportHeight = 80.dp
     val alertReportHeight = 110.dp
 
-    /** 1:1 附近视为方形窗口；其余宽高比走 340dp。 */
-    private val squareRatio = 0.9f..1.1f
-    private const val wideRatio = 1.5f
+    /** 报告下方的密度/操作条高度；密度开关始终横排右对齐。 */
+    val reportControlsHeight = 44.dp
 
     fun railWidth(layoutMode: MyTokenLayoutMode): Dp =
         if (layoutMode == MyTokenLayoutMode.Expanded) railWidthExpanded else railWidthMedium
 
-    fun detailWidth(aspectRatio: Float): Dp = when {
-        aspectRatio >= wideRatio -> detailWidthWide
-        aspectRatio in squareRatio -> detailWidthSquare
-        else -> detailWidthNarrow
-    }
+    fun drawerWidth(availableWidth: Dp): Dp =
+        minOf(availableWidth * drawerWidthFraction, maxDrawerWidth)
 
     fun reportOrientation(isLandscape: Boolean): WideReportOrientation =
         if (isLandscape) WideReportOrientation.Horizontal else WideReportOrientation.Vertical
-
-    /** “全部供应商”合成图标的列数：1 个居中；2–4 个 2×2；更多 3 列自适应行数。 */
-    fun allProviderLogoColumns(count: Int): Int = when {
-        count <= 1 -> 1
-        count <= 4 -> 2
-        else -> 3
-    }
 
     /**
      * 以手机竖屏卡宽为基准，按可用宽度选列数；最多拉伸 12% 来铺满整行。

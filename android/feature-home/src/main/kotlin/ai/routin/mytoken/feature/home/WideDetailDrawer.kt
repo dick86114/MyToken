@@ -11,15 +11,23 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,14 +41,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import java.util.UUID
 import kotlin.math.abs
@@ -49,6 +58,7 @@ import kotlinx.coroutines.launch
 /**
  * 大屏详情浮层：像设置页一样从右侧滑出，悬浮在首页之上。
  *
+ * 宽度与设置抽屉一致（窗口 88%，上限 420dp）；带遮罩，点击浮层外关闭。
  * 首页不缩放、不位移、不缩窄；支持右滑、下拉顶部手柄、✕ 与系统返回关闭。
  * 所有位移/透明度只在 graphicsLayer 中读取，滑动时不会触发整页重组。
  *
@@ -59,7 +69,6 @@ import kotlinx.coroutines.launch
 internal fun WideDetailDrawer(
     selectedCard: CredentialCardUi?,
     layoutMode: MyTokenLayoutMode,
-    panelWidth: Dp,
     globalAlertThresholds: AlertThresholds,
     alertThresholdOverrides: Map<UUID, AlertThresholds>,
     onClose: () -> Unit,
@@ -82,7 +91,6 @@ internal fun WideDetailDrawer(
     var handleDragPx by remember { mutableFloatStateOf(0f) }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
-    val panelWidthPx = with(density) { panelWidth.toPx() }
     val handleClosePx = with(density) { 72.dp.toPx() }
     val maxHandleDragPx = with(density) { 240.dp.toPx() }
 
@@ -109,12 +117,43 @@ internal fun WideDetailDrawer(
 
     val shownCard = selectedCard ?: lastCard ?: return
 
-    Box(modifier = modifier.fillMaxSize()) {
-        MyTokenSurface(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .width(panelWidth)
-                .fillMaxHeight()
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val drawerWidth = WideHomeSpec.drawerWidth(maxWidth)
+        val panelWidthPx = with(density) { drawerWidth.toPx() }
+        val isDark = MyTokenThemeTokens.colors.canvas.luminance() < 0.5f
+        val scrimColor = MyTokenThemeTokens.colors.scrim
+        val scrimAlpha = if (isDark) 0.46f else 0.24f
+
+        Box(modifier = Modifier.fillMaxSize()) {
+            // 遮罩与设置抽屉同一套色值；开合进度只在图层阶段读取。
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    // 遮罩固定浓度、不参与开合动画：否则每帧重画整屏会把下方
+                    // 全部卡片一起重绘，详情开合会明显掉帧。面板自身仍有滑入/滑出。
+                    .drawBehind {
+                        drawRect(color = scrimColor, alpha = scrimAlpha)
+                    }
+                    .then(
+                        if (selectedCard != null) {
+                            Modifier
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    onClick = onClose,
+                                )
+                                .semantics { contentDescription = "关闭详情" }
+                        } else {
+                            Modifier
+                        },
+                    )
+                    .testTag("home_wide_detail_scrim"),
+            )
+            MyTokenSurface(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .width(drawerWidth)
+                    .fillMaxHeight()
                 .myTokenDrawerSwipeToDismiss(
                     enabled = selectedCard != null && !handleDragging,
                     side = MyTokenEdgeDrawerSide.End,
@@ -162,7 +201,17 @@ internal fun WideDetailDrawer(
             surfaceRole = MyTokenVisualPolicy.SurfaceRole.Modal,
             shape = RoundedCornerShape(28.dp),
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(
+                        WindowInsets.systemBars.only(
+                            WindowInsetsSides.Top +
+                                WindowInsetsSides.Bottom +
+                                WindowInsetsSides.End,
+                        ),
+                    ),
+            ) {
                 DrawerHandle(
                     enabled = selectedCard != null,
                     onDragStart = {
@@ -219,6 +268,7 @@ internal fun WideDetailDrawer(
                 }
             }
         }
+    }
     }
 }
 

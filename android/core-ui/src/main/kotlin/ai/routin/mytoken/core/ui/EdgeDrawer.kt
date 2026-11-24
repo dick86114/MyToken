@@ -29,7 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
@@ -190,7 +189,7 @@ fun MyTokenEdgeDrawerHost(
         if (activeSide != null) {
             val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
             val scrimBaseAlpha = if (isDark) 0.46f else 0.24f
-            val scrimColor = if (isDark) Color.Black else Color(0xFF17222C)
+            val scrimColor = MyTokenThemeTokens.colors.scrim
             val scrimDismissModifier = if (drawerSide != null) {
                 Modifier
                     .clickable(

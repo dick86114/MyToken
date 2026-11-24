@@ -113,22 +113,34 @@ internal fun UsageCardFrame(
     density: UsageCardDensity,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    flat: Boolean = false,
     footer: @Composable () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val compact = density.isCompact()
     val interactionSource = remember { MutableInteractionSource() }
+    // 大屏卡片使用平面卡：不再为每张卡创建按压缩放层和投影层，滚动时只画
+    // surface + 发丝线，显著减少每帧需要合成的图层数量。手机视觉保持不变。
+    val press = if (flat) {
+        Modifier
+    } else {
+        Modifier.myTokenPressScale(interactionSource, pressedScale = 0.99f)
+    }
     MyTokenSurface(
         modifier = modifier
             .fillMaxWidth()
-            .myTokenPressScale(interactionSource, pressedScale = 0.99f)
+            .then(press)
             .clickable(
                 interactionSource = interactionSource,
                 indication = LocalIndication.current,
                 role = Role.Button,
                 onClick = onClick,
             ),
-        surfaceRole = MyTokenVisualPolicy.SurfaceRole.FloatingCard,
+        surfaceRole = if (flat) {
+            MyTokenVisualPolicy.SurfaceRole.Card
+        } else {
+            MyTokenVisualPolicy.SurfaceRole.FloatingCard
+        },
         shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
     ) {
         Column(

@@ -16,6 +16,8 @@ object MyTokenMotion {
     const val modeSwitchMillis = 320
     const val ringMillis = 500
     const val locateMillis = 300
+    const val locatePulseGapMillis = 90
+    const val wideLocatePulseCount = 3
     const val starMillis = 2400
 
     /** 大屏三栏：详情挤入 / 退出、中间重排、筛选与报告高度。 */
@@ -27,6 +29,14 @@ object MyTokenMotion {
 
     fun ringDurationMillis(enabled: Boolean): Int = if (enabled) ringMillis else 0
     fun locateDurationMillis(enabled: Boolean): Int = if (enabled) locateMillis else 0
+
+    /** 定位高亮从开始到完全结束的时间，用于决定何时清除高亮状态。 */
+    fun locateHighlightWindowMillis(enabled: Boolean, pulses: Int): Int =
+        if (enabled) {
+            locateMillis * 2 * pulses + locatePulseGapMillis * (pulses - 1) + 120
+        } else {
+            250
+        }
     fun modeSwitchDurationMillis(enabled: Boolean): Int = if (enabled) modeSwitchMillis else 0
     fun detailOpenDurationMillis(enabled: Boolean): Int = if (enabled) detailOpenMillis else 0
     fun detailCloseDurationMillis(enabled: Boolean): Int = if (enabled) detailCloseMillis else 0
