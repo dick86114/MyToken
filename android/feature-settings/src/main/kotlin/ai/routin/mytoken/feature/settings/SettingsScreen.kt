@@ -27,17 +27,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
-import kotlin.math.abs
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.outlined.ArrowCircleUp
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Handyman
@@ -70,7 +63,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import kotlinx.coroutines.launch
@@ -167,12 +159,6 @@ fun SettingsScreen(
     var showUpdateSettings by remember { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf(false) }
     var updateDialogDownloadStarted by remember { mutableStateOf(false) }
-    // 拖动阈值滑块时暂停页面滚动；松手或滑块销毁后自动恢复。
-    var alertThresholdSliderDragging by remember { mutableStateOf(false) }
-    val thresholdBlockBounds = remember { mutableStateOf(Rect.Zero) }
-    val thresholdSliderBounds = remember { mutableStateOf(Rect.Zero) }
-    val contentWindowOrigin = remember { mutableStateOf(Offset.Zero) }
-    val notificationsEnabledState = rememberUpdatedState(state.notifications.notificationsEnabled)
     val versionScale = remember { androidx.compose.animation.core.Animatable(1f) }
     val versionScope = androidx.compose.runtime.rememberCoroutineScope()
     LogExportDialog(
@@ -257,57 +243,7 @@ fun SettingsScreen(
             horizontalPadding = 16.dp,
             modifier = Modifier
                 .padding(padding)
-                .fillMaxSize()
-                .onGloballyPositioned { coordinates ->
-                    contentWindowOrigin.value = coordinates.localToWindow(Offset.Zero)
-                }
-                .pointerInput(Unit) {
-                    // 阈值卡内起手的竖向拖动在 Initial 阶段吞掉，避免 LazyVerticalGrid
-                    // 先一步进入滚动；横向移动仍放行给 RangeSlider。
-                    awaitEachGesture {
-                        val down = awaitFirstDown(
-                            requireUnconsumed = false,
-                            pass = PointerEventPass.Initial,
-                        )
-                        if (!notificationsEnabledState.value) return@awaitEachGesture
-                        val bounds = thresholdBlockBounds.value
-                        if (bounds.isEmpty) return@awaitEachGesture
-                        val point = down.position + contentWindowOrigin.value
-                        if (!bounds.contains(point)) return@awaitEachGesture
-                        // 滑块本体仍交给 RangeSlider 自己处理；只拦截标题/数值区域的拖动。
-                        val slider = thresholdSliderBounds.value
-                        if (!slider.isEmpty && slider.contains(point)) return@awaitEachGesture
-                        while (true) {
-                            val event = awaitPointerEvent(PointerEventPass.Initial)
-                            event.changes.forEach { change ->
-                                val delta = change.position - change.previousPosition
-                                if (change.pressed && abs(delta.y) > abs(delta.x)) {
-                                    change.consume()
-                                }
-                            }
-                            if (event.changes.none { it.id == down.id && it.pressed }) break
-                        }
-                    }
-                }
-                .pointerInput(Unit) {
-                    // 阈值卡内的横向拖动也不应关闭设置抽屉：RangeSlider 先在 Main
-                    // 阶段处理手势，随后在这里吞掉剩余变化，抽屉的滑动关闭就收不到。
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        if (!notificationsEnabledState.value) return@awaitEachGesture
-                        val bounds = thresholdBlockBounds.value
-                        if (bounds.isEmpty) return@awaitEachGesture
-                        val point = down.position + contentWindowOrigin.value
-                        if (!bounds.contains(point)) return@awaitEachGesture
-                        while (true) {
-                            val event = awaitPointerEvent(PointerEventPass.Main)
-                            event.changes.forEach { change ->
-                                if (change.pressed) change.consume()
-                            }
-                            if (event.changes.none { it.id == down.id && it.pressed }) break
-                        }
-                    }
-                },
+                .fillMaxSize(),
         ) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(columns),
@@ -321,7 +257,6 @@ fun SettingsScreen(
             ),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(MyTokenSpacing.settingsSectionCompact),
-            userScrollEnabled = !alertThresholdSliderDragging,
         ) {
             item(
                 key = "settings_header",
@@ -364,9 +299,6 @@ fun SettingsScreen(
                     onCredentialFailureAlertsChange = onCredentialFailureAlertsChange,
                     onNotificationsEnabledChange = onNotificationsEnabledChange,
                     onThresholdsChange = onAlertThresholdsChange,
-                    onAlertThresholdDraggingChange = { alertThresholdSliderDragging = it },
-                    onThresholdBoundsChange = { thresholdBlockBounds.value = it },
-                    onSliderBoundsChange = { thresholdSliderBounds.value = it },
                 )
             }
             item(key = "data") {

@@ -62,8 +62,20 @@ class NotificationSettingsSectionTest {
         composeRule.waitForIdle()
     }
 
+    private fun openThresholdDialog() {
+        composeRule.onNodeWithTag("settings_alert_threshold_edit", useUnmergedTree = true)
+            .performClick()
+        composeRule.waitForIdle()
+    }
+
+    private fun saveThresholdDialog() {
+        composeRule.onNodeWithTag("settings_threshold_save", useUnmergedTree = true)
+            .performClick()
+        composeRule.waitForIdle()
+    }
+
     @Test
-    fun rendersMasterToggleRangeSliderAndPermission() {
+    fun rendersThresholdSummaryAndEditEntry() {
         setContent()
 
         composeRule.onNodeWithText("通知").assertIsDisplayed()
@@ -71,12 +83,17 @@ class NotificationSettingsSectionTest {
         composeRule.onNodeWithText("启用提醒").assertDoesNotExist()
         composeRule.onNodeWithText("用量提醒阈值").assertIsDisplayed()
         composeRule.onNodeWithText("同时影响首页状态与通知").assertIsDisplayed()
-        composeRule.onNodeWithTag("settings_alert_threshold_range").assertIsDisplayed()
         composeRule.onNodeWithText("低 80% · 高 95%").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_alert_threshold_edit").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_alert_threshold_range").assertDoesNotExist()
         composeRule.onNodeWithText("凭证失效提醒").assertIsDisplayed()
         composeRule.onNodeWithText("已允许").assertIsDisplayed()
         composeRule.onNodeWithText("去授权").assertDoesNotExist()
-        composeRule.onNodeWithText("保存阈值").assertDoesNotExist()
+
+        openThresholdDialog()
+        composeRule.onNodeWithTag("settings_threshold_dialog").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_alert_threshold_range").assertIsDisplayed()
+        composeRule.onNodeWithText("保存").assertIsDisplayed()
     }
 
     @Test
@@ -110,26 +127,45 @@ class NotificationSettingsSectionTest {
     }
 
     @Test
-    fun rangeSliderUpdatesLabelAndAutoSavesOnRelease() {
+    fun rangeSliderUpdatesDraftAndSavesOnConfirm() {
         setContent()
+        openThresholdDialog()
 
         setRange(low = 70f, high = 95f)
         composeRule.onNodeWithText("低 70% · 高 95%").assertIsDisplayed()
+        assertNull(savedThresholds)
+
+        saveThresholdDialog()
         assertEquals(70 to 95, savedThresholds)
+        composeRule.onNodeWithText("低 70% · 高 95%").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_threshold_dialog").assertDoesNotExist()
+    }
+
+    @Test
+    fun cancelKeepsSavedThresholds() {
+        setContent()
+        openThresholdDialog()
 
         setRange(low = 70f, high = 90f)
-        composeRule.onNodeWithText("低 70% · 高 90%").assertIsDisplayed()
-        assertEquals(70 to 90, savedThresholds)
+        composeRule.onNodeWithTag("settings_threshold_cancel", useUnmergedTree = true)
+            .performClick()
+        composeRule.waitForIdle()
+
+        assertNull(savedThresholds)
+        composeRule.onNodeWithText("低 80% · 高 95%").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_threshold_dialog").assertDoesNotExist()
     }
 
     @Test
     fun rangeSliderKeepsAtLeastOnePointBetweenThumbs() {
         setContent()
+        openThresholdDialog()
 
         // Drag the low thumb onto the high thumb; the range normalizes to 94/95.
         setRange(low = 95f, high = 95f)
-
         composeRule.onNodeWithText("低 94% · 高 95%").assertIsDisplayed()
+
+        saveThresholdDialog()
         assertEquals(94 to 95, savedThresholds)
     }
 
@@ -140,6 +176,7 @@ class NotificationSettingsSectionTest {
         composeRule.onNodeWithContentDescription("启用通知").assertIsEnabled()
         composeRule.onNodeWithContentDescription("凭证失效提醒").assertIsNotEnabled()
         composeRule.onNodeWithTag("settings_alert_threshold_range").assertDoesNotExist()
+        composeRule.onNodeWithTag("settings_alert_threshold_edit").assertDoesNotExist()
         composeRule.onNodeWithText("用量提醒阈值").assertDoesNotExist()
         composeRule.onNodeWithText("低 80% · 高 95%").assertDoesNotExist()
         assertNull(savedThresholds)

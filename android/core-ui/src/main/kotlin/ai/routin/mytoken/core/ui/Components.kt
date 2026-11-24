@@ -227,12 +227,8 @@ fun MyTokenSwitch(
  * first vertical movement can still scroll the page before drag start is observed.
  * It resets on up/cancel and when the slider leaves composition (e.g. a lazy item).
  */
-/**
- * 在滑块所在的整块设置区域上拦截拖动：手指落在滑块边缘、标题或数值上时，
- * 父级滚动容器也不会抢走手势。松手后立即恢复页面滚动。
- */
 @Composable
-fun rememberSliderGestureGuard(
+private fun rememberSliderGestureGuard(
     enabled: Boolean = true,
     onDraggingChanged: (Boolean) -> Unit = {},
 ): Modifier {
