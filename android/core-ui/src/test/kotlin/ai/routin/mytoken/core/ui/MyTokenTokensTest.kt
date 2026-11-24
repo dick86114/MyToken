@@ -32,6 +32,10 @@ class MyTokenTokensTest {
         assertEquals(Color(0xFF8A8F96), MyTokenLightColors.cat2)
         assertEquals(Color(0xFFC9CDD3), MyTokenLightColors.cat3)
         assertEquals(Color(0xFFE9EBEE), MyTokenLightColors.track)
+        assertEquals(Color(0xFFE7E9EE), MyTokenLightColors.hairline)
+        assertEquals(Color(0xFFE2E4E9), MyTokenLightColors.controlTrack)
+        assertEquals(Color(0xFFD4D7DE), MyTokenLightColors.controlBorder)
+        assertEquals(Color(0xFFFFFFFF), MyTokenLightColors.controlHandle)
         assertEquals(Color(0xFFA3A9B0), MyTokenLightColors.statusDotNormal)
         // 报告票面始终保持琥珀；只有折叠行百分比与收起标题按 severity 变红。
         assertEquals(Color(0xFFFF7A7D), MyTokenLightColors.reportCritical)
@@ -59,6 +63,7 @@ class MyTokenTokensTest {
         assertEquals(Color(0xFF9BA1A8), MyTokenDarkColors.cat2)
         assertEquals(Color(0xFF4A4F56), MyTokenDarkColors.cat3)
         assertEquals(Color(0xFF2A2E34), MyTokenDarkColors.track)
+        assertEquals(Color(0xFF2A2E34), MyTokenDarkColors.controlTrack)
         assertEquals(Color(0xFF6B7076), MyTokenDarkColors.statusDotNormal)
         // 深色外观下报告正文是浅色纸面，Critical 百分比改用深红保证对比度。
         assertEquals(Color(0xFFC0272D), MyTokenDarkColors.reportCritical)
@@ -107,6 +112,10 @@ class MyTokenTokensTest {
         )
         assertEquals(
             MyTokenVisualPolicy.Material.Solid,
+            MyTokenVisualPolicy.materialFor(MyTokenVisualPolicy.SurfaceRole.FloatingCard),
+        )
+        assertEquals(
+            MyTokenVisualPolicy.Material.Solid,
             MyTokenVisualPolicy.materialFor(MyTokenVisualPolicy.SurfaceRole.Window),
         )
         assertEquals(
@@ -114,6 +123,7 @@ class MyTokenTokensTest {
             MyTokenVisualPolicy.materialFor(MyTokenVisualPolicy.SurfaceRole.Modal),
         )
         assertTrue(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.Modal))
+        assertTrue(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.FloatingCard))
         assertFalse(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.Card))
         assertFalse(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.Window))
     }

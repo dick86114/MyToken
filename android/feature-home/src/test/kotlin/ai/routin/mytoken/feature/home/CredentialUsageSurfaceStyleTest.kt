@@ -277,7 +277,10 @@ class CredentialUsageSurfaceStyleTest {
         val chrome = sourceText("HomeChrome.kt")
 
         assertFalse("分页过程中切换组件不应播放颜色加载动画", chrome.contains("animateColorAsState"))
-        assertTrue(chrome.contains("tint = if (selected) colors.canvas else colors.muted"))
+        assertTrue(
+            "选中图标为白底上的深色/浅色前景，未选中用中性色",
+            chrome.contains("tint = if (selected) colors.surface else colors.muted"),
+        )
     }
 
     @Test

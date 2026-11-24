@@ -73,7 +73,7 @@ class SettingsIconographyTest {
             .substringBefore("@Composable\nprivate fun ThemeSelector")
 
         assertTrue(
-            "铭牌外形应与凭证报告一致，右上和左下切角",
+            "铭牌外形应与凭证报告一致（圆角票据）",
             profile.contains(".background(colors.reportSurface, MyTokenReportBodyShape)"),
         )
         assertTrue(

@@ -125,6 +125,7 @@ fun HomeScreen(
     isUpdateDownloading: Boolean = false,
     updateDownloadProgress: Float? = null,
     isUpdateReadyToInstall: Boolean = false,
+    isUpdateNeedsInstallPermission: Boolean = false,
     onConfirmUpdate: () -> Unit = onOpenSettings,
     layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
     usageCardDensity: UsageCardDensity = UsageCardDensity.FULL,
@@ -173,8 +174,9 @@ fun HomeScreen(
     var shownUpdateVersion by remember { mutableStateOf<String?>(null) }
     var pagerHasUserInput by remember { mutableStateOf(false) }
 
-    // 下载期间保持弹窗打开并展示进度；下载结束（成功或失败）后自动收起。
-    LaunchedEffect(showUpdateDialog, isUpdateDownloading) {
+    // 下载期间保持弹窗打开并展示进度；下载结束（成功或失败）后自动收起，
+    // 但缺安装权限时保留弹窗，引导用户去系统授权。
+    LaunchedEffect(showUpdateDialog, isUpdateDownloading, isUpdateNeedsInstallPermission) {
         if (!showUpdateDialog) {
             updateDownloadStarted = false
             return@LaunchedEffect
@@ -182,7 +184,9 @@ fun HomeScreen(
         if (isUpdateDownloading) {
             updateDownloadStarted = true
         } else if (updateDownloadStarted) {
-            showUpdateDialog = false
+            if (!isUpdateNeedsInstallPermission) {
+                showUpdateDialog = false
+            }
             updateDownloadStarted = false
         }
     }
@@ -880,6 +884,7 @@ fun HomeScreen(
             confirmLabel = updateConfirmLabel,
             downloading = isUpdateDownloading,
             downloadProgress = updateDownloadProgress,
+            needsInstallPermission = isUpdateNeedsInstallPermission,
             onConfirm = {
                 onConfirmUpdate()
                 if (isUpdateReadyToInstall) showUpdateDialog = false

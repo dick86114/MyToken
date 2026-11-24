@@ -13,12 +13,14 @@ object MyTokenVisualPolicy {
     enum class SurfaceRole {
         Window,
         Card,
+        /** 首页供应商白卡：从纸灰页底上浮，使用 0.5dp 发丝线与一层很轻的阴影。 */
+        FloatingCard,
         Metric,
         Control,
         Modal,
     }
 
-    /** 实色表面是默认；只有浮层允许阴影。 */
+    /** 实色表面是默认；浮层与首页浮起白卡允许阴影。 */
     enum class Material {
         Solid,
         Overlay,
@@ -30,8 +32,14 @@ object MyTokenVisualPolicy {
 
     fun materialFor(role: SurfaceRole): Material = when (role) {
         SurfaceRole.Modal -> Material.Overlay
-        SurfaceRole.Window, SurfaceRole.Card, SurfaceRole.Metric, SurfaceRole.Control -> Material.Solid
+        SurfaceRole.Window,
+        SurfaceRole.Card,
+        SurfaceRole.FloatingCard,
+        SurfaceRole.Metric,
+        SurfaceRole.Control,
+        -> Material.Solid
     }
 
-    fun allowsShadow(role: SurfaceRole): Boolean = role == SurfaceRole.Modal
+    fun allowsShadow(role: SurfaceRole): Boolean =
+        role == SurfaceRole.Modal || role == SurfaceRole.FloatingCard
 }

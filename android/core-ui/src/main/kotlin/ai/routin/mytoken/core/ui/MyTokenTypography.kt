@@ -71,6 +71,14 @@ object MyTokenType {
         letterSpacing = 0.sp,
     )
 
+    /** 滑块拖动数值气泡：12sp 白字。 */
+    val tooltip = TextStyle(
+        fontSize = 12.sp,
+        lineHeight = 16.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.sp,
+    )
+
     /** 拉丁单位、重置卡数字；不用于中文句子。 */
     val micro = TextStyle(
         fontSize = 11.sp,

@@ -107,7 +107,7 @@ internal fun usageCardRingTone(health: UsageCardHealth): UsageMetricTone = when 
 internal fun usageCardRingInactive(health: UsageCardHealth): Boolean =
     health == UsageCardHealth.Stale || health == UsageCardHealth.Failed || health == UsageCardHealth.Loading
 
-/** 卡片外框：实色表面 + hairline，无阴影；高度随内容，内部节奏由固定行高保持。 */
+/** 卡片外框：浮起白卡 = surface + 0.5dp 发丝线 + 很轻的阴影；高度随内容。 */
 @Composable
 internal fun UsageCardFrame(
     density: UsageCardDensity,
@@ -128,7 +128,7 @@ internal fun UsageCardFrame(
                 role = Role.Button,
                 onClick = onClick,
             ),
-        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
+        surfaceRole = MyTokenVisualPolicy.SurfaceRole.FloatingCard,
         shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
     ) {
         Column(

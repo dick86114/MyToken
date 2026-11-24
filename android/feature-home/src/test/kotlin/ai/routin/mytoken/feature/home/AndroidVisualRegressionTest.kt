@@ -49,12 +49,14 @@ class AndroidVisualRegressionTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun 方案A材质契约只允许模态投影() {
+    fun 方案A材质契约只允许浮起卡与模态投影() {
         assertEquals(MyTokenVisualPolicy.Material.Solid, MyTokenVisualPolicy.materialFor(MyTokenVisualPolicy.SurfaceRole.Window))
         assertEquals(MyTokenVisualPolicy.Material.Solid, MyTokenVisualPolicy.materialFor(MyTokenVisualPolicy.SurfaceRole.Card))
+        assertEquals(MyTokenVisualPolicy.Material.Solid, MyTokenVisualPolicy.materialFor(MyTokenVisualPolicy.SurfaceRole.FloatingCard))
         assertEquals(MyTokenVisualPolicy.Material.Overlay, MyTokenVisualPolicy.materialFor(MyTokenVisualPolicy.SurfaceRole.Modal))
         assertFalse(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.Card))
         assertFalse(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.Window))
+        assertTrue(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.FloatingCard))
         assertTrue(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.Modal))
     }
 

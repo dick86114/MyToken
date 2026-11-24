@@ -35,6 +35,16 @@ data class MyTokenColors(
     val cat2: Color,
     val cat3: Color,
     val track: Color,
+    /** 首页浮起白卡的发丝描边（设计稿 §6：0.5dp #E7E9EE）。 */
+    val hairline: Color,
+    /** 范围滑块未选中轨道（设计稿 §7：#E2E4E9）。 */
+    val controlTrack: Color,
+    /** 范围滑块手柄描边（设计稿 §7：#D4D7DE）。 */
+    val controlBorder: Color,
+    /** 范围滑块手柄填充：设计稿固定为白色，深色外观也保留白手柄。 */
+    val controlHandle: Color,
+    /** 浮起表面与滑块手柄的阴影色，alpha 表示“很轻”的一层。 */
+    val cardShadow: Color,
     val statusDotNormal: Color,
     // 首页琥珀报告：正文区随主题反相，票据主区固定为琥珀纸色。
     val reportSurface: Color,
@@ -71,6 +81,11 @@ internal val MyTokenLightColors = MyTokenColors(
     cat2 = Color(0xFF8A8F96),
     cat3 = Color(0xFFC9CDD3),
     track = Color(0xFFE9EBEE),
+    hairline = Color(0xFFE7E9EE),
+    controlTrack = Color(0xFFE2E4E9),
+    controlBorder = Color(0xFFD4D7DE),
+    controlHandle = Color(0xFFFFFFFF),
+    cardShadow = Color(0x0B000000),
     statusDotNormal = Color(0xFFA3A9B0),
     reportSurface = Color(0xFF17181A),
     reportInk = Color(0xFFF5F6F7),
@@ -105,6 +120,11 @@ internal val MyTokenDarkColors = MyTokenColors(
     cat2 = Color(0xFF9BA1A8),
     cat3 = Color(0xFF4A4F56),
     track = Color(0xFF2A2E34),
+    hairline = Color(0xFF2E3238),
+    controlTrack = Color(0xFF2A2E34),
+    controlBorder = Color(0xFF3A3F46),
+    controlHandle = Color(0xFFFFFFFF),
+    cardShadow = Color(0x40000000),
     statusDotNormal = Color(0xFF6B7076),
     reportSurface = Color(0xFFF5F6F7),
     reportInk = Color(0xFF17181A),

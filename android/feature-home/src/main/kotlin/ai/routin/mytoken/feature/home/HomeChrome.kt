@@ -16,7 +16,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -27,7 +26,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -374,7 +372,7 @@ internal fun HomeProviderToolbar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(64.dp)
+            .height(42.dp)
             .testTag("home_provider_toolbar"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -411,7 +409,7 @@ private fun ProviderFilter(
     Box(modifier = modifier) {
         Row(
             modifier = Modifier
-                .height(48.dp)
+                .height(42.dp)
                 .widthIn(min = MyTokenSize.touch)
                 .clickable(role = Role.Button) { expanded = true }
                 .semantics { selected = selectedProvider != null }
@@ -668,7 +666,19 @@ private fun SelectedCheck(modifier: Modifier = Modifier) {
     )
 }
 
-/** 设计稿的纯图标密度滑块：双列 / 单列图标，选中块随分页进度滑动。 */
+/** 设计稿 §5：32dp 轨道 + 34×28dp 按钮，选中块随分页进度滑动。 */
+private object DensitySwitchSpec {
+    val trackWidth = 74.dp
+    val trackHeight = 32.dp
+    val trackRadius = 16.dp
+    val padding = 2.dp
+    val gap = 2.dp
+    val itemWidth = 34.dp
+    val itemHeight = 28.dp
+    val itemRadius = 14.dp
+    val iconSize = 13.dp
+}
+
 @Composable
 private fun DensityModeSwitch(
     density: UsageCardDensity,
@@ -678,44 +688,36 @@ private fun DensityModeSwitch(
 ) {
     val compact = density.isCompact()
     val colors = MyTokenThemeTokens.colors
-    // 视觉高度保持设计稿的 42dp，但把触控区扩展到 48dp；滑块仍在 42dp 轨道内移动。
+    val itemTravelPx = with(LocalDensity.current) {
+        (DensitySwitchSpec.itemWidth + DensitySwitchSpec.gap).toPx()
+    }
     Box(
         modifier = modifier
-            .width(104.dp)
-            .height(MyTokenSize.touch)
+            .width(DensitySwitchSpec.trackWidth)
+            .height(DensitySwitchSpec.trackHeight)
+            .clip(RoundedCornerShape(DensitySwitchSpec.trackRadius))
+            .background(colors.track)
             .testTag("usage_density_toggle"),
-        contentAlignment = Alignment.Center,
     ) {
-        BoxWithConstraints(
+        Box(
             modifier = Modifier
-                .width(104.dp)
-                .height(42.dp)
-                .clip(RoundedCornerShape(13.dp))
-                .background(colors.surface)
-                .border(1.dp, colors.line, RoundedCornerShape(13.dp)),
-        ) {
-            val inset = 3.dp
-            val segmentWidth = (maxWidth - inset * 2) / 2
-            val segmentHeight = maxHeight - inset * 2
-            val segmentWidthPx = with(LocalDensity.current) { segmentWidth.toPx() }
-            Box(
-                modifier = Modifier
-                    .offset(x = inset, y = inset)
-                    .width(segmentWidth)
-                    .height(segmentHeight)
-                    // 只用 draw 阶段位移，拖动分页时不会整块重新布局而闪动。
-                    .graphicsLayer {
-                        translationX = segmentWidthPx * progress().coerceIn(0f, 1f)
-                    }
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(colors.ink)
-                    .testTag("usage_density_thumb"),
-            )
-        }
+                .padding(DensitySwitchSpec.padding)
+                .width(DensitySwitchSpec.itemWidth)
+                .height(DensitySwitchSpec.itemHeight)
+                // 只用 draw 阶段位移，拖动分页时不会整块重新布局而闪动。
+                .graphicsLayer {
+                    translationX = itemTravelPx * progress().coerceIn(0f, 1f)
+                }
+                .clip(RoundedCornerShape(DensitySwitchSpec.itemRadius))
+                .background(colors.ink)
+                .testTag("usage_density_thumb"),
+        )
         Row(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(DensitySwitchSpec.padding)
                 .selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(DensitySwitchSpec.gap),
         ) {
             DensityIconOption(
                 compact = true,
@@ -760,7 +762,7 @@ private fun RowScope.DensityIconOption(
         // 分页过程中滑块已跟手；图标直接使用当前选中态，禁止加载动画。
         DensityGlyph(
             compact = compact,
-            tint = if (selected) colors.canvas else colors.muted,
+            tint = if (selected) colors.surface else colors.muted,
             emphasized = selected,
         )
     }
@@ -768,7 +770,7 @@ private fun RowScope.DensityIconOption(
 
 /**
  * SF Symbol 风格的密度图标：简洁为 `app.grid.2x2`，完整为 `rectangle.grid.1x2`。
- * 统一 24×24 几何缩放到 19dp；选中时线宽略增。
+ * 统一 24×24 几何缩放到 13dp；选中时线宽略增。
  */
 @Composable
 private fun DensityGlyph(
@@ -777,7 +779,7 @@ private fun DensityGlyph(
     emphasized: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    Canvas(modifier = modifier.size(19.dp)) {
+    Canvas(modifier = modifier.size(DensitySwitchSpec.iconSize)) {
         val scale = size.width / 24f
         val stroke = Stroke(width = (if (emphasized) 1.9f else 1.7f) * scale)
         val radius = CornerRadius(2.2f * scale)

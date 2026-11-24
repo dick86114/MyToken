@@ -43,4 +43,15 @@ object MyTokenSize {
     val switchWidth = 46.dp
     val switchHeight = 28.dp
     val settingsRowMin = 44.dp
+    /** 浮起卡片描边（设计稿 §6：0.5dp）。 */
+    val hairline = 0.5.dp
+    /** 阈值双滑块（设计稿 §7：22dp 手柄、4dp 轨道）。 */
+    val sliderHandle = 22.dp
+    val sliderTrack = 4.dp
+}
+
+/** 轻阴影：只给首页浮起白卡与范围滑块手柄，保持很轻的一层。 */
+object MyTokenElevation {
+    val floatingCard = 4.dp
+    val sliderHandle = 1.5.dp
 }

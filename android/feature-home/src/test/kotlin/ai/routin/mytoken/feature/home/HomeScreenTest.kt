@@ -609,15 +609,13 @@ class HomeScreenTest {
             }
         }
 
-        // 顶部导航、供应商筛选与报告刷新都保持 48dp 触控。
+        // 顶部导航与报告刷新保持 48dp 触控；设计稿 §5 把供应商筛选与
+        // 密度切换器收成 42dp 行 / 32dp 轨道，尺寸在下方单独断言。
         mapOf(
             "credential_refresh_${credential.id}" to 48.dp,
-            "provider_filter_menu" to 48.dp,
             "report_refresh" to 48.dp,
             "home_open_credentials" to 48.dp,
             "home_open_settings" to 48.dp,
-            "usage_density_option_compact" to 48.dp,
-            "usage_density_option_full" to 48.dp,
         ).forEach { (tag, minSize) ->
             val bounds = composeRule.onNodeWithTag(tag, useUnmergedTree = true)
                 .getUnclippedBoundsInRoot()
@@ -625,6 +623,25 @@ class HomeScreenTest {
             val width = bounds.right - bounds.left
             assertTrue("触控目标 $tag 高度应 ≥$minSize（实际 $height）", height >= minSize)
             assertTrue("触控目标 $tag 宽度应 ≥48dp（实际 $width）", width >= 48.dp)
+        }
+
+        val filterBounds = composeRule.onNodeWithTag("provider_filter_menu", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        assertEquals(
+            "供应商筛选行应与设计稿的 42dp 行同高",
+            42f,
+            (filterBounds.bottom - filterBounds.top).value,
+            1f,
+        )
+        val toggleBounds = composeRule.onNodeWithTag("usage_density_toggle", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        assertEquals("密度切换器宽 74dp", 74f, (toggleBounds.right - toggleBounds.left).value, 1f)
+        assertEquals("密度切换器高 32dp", 32f, (toggleBounds.bottom - toggleBounds.top).value, 1f)
+        listOf("usage_density_option_compact", "usage_density_option_full").forEach { tag ->
+            val bounds = composeRule.onNodeWithTag(tag, useUnmergedTree = true)
+                .getUnclippedBoundsInRoot()
+            assertEquals("$tag 宽 34dp", 34f, (bounds.right - bounds.left).value, 1f)
+            assertEquals("$tag 高 28dp", 28f, (bounds.bottom - bounds.top).value, 1f)
         }
     }
 
@@ -1301,7 +1318,8 @@ class HomeScreenTest {
             (toggleBounds.left + toggleBounds.right) / 2f >
                 (rootBounds.left + rootBounds.right) / 2f,
         )
-        assertEquals("密度滑块宽度按设计稿 104dp", 104f, toggleBounds.right.value - toggleBounds.left.value, 1.5f)
+        assertEquals("密度滑块宽度按设计稿 74dp", 74f, toggleBounds.right.value - toggleBounds.left.value, 1.5f)
+        assertEquals("密度滑块高度按设计稿 32dp", 32f, toggleBounds.bottom.value - toggleBounds.top.value, 1.5f)
     }
 
     @Test
@@ -3785,6 +3803,56 @@ class HomeScreenTest {
         composeRule.onNodeWithTag("home_update_dialog").assertDoesNotExist()
         composeRule.onNodeWithTag("home_open_settings").performClick()
         assertEquals(1, openedSettings)
+    }
+
+    @Test
+    fun 下载结束但缺安装权限时弹窗保持并提示去授权() {
+        var downloading by mutableStateOf(true)
+        var needsPermission by mutableStateOf(false)
+        var confirmed = 0
+        composeRule.setContent {
+            MaterialTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = listOf(card(credential("安装权限"))),
+                        groups = emptyList(),
+                        credentialCount = 1,
+                    ),
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                    hasUpdateAvailable = true,
+                    updateVersion = "6.1.0",
+                    updateReleaseNotes = "本次更新",
+                    updateConfirmLabel = "安装更新",
+                    isUpdateDownloading = downloading,
+                    isUpdateReadyToInstall = true,
+                    isUpdateNeedsInstallPermission = needsPermission,
+                    onConfirmUpdate = { confirmed++ },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("home_update_banner").performClick()
+        composeRule.onNodeWithTag("home_update_dialog").assertIsDisplayed()
+        composeRule.onNodeWithTag("update_download_progress").assertExists()
+
+        composeRule.runOnIdle {
+            downloading = false
+            needsPermission = true
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("home_update_dialog").assertIsDisplayed()
+        composeRule.onNodeWithText(
+            "安装包已下载，请先允许安装未知来源应用",
+            useUnmergedTree = true,
+        ).assertExists()
+        composeRule.onNodeWithTag("home_update_confirm").performClick()
+        assertEquals(1, confirmed)
     }
 
     @Test

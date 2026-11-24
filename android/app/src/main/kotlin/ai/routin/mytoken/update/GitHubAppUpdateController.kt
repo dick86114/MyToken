@@ -173,6 +173,9 @@ class GitHubAppUpdateController(
             _state.update {
                 AppUpdateUiState.NeedsInstallPermission(update.version)
             }
+            // 已下载但缺“安装未知应用”权限：直接把用户送到系统授权页，
+            // 授权返回后再次点击「安装更新」即可交给系统安装器。
+            openInstallPermissionSettings()
             return
         }
         install(update)

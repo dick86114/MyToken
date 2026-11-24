@@ -206,7 +206,10 @@ fun SettingsScreen(
         if (updateDownloading) {
             updateDialogDownloadStarted = true
         } else if (updateDialogDownloadStarted) {
-            showUpdateDialog = false
+            // 下载结束但还缺安装权限时保留弹窗，引导用户去系统授权。
+            if (updateState !is AppUpdateUiState.NeedsInstallPermission) {
+                showUpdateDialog = false
+            }
             updateDialogDownloadStarted = false
         }
     }
@@ -572,6 +575,7 @@ fun SettingsScreen(
             confirmLabel = updateDialogConfirmLabel,
             downloading = updateDownloading,
             downloadProgress = updateDownloadProgress,
+            needsInstallPermission = updateState is AppUpdateUiState.NeedsInstallPermission,
             onConfirm = confirmUpdateDialog,
             onDismiss = { if (!updateDownloading) showUpdateDialog = false },
             modifier = Modifier.testTag("settings_update_dialog"),

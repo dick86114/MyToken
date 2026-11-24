@@ -3,12 +3,14 @@ package ai.routin.mytoken.core.ui
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -18,6 +20,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -37,6 +40,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RangeSlider
+import androidx.compose.material3.RangeSliderState
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
@@ -49,27 +53,38 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 
 /**
  * MyToken 基础控件。
  *
- * 材质规则（设计文档 §6.2）：实色表面 + 1px hairline；只有浮层允许阴影。
+ * 材质规则（设计文档 §6.2）：实色表面 + hairline；浮层与首页浮起白卡允许阴影。
  * 颜色只来自 [MyTokenThemeTokens]，业务代码不再拼 alpha 或自带色值。
  */
 
@@ -328,7 +343,8 @@ fun MyTokenSlider(
 }
 
 /**
- * 双滑块：用于低/高阈值等区间配置。低值始终小于等于高值由调用方归一化。
+ * 双滑块：22dp 白手柄 + 品牌金区间；拖动时在手柄上方显示当前百分比。
+ * 低值始终小于等于高值由调用方归一化。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -345,20 +361,11 @@ fun MyTokenRangeSlider(
     onDraggingChanged: ((Boolean) -> Unit)? = null,
 ) {
     val colors = MyTokenThemeTokens.colors
-    val sliderColors = SliderDefaults.colors(
-        thumbColor = colors.actionFill,
-        activeTrackColor = colors.actionFill,
-        activeTickColor = colors.actionFill,
-        inactiveTrackColor = colors.line,
-        inactiveTickColor = colors.line,
-        disabledThumbColor = colors.actionFill,
-        disabledActiveTrackColor = colors.actionFill,
-        disabledInactiveTrackColor = colors.line,
-        disabledActiveTickColor = colors.actionFill,
-        disabledInactiveTickColor = colors.line,
-    )
     val startInteractionSource = remember { MutableInteractionSource() }
     val endInteractionSource = remember { MutableInteractionSource() }
+    val startDragging by startInteractionSource.collectIsDraggedAsState()
+    val endDragging by endInteractionSource.collectIsDraggedAsState()
+    val showValueBubbles = startDragging || endDragging
     val dragReporter = rememberSliderDragReporter(
         if (enabled) onDraggingChanged else null,
     )
@@ -378,30 +385,128 @@ fun MyTokenRangeSlider(
         valueRange = valueRange,
         steps = steps,
         onValueChangeFinished = onValueChangeFinished,
-        colors = sliderColors,
         startInteractionSource = startInteractionSource,
         endInteractionSource = endInteractionSource,
-        startThumb = {
-            SliderDefaults.Thumb(
-                interactionSource = startInteractionSource,
+        startThumb = { state ->
+            RangeSliderHandle(
+                value = state.activeRangeStart,
+                showBubble = showValueBubbles,
                 modifier = Modifier.semantics {
                     this.contentDescription = "$contentDescription 低值"
                 },
-                colors = sliderColors,
-                enabled = enabled,
             )
         },
-        endThumb = {
-            SliderDefaults.Thumb(
-                interactionSource = endInteractionSource,
+        endThumb = { state ->
+            RangeSliderHandle(
+                value = state.activeRangeEnd,
+                showBubble = showValueBubbles,
                 modifier = Modifier.semantics {
                     this.contentDescription = "$contentDescription 高值"
                 },
-                colors = sliderColors,
-                enabled = enabled,
+            )
+        },
+        track = { state ->
+            RangeSliderTrack(
+                state = state,
+                activeColor = colors.actionFill,
+                inactiveColor = colors.controlTrack,
             )
         },
     )
+}
+
+/** 设计稿 §7：两个同尺寸 22dp 圆手柄，白底 + #D4D7DE 描边 + 轻阴影。 */
+@Composable
+private fun RangeSliderHandle(
+    value: Float,
+    showBubble: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MyTokenThemeTokens.colors
+    val textMeasurer = rememberTextMeasurer()
+    val bubbleText = "${value.roundToInt()}%"
+    val bubbleLayout = remember(bubbleText) {
+        textMeasurer.measure(text = bubbleText, style = MyTokenType.tooltip)
+    }
+    Box(
+        modifier = modifier
+            .size(MyTokenSize.sliderHandle)
+            .drawWithContent {
+                drawContent()
+                if (showBubble) {
+                    val horizontalPadding = 6.dp.toPx()
+                    val verticalPadding = 3.dp.toPx()
+                    val bubbleWidth = bubbleLayout.size.width + horizontalPadding * 2
+                    val bubbleHeight = bubbleLayout.size.height + verticalPadding * 2
+                    val left = (size.width - bubbleWidth) / 2f
+                    val top = -bubbleHeight - 4.dp.toPx()
+                    drawRoundRect(
+                        color = colors.ink,
+                        topLeft = Offset(left, top),
+                        size = Size(bubbleWidth, bubbleHeight),
+                        cornerRadius = CornerRadius(6.dp.toPx()),
+                    )
+                    drawText(
+                        textLayoutResult = bubbleLayout,
+                        color = colors.surface,
+                        topLeft = Offset(left + horizontalPadding, top + verticalPadding),
+                    )
+                }
+            },
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .shadow(
+                    elevation = MyTokenElevation.sliderHandle,
+                    shape = CircleShape,
+                    ambientColor = colors.cardShadow,
+                    spotColor = colors.cardShadow,
+                )
+                .background(colors.controlHandle, CircleShape)
+                .border(1.dp, colors.controlBorder, CircleShape),
+        )
+    }
+}
+
+/** 设计稿 §7：低→高之间填品牌金，其余为 4dp 高的中性轨道。 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RangeSliderTrack(
+    state: RangeSliderState,
+    activeColor: Color,
+    inactiveColor: Color,
+) {
+    val valueRange = state.valueRange
+    val span = (valueRange.endInclusive - valueRange.start).takeIf { it > 0f } ?: 1f
+    val startFraction =
+        ((state.activeRangeStart - valueRange.start) / span).coerceIn(0f, 1f)
+    val endFraction =
+        ((state.activeRangeEnd - valueRange.start) / span).coerceIn(0f, 1f)
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(MyTokenSize.sliderTrack)
+            .then(if (rtl) Modifier.rotate(180f) else Modifier),
+    ) {
+        val strokeWidth = size.height
+        val centerY = center.y
+        drawLine(
+            color = inactiveColor,
+            start = Offset(0f, centerY),
+            end = Offset(size.width, centerY),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
+        drawLine(
+            color = activeColor,
+            start = Offset(size.width * startFraction, centerY),
+            end = Offset(size.width * endFraction, centerY),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
+    }
 }
 
 /** 筛选 chip：未选中 subtle，选中 ink；不使用强调色底。 */
@@ -487,7 +592,7 @@ fun MyTokenTextField(
     }
 }
 
-/** 实色表面：卡片/输入框用 surface/subtle + hairline；Modal 才投影。 */
+/** 实色表面：卡片/输入框用 surface/subtle + hairline；Modal 与浮起白卡才投影。 */
 @Composable
 fun MyTokenSurface(
     modifier: Modifier = Modifier,
@@ -500,6 +605,7 @@ fun MyTokenSurface(
     val background = when (surfaceRole) {
         MyTokenVisualPolicy.SurfaceRole.Window,
         MyTokenVisualPolicy.SurfaceRole.Card,
+        MyTokenVisualPolicy.SurfaceRole.FloatingCard,
         MyTokenVisualPolicy.SurfaceRole.Modal,
         -> colors.surface
 
@@ -507,23 +613,29 @@ fun MyTokenSurface(
         MyTokenVisualPolicy.SurfaceRole.Metric,
         -> colors.subtle
     }
-    val resolved = modifier
-        .then(
-            if (MyTokenVisualPolicy.allowsShadow(surfaceRole)) {
-                Modifier.shadow(elevation = 24.dp, shape = shape)
-            } else {
-                Modifier
-            },
+    val shadow = when (surfaceRole) {
+        MyTokenVisualPolicy.SurfaceRole.Modal -> Modifier.shadow(elevation = 24.dp, shape = shape)
+        // 设计稿 §6：0 4dp 14dp、黑 alpha 0.045 的一层很轻的浮起阴影。
+        MyTokenVisualPolicy.SurfaceRole.FloatingCard -> Modifier.shadow(
+            elevation = MyTokenElevation.floatingCard,
+            shape = shape,
+            ambientColor = colors.cardShadow,
+            spotColor = colors.cardShadow,
         )
+        else -> Modifier
+    }
+    val border = when (surfaceRole) {
+        MyTokenVisualPolicy.SurfaceRole.Window -> Modifier
+        // 设计稿 §6：浮起白卡使用 0.5dp 发丝线。
+        MyTokenVisualPolicy.SurfaceRole.FloatingCard ->
+            Modifier.border(MyTokenSize.hairline, colors.hairline, shape)
+        else -> Modifier.border(1.dp, colors.line, shape)
+    }
+    val resolved = modifier
+        .then(shadow)
         .clip(shape)
         .background(background)
-        .then(
-            if (surfaceRole == MyTokenVisualPolicy.SurfaceRole.Window) {
-                Modifier
-            } else {
-                Modifier.border(1.dp, colors.line, shape)
-            },
-        )
+        .then(border)
     Box(modifier = resolved, contentAlignment = contentAlignment) {
         content()
     }

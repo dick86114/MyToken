@@ -37,15 +37,16 @@ fun MyTokenUpdateDialog(
     confirmTag: String = "update_confirm",
     downloading: Boolean = false,
     downloadProgress: Float? = null,
+    needsInstallPermission: Boolean = false,
 ) {
     val colors = MyTokenThemeTokens.colors
     val notes = releaseNotes?.trim().orEmpty()
     MyTokenDialog(
         title = version?.takeIf { it.isNotBlank() }?.let { "发现新版本 $it" } ?: "发现新版本",
-        subtitle = if (downloading) {
-            "正在下载新版本，完成后会自动打开安装器"
-        } else {
-            "确认后将开始下载并安装"
+        subtitle = when {
+            downloading -> "正在下载新版本，完成后会自动打开安装器"
+            needsInstallPermission -> "安装包已下载，请先允许安装未知来源应用"
+            else -> "确认后将开始下载并安装"
         },
         icon = Icons.Outlined.Star,
         tone = MyTokenDialogTone.Info,

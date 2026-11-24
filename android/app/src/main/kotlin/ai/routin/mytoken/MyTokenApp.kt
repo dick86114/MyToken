@@ -230,6 +230,8 @@ fun MyTokenApp(
     val isUpdateReadyToInstall =
         updateState is AppUpdateUiState.ReadyToInstall ||
             updateState is AppUpdateUiState.NeedsInstallPermission
+    val isUpdateNeedsInstallPermission =
+        updateState is AppUpdateUiState.NeedsInstallPermission
     val pendingUpdateConfirmLabel = when (updateState) {
         is AppUpdateUiState.ReadyToInstall,
         is AppUpdateUiState.NeedsInstallPermission,
@@ -387,6 +389,7 @@ fun MyTokenApp(
                     isUpdateDownloading = isUpdateDownloading,
                     updateDownloadProgress = updateDownloadProgress,
                     isUpdateReadyToInstall = isUpdateReadyToInstall,
+                    isUpdateNeedsInstallPermission = isUpdateNeedsInstallPermission,
                     onConfirmUpdate = confirmPendingUpdate,
                     homeScrollStates = homeScrollStates,
                 )            }

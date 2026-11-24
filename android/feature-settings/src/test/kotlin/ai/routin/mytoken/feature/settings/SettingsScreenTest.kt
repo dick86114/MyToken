@@ -458,6 +458,28 @@ class SettingsScreenTest {
     }
 
     @Test
+    fun needsInstallPermissionDialogExplainsAndTriggersInstall() {
+        var installCalls = 0
+        setContent(
+            updateState = AppUpdateUiState.NeedsInstallPermission("0.2.0"),
+            onInstallDownloadedUpdate = { installCalls++ },
+        )
+
+        scrollToAbout()
+        composeRule.onNodeWithTag("settings_update_available_arrow", useUnmergedTree = true)
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithTag("settings_update_dialog", useUnmergedTree = true)
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("安装包已下载，请先允许安装未知来源应用", useUnmergedTree = true)
+            .assertExists()
+        composeRule.onNodeWithTag("settings_update_confirm", useUnmergedTree = true)
+            .performClick()
+
+        assertEquals(1, installCalls)
+    }
+
+    @Test
     fun draggingThresholdSliderDoesNotScrollPageUntilRelease() {
         setContent()
         composeRule.onNodeWithTag("settings_list")
