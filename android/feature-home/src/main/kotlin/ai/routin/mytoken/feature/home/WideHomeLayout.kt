@@ -88,7 +88,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
@@ -186,24 +185,10 @@ internal fun WideHomeScreen(
     val systemBarEndDp = with(density) {
         systemBars.getRight(density, layoutDirection).toDp()
     }
-    // 收合头部：状态栏 + 48dp 报告行为整块实色琥珀，随后 200dp 过渡到画布色。
-    // 整窗背景与遮住卡片的实色渐变共用这两个尺寸，颜色和终点完全一致。
+    // 收合头部只有顶部一条不透明琥珀 app bar（状态栏 + 48dp 报告行）；
+    // 其下的琥珀→画布渐变放在整窗背景里、位于卡片背后，不再做前景渐变盖层。
     val headerBarHeight = 48.dp
     val headerFadeDistance = 200.dp
-    val headerGradientEndDp = systemBarTopDp + headerBarHeight + headerFadeDistance
-    val headerSolidFraction =
-        (systemBarTopDp + headerBarHeight).value / headerGradientEndDp.value.coerceAtLeast(1f)
-    val headerCoverBrush = remember(
-        colors.reportTicket,
-        colors.canvas,
-        headerSolidFraction,
-    ) {
-        Brush.verticalGradient(
-            0f to colors.reportTicket,
-            headerSolidFraction to colors.reportTicket,
-            1f to colors.canvas,
-        )
-    }
 
     val pagerState = rememberPagerState(
         initialPage = if (usageCardDensity == UsageCardDensity.COMPACT) 0 else 1,
@@ -678,22 +663,35 @@ internal fun WideHomeScreen(
                             }
 
                             if (chromeVisible) {
-                                // 不透明实色渐变头：从状态栏的琥珀用实色色标过渡到画布色，
-                                // 高度随收合进度增长，把渐变区内的卡片全部盖住；
-                                // 不使用 alpha 遮罩，收合后任何卡片都不会从头部透出。
+                                // 顶部只保留这一条不透明琥珀 app bar（状态栏 + 48dp 报告行）：
+                                // 卡片从它下方立刻出现，向上滚动经过时被它完全盖住。
+                                // 淡入随收合进度推进，但会在第一张卡片可能进入 app bar 区域
+                                // 之前就达到完全不透明，因此任何卡片都不会透过 app bar 显示。
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(headerGradientEndDp)
+                                        .height(systemBarTopDp + headerBarHeight)
                                         .drawBehind {
                                             val p = collapseProgress()
                                             if (p > 0.001f) {
-                                                clipRect(bottom = size.height * p) {
-                                                    drawRect(brush = headerCoverBrush)
+                                                val headerPx = headerHeightPx.toFloat()
+                                                // 第一张卡片顶部 = headerPx + 2dp - 滚动距离；
+                                                // 它进入 app bar 区域时的收合进度即最迟不透明点。
+                                                val opaqueBy = if (headerPx > 0f) {
+                                                    (
+                                                        1f -
+                                                            (size.height - 2.dp.toPx()) / headerPx
+                                                        ).coerceIn(0.01f, 1f)
+                                                } else {
+                                                    1f
                                                 }
+                                                drawRect(
+                                                    color = colors.reportTicket,
+                                                    alpha = (p / opaqueBy).coerceIn(0f, 1f),
+                                                )
                                             }
                                         }
-                                        .testTag("home_wide_header_cover"),
+                                        .testTag("home_wide_app_bar"),
                                 )
                                 // 报告和工具条是覆盖层：只做图层位移，不改变分页区高度。
                                 // 背景统一由整窗渐变承担，这里不再额外叠一层底衬。

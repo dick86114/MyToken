@@ -336,15 +336,19 @@ class WideHomeScreenTest {
             (ticket.top.value + ticket.bottom.value) / 2f,
             2f,
         )
-        // 不透明实色渐变头从窗口最顶部（状态栏）开始，向下盖住渐变区内的卡片。
-        val cover = composeRule.onNodeWithTag(
-            "home_wide_header_cover",
+        // 顶部只保留一条不透明琥珀 app bar：从窗口最顶部（状态栏）开始，只包住报告行。
+        // 不再有 200dp 前景渐变盖层，琥珀→画布渐变由整窗背景在卡片背后承担。
+        val appBar = composeRule.onNodeWithTag(
+            "home_wide_app_bar",
             useUnmergedTree = true,
         ).getUnclippedBoundsInRoot()
-        assertEquals("琥珀头应从状态栏顶部开始", 0f, cover.top.value, 0.5f)
-        assertTrue(
-            "渐变头应包住整行报告，cover.bottom=${cover.bottom} ticket.bottom=${ticket.bottom}",
-            cover.bottom.value >= ticket.bottom.value - 0.5f,
+        assertEquals("琥珀 app bar 应从状态栏顶部开始", 0f, appBar.top.value, 0.5f)
+        assertEquals(
+            "app bar 应只盖住状态栏 + 报告行，" +
+                "appBar.bottom=${appBar.bottom} ticket.bottom=${ticket.bottom}",
+            ticket.bottom.value,
+            appBar.bottom.value,
+            1f,
         )
         composeRule.onNodeWithTag("home_wide_nav_bar_tint", useUnmergedTree = true)
             .assertExists()
