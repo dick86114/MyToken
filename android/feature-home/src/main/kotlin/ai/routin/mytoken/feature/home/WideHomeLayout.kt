@@ -88,6 +88,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
@@ -184,6 +185,24 @@ internal fun WideHomeScreen(
     val systemBarBottomDp = with(density) { systemBars.getBottom(density).toDp() }
     val systemBarEndDp = with(density) {
         systemBars.getRight(density, layoutDirection).toDp()
+    }
+    // 收合头部：状态栏 + 48dp 报告行为整块实色琥珀，随后 200dp 过渡到画布色。
+    // 整窗背景与遮住卡片的实色渐变共用这两个尺寸，颜色和终点完全一致。
+    val headerBarHeight = 48.dp
+    val headerFadeDistance = 200.dp
+    val headerGradientEndDp = systemBarTopDp + headerBarHeight + headerFadeDistance
+    val headerSolidFraction =
+        (systemBarTopDp + headerBarHeight).value / headerGradientEndDp.value.coerceAtLeast(1f)
+    val headerCoverBrush = remember(
+        colors.reportTicket,
+        colors.canvas,
+        headerSolidFraction,
+    ) {
+        Brush.verticalGradient(
+            0f to colors.reportTicket,
+            headerSolidFraction to colors.reportTicket,
+            1f to colors.canvas,
+        )
     }
 
     val pagerState = rememberPagerState(
@@ -507,8 +526,8 @@ internal fun WideHomeScreen(
                 if (p > 0.001f) {
                     // 顶部状态栏 + 报告行整块保持不透明票面黄，再向下渐变到画布色。
                     // 整窗同一张背景图：左轨与内容区共用，不会出现左右两条渐变。
-                    val headerPx = systemBarTopDp.toPx() + 48.dp.toPx()
-                    val fadePx = 200.dp.toPx()
+                    val headerPx = systemBarTopDp.toPx() + headerBarHeight.toPx()
+                    val fadePx = headerFadeDistance.toPx()
                     val target = IntSize(
                         size.width.toInt().coerceAtLeast(1),
                         size.height.toInt().coerceAtLeast(1),
@@ -659,6 +678,23 @@ internal fun WideHomeScreen(
                             }
 
                             if (chromeVisible) {
+                                // 不透明实色渐变头：从状态栏的琥珀用实色色标过渡到画布色，
+                                // 高度随收合进度增长，把渐变区内的卡片全部盖住；
+                                // 不使用 alpha 遮罩，收合后任何卡片都不会从头部透出。
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(headerGradientEndDp)
+                                        .drawBehind {
+                                            val p = collapseProgress()
+                                            if (p > 0.001f) {
+                                                clipRect(bottom = size.height * p) {
+                                                    drawRect(brush = headerCoverBrush)
+                                                }
+                                            }
+                                        }
+                                        .testTag("home_wide_header_cover"),
+                                )
                                 // 报告和工具条是覆盖层：只做图层位移，不改变分页区高度。
                                 // 背景统一由整窗渐变承担，这里不再额外叠一层底衬。
                                 Column(
@@ -729,46 +765,26 @@ internal fun WideHomeScreen(
         }
 
         if (chromeVisible) {
-            // 状态栏区域随收合铺满不透明琥珀，滚动内容不会从状态栏透出。
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .height(systemBarTopDp)
-                    .drawBehind {
-                        drawRect(
-                            color = colors.reportTicket,
-                            alpha = collapseProgress(),
-                        )
-                    }
-                    .testTag("home_wide_status_bar_tint"),
-            )
-            // 收起后的报告与状态栏连成一整块不透明琥珀头，不再是独立圆角票。
-            // 头部右缘与整窗渐变的实色段对齐，下沿直接接渐变，最后落到画布色。
-            Box(
+            // 收合后的报告行直接落在不透明实色渐变头上，不再有独立底板/圆角票。
+            WideCollapsedReportTicket(
+                headlineCount = collapsedHeadline,
+                tail = collapsedTail,
+                tone = collapsedTone,
+                syncText = syncLabel,
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(start = railWidth, end = systemBarEndDp)
+                    .padding(
+                        start = railWidth,
+                        top = systemBarTopDp,
+                        end = systemBarEndDp,
+                    )
                     .fillMaxWidth()
-                    .height(systemBarTopDp + 48.dp)
+                    .height(headerBarHeight)
                     .graphicsLayer {
                         alpha = ((collapseProgress() - 0.45f) / 0.55f).coerceIn(0f, 1f)
                     }
-                    .background(colors.reportTicket)
-                    .testTag("home_wide_header_backdrop"),
-            ) {
-                WideCollapsedReportTicket(
-                    headlineCount = collapsedHeadline,
-                    tail = collapsedTail,
-                    tone = collapsedTone,
-                    syncText = syncLabel,
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .testTag("home_wide_collapsed_ticket"),
-                )
-            }
+                    .testTag("home_wide_collapsed_ticket"),
+            )
             // 底部导航栏/手势条区域保持画布色，收合时也不跟着变琥珀。
             Box(
                 modifier = Modifier

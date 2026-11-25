@@ -336,18 +336,16 @@ class WideHomeScreenTest {
             (ticket.top.value + ticket.bottom.value) / 2f,
             2f,
         )
-        // 琥珀头从窗口最顶部（状态栏）开始，不再是一条独立圆角票。
-        val backdrop = composeRule.onNodeWithTag(
-            "home_wide_header_backdrop",
+        // 不透明实色渐变头从窗口最顶部（状态栏）开始，向下盖住渐变区内的卡片。
+        val cover = composeRule.onNodeWithTag(
+            "home_wide_header_cover",
             useUnmergedTree = true,
         ).getUnclippedBoundsInRoot()
-        assertEquals("琥珀头应从状态栏顶部开始", 0f, backdrop.top.value, 0.5f)
+        assertEquals("琥珀头应从状态栏顶部开始", 0f, cover.top.value, 0.5f)
         assertTrue(
-            "琥珀头应包住整行报告，backdrop.bottom=${backdrop.bottom} ticket.bottom=${ticket.bottom}",
-            backdrop.bottom.value >= ticket.bottom.value - 0.5f,
+            "渐变头应包住整行报告，cover.bottom=${cover.bottom} ticket.bottom=${ticket.bottom}",
+            cover.bottom.value >= ticket.bottom.value - 0.5f,
         )
-        composeRule.onNodeWithTag("home_wide_status_bar_tint", useUnmergedTree = true)
-            .assertExists()
         composeRule.onNodeWithTag("home_wide_nav_bar_tint", useUnmergedTree = true)
             .assertExists()
     }
