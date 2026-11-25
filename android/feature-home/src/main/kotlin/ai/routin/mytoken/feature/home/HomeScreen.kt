@@ -44,10 +44,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
@@ -635,17 +631,17 @@ fun HomeScreen(
                         }
                     }
 
-                    HomeScrollMode.FullWideGrid -> LazyVerticalGrid(
+                    HomeScrollMode.FullWideGrid -> LazyVerticalStaggeredGrid(
                         state = homeScrollStates.fullWide,
-                        columns = GridCells.Fixed(pageColumns),
+                        columns = StaggeredGridCells.Fixed(pageColumns),
                         modifier = Modifier
                             .fillMaxSize()
                             .testTag(pageTag),
                         contentPadding = contentPadding,
                         horizontalArrangement = Arrangement.spacedBy(spacing),
-                        verticalArrangement = Arrangement.spacedBy(spacing),
+                        verticalItemSpacing = spacing,
                     ) {
-                        gridItems(
+                        staggeredItems(
                             items = visibleCards,
                             key = { it.credential.id },
                             contentType = { "credential-usage-card" },
@@ -653,7 +649,7 @@ fun HomeScreen(
                         item(
                             key = "credential_end",
                             contentType = "credential-end",
-                            span = { GridItemSpan(maxLineSpan) },
+                            span = StaggeredGridItemSpan.FullLine,
                         ) {
                             CredentialEndActions(onManage = onManageCredentials)
                         }

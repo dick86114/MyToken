@@ -44,10 +44,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
@@ -213,6 +209,12 @@ internal fun WideHomeScreen(
     // 与手机竖屏收合报告同口径：告警凭证对应的供应商（去重、最多 4 个）直接显示在 app bar 上。
     val collapsedAlertProviders = remember(reportFindings) {
         reportFindings.map { it.providerId }.distinct().take(4)
+    }
+    // 卡片集合（筛选/凭证增删）变化时重建瀑布流状态：Compose 瀑布流按「索引」记忆列位，
+    // 沿用旧状态会让剩余卡片留在原列、中间留下空洞；重建后按新集合从最左列重新铺排。
+    val visibleCardIds = remember(visibleCards) { visibleCards.map { it.credential.id } }
+    LaunchedEffect(visibleCardIds) {
+        homeScrollStates.syncCardSet(visibleCardIds)
     }
     val syncLabel = state.lastUpdatedText ?: "刚刚同步"
 
@@ -906,17 +908,19 @@ private fun WideCardsPage(
                 }
             }
 
-            HomeScrollMode.FullWideGrid -> LazyVerticalGrid(
+            // 完整卡与简洁卡一样走瀑布流：每列按卡片实际高度紧接着排，不再按行对齐留白；
+            // 卡片内部仍是手机竖屏的左右分栏（见 CredentialUsageCard 的 FullUsageCardBody）。
+            HomeScrollMode.FullWideGrid -> LazyVerticalStaggeredGrid(
                 state = scrollStates.fullWide,
-                columns = GridCells.Fixed(columns),
+                columns = StaggeredGridCells.Fixed(columns),
                 modifier = Modifier
                     .fillMaxSize()
                     .testTag(homeGridTag(mode, columns)),
                 contentPadding = contentPadding,
                 horizontalArrangement = Arrangement.spacedBy(spacing),
-                verticalArrangement = Arrangement.spacedBy(spacing),
+                verticalItemSpacing = spacing,
             ) {
-                gridItems(
+                staggeredItems(
                     items = cards,
                     key = { it.credential.id },
                     contentType = { "credential-usage-card" },
@@ -938,7 +942,7 @@ private fun WideCardsPage(
                 item(
                     key = "credential_end",
                     contentType = "credential-end",
-                    span = { GridItemSpan(maxLineSpan) },
+                    span = StaggeredGridItemSpan.FullLine,
                 ) {
                     CredentialEndActions(onManage = onManageCredentials)
                 }

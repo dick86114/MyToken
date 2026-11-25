@@ -94,6 +94,38 @@ class WideHomeScreenTest {
         return all
     }
 
+    /** 用给定凭证集合渲染大屏首页，供应商分组按集合自动生成。 */
+    private fun setContentWithCards(
+        all: List<CredentialCardUi>,
+        initialDensity: UsageCardDensity = UsageCardDensity.COMPACT,
+    ) {
+        density = initialDensity
+        densityChanges = 0
+        val groups = all.groupBy { it.credential.providerId }.map { (provider, cards) ->
+            ProviderGroupUi(provider, ProviderCatalog.displayName(provider), false, cards)
+        }
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = all,
+                        groups = groups,
+                        credentialCount = all.size,
+                    ),
+                    layoutMode = MyTokenLayoutMode.Expanded,
+                    usageCardDensity = density,
+                    onToggleUsageCardDensity = {},
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                )
+            }
+        }
+    }
+
     @Test
     @Config(qualifiers = "w1280dp-h720dp")
     fun 大屏使用左轨报告与手机同款分页卡片区() {
@@ -478,6 +510,135 @@ class WideHomeScreenTest {
 
         composeRule.onNodeWithTag("home_wide_rail_all").performClick()
         composeRule.onNodeWithTag("credential_card_${all[0].credential.id}").assertExists()
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 筛选供应商后卡片按新集合重排() {
+        val all = listOf(
+            sampleCard("R1", ProviderId.Routin),
+            sampleCard("G1", ProviderId.Glm),
+            sampleCard("D1", ProviderId.DeepSeek),
+            sampleCard("R2", ProviderId.Routin),
+            sampleCard("G2", ProviderId.Glm),
+            sampleCard("D2", ProviderId.DeepSeek),
+        )
+        setContentWithCards(all)
+
+        fun leftOf(card: CredentialCardUi): Float =
+            composeRule.onNodeWithTag("credential_card_${card.credential.id}")
+                .getUnclippedBoundsInRoot().left.value
+
+        // 6 列时每张卡各占一列，记录原始列起点。
+        val columnLefts = all.map(::leftOf)
+        assertEquals(
+            "初始应铺满 6 列",
+            6,
+            columnLefts.map { it.toInt() }.distinct().size,
+        )
+
+        // 筛选 GLM 后只剩 2 张卡，必须按新集合回到最左两列，而不是保留原列位。
+        composeRule.onNodeWithTag("home_wide_rail_provider_glm").performClick()
+        composeRule.waitForIdle()
+        val expected = columnLefts.sorted().take(2)
+        assertEquals("第一张 GLM 卡应回到第一列", expected[0], leftOf(all[1]), 1f)
+        assertEquals("第二张 GLM 卡应回到第二列", expected[1], leftOf(all[4]), 1f)
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 完整卡横屏按瀑布流排布不再按行对齐() {
+        // Routin/NewAPI 卡更高，Glm/DeepSeek/CommandCode/Xiaomi 更矮。
+        val all = listOf(
+            sampleCard("R1", ProviderId.Routin),
+            sampleCard("G1", ProviderId.Glm),
+            sampleCard("D1", ProviderId.DeepSeek),
+            sampleCard("N1", ProviderId.NewAPI),
+            sampleCard("C1", ProviderId.CommandCode),
+            sampleCard("X1", ProviderId.Xiaomi),
+        )
+        setContentWithCards(all, initialDensity = UsageCardDensity.FULL)
+
+        fun bounds(card: CredentialCardUi) =
+            composeRule.onNodeWithTag("credential_card_${card.credential.id}")
+                .getUnclippedBoundsInRoot()
+
+        val r1 = bounds(all[0])
+        val n1 = bounds(all[3])
+        val x1 = bounds(all[5])
+        assertEquals("最后一张卡应回填第一列", r1.left.value, x1.left.value, 0.5f)
+        assertEquals(
+            "第一列第四张卡应紧接 R1 底部（瀑布流），而不是等整行最高的 N1，" +
+                "x1.top=${x1.top} r1.bottom=${r1.bottom} n1.bottom=${n1.bottom}",
+            r1.bottom.value + 12f,
+            x1.top.value,
+            1f,
+        )
+        assertTrue(
+            "第一列第四张卡应早于最高卡结束，x1.top=${x1.top} n1.bottom=${n1.bottom}",
+            x1.top.value < n1.bottom.value - 1f,
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w800dp-h1280dp")
+    fun 完整卡竖屏按瀑布流交错排列() {
+        val all = listOf(
+            sampleCard("R1", ProviderId.Routin),
+            sampleCard("G1", ProviderId.Glm),
+            sampleCard("D1", ProviderId.DeepSeek),
+            sampleCard("X1", ProviderId.Xiaomi),
+        )
+        setContentWithCards(all, initialDensity = UsageCardDensity.FULL)
+
+        fun bounds(card: CredentialCardUi) =
+            composeRule.onNodeWithTag("credential_card_${card.credential.id}")
+                .getUnclippedBoundsInRoot()
+
+        val r1 = bounds(all[0])
+        val g1 = bounds(all[1])
+        val d1 = bounds(all[2])
+        val x1 = bounds(all[3])
+        // R1 更高：第三张应回填更短的第二列，第四张再回填第一列（交错），而非按行对齐。
+        assertEquals("第三张卡应回填第二列", g1.left.value, d1.left.value, 0.5f)
+        assertEquals("第四张卡应回填第一列", r1.left.value, x1.left.value, 0.5f)
+        assertTrue(
+            "第二列第三张卡应早于第一列最高卡结束，d1.top=${d1.top} r1.bottom=${r1.bottom}",
+            d1.top.value < r1.bottom.value - 1f,
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w800dp-h1280dp")
+    fun 筛选来回切换后卡片仍按新集合从最左列重排() {
+        // 4 列竖屏：Xiaomi 两张 + 其它 5 张。先筛到单张供应商再回全部，最后筛 Xiaomi。
+        val all = listOf(
+            sampleCard("X1", ProviderId.Xiaomi),
+            sampleCard("R1", ProviderId.Routin),
+            sampleCard("G1", ProviderId.Glm),
+            sampleCard("D1", ProviderId.DeepSeek),
+            sampleCard("X2", ProviderId.Xiaomi),
+            sampleCard("R2", ProviderId.Routin),
+            sampleCard("G2", ProviderId.Glm),
+        )
+        setContentWithCards(all)
+
+        fun leftOf(card: CredentialCardUi): Float =
+            composeRule.onNodeWithTag("credential_card_${card.credential.id}")
+                .getUnclippedBoundsInRoot().left.value
+
+        val columnLefts = all.take(4).map(::leftOf).sorted()
+
+        // 单供应商 → 全部 → Xiaomi；筛选切换后必须按新集合重新铺满最左列。
+        composeRule.onNodeWithTag("home_wide_rail_provider_deepseek").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("home_wide_rail_all").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("home_wide_rail_provider_xiaomi").performClick()
+        composeRule.waitForIdle()
+
+        assertEquals("第一张 Xiaomi 卡应在第一列", columnLefts[0], leftOf(all[0]), 1f)
+        assertEquals("第二张 Xiaomi 卡应在第二列", columnLefts[1], leftOf(all[4]), 1f)
     }
 
     @Test
