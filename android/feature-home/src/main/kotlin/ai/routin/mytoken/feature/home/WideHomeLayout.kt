@@ -182,9 +182,9 @@ internal fun WideHomeScreen(
         systemBars.getRight(density, layoutDirection).toDp()
     }
     // 收合头部只有顶部一条不透明琥珀 app bar（状态栏 + 48dp 报告行）；
-    // 其下的琥珀→画布渐变放在整窗背景里、位于卡片背后，不再做前景渐变盖层。
+    // 其下的琥珀→画布渐变放在整窗背景里、位于卡片背后，一直铺到导航栏上方，
+    // 按当前窗口可用高度计算终点，不再使用固定 200dp 的半屏渐变。
     val headerBarHeight = 48.dp
-    val headerFadeDistance = 200.dp
 
     val pagerState = rememberPagerState(
         initialPage = if (usageCardDensity == UsageCardDensity.COMPACT) 0 else 1,
@@ -518,7 +518,11 @@ internal fun WideHomeScreen(
                     // 顶部状态栏 + 报告行整块保持不透明票面黄，再向下渐变到画布色。
                     // 整窗同一张背景图：左轨与内容区共用，不会出现左右两条渐变。
                     val headerPx = systemBarTopDp.toPx() + headerBarHeight.toPx()
-                    val fadePx = headerFadeDistance.toPx()
+                    // 渐变终点 = 当前窗口底部再减去系统导航栏高度，即导航栏上方的可用底边；
+                    // 高度随窗口/横竖屏变化，1280/1024/800 都是整屏渐变。
+                    val gradientBottomPx = (size.height - systemBarBottomDp.toPx())
+                        .coerceAtLeast(headerPx + 1f)
+                        .coerceAtMost(size.height)
                     val target = IntSize(
                         size.width.toInt().coerceAtLeast(1),
                         size.height.toInt().coerceAtLeast(1),
@@ -527,7 +531,8 @@ internal fun WideHomeScreen(
                     val bitmap = if (
                         cached != null &&
                         gradientCache.size == target &&
-                        gradientCache.headerPx == headerPx
+                        gradientCache.headerPx == headerPx &&
+                        gradientCache.gradientBottomPx == gradientBottomPx
                     ) {
                         cached
                     } else {
@@ -540,7 +545,7 @@ internal fun WideHomeScreen(
                         ) {
                             val height = size.height.coerceAtLeast(1f)
                             val solidStop = (headerPx / height).coerceIn(0f, 1f)
-                            val canvasStop = ((headerPx + fadePx) / height)
+                            val canvasStop = (gradientBottomPx / height)
                                 .coerceIn(solidStop, 1f)
                             drawRect(
                                 brush = Brush.verticalGradient(
@@ -554,6 +559,7 @@ internal fun WideHomeScreen(
                         gradientCache.bitmap = created
                         gradientCache.size = target
                         gradientCache.headerPx = headerPx
+                        gradientCache.gradientBottomPx = gradientBottomPx
                         created
                     }
                     drawImage(
@@ -1347,9 +1353,10 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     else -> null
 }
 
-/** 全窗渐变的位图缓存；只在窗口尺寸或头部高度变化时重建。 */
+/** 全窗渐变的位图缓存；只在窗口尺寸、头部高度或渐变终点变化时重建。 */
 private class WideGradientBitmapCache {
     var bitmap: ImageBitmap? = null
     var size: IntSize = IntSize.Zero
     var headerPx: Float = -1f
+    var gradientBottomPx: Float = -1f
 }
