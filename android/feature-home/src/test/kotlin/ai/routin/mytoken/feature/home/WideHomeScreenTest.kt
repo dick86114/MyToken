@@ -11,6 +11,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertContentDescriptionContains
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -110,19 +111,22 @@ class WideHomeScreenTest {
 
     @Test
     @Config(qualifiers = "w1280dp-h720dp")
-    fun 全部供应商图标是二乘二网格且品牌下方有分隔线() {
+    fun 顶部品牌logo作为全部入口且左轨没有全部按钮和分割线() {
         setContent()
+        // 旧的“全部供应商”网格按钮与其上方的分割线都已移除。
         composeRule.onNodeWithTag("home_wide_rail_all_icon", useUnmergedTree = true)
-            .assertExists()
+            .assertDoesNotExist()
         composeRule.onNodeWithTag("home_wide_rail_all_grid_icon", useUnmergedTree = true)
-            .assertExists()
-        composeRule.onNodeWithTag("home_wide_rail_all_logo_routin", useUnmergedTree = true)
             .assertDoesNotExist()
         composeRule.onNodeWithTag("home_wide_rail_brand_divider", useUnmergedTree = true)
+            .assertDoesNotExist()
+        // 顶部品牌 logo 成为“全部”入口：默认选中、带全部凭证口径的无障碍标签。
+        composeRule.onNodeWithTag("home_wide_rail_all", useUnmergedTree = true)
             .assertExists()
-        val bounds = composeRule.onNodeWithTag("home_wide_rail_all_icon", useUnmergedTree = true)
-            .getUnclippedBoundsInRoot()
-        assertEquals(30.dp, bounds.right - bounds.left)
+            .assertContentDescriptionContains("全部供应商", substring = true)
+            .assertIsSelected()
+        composeRule.onNodeWithTag("home_wide_rail_brand", useUnmergedTree = true)
+            .assertExists()
     }
 
     @Test
@@ -352,6 +356,58 @@ class WideHomeScreenTest {
         )
         composeRule.onNodeWithTag("home_wide_nav_bar_tint", useUnmergedTree = true)
             .assertExists()
+        // 正常态没有告警：收合行不显示任何告警供应商 logo。
+        composeRule.onNodeWithTag("home_wide_alert_logo_0", useUnmergedTree = true)
+            .assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 收合后琥珀appbar展示告警供应商logo() {
+        // 18 张卡确保列表可滚；GLM 接近上限、DeepSeek 已达上限，各有一个告警。
+        val all = (1..6).flatMap { cards(used = listOf(20.0, 90.0, 96.0)) }
+        density = UsageCardDensity.COMPACT
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = all,
+                        groups = emptyList(),
+                        credentialCount = all.size,
+                    ),
+                    layoutMode = MyTokenLayoutMode.Expanded,
+                    usageCardDensity = density,
+                    onToggleUsageCardDensity = {},
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                )
+            }
+        }
+        composeRule.onNodeWithTag("home_grid_6_columns").performTouchInput { swipeUp() }
+        composeRule.waitForIdle()
+
+        // 告警供应商 logo 去重后为两个（GLM、DeepSeek），且必须落在顶部琥珀 app bar 内。
+        val appBar = composeRule.onNodeWithTag("home_wide_app_bar", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        listOf(0, 1).forEach { index ->
+            val logo = composeRule.onNodeWithTag(
+                "home_wide_alert_logo_$index",
+                useUnmergedTree = true,
+            )
+            logo.assertIsDisplayed()
+            val bounds = logo.getUnclippedBoundsInRoot()
+            assertTrue(
+                "告警 logo 应在 app bar 内，logo=$bounds appBar=$appBar",
+                bounds.top.value >= appBar.top.value - 0.5f &&
+                    bounds.bottom.value <= appBar.bottom.value + 0.5f,
+            )
+        }
+        composeRule.onNodeWithTag("home_wide_alert_logo_2", useUnmergedTree = true)
+            .assertDoesNotExist()
     }
 
     @Test

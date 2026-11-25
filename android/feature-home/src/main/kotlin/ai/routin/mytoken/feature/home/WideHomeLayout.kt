@@ -6,6 +6,7 @@ import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.MyTokenMotion
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
+import ai.routin.mytoken.core.ui.ProviderLogoPlate
 import ai.routin.mytoken.core.ui.rememberMyTokenMotionEnabled
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageCardDensity
@@ -60,7 +61,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.ArrowCircleUp
 import androidx.compose.material.icons.outlined.CreditCard
-import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -210,6 +210,10 @@ internal fun WideHomeScreen(
     val collapsedHeadline = if (reportFindings.isEmpty()) allCards.size else reportFindings.size
     val collapsedTail = remember(reportFindings) { homeReportTail(reportFindings) }
     val collapsedTone = remember(reportFindings) { homeReportTone(reportFindings) }
+    // 与手机竖屏收合报告同口径：告警凭证对应的供应商（去重、最多 4 个）直接显示在 app bar 上。
+    val collapsedAlertProviders = remember(reportFindings) {
+        reportFindings.map { it.providerId }.distinct().take(4)
+    }
     val syncLabel = state.lastUpdatedText ?: "刚刚同步"
 
     fun pageDensity(page: Int): UsageCardDensity =
@@ -769,6 +773,7 @@ internal fun WideHomeScreen(
                 tail = collapsedTail,
                 tone = collapsedTone,
                 syncText = syncLabel,
+                alertProviders = collapsedAlertProviders,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(
@@ -996,13 +1001,14 @@ private fun WideReportHeader(
     }
 }
 
-/** 收起后的单行短票：数量 + 结论 + 最近同步，与左轨 logo 行齐平。 */
+/** 收起后的单行短票：数量 + 结论 + 告警供应商 logo + 最近同步，与左轨 logo 行齐平。 */
 @Composable
 private fun WideCollapsedReportTicket(
     headlineCount: Int,
     tail: String,
     tone: HomeHealthTone,
     syncText: String,
+    alertProviders: List<ProviderId>,
     modifier: Modifier = Modifier,
 ) {
     val colors = MyTokenThemeTokens.colors
@@ -1030,6 +1036,18 @@ private fun WideCollapsedReportTicket(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        // 复用手机竖屏收合报告的告警 logo 呈现：告警凭证对应供应商的图标（去重、最多 4 个）。
+        alertProviders.forEachIndexed { index, provider ->
+            Spacer(modifier = Modifier.width(5.dp))
+            ProviderLogoPlate(
+                painter = painterResource(ProviderCatalog.logoRes(provider)),
+                contentDescription = null,
+                size = 20.dp,
+                shape = RoundedCornerShape(6.dp),
+                contentPadding = 2.dp,
+                modifier = Modifier.testTag("home_wide_alert_logo_$index"),
+            )
+        }
         Spacer(modifier = Modifier.weight(1f))
         Text(
             text = "最近同步 ${reportSyncLabel(syncText)}",
@@ -1040,7 +1058,7 @@ private fun WideCollapsedReportTicket(
     }
 }
 
-/** 左侧 64/72dp 图标轨：品牌、全部、供应商，底部固定刷新/设置/凭证管理。 */
+/** 左侧 64/72dp 图标轨：品牌 logo 即“全部”入口，其后是供应商，底部固定刷新/设置/凭证管理。 */
 @Composable
 private fun WideProviderRail(
     providers: List<ProviderId>,
@@ -1088,13 +1106,17 @@ private fun WideProviderRail(
             .testTag("home_wide_rail"),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        // 顶部产品 logo 就是“全部供应商”入口：点击清除供应商筛选、查询全部凭证。
         Box(
             modifier = Modifier
                 .size(48.dp)
                 .clip(RoundedCornerShape(14.dp))
-                .clickable(role = Role.Button, onClick = onOpenCredentials)
-                .semantics { contentDescription = "打开凭证列表" }
-                .testTag("home_open_credentials"),
+                .clickable(role = Role.RadioButton, onClick = { onSelectProvider(null) })
+                .semantics {
+                    selected = selectedProvider == null
+                    contentDescription = "全部供应商，$allTotal 个凭证"
+                }
+                .testTag("home_wide_rail_all"),
             contentAlignment = Alignment.Center,
         ) {
             Box(modifier = Modifier.size(30.dp)) {
@@ -1120,16 +1142,19 @@ private fun WideProviderRail(
                     )
                 }
             }
+            if (selectedProvider == null) {
+                // 与供应商按钮一致的选中指示条，表明当前展示的是全部凭证。
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .width(3.dp)
+                        .height(20.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(colors.ink),
+                )
+            }
         }
-        Spacer(modifier = Modifier.height(4.dp))
-        Box(
-            modifier = Modifier
-                .width(28.dp)
-                .height(1.dp)
-                .background(colors.line)
-                .testTag("home_wide_rail_brand_divider"),
-        )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -1138,14 +1163,6 @@ private fun WideProviderRail(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            RailSelectionButton(
-                selected = selectedProvider == null,
-                contentDescription = "全部供应商，$allTotal 个凭证",
-                tag = "home_wide_rail_all",
-                onClick = { onSelectProvider(null) },
-            ) {
-                AllProvidersGlyph(selected = selectedProvider == null)
-            }
             providers.forEach { provider ->
                 RailSelectionButton(
                     selected = selectedProvider == provider,
@@ -1224,29 +1241,6 @@ private fun WideProviderRail(
             )
         }
         Spacer(modifier = Modifier.height(8.dp))
-    }
-}
-
-/** “全部供应商”图标：直接显示 2×2 网格（app.grid.2x2），不再垫白色底板。 */
-@Composable
-private fun AllProvidersGlyph(
-    selected: Boolean,
-) {
-    val colors = MyTokenThemeTokens.colors
-    Box(
-        modifier = Modifier
-            .size(30.dp)
-            .testTag("home_wide_rail_all_icon"),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = Icons.Filled.GridView,
-            contentDescription = null,
-            tint = if (selected) colors.ink else colors.muted,
-            modifier = Modifier
-                .size(20.dp)
-                .testTag("home_wide_rail_all_grid_icon"),
-        )
     }
 }
 

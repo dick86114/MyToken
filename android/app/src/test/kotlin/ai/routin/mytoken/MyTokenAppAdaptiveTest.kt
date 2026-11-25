@@ -30,7 +30,8 @@ class MyTokenAppAdaptiveTest {
     fun 中等宽度仍保留双侧抽屉导航() {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("bottom_navigation").assertDoesNotExist()
-        composeRule.onNodeWithTag("home_open_credentials").performClick()
+        // 大屏左轨顶部品牌 logo 现在是“全部供应商”入口，凭证抽屉改由左轨底部凭证按钮打开。
+        composeRule.onNodeWithTag("home_wide_rail_credentials").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("edge_drawer_start").assertIsDisplayed()
     }
