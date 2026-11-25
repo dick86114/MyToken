@@ -407,9 +407,9 @@ internal fun ResetCardsGlyph(color: Color, modifier: Modifier = Modifier) {
     }
 }
 
-/** 浮层使用实色表面 + hairline，由 Surface 统一投影。 */
+/** 菜单属于浮层：使用 overlay 底色 + hairline，由 Surface 统一投影。 */
 @Composable
-private fun resetCardsMenuContainer(): Color = MyTokenThemeTokens.colors.surface
+private fun resetCardsMenuContainer(): Color = MyTokenThemeTokens.colors.overlay
 
 @Composable
 private fun resetCardsMenuBorder(): Color = MyTokenThemeTokens.colors.line

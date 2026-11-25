@@ -30,10 +30,10 @@ class ResetCardsMenuStyleTest {
     }
 
     @Test
-    fun `重置卡浮窗使用实色表面token`() {
+    fun `重置卡浮窗使用浮层token`() {
         val source = sourceText("UsageMetricGrid.kt")
 
-        assertTrue(source.contains("private fun resetCardsMenuContainer(): Color = MyTokenThemeTokens.colors.surface"))
+        assertTrue(source.contains("private fun resetCardsMenuContainer(): Color = MyTokenThemeTokens.colors.overlay"))
         assertTrue(source.contains("private fun resetCardsMenuBorder(): Color = MyTokenThemeTokens.colors.line"))
         assertFalse(source.contains("copy(alpha = 0.96f)"))
         assertFalse(source.contains("Color.White.copy(alpha = 0.14f)"))

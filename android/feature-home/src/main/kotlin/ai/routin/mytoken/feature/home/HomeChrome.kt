@@ -393,7 +393,7 @@ internal fun HomeProviderToolbar(
 }
 
 @Composable
-private fun ProviderFilter(
+internal fun ProviderFilter(
     selectedProvider: ProviderId?,
     providers: List<ProviderId>,
     counts: Map<ProviderId, Int>,
@@ -463,7 +463,7 @@ private fun ProviderPickerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = colors.surface,
+        containerColor = colors.overlay,
         shape = RoundedCornerShape(
             topStart = MyTokenRadius.sheetTop,
             topEnd = MyTokenRadius.sheetTop,
@@ -559,7 +559,8 @@ private fun ProviderAllTile(
             .fillMaxWidth()
             .heightIn(min = 54.dp)
             .clip(shape)
-            .background(colors.surface)
+            // 供应商筛选是底部浮层，选项块属于浮层内的元素。
+            .background(colors.overlay)
             .border(
                 width = if (selected) 2.dp else 1.dp,
                 color = if (selected) colors.actionFill else colors.line,
@@ -612,7 +613,7 @@ private fun ProviderSheetTile(
         modifier = modifier
             .heightIn(min = 88.dp)
             .clip(shape)
-            .background(colors.surface)
+            .background(colors.overlay)
             .border(
                 width = if (selected) 2.dp else 1.dp,
                 color = if (selected) colors.actionFill else colors.line,
@@ -666,35 +667,69 @@ private fun SelectedCheck(modifier: Modifier = Modifier) {
     )
 }
 
+/** 密度切换在手机/横屏报告右侧是横条，在大屏报告右上角默认竖排。 */
+internal enum class DensitySwitchOrientation { Horizontal, Vertical }
+
 /** 设计稿 §5：32dp 轨道 + 34×28dp 按钮，选中块随分页进度滑动。 */
 private object DensitySwitchSpec {
     val trackWidth = 74.dp
     val trackHeight = 32.dp
+    val verticalTrackWidth = 32.dp
+    val verticalTrackHeight = 74.dp
     val trackRadius = 16.dp
     val padding = 2.dp
     val gap = 2.dp
     val itemWidth = 34.dp
     val itemHeight = 28.dp
+    val verticalItemWidth = 28.dp
+    val verticalItemHeight = 34.dp
     val itemRadius = 14.dp
     val iconSize = 13.dp
 }
 
 @Composable
-private fun DensityModeSwitch(
+internal fun DensityModeSwitch(
     density: UsageCardDensity,
     onToggle: () -> Unit,
     progress: () -> Float,
     modifier: Modifier = Modifier,
+    orientation: DensitySwitchOrientation = DensitySwitchOrientation.Horizontal,
 ) {
     val compact = density.isCompact()
     val colors = MyTokenThemeTokens.colors
+    val vertical = orientation == DensitySwitchOrientation.Vertical
+    val trackWidth = if (vertical) {
+        DensitySwitchSpec.verticalTrackWidth
+    } else {
+        DensitySwitchSpec.trackWidth
+    }
+    val trackHeight = if (vertical) {
+        DensitySwitchSpec.verticalTrackHeight
+    } else {
+        DensitySwitchSpec.trackHeight
+    }
+    val itemWidth = if (vertical) {
+        DensitySwitchSpec.verticalItemWidth
+    } else {
+        DensitySwitchSpec.itemWidth
+    }
+    val itemHeight = if (vertical) {
+        DensitySwitchSpec.verticalItemHeight
+    } else {
+        DensitySwitchSpec.itemHeight
+    }
     val itemTravelPx = with(LocalDensity.current) {
-        (DensitySwitchSpec.itemWidth + DensitySwitchSpec.gap).toPx()
+        val travel = if (vertical) {
+            DensitySwitchSpec.verticalItemHeight + DensitySwitchSpec.gap
+        } else {
+            DensitySwitchSpec.itemWidth + DensitySwitchSpec.gap
+        }
+        travel.toPx()
     }
     Box(
         modifier = modifier
-            .width(DensitySwitchSpec.trackWidth)
-            .height(DensitySwitchSpec.trackHeight)
+            .width(trackWidth)
+            .height(trackHeight)
             .clip(RoundedCornerShape(DensitySwitchSpec.trackRadius))
             .background(colors.track)
             .testTag("usage_density_toggle"),
@@ -702,51 +737,78 @@ private fun DensityModeSwitch(
         Box(
             modifier = Modifier
                 .padding(DensitySwitchSpec.padding)
-                .width(DensitySwitchSpec.itemWidth)
-                .height(DensitySwitchSpec.itemHeight)
+                .width(itemWidth)
+                .height(itemHeight)
                 // 只用 draw 阶段位移，拖动分页时不会整块重新布局而闪动。
                 .graphicsLayer {
-                    translationX = itemTravelPx * progress().coerceIn(0f, 1f)
+                    val p = progress().coerceIn(0f, 1f)
+                    if (vertical) translationY = itemTravelPx * p else translationX = itemTravelPx * p
                 }
                 .clip(RoundedCornerShape(DensitySwitchSpec.itemRadius))
                 .background(colors.ink)
                 .testTag("usage_density_thumb"),
         )
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(DensitySwitchSpec.padding)
-                .selectableGroup(),
-            horizontalArrangement = Arrangement.spacedBy(DensitySwitchSpec.gap),
-        ) {
-            DensityIconOption(
-                compact = true,
-                selected = compact,
-                testTag = "usage_density_option_compact",
-                onClick = { if (!compact) onToggle() },
-            )
-            DensityIconOption(
-                compact = false,
-                selected = !compact,
-                testTag = "usage_density_option_full",
-                onClick = { if (compact) onToggle() },
-            )
+        if (vertical) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(DensitySwitchSpec.padding)
+                    .selectableGroup(),
+                verticalArrangement = Arrangement.spacedBy(DensitySwitchSpec.gap),
+            ) {
+                DensityIconOption(
+                    compact = true,
+                    selected = compact,
+                    testTag = "usage_density_option_compact",
+                    onClick = { if (!compact) onToggle() },
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                )
+                DensityIconOption(
+                    compact = false,
+                    selected = !compact,
+                    testTag = "usage_density_option_full",
+                    onClick = { if (compact) onToggle() },
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(DensitySwitchSpec.padding)
+                    .selectableGroup(),
+                horizontalArrangement = Arrangement.spacedBy(DensitySwitchSpec.gap),
+            ) {
+                DensityIconOption(
+                    compact = true,
+                    selected = compact,
+                    testTag = "usage_density_option_compact",
+                    onClick = { if (!compact) onToggle() },
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                )
+                DensityIconOption(
+                    compact = false,
+                    selected = !compact,
+                    testTag = "usage_density_option_full",
+                    onClick = { if (compact) onToggle() },
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun RowScope.DensityIconOption(
+private fun DensityIconOption(
     compact: Boolean,
     selected: Boolean,
     testTag: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = MyTokenThemeTokens.colors
     Box(
-        modifier = Modifier
-            .weight(1f)
-            .fillMaxHeight()
+        modifier = modifier
             .selectable(
                 selected = selected,
                 role = Role.RadioButton,

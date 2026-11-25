@@ -161,7 +161,7 @@ fun MyTokenDialog(
     }
 }
 
-/** 弹窗中的信息分组：subtle 底 + hairline 承载关系，组与组之间靠留白区分。 */
+/** 弹窗中的信息分组：浮层内的选项块 + 描边承载关系，组与组之间靠留白区分。 */
 @Composable
 fun MyTokenDialogSection(
     title: String? = null,

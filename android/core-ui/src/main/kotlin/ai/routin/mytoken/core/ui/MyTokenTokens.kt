@@ -18,6 +18,8 @@ import androidx.compose.ui.graphics.Color
 data class MyTokenColors(
     val canvas: Color,
     val surface: Color,
+    /** 对话框、底部弹层、菜单等浮层底色，以及卡片上的选项块；比卡片再亮一档。 */
+    val overlay: Color,
     val subtle: Color,
     val line: Color,
     val ink: Color,
@@ -45,6 +47,8 @@ data class MyTokenColors(
     val controlHandle: Color,
     /** 浮起表面与滑块手柄的阴影色，alpha 表示“很轻”的一层。 */
     val cardShadow: Color,
+    /** 侧栏 / 详情浮层后面的遮罩底色；透明度由调用方按主题决定。 */
+    val scrim: Color,
     val statusDotNormal: Color,
     // 首页琥珀报告：正文区随主题反相，票据主区固定为琥珀纸色。
     val reportSurface: Color,
@@ -63,6 +67,7 @@ data class MyTokenColors(
 internal val MyTokenLightColors = MyTokenColors(
     canvas = Color(0xFFEEF0F2),
     surface = Color(0xFFFFFFFF),
+    overlay = Color(0xFFFFFFFF),
     subtle = Color(0xFFF6F7F9),
     line = Color(0xFFE5E7EB),
     ink = Color(0xFF17181A),
@@ -86,6 +91,7 @@ internal val MyTokenLightColors = MyTokenColors(
     controlBorder = Color(0xFFD4D7DE),
     controlHandle = Color(0xFFFFFFFF),
     cardShadow = Color(0x0B000000),
+    scrim = Color(0xFF17222C),
     statusDotNormal = Color(0xFFA3A9B0),
     reportSurface = Color(0xFF17181A),
     reportInk = Color(0xFFF5F6F7),
@@ -101,12 +107,14 @@ internal val MyTokenLightColors = MyTokenColors(
 )
 
 internal val MyTokenDarkColors = MyTokenColors(
-    canvas = Color(0xFF0D0F12),
-    surface = Color(0xFF16181C),
-    subtle = Color(0xFF1D2025),
-    line = Color(0xFF292D33),
-    ink = Color(0xFFF5F6F7),
-    muted = Color(0xFF9BA1A8),
+    // 深色外观：正文 #E6E8EC 对背景 #121418 的对比度约 15:1。
+    canvas = Color(0xFF121418),
+    surface = Color(0xFF1B1E24),
+    overlay = Color(0xFF252931),
+    subtle = Color(0xFF252931),
+    line = Color(0xFF2E333C),
+    ink = Color(0xFFE6E8EC),
+    muted = Color(0xFFA7ADB7),
     actionFill = Color(0xFFF3CB73),
     actionText = Color(0xFFF3CB73),
     onAction = Color(0xFF061326),
@@ -116,16 +124,17 @@ internal val MyTokenDarkColors = MyTokenColors(
     warningText = Color(0xFFFFC266),
     criticalFill = Color(0xFFFF6369),
     criticalText = Color(0xFFFF8A8E),
-    cat1 = Color(0xFFE8EAED),
-    cat2 = Color(0xFF9BA1A8),
+    cat1 = Color(0xFFE6E8EC),
+    cat2 = Color(0xFFA7ADB7),
     cat3 = Color(0xFF4A4F56),
-    track = Color(0xFF2A2E34),
-    hairline = Color(0xFF2E3238),
-    controlTrack = Color(0xFF2A2E34),
-    controlBorder = Color(0xFF3A3F46),
+    track = Color(0xFF2A2F38),
+    hairline = Color(0xFF343A44),
+    controlTrack = Color(0xFF2A2F38),
+    controlBorder = Color(0xFF3C424D),
     controlHandle = Color(0xFFFFFFFF),
     cardShadow = Color(0x40000000),
-    statusDotNormal = Color(0xFF6B7076),
+    scrim = Color(0xFF000000),
+    statusDotNormal = Color(0xFF8A909A),
     reportSurface = Color(0xFFF5F6F7),
     reportInk = Color(0xFF17181A),
     reportMuted = Color(0xFF696D73),

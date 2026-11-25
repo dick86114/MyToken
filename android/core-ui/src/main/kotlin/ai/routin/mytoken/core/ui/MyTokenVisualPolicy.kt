@@ -18,6 +18,8 @@ object MyTokenVisualPolicy {
         Metric,
         Control,
         Modal,
+        /** 侧边抽屉页：与页面同用 canvas 背景，靠 1dp 描边与阴影和背后内容分隔。 */
+        Drawer,
     }
 
     /** 实色表面是默认；浮层与首页浮起白卡允许阴影。 */
@@ -38,8 +40,14 @@ object MyTokenVisualPolicy {
         SurfaceRole.Metric,
         SurfaceRole.Control,
         -> Material.Solid
+
+        SurfaceRole.Modal,
+        SurfaceRole.Drawer,
+        -> Material.Overlay
     }
 
     fun allowsShadow(role: SurfaceRole): Boolean =
-        role == SurfaceRole.Modal || role == SurfaceRole.FloatingCard
+        role == SurfaceRole.Modal ||
+            role == SurfaceRole.Drawer ||
+            role == SurfaceRole.FloatingCard
 }

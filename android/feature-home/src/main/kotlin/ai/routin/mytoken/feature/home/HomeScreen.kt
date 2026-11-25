@@ -1,5 +1,6 @@
 package ai.routin.mytoken.feature.home
 
+import ai.routin.mytoken.core.alerts.AlertThresholds
 import ai.routin.mytoken.core.ui.MyTokenAdaptiveContent
 import ai.routin.mytoken.core.ui.MyTokenBrandMark
 import ai.routin.mytoken.core.ui.MyTokenButton
@@ -15,6 +16,7 @@ import ai.routin.mytoken.core.ui.rememberMyTokenMotionEnabled
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageCardDensity
 import ai.routin.mytoken.domain.usage.RefreshStatus
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
@@ -42,10 +44,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
@@ -69,6 +67,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -131,6 +130,10 @@ fun HomeScreen(
     usageCardDensity: UsageCardDensity = UsageCardDensity.FULL,
     onToggleUsageCardDensity: () -> Unit = {},
     homeScrollStates: HomeScrollStates = rememberHomeScrollStates(),
+    globalAlertThresholds: AlertThresholds = AlertThresholds.DEFAULT,
+    alertThresholdOverrides: Map<UUID, AlertThresholds> = emptyMap(),
+    onEditCredential: (UUID) -> Unit = {},
+    onDeleteCredential: (UUID) -> Unit = {},
 ) {
     val colors = MyTokenThemeTokens.colors
     var selectedProvider by remember { mutableStateOf<ProviderId?>(null) }
@@ -173,6 +176,8 @@ fun HomeScreen(
     var updateDownloadStarted by remember { mutableStateOf(false) }
     var shownUpdateVersion by remember { mutableStateOf<String?>(null) }
     var pagerHasUserInput by remember { mutableStateOf(false) }
+    // 大屏右侧详情的选中项；折叠/旋转后仍保留，切回 compact 时交给现有整页详情。
+    var wideDetailId by rememberSaveable { mutableStateOf<UUID?>(null) }
 
     // 下载期间保持弹窗打开并展示进度；下载结束（成功或失败）后自动收起，
     // 但缺安装权限时保留弹窗，引导用户去系统授权。
@@ -189,6 +194,74 @@ fun HomeScreen(
             }
             updateDownloadStarted = false
         }
+    }
+
+    // 折叠或旋转回普通手机宽度时，把已打开的侧栏详情交还给整页详情导航。
+    LaunchedEffect(layoutMode, wideDetailId) {
+        val id = wideDetailId
+        if (layoutMode == MyTokenLayoutMode.Compact && id != null) {
+            wideDetailId = null
+            onOpenCredential(id)
+        }
+    }
+
+    if (layoutMode != MyTokenLayoutMode.Compact) {
+        // 右侧详情是浮层，系统返回先收起它，不离开首页。
+        BackHandler(enabled = wideDetailId != null) {
+            wideDetailId = null
+        }
+        // 大屏不再套 Scaffold：整窗渐变要画到状态栏、导航栏和左轨后面。
+        // 系统栏避让由 WideHomeScreen 内部的 insets 处理。
+        WideHomeScreen(
+            state = state,
+            allCards = allCards,
+            visibleCards = visibleCards,
+            providers = visibleProviders,
+            providerCounts = providerCounts,
+            selectedProvider = selectedProvider,
+            onSelectProvider = {
+                pendingLocateId = null
+                selectedProvider = it
+            },
+            usageCardDensity = usageCardDensity,
+            onToggleUsageCardDensity = onToggleUsageCardDensity,
+            layoutMode = layoutMode,
+            selectedDetailId = wideDetailId,
+            onSelectDetail = { wideDetailId = it },
+            onRefreshAll = onRefreshAll,
+            onRefreshCredential = onRefreshCredential,
+            onRetryCredential = onRetryCredential,
+            onOpenCredentials = onOpenCredentials,
+            onManageCredentials = onManageCredentials,
+            onOpenSettings = onOpenSettings,
+            onImportFromMac = onImportFromMac,
+            onAddManually = onAddManually,
+            globalAlertThresholds = globalAlertThresholds,
+            alertThresholdOverrides = alertThresholdOverrides,
+            onEditCredential = onEditCredential,
+            onDeleteCredential = onDeleteCredential,
+            hasUpdateAvailable = hasUpdateAvailable,
+            onOpenUpdate = {
+                shownUpdateVersion = updateVersion
+                showUpdateDialog = true
+            },
+            homeScrollStates = homeScrollStates,
+            modifier = Modifier.fillMaxSize(),
+        )
+        HomeUpdateDialogHost(
+            show = showUpdateDialog,
+            shownVersion = shownUpdateVersion,
+            updateVersion = updateVersion,
+            releaseNotes = updateReleaseNotes,
+            confirmLabel = updateConfirmLabel,
+            downloading = isUpdateDownloading,
+            progress = updateDownloadProgress,
+            readyToInstall = isUpdateReadyToInstall,
+            needsInstallPermission = isUpdateNeedsInstallPermission,
+            onConfirmUpdate = onConfirmUpdate,
+            onDismiss = { if (!isUpdateDownloading) showUpdateDialog = false },
+        )
+        return
     }
 
     val density = LocalDensity.current
@@ -558,17 +631,17 @@ fun HomeScreen(
                         }
                     }
 
-                    HomeScrollMode.FullWideGrid -> LazyVerticalGrid(
+                    HomeScrollMode.FullWideGrid -> LazyVerticalStaggeredGrid(
                         state = homeScrollStates.fullWide,
-                        columns = GridCells.Fixed(pageColumns),
+                        columns = StaggeredGridCells.Fixed(pageColumns),
                         modifier = Modifier
                             .fillMaxSize()
                             .testTag(pageTag),
                         contentPadding = contentPadding,
                         horizontalArrangement = Arrangement.spacedBy(spacing),
-                        verticalArrangement = Arrangement.spacedBy(spacing),
+                        verticalItemSpacing = spacing,
                     ) {
-                        gridItems(
+                        staggeredItems(
                             items = visibleCards,
                             key = { it.credential.id },
                             contentType = { "credential-usage-card" },
@@ -576,7 +649,7 @@ fun HomeScreen(
                         item(
                             key = "credential_end",
                             contentType = "credential-end",
-                            span = { GridItemSpan(maxLineSpan) },
+                            span = StaggeredGridItemSpan.FullLine,
                         ) {
                             CredentialEndActions(onManage = onManageCredentials)
                         }
@@ -877,23 +950,52 @@ fun HomeScreen(
         }
     }
 
-    if (showUpdateDialog) {
-        MyTokenUpdateDialog(
-            version = shownUpdateVersion ?: updateVersion,
-            releaseNotes = updateReleaseNotes,
-            confirmLabel = updateConfirmLabel,
-            downloading = isUpdateDownloading,
-            downloadProgress = updateDownloadProgress,
-            needsInstallPermission = isUpdateNeedsInstallPermission,
-            onConfirm = {
-                onConfirmUpdate()
-                if (isUpdateReadyToInstall) showUpdateDialog = false
-            },
-            onDismiss = { if (!isUpdateDownloading) showUpdateDialog = false },
-            modifier = Modifier.testTag("home_update_dialog"),
-            confirmTag = "home_update_confirm",
-        )
-    }
+    HomeUpdateDialogHost(
+        show = showUpdateDialog,
+        shownVersion = shownUpdateVersion,
+        updateVersion = updateVersion,
+        releaseNotes = updateReleaseNotes,
+        confirmLabel = updateConfirmLabel,
+        downloading = isUpdateDownloading,
+        progress = updateDownloadProgress,
+        readyToInstall = isUpdateReadyToInstall,
+        needsInstallPermission = isUpdateNeedsInstallPermission,
+        onConfirmUpdate = onConfirmUpdate,
+        onDismiss = { if (!isUpdateDownloading) showUpdateDialog = false },
+    )
+}
+
+/** 手机与大屏共用的更新弹窗；下载结束后的收起规则保持一致。 */
+@Composable
+private fun HomeUpdateDialogHost(
+    show: Boolean,
+    shownVersion: String?,
+    updateVersion: String?,
+    releaseNotes: String?,
+    confirmLabel: String,
+    downloading: Boolean,
+    progress: Float?,
+    readyToInstall: Boolean,
+    needsInstallPermission: Boolean,
+    onConfirmUpdate: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    if (!show) return
+    MyTokenUpdateDialog(
+        version = shownVersion ?: updateVersion,
+        releaseNotes = releaseNotes,
+        confirmLabel = confirmLabel,
+        downloading = downloading,
+        downloadProgress = progress,
+        needsInstallPermission = needsInstallPermission,
+        onConfirm = {
+            onConfirmUpdate()
+            if (readyToInstall) onDismiss()
+        },
+        onDismiss = onDismiss,
+        modifier = Modifier.testTag("home_update_dialog"),
+        confirmTag = "home_update_confirm",
+    )
 }
 
 /** 下拉刷新指示器：透明图标直接出现在报告上方，不铺整行底色。 */
@@ -945,7 +1047,7 @@ private fun HomePullIndicator(
 
 /** 卡片末尾的小胶囊入口：集中管理已有凭证。 */
 @Composable
-private fun CredentialEndActions(
+internal fun CredentialEndActions(
     onManage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -987,7 +1089,7 @@ private fun CredentialEndActions(
 }
 
 @Composable
-private fun EmptyState(
+internal fun EmptyState(
     modifier: Modifier = Modifier,
     onImportFromMac: () -> Unit,
     onAddManually: () -> Unit,

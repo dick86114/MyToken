@@ -8,6 +8,7 @@ import ai.routin.mytoken.core.ui.MyTokenDialogSection
 import ai.routin.mytoken.core.ui.MyTokenDialogStatus
 import ai.routin.mytoken.core.ui.MyTokenDialogTone
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
+import ai.routin.mytoken.core.ui.MyTokenRadius
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.domain.model.ProviderId
@@ -21,6 +22,7 @@ import androidx.compose.animation.core.tween
 import ai.routin.mytoken.core.ui.MyTokenMotion
 import ai.routin.mytoken.core.ui.rememberMyTokenMotionEnabled
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -31,10 +33,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,7 +47,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -58,6 +66,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.math.BigDecimal
+import kotlinx.coroutines.delay
 
 /** 状态色：只用于数据可视化（弧线、细条、构成条）。 */
 internal data class StatusColors(
@@ -92,6 +101,8 @@ fun CredentialUsageCard(
     layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Compact,
     usageCardDensity: UsageCardDensity = UsageCardDensity.FULL,
     highlightSignal: Int = 0,
+    selected: Boolean = false,
+    flat: Boolean = false,
 ) {
     val compact = usageCardDensity.isCompact()
     var showsFailureDetails by remember(card.credential.id) { mutableStateOf(false) }
@@ -100,6 +111,7 @@ fun CredentialUsageCard(
     val showsSkeleton = health == UsageCardHealth.Loading && card.snapshot?.metrics.isNullOrEmpty()
 
     val motionEnabled = rememberMyTokenMotionEnabled()
+    val wide = layoutMode != MyTokenLayoutMode.Compact
     val locateLift = remember { Animatable(0f) }
     LaunchedEffect(highlightSignal) {
         if (highlightSignal <= 0) {
@@ -108,16 +120,54 @@ fun CredentialUsageCard(
         }
         locateLift.snapTo(0f)
         val duration = MyTokenMotion.locateDurationMillis(motionEnabled)
-        locateLift.animateTo(1f, tween(durationMillis = duration, easing = FastOutSlowInEasing))
-        locateLift.animateTo(0f, tween(durationMillis = duration, easing = FastOutSlowInEasing))
-    }
-    val locateBounceModifier = if (highlightSignal > 0) {
-        Modifier.graphicsLayer {
-            val lift = locateLift.value
-            scaleX = 1f + 0.02f * lift
-            scaleY = 1f + 0.02f * lift
-            translationY = -4.dp.toPx() * lift
+        val pulses = if (wide) MyTokenMotion.wideLocatePulseCount else 1
+        repeat(pulses) { pulse ->
+            locateLift.animateTo(
+                1f,
+                tween(durationMillis = duration, easing = FastOutSlowInEasing),
+            )
+            locateLift.animateTo(
+                0f,
+                tween(durationMillis = duration, easing = FastOutSlowInEasing),
+            )
+            if (pulse < pulses - 1) delay(MyTokenMotion.locatePulseGapMillis.toLong())
         }
+    }
+    val highlightInk = MyTokenThemeTokens.colors.ink
+    val locateBounceModifier = if (highlightSignal > 0) {
+        Modifier
+            .graphicsLayer {
+                val lift = locateLift.value
+                val scale = if (wide) 0.045f else 0.02f
+                scaleX = 1f + scale * lift
+                scaleY = 1f + scale * lift
+                translationY = (if (wide) -9.dp else -4.dp).toPx() * lift
+            }
+            // 大屏定位用高对比描边 + 位移，多次脉冲时远看也能辨认。
+            .then(
+                if (wide) {
+                    Modifier.drawWithContent {
+                        drawContent()
+                        val lift = locateLift.value
+                        if (lift > 0.01f) {
+                            val stroke = 2.dp.toPx()
+                            drawRoundRect(
+                                color = highlightInk,
+                                alpha = (0.18f + 0.82f * lift).coerceIn(0f, 1f),
+                                topLeft = androidx.compose.ui.geometry.Offset(stroke / 2f, stroke / 2f),
+                                size = Size(size.width - stroke, size.height - stroke),
+                                cornerRadius = CornerRadius(
+                                    x = MyTokenRadius.card.toPx(),
+                                    y = MyTokenRadius.card.toPx(),
+                                ),
+                                style = Stroke(width = stroke),
+                            )
+                        }
+                    }
+                } else {
+                    Modifier
+                },
+            )
     } else {
         Modifier
     }
@@ -136,10 +186,21 @@ fun CredentialUsageCard(
         primaryText.takeIf { it.isNotBlank() },
     ).joinToString("，")
 
+    val selectionModifier = if (selected) {
+        Modifier.border(
+            width = 2.dp,
+            color = MyTokenThemeTokens.colors.ink,
+            shape = RoundedCornerShape(MyTokenRadius.card),
+        )
+    } else {
+        Modifier
+    }
     UsageCardFrame(
         density = usageCardDensity,
         onClick = onOpen,
+        flat = flat,
         modifier = modifier
+            .then(selectionModifier)
             .then(locateBounceModifier)
             .semantics { contentDescription = cardDescription }
             .testTag("credential_card_${card.credential.id}"),
@@ -170,7 +231,10 @@ fun CredentialUsageCard(
         } else if (compact) {
             CompactUsageCardBody(card = card, health = health)
         } else {
-            FullUsageCardBody(card = card)
+            // 大屏完整卡不改成上下排版，保持手机竖屏的左右分栏。
+            CompositionLocalProvider(LocalForcePhoneFullCardLayout provides wide) {
+                FullUsageCardBody(card = card)
+            }
         }
     }
 

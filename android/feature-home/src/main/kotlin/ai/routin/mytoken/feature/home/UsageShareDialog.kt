@@ -2,7 +2,6 @@ package ai.routin.mytoken.feature.home
 
 import android.widget.Toast
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
-import ai.routin.mytoken.core.ui.MyTokenSurface
 import ai.routin.mytoken.core.ui.MyTokenTextField
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
@@ -221,7 +220,7 @@ internal fun UsageShareDialog(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = colors.canvas,
+        containerColor = colors.overlay,
         contentColor = colors.ink,
     ) {
         if (layoutMode == MyTokenLayoutMode.Compact) {
@@ -397,31 +396,32 @@ private fun ShareControlSection(
     action: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    MyTokenSurface(
-        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
-        shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
+    val colors = MyTokenThemeTokens.colors
+    val shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp)
+    // 分享弹层属于浮层，内部区块同样使用 overlay 底色，靠描边区分。
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(colors.overlay)
+            .border(1.dp, colors.line, shape)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f),
-                )
-                action?.invoke()
-            }
-            content()
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            action?.invoke()
         }
+        content()
     }
 }
 

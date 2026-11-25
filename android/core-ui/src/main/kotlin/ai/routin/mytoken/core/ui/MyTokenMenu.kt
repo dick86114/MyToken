@@ -19,7 +19,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-/** 统一菜单容器：实色表面 + hairline，只有浮层投影，不带 Material 默认大圆角。 */
+/** 统一菜单容器：浮层 overlay 底色 + hairline，只有浮层投影，不带 Material 默认大圆角。 */
 @Composable
 fun MyTokenDropdownMenu(
     expanded: Boolean,
@@ -33,7 +33,7 @@ fun MyTokenDropdownMenu(
         onDismissRequest = onDismissRequest,
         modifier = modifier,
         shape = RoundedCornerShape(MyTokenRadius.inner),
-        containerColor = colors.surface,
+        containerColor = colors.overlay,
         tonalElevation = 0.dp,
         shadowElevation = 12.dp,
         border = BorderStroke(1.dp, colors.line),

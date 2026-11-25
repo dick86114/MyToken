@@ -1,0 +1,768 @@
+package ai.routin.mytoken.feature.home
+
+import ai.routin.mytoken.core.ui.MyTokenLayoutMode
+import ai.routin.mytoken.core.ui.MyTokenTheme
+import ai.routin.mytoken.domain.model.ProviderId
+import ai.routin.mytoken.domain.model.UsageCardDensity
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.assertContentDescriptionContains
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.junit4.StateRestorationTester
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
+import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.unit.dp
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
+class WideHomeScreenTest {
+    @get:Rule
+    val composeRule = createComposeRule()
+
+    private var density by mutableStateOf(UsageCardDensity.COMPACT)
+    private var densityChanges = 0
+
+    private fun cards(used: List<Double> = listOf(20.0, 20.0, 20.0)): List<CredentialCardUi> =
+        listOf(
+            sampleCard("Routin 主账号", ProviderId.Routin, used = used[0]),
+            sampleCard("GLM 主账号", ProviderId.Glm, used = used[1]),
+            sampleCard("DeepSeek 主账号", ProviderId.DeepSeek, used = used[2]),
+        )
+
+    private fun setContent(
+        layoutMode: MyTokenLayoutMode = MyTokenLayoutMode.Expanded,
+        used: List<Double> = listOf(20.0, 20.0, 20.0),
+        initialDensity: UsageCardDensity = UsageCardDensity.COMPACT,
+        hasUpdate: Boolean = false,
+    ): List<CredentialCardUi> {
+        density = initialDensity
+        densityChanges = 0
+        val all = cards(used)
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = all,
+                        groups = listOf(
+                            ProviderGroupUi(ProviderId.Routin, "Routin", false, listOf(all[0])),
+                            ProviderGroupUi(ProviderId.Glm, "智谱 GLM", false, listOf(all[1])),
+                            ProviderGroupUi(ProviderId.DeepSeek, "DeepSeek", false, listOf(all[2])),
+                        ),
+                        credentialCount = all.size,
+                    ),
+                    layoutMode = layoutMode,
+                    usageCardDensity = density,
+                    onToggleUsageCardDensity = {
+                        densityChanges += 1
+                        density = if (density == UsageCardDensity.COMPACT) {
+                            UsageCardDensity.FULL
+                        } else {
+                            UsageCardDensity.COMPACT
+                        }
+                    },
+                    hasUpdateAvailable = hasUpdate,
+                    updateVersion = if (hasUpdate) "6.2.0" else null,
+                    onConfirmUpdate = {},
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                )
+            }
+        }
+        return all
+    }
+
+    /** 用给定凭证集合渲染大屏首页，供应商分组按集合自动生成。 */
+    private fun setContentWithCards(
+        all: List<CredentialCardUi>,
+        initialDensity: UsageCardDensity = UsageCardDensity.COMPACT,
+    ) {
+        density = initialDensity
+        densityChanges = 0
+        val groups = all.groupBy { it.credential.providerId }.map { (provider, cards) ->
+            ProviderGroupUi(provider, ProviderCatalog.displayName(provider), false, cards)
+        }
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = all,
+                        groups = groups,
+                        credentialCount = all.size,
+                    ),
+                    layoutMode = MyTokenLayoutMode.Expanded,
+                    usageCardDensity = density,
+                    onToggleUsageCardDensity = {},
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                )
+            }
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 大屏使用左轨报告与手机同款分页卡片区() {
+        setContent()
+        composeRule.onNodeWithTag("home_wide_rail").assertIsDisplayed()
+        composeRule.onNodeWithTag("home_wide_report").assertIsDisplayed()
+        composeRule.onNodeWithTag("home_pager").assertIsDisplayed()
+        composeRule.onNodeWithTag("home_page_active").assertExists()
+        composeRule.onNodeWithTag("home_grid_6_columns").assertExists()
+        // 大屏不再出现“全部供应商”筛选行，也不再放大屏更新条。
+        composeRule.onNodeWithTag("home_provider_toolbar").assertDoesNotExist()
+        composeRule.onNodeWithTag("home_toolbar").assertDoesNotExist()
+        composeRule.onNodeWithTag("home_update_banner").assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 顶部品牌logo作为全部入口且左轨没有全部按钮和分割线() {
+        setContent()
+        // 旧的“全部供应商”网格按钮与其上方的分割线都已移除。
+        composeRule.onNodeWithTag("home_wide_rail_all_icon", useUnmergedTree = true)
+            .assertDoesNotExist()
+        composeRule.onNodeWithTag("home_wide_rail_all_grid_icon", useUnmergedTree = true)
+            .assertDoesNotExist()
+        composeRule.onNodeWithTag("home_wide_rail_brand_divider", useUnmergedTree = true)
+            .assertDoesNotExist()
+        // 顶部品牌 logo 成为“全部”入口：默认选中、带全部凭证口径的无障碍标签。
+        composeRule.onNodeWithTag("home_wide_rail_all", useUnmergedTree = true)
+            .assertExists()
+            .assertContentDescriptionContains("全部供应商", substring = true)
+            .assertIsSelected()
+        composeRule.onNodeWithTag("home_wide_rail_brand", useUnmergedTree = true)
+            .assertExists()
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 无告警时报告收成八十短票并显示全部凭证正常() {
+        setContent()
+        composeRule.onNodeWithText("全部 3 个凭证当前用量正常").assertIsDisplayed()
+        val height = composeRule.onNodeWithTag("home_wide_report")
+            .getUnclippedBoundsInRoot()
+            .let { it.bottom - it.top }
+        assertEquals(80.dp, height)
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 有告警时报告一百一十高并展示告警条目() {
+        val all = setContent(used = listOf(20.0, 90.0, 96.0))
+        composeRule.onNodeWithTag("health_finding_${all[1].credential.id}").assertExists()
+        composeRule.onNodeWithTag("health_finding_${all[2].credential.id}").assertExists()
+        val height = composeRule.onNodeWithTag("home_wide_report")
+            .getUnclippedBoundsInRoot()
+            .let { it.bottom - it.top }
+        assertEquals(110.dp, height)
+    }
+
+    @Test
+    @Config(qualifiers = "w1024dp-h768dp")
+    fun 四比三横屏报告仍横排且密度横排位于报告下方右侧() {
+        val all = setContent(used = listOf(20.0, 90.0, 96.0))
+        val report = composeRule.onNodeWithTag("home_wide_report").getUnclippedBoundsInRoot()
+        val toggle = composeRule.onNodeWithTag("usage_density_toggle").getUnclippedBoundsInRoot()
+        assertEquals(110.dp, report.bottom - report.top)
+        assertTrue(
+            "密度切换器应在报告下方，report.bottom=${report.bottom} toggle.top=${toggle.top}",
+            toggle.top.value >= report.bottom.value,
+        )
+        assertEquals("密度切换器始终横排", 32.dp, toggle.bottom - toggle.top)
+        assertEquals("密度切换器右对齐", report.right, toggle.right)
+        composeRule.onNodeWithTag("home_grid_5_columns").assertExists()
+        composeRule.onNodeWithTag("health_finding_${all[1].credential.id}").assertExists()
+    }
+
+    @Test
+    @Config(qualifiers = "w768dp-h1024dp")
+    fun 竖屏报告在上控制条在下() {
+        setContent(layoutMode = MyTokenLayoutMode.Medium)
+        val report = composeRule.onNodeWithTag("home_wide_report").getUnclippedBoundsInRoot()
+        val toggle = composeRule.onNodeWithTag("usage_density_toggle").getUnclippedBoundsInRoot()
+        assertTrue(
+            "竖屏控制条应在报告下方，report.bottom=${report.bottom} toggle.top=${toggle.top}",
+            toggle.top.value >= report.bottom.value,
+        )
+        composeRule.onNodeWithTag("home_grid_4_columns").assertExists()
+    }
+
+    @Test
+    @Config(qualifiers = "w720dp-h1280dp")
+    fun 竖屏完整卡保持手机左右分栏() {
+        val base = sampleCard("Routin 双窗口", ProviderId.Routin, used = 42.0)
+        val snapshot = requireNotNull(base.snapshot)
+        val first = snapshot.metrics.first()
+        val weekly = first.copy(id = "weekly", label = "周")
+        val card = base.copy(snapshot = snapshot.copy(metrics = listOf(first, weekly)))
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = listOf(card),
+                        groups = emptyList(),
+                        credentialCount = 1,
+                    ),
+                    layoutMode = MyTokenLayoutMode.Medium,
+                    usageCardDensity = UsageCardDensity.FULL,
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                )
+            }
+        }
+        composeRule.onAllNodesWithTag("full_split_row", useUnmergedTree = true)
+            .assertCountEquals(1)
+        composeRule.onAllNodesWithTag("full_split_column", useUnmergedTree = true)
+            .assertCountEquals(0)
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 有更新时箭头在左轨刷新上方且报告内无重复提示() {
+        setContent(hasUpdate = true)
+        composeRule.onNodeWithTag("home_update_banner").assertDoesNotExist()
+        composeRule.onNodeWithTag("home_wide_update_hint").assertDoesNotExist()
+
+        val update = composeRule.onNodeWithTag("home_wide_rail_update", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val refresh = composeRule.onNodeWithTag("home_wide_rail_refresh", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        assertTrue(
+            "更新箭头应在刷新按钮上方，update.bottom=${update.bottom} refresh.top=${refresh.top}",
+            update.bottom.value <= refresh.top.value + 1f,
+        )
+        val toggle = composeRule.onNodeWithTag("usage_density_toggle").getUnclippedBoundsInRoot()
+        assertEquals("密度切换始终横排（高 32dp）", 32.dp, toggle.bottom - toggle.top)
+
+        composeRule.onNodeWithTag("home_wide_rail_update", useUnmergedTree = true)
+            .performClick()
+        composeRule.onNodeWithTag("home_update_dialog").assertExists()
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 密度切换器驱动分页并在落页后写回模式() {
+        setContent()
+        composeRule.onNodeWithTag("home_grid_6_columns").assertExists()
+        composeRule.onNodeWithTag("usage_density_option_full").performClick()
+        composeRule.waitForIdle()
+
+        assertEquals(UsageCardDensity.FULL, density)
+        assertEquals(1, densityChanges)
+        composeRule.onNodeWithTag("home_grid_3_columns").assertExists()
+        composeRule.onNodeWithTag("home_grid_6_columns").assertDoesNotExist()
+
+        composeRule.onNodeWithTag("usage_density_option_compact").performClick()
+        composeRule.waitForIdle()
+        assertEquals(UsageCardDensity.COMPACT, density)
+        assertEquals(2, densityChanges)
+        composeRule.onNodeWithTag("home_grid_6_columns").assertExists()
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 卡片宽度以手机竖屏卡宽为基准且不超百分之十二拉伸() {
+        val all = setContent()
+        val compactWidth = composeRule
+            .onNodeWithTag("credential_card_${all[0].credential.id}")
+            .getUnclippedBoundsInRoot()
+            .let { it.right - it.left }
+        assertTrue(
+            "1280 简洁页卡宽 $compactWidth 应接近 176dp",
+            compactWidth.value >= 176f * 0.9f && compactWidth.value <= 176f * 1.12f + 0.1f,
+        )
+
+        composeRule.onNodeWithTag("usage_density_option_full").performClick()
+        composeRule.waitForIdle()
+        val fullWidth = composeRule
+            .onNodeWithTag("credential_card_${all[0].credential.id}")
+            .getUnclippedBoundsInRoot()
+            .let { it.right - it.left }
+        assertTrue(
+            "1280 完整页卡宽 $fullWidth 应接近 360dp",
+            fullWidth.value >= 360f * 0.9f && fullWidth.value <= 360f * 1.12f + 0.1f,
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 上滑网格后报告跟随收起() {
+        // 18 张卡确保列表可滚，头部有足够的收起空间。
+        val all = (1..6).flatMap { cards() }
+        density = UsageCardDensity.COMPACT
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = all,
+                        groups = emptyList(),
+                        credentialCount = all.size,
+                    ),
+                    layoutMode = MyTokenLayoutMode.Expanded,
+                    usageCardDensity = density,
+                    onToggleUsageCardDensity = {
+                        density = if (density == UsageCardDensity.COMPACT) {
+                            UsageCardDensity.FULL
+                        } else {
+                            UsageCardDensity.COMPACT
+                        }
+                    },
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                )
+            }
+        }
+        val before = composeRule.onNodeWithTag("home_wide_report").getUnclippedBoundsInRoot()
+        composeRule.onNodeWithTag("home_grid_6_columns").performTouchInput { swipeUp() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("home_scroll_edge").assertExists()
+        val after = composeRule.onNodeWithTag("home_wide_report").getUnclippedBoundsInRoot()
+        assertTrue(
+            "报告应随上滑收起，before.top=${before.top} after.top=${after.top}",
+            after.top.value < before.top.value,
+        )
+
+        // 收起后：报告行与左轨 brand 同一行，并和状态栏连成一块琥珀头。
+        val ticket = composeRule.onNodeWithTag(
+            "home_wide_collapsed_ticket",
+            useUnmergedTree = true,
+        ).getUnclippedBoundsInRoot()
+        val brand = composeRule.onNodeWithTag(
+            "home_wide_rail_brand",
+            useUnmergedTree = true,
+        ).getUnclippedBoundsInRoot()
+        assertEquals(
+            "报告行中心应与左轨 logo 中心齐平",
+            (brand.top.value + brand.bottom.value) / 2f,
+            (ticket.top.value + ticket.bottom.value) / 2f,
+            2f,
+        )
+        // 顶部只保留一条不透明琥珀 app bar：从窗口最顶部（状态栏）开始，只包住报告行。
+        // 不再有 200dp 前景渐变盖层，琥珀→画布渐变由整窗背景在卡片背后承担。
+        val appBar = composeRule.onNodeWithTag(
+            "home_wide_app_bar",
+            useUnmergedTree = true,
+        ).getUnclippedBoundsInRoot()
+        assertEquals("琥珀 app bar 应从状态栏顶部开始", 0f, appBar.top.value, 0.5f)
+        assertEquals(
+            "app bar 应只盖住状态栏 + 报告行，" +
+                "appBar.bottom=${appBar.bottom} ticket.bottom=${ticket.bottom}",
+            ticket.bottom.value,
+            appBar.bottom.value,
+            1f,
+        )
+        composeRule.onNodeWithTag("home_wide_nav_bar_tint", useUnmergedTree = true)
+            .assertExists()
+        // 正常态没有告警：收合行不显示任何告警供应商 logo。
+        composeRule.onNodeWithTag("home_wide_alert_logo_0", useUnmergedTree = true)
+            .assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 收合后琥珀appbar展示告警供应商logo() {
+        // 18 张卡确保列表可滚；GLM 接近上限、DeepSeek 已达上限，各有一个告警。
+        val all = (1..6).flatMap { cards(used = listOf(20.0, 90.0, 96.0)) }
+        density = UsageCardDensity.COMPACT
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = all,
+                        groups = emptyList(),
+                        credentialCount = all.size,
+                    ),
+                    layoutMode = MyTokenLayoutMode.Expanded,
+                    usageCardDensity = density,
+                    onToggleUsageCardDensity = {},
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                )
+            }
+        }
+        composeRule.onNodeWithTag("home_grid_6_columns").performTouchInput { swipeUp() }
+        composeRule.waitForIdle()
+
+        // 告警供应商 logo 去重后为两个（GLM、DeepSeek），且必须落在顶部琥珀 app bar 内。
+        val appBar = composeRule.onNodeWithTag("home_wide_app_bar", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        listOf(0, 1).forEach { index ->
+            val logo = composeRule.onNodeWithTag(
+                "home_wide_alert_logo_$index",
+                useUnmergedTree = true,
+            )
+            logo.assertIsDisplayed()
+            val bounds = logo.getUnclippedBoundsInRoot()
+            assertTrue(
+                "告警 logo 应在 app bar 内，logo=$bounds appBar=$appBar",
+                bounds.top.value >= appBar.top.value - 0.5f &&
+                    bounds.bottom.value <= appBar.bottom.value + 0.5f,
+            )
+        }
+        composeRule.onNodeWithTag("home_wide_alert_logo_2", useUnmergedTree = true)
+            .assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 点卡片打开与设置同宽浮层且首页不变形() {
+        val all = setContent()
+        val cardTag = "credential_card_${all[0].credential.id}"
+        val gridBefore = composeRule.onNodeWithTag("home_grid_6_columns").getUnclippedBoundsInRoot()
+        val reportBefore = composeRule.onNodeWithTag("home_wide_report").getUnclippedBoundsInRoot()
+        composeRule.onNodeWithTag(cardTag).performClick()
+        composeRule.onNodeWithTag("home_wide_detail").assertIsDisplayed()
+        val width = composeRule.onNodeWithTag("home_wide_detail")
+            .getUnclippedBoundsInRoot()
+            .let { it.right - it.left }
+        assertEquals(420.dp, width)
+        // 浮层是覆盖层：首页不缩窄、不位移。
+        assertEquals(
+            gridBefore,
+            composeRule.onNodeWithTag("home_grid_6_columns").getUnclippedBoundsInRoot(),
+        )
+        assertEquals(
+            reportBefore,
+            composeRule.onNodeWithTag("home_wide_report").getUnclippedBoundsInRoot(),
+        )
+
+        composeRule.onNodeWithTag("home_wide_detail_close").performClick()
+        composeRule.onNodeWithTag("home_wide_detail").assertDoesNotExist()
+
+        composeRule.onNodeWithTag(cardTag).performClick()
+        composeRule.onNodeWithTag("home_wide_detail").assertIsDisplayed()
+        composeRule.onNodeWithTag(cardTag).performClick()
+        composeRule.onNodeWithTag("home_wide_detail").assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = "w1024dp-h1024dp")
+    fun 方形窗口详情同样使用四百二十宽() {
+        val all = setContent()
+        composeRule.onNodeWithTag("credential_card_${all[0].credential.id}").performClick()
+        val width = composeRule.onNodeWithTag("home_wide_detail")
+            .getUnclippedBoundsInRoot()
+            .let { it.right - it.left }
+        assertEquals(420.dp, width)
+    }
+
+    @Test
+    @Config(qualifiers = "w768dp-h1024dp")
+    fun 竖屏折叠详情与设置抽屉同宽四百二十() {
+        val all = setContent(layoutMode = MyTokenLayoutMode.Medium)
+        composeRule.onNodeWithTag("credential_card_${all[0].credential.id}").performClick()
+        val width = composeRule.onNodeWithTag("home_wide_detail")
+            .getUnclippedBoundsInRoot()
+            .let { it.right - it.left }
+        assertEquals(420.dp, width)
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 左轨筛选只影响中间卡片报告仍覆盖全部() {
+        val all = setContent(used = listOf(20.0, 90.0, 96.0))
+        composeRule.onNodeWithTag("home_wide_rail_provider_glm").performClick()
+        composeRule.onNodeWithTag("credential_card_${all[1].credential.id}").assertExists()
+        composeRule.onNodeWithTag("credential_card_${all[0].credential.id}").assertDoesNotExist()
+        composeRule.onNodeWithTag("credential_card_${all[2].credential.id}").assertDoesNotExist()
+        // 报告口径仍是全部凭证：两条告警仍在。
+        composeRule.onNodeWithTag("health_finding_${all[1].credential.id}").assertExists()
+        composeRule.onNodeWithTag("health_finding_${all[2].credential.id}").assertExists()
+
+        composeRule.onNodeWithTag("home_wide_rail_all").performClick()
+        composeRule.onNodeWithTag("credential_card_${all[0].credential.id}").assertExists()
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 筛选供应商后卡片按新集合重排() {
+        val all = listOf(
+            sampleCard("R1", ProviderId.Routin),
+            sampleCard("G1", ProviderId.Glm),
+            sampleCard("D1", ProviderId.DeepSeek),
+            sampleCard("R2", ProviderId.Routin),
+            sampleCard("G2", ProviderId.Glm),
+            sampleCard("D2", ProviderId.DeepSeek),
+        )
+        setContentWithCards(all)
+
+        fun leftOf(card: CredentialCardUi): Float =
+            composeRule.onNodeWithTag("credential_card_${card.credential.id}")
+                .getUnclippedBoundsInRoot().left.value
+
+        // 6 列时每张卡各占一列，记录原始列起点。
+        val columnLefts = all.map(::leftOf)
+        assertEquals(
+            "初始应铺满 6 列",
+            6,
+            columnLefts.map { it.toInt() }.distinct().size,
+        )
+
+        // 筛选 GLM 后只剩 2 张卡，必须按新集合回到最左两列，而不是保留原列位。
+        composeRule.onNodeWithTag("home_wide_rail_provider_glm").performClick()
+        composeRule.waitForIdle()
+        val expected = columnLefts.sorted().take(2)
+        assertEquals("第一张 GLM 卡应回到第一列", expected[0], leftOf(all[1]), 1f)
+        assertEquals("第二张 GLM 卡应回到第二列", expected[1], leftOf(all[4]), 1f)
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 完整卡横屏按瀑布流排布不再按行对齐() {
+        // Routin/NewAPI 卡更高，Glm/DeepSeek/CommandCode/Xiaomi 更矮。
+        val all = listOf(
+            sampleCard("R1", ProviderId.Routin),
+            sampleCard("G1", ProviderId.Glm),
+            sampleCard("D1", ProviderId.DeepSeek),
+            sampleCard("N1", ProviderId.NewAPI),
+            sampleCard("C1", ProviderId.CommandCode),
+            sampleCard("X1", ProviderId.Xiaomi),
+        )
+        setContentWithCards(all, initialDensity = UsageCardDensity.FULL)
+
+        fun bounds(card: CredentialCardUi) =
+            composeRule.onNodeWithTag("credential_card_${card.credential.id}")
+                .getUnclippedBoundsInRoot()
+
+        val r1 = bounds(all[0])
+        val n1 = bounds(all[3])
+        val x1 = bounds(all[5])
+        assertEquals("最后一张卡应回填第一列", r1.left.value, x1.left.value, 0.5f)
+        assertEquals(
+            "第一列第四张卡应紧接 R1 底部（瀑布流），而不是等整行最高的 N1，" +
+                "x1.top=${x1.top} r1.bottom=${r1.bottom} n1.bottom=${n1.bottom}",
+            r1.bottom.value + 12f,
+            x1.top.value,
+            1f,
+        )
+        assertTrue(
+            "第一列第四张卡应早于最高卡结束，x1.top=${x1.top} n1.bottom=${n1.bottom}",
+            x1.top.value < n1.bottom.value - 1f,
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w800dp-h1280dp")
+    fun 完整卡竖屏按瀑布流交错排列() {
+        val all = listOf(
+            sampleCard("R1", ProviderId.Routin),
+            sampleCard("G1", ProviderId.Glm),
+            sampleCard("D1", ProviderId.DeepSeek),
+            sampleCard("X1", ProviderId.Xiaomi),
+        )
+        setContentWithCards(all, initialDensity = UsageCardDensity.FULL)
+
+        fun bounds(card: CredentialCardUi) =
+            composeRule.onNodeWithTag("credential_card_${card.credential.id}")
+                .getUnclippedBoundsInRoot()
+
+        val r1 = bounds(all[0])
+        val g1 = bounds(all[1])
+        val d1 = bounds(all[2])
+        val x1 = bounds(all[3])
+        // R1 更高：第三张应回填更短的第二列，第四张再回填第一列（交错），而非按行对齐。
+        assertEquals("第三张卡应回填第二列", g1.left.value, d1.left.value, 0.5f)
+        assertEquals("第四张卡应回填第一列", r1.left.value, x1.left.value, 0.5f)
+        assertTrue(
+            "第二列第三张卡应早于第一列最高卡结束，d1.top=${d1.top} r1.bottom=${r1.bottom}",
+            d1.top.value < r1.bottom.value - 1f,
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w800dp-h1280dp")
+    fun 筛选来回切换后卡片仍按新集合从最左列重排() {
+        // 4 列竖屏：Xiaomi 两张 + 其它 5 张。先筛到单张供应商再回全部，最后筛 Xiaomi。
+        val all = listOf(
+            sampleCard("X1", ProviderId.Xiaomi),
+            sampleCard("R1", ProviderId.Routin),
+            sampleCard("G1", ProviderId.Glm),
+            sampleCard("D1", ProviderId.DeepSeek),
+            sampleCard("X2", ProviderId.Xiaomi),
+            sampleCard("R2", ProviderId.Routin),
+            sampleCard("G2", ProviderId.Glm),
+        )
+        setContentWithCards(all)
+
+        fun leftOf(card: CredentialCardUi): Float =
+            composeRule.onNodeWithTag("credential_card_${card.credential.id}")
+                .getUnclippedBoundsInRoot().left.value
+
+        val columnLefts = all.take(4).map(::leftOf).sorted()
+
+        // 单供应商 → 全部 → Xiaomi；筛选切换后必须按新集合重新铺满最左列。
+        composeRule.onNodeWithTag("home_wide_rail_provider_deepseek").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("home_wide_rail_all").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("home_wide_rail_provider_xiaomi").performClick()
+        composeRule.waitForIdle()
+
+        assertEquals("第一张 Xiaomi 卡应在第一列", columnLefts[0], leftOf(all[0]), 1f)
+        assertEquals("第二张 Xiaomi 卡应在第二列", columnLefts[1], leftOf(all[4]), 1f)
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 侧栏详情保留详情页全部区块与操作() {
+        val all = setContent()
+        composeRule.onNodeWithTag("credential_card_${all[0].credential.id}").performClick()
+        composeRule.onNodeWithTag("detail_hero").assertExists()
+        composeRule.onNodeWithTag("detail_windows").assertExists()
+        composeRule.onNodeWithTag("detail_facts").assertExists()
+        composeRule.onNodeWithTag("detail_config").assertExists()
+        composeRule.onNodeWithTag("detail_share_icon").assertExists()
+        composeRule.onNodeWithTag("detail_delete").assertExists()
+        composeRule.onNodeWithTag("detail_edit").assertExists()
+        composeRule.onNodeWithTag("detail_refresh_now").assertExists()
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 旋转重建后仍保留打开的详情() {
+        val all = cards()
+        val restorationTester = StateRestorationTester(composeRule)
+        restorationTester.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = all,
+                        groups = emptyList(),
+                        credentialCount = all.size,
+                    ),
+                    layoutMode = MyTokenLayoutMode.Expanded,
+                    usageCardDensity = UsageCardDensity.COMPACT,
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = {},
+                    onImportFromMac = {},
+                    onAddManually = {},
+                )
+            }
+        }
+        composeRule.onNodeWithTag("credential_card_${all[0].credential.id}").performClick()
+        composeRule.onNodeWithTag("home_wide_detail").assertExists()
+
+        restorationTester.emulateSavedInstanceStateRestore()
+
+        composeRule.onNodeWithTag("home_wide_detail").assertExists()
+        composeRule.onNodeWithTag("home_wide_detail")
+            .assertContentDescriptionContains(all[0].credential.name, substring = true)
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 折叠回手机宽度时把侧栏详情交给整页详情() {
+        val all = cards()
+        var layoutMode by mutableStateOf(MyTokenLayoutMode.Expanded)
+        var openedCredentialId: java.util.UUID? = null
+        composeRule.setContent {
+            MyTokenTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        isLoading = false,
+                        cards = all,
+                        groups = emptyList(),
+                        credentialCount = all.size,
+                    ),
+                    layoutMode = layoutMode,
+                    usageCardDensity = UsageCardDensity.COMPACT,
+                    onRefreshAll = {},
+                    onRefreshCredential = {},
+                    onOpenCredential = { openedCredentialId = it },
+                    onImportFromMac = {},
+                    onAddManually = {},
+                )
+            }
+        }
+        composeRule.onNodeWithTag("credential_card_${all[0].credential.id}").performClick()
+        composeRule.onNodeWithTag("home_wide_detail").assertExists()
+
+        composeRule.runOnIdle { layoutMode = MyTokenLayoutMode.Compact }
+        composeRule.waitForIdle()
+
+        assertEquals(all[0].credential.id, openedCredentialId)
+        composeRule.onNodeWithTag("home_wide_detail").assertDoesNotExist()
+        composeRule.onNodeWithTag("home_pager").assertExists()
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 点击浮层外遮罩关闭详情() {
+        val all = setContent()
+        composeRule.onNodeWithTag("credential_card_${all[0].credential.id}").performClick()
+        composeRule.onNodeWithTag("home_wide_detail").assertIsDisplayed()
+        composeRule.onNodeWithTag("home_wide_detail_scrim").assertIsDisplayed()
+        composeRule.onNodeWithTag("home_wide_detail_scrim").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("home_wide_detail").assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 下拉详情顶部手柄关闭浮层() {
+        val all = setContent()
+        composeRule.onNodeWithTag("credential_card_${all[0].credential.id}").performClick()
+        composeRule.onNodeWithTag("home_wide_detail").assertIsDisplayed()
+        composeRule.onNodeWithTag("home_wide_detail_handle").performTouchInput {
+            swipe(
+                start = center,
+                end = Offset(center.x, center.y + 160.dp.toPx()),
+                durationMillis = 400,
+            )
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("home_wide_detail").assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h720dp")
+    fun 右滑详情浮层关闭() {
+        val all = setContent()
+        composeRule.onNodeWithTag("credential_card_${all[0].credential.id}").performClick()
+        composeRule.onNodeWithTag("home_wide_detail").assertIsDisplayed()
+        composeRule.onNodeWithTag("home_wide_detail").performTouchInput { swipeRight() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("home_wide_detail").assertDoesNotExist()
+    }
+}

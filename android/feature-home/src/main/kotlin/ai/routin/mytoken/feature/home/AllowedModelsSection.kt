@@ -157,7 +157,8 @@ private fun ModelDeck(
         Surface(
             onClick = onExpand,
             shape = shape,
-            color = colors.surface,
+            // 分节卡（卡片层）之上的内部小卡，属于浮层。
+            color = colors.overlay,
             border = BorderStroke(1.dp, colors.line),
             modifier = Modifier
                 .fillMaxWidth()

@@ -602,15 +602,21 @@ fun MyTokenSurface(
         MyTokenVisualPolicy.SurfaceRole.Window,
         MyTokenVisualPolicy.SurfaceRole.Card,
         MyTokenVisualPolicy.SurfaceRole.FloatingCard,
-        MyTokenVisualPolicy.SurfaceRole.Modal,
         -> colors.surface
+
+        MyTokenVisualPolicy.SurfaceRole.Modal -> colors.overlay
+
+        // 抽屉是“页面”，与屏幕页面共用 canvas 底色，靠描边/阴影分隔。
+        MyTokenVisualPolicy.SurfaceRole.Drawer -> colors.canvas
 
         MyTokenVisualPolicy.SurfaceRole.Control,
         MyTokenVisualPolicy.SurfaceRole.Metric,
         -> colors.subtle
     }
     val shadow = when (surfaceRole) {
-        MyTokenVisualPolicy.SurfaceRole.Modal -> Modifier.shadow(elevation = 24.dp, shape = shape)
+        MyTokenVisualPolicy.SurfaceRole.Modal,
+        MyTokenVisualPolicy.SurfaceRole.Drawer,
+        -> Modifier.shadow(elevation = 24.dp, shape = shape)
         // 设计稿 §6：0 4dp 14dp、黑 alpha 0.045 的一层很轻的浮起阴影。
         MyTokenVisualPolicy.SurfaceRole.FloatingCard -> Modifier.shadow(
             elevation = MyTokenElevation.floatingCard,
@@ -637,7 +643,7 @@ fun MyTokenSurface(
     }
 }
 
-/** 分节卡片：surface + hairline + 20dp 圆角，无阴影、无内部分割线。 */
+/** 分节卡片：页面内的卡片层，surface + hairline + 20dp 圆角，无阴影、无内部分割线。 */
 @Composable
 fun MyTokenSection(
     title: String,

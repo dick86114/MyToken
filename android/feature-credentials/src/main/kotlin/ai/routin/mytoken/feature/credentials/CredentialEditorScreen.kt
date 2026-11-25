@@ -582,7 +582,7 @@ private fun ProviderPickerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = colors.surface,
+        containerColor = colors.overlay,
         shape = RoundedCornerShape(topStart = MyTokenRadius.sheetTop, topEnd = MyTokenRadius.sheetTop),
         dragHandle = {
             Box(modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)) {
@@ -664,7 +664,8 @@ private fun ProviderTile(
     Box(
         modifier = modifier
             .clip(shape)
-            .background(colors.surface)
+            // 供应商选项块属于浮层内的元素。
+            .background(colors.overlay)
             .border(
                 width = 1.dp,
                 color = if (isSelected) colors.actionFill else colors.line,

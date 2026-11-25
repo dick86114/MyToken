@@ -8,6 +8,7 @@ import ai.routin.mytoken.feature.credentials.CredentialEditorViewModel
 import ai.routin.mytoken.feature.credentials.CredentialListScreen
 import ai.routin.mytoken.feature.credentials.CredentialListViewModel
 import ai.routin.mytoken.feature.credentials.pruneCredential
+import ai.routin.mytoken.feature.home.CredentialDeleteDialog
 import ai.routin.mytoken.feature.home.HomeScreen
 import ai.routin.mytoken.feature.home.HomeViewModel
 import ai.routin.mytoken.feature.home.CredentialDetailScreen
@@ -20,13 +21,6 @@ import ai.routin.mytoken.feature.transfer.TransferPreviewScreen
 import ai.routin.mytoken.feature.transfer.TransferScannerScreen
 import ai.routin.mytoken.feature.transfer.TransferUiState
 import ai.routin.mytoken.feature.transfer.TransferViewModel
-import ai.routin.mytoken.core.ui.MyTokenButton
-import ai.routin.mytoken.core.ui.MyTokenButtonTone
-import ai.routin.mytoken.core.ui.MyTokenDialog
-import ai.routin.mytoken.core.ui.MyTokenDialogRow
-import ai.routin.mytoken.core.ui.MyTokenDialogSection
-import ai.routin.mytoken.core.ui.MyTokenDialogStatus
-import ai.routin.mytoken.core.ui.MyTokenDialogTone
 import ai.routin.mytoken.core.ui.MyTokenEdgeDrawerHost
 import ai.routin.mytoken.core.ui.MyTokenEdgeDrawerSide
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
@@ -52,8 +46,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -110,6 +102,10 @@ fun MyTokenApp(
     onRequestNotificationPermission: () -> Unit = {},
     openCredentialId: UUID? = null,
     onOpenCredentialConsumed: () -> Unit = {},
+    /** 仅 debug 包使用：通过 adb extra 强制展示更新提示，便于截图与验收。 */
+    debugForceUpdate: Boolean = false,
+    /** 仅 debug 包使用：屏蔽真实更新检查，便于截取“无更新”状态。 */
+    debugSuppressUpdate: Boolean = false,
 ) {
     var screen by remember { mutableStateOf<AppScreen>(AppScreen.Home) }
     var drawerSide by remember { mutableStateOf<MyTokenEdgeDrawerSide?>(null) }
@@ -224,6 +220,12 @@ fun MyTokenApp(
         is AppUpdateUiState.ReadyToInstall -> update.version
         else -> null
     }
+    val debugUpdateVersion = if (debugForceUpdate) "9.9.9" else null
+    val effectiveUpdateVersion = when {
+        debugSuppressUpdate -> null
+        debugUpdateVersion != null -> debugUpdateVersion
+        else -> pendingUpdateVersion
+    }
     val pendingUpdateNotes = (updateState as? AppUpdateUiState.Available)?.releaseNotes
     val isUpdateDownloading = updateState is AppUpdateUiState.Downloading
     val updateDownloadProgress = (updateState as? AppUpdateUiState.Downloading)?.progress
@@ -259,6 +261,16 @@ fun MyTokenApp(
     }
 
     val layoutMode = rememberMyTokenLayoutMode()
+
+    suspend fun deleteCredential(target: Credential) {
+        runCatching { graph.credentialRepository.delete(target.id) }
+        // Keep the Android-local order/pinned sets clean
+        // (same contract as the credential list delete path).
+        runCatching {
+            graph.credentialOrderStore.pruneCredential(target.id)
+        }
+        homeViewModel.refreshAll()
+    }
 
     LaunchedEffect(openCredentialId) {
         openCredentialId?.let { credentialId ->
@@ -382,8 +394,8 @@ fun MyTokenApp(
                     onOpenCredentials = { drawerSide = MyTokenEdgeDrawerSide.Start },
                     onManageCredentials = { homeSheet = HomeCredentialSheet.Manage },
                     onOpenSettings = { drawerSide = MyTokenEdgeDrawerSide.End },
-                    hasUpdateAvailable = pendingUpdateVersion != null,
-                    updateVersion = pendingUpdateVersion,
+                    hasUpdateAvailable = effectiveUpdateVersion != null,
+                    updateVersion = effectiveUpdateVersion,
                     updateReleaseNotes = pendingUpdateNotes,
                     updateConfirmLabel = pendingUpdateConfirmLabel,
                     isUpdateDownloading = isUpdateDownloading,
@@ -392,6 +404,20 @@ fun MyTokenApp(
                     isUpdateNeedsInstallPermission = isUpdateNeedsInstallPermission,
                     onConfirmUpdate = confirmPendingUpdate,
                     homeScrollStates = homeScrollStates,
+                    globalAlertThresholds = AlertThresholds(
+                        lowPercent = settingsState.notifications.lowThresholdPercent,
+                        highPercent = settingsState.notifications.highThresholdPercent,
+                    ),
+                    alertThresholdOverrides = alertThresholdOverrides,
+                    onEditCredential = { id -> navigate(AppScreen.Editor(id)) },
+                    onDeleteCredential = { id ->
+                        homeState.groups
+                            .flatMap { it.cards }
+                            .firstOrNull { it.credential.id == id }
+                            ?.let { target ->
+                                scope.launch { deleteCredential(target.credential) }
+                            }
+                    },
                 )            }
         }
 
@@ -415,52 +441,18 @@ fun MyTokenApp(
                 onDelete = { deletionTarget = card?.credential },
             )
             deletionTarget?.let { target ->
-                MyTokenDialog(
-                    title = "删除凭证",
-                    subtitle = "只影响本机数据",
-                    icon = Icons.Outlined.Delete,
-                    tone = MyTokenDialogTone.Danger,
-                    onDismissRequest = { deletionTarget = null },
-                    content = {
-                        MyTokenDialogSection {
-                            MyTokenDialogRow(
-                                label = "「${target.name}」",
-                                detail = "将从首页和凭证列表移除",
-                            )
+                CredentialDeleteDialog(
+                    target = target,
+                    onDismiss = { deletionTarget = null },
+                    onConfirm = {
+                        deletionTarget = null
+                        scope.launch {
+                            deleteCredential(target)
+                            pageDirection = -1
+                            drawerSide = null
+                            screen = AppScreen.Home
+                            backStack.clear()
                         }
-                        MyTokenDialogStatus(
-                            message = "不会删除或修改供应商账户中的任何内容。",
-                            tone = MyTokenDialogTone.Info,
-                        )
-                    },
-                    actions = {
-                        MyTokenButton(
-                            text = "取消",
-                            onClick = { deletionTarget = null },
-                            modifier = Modifier.weight(1f),
-                            tone = MyTokenButtonTone.Neutral,
-                        )
-                        MyTokenButton(
-                            text = "删除",
-                            onClick = {
-                                deletionTarget = null
-                                scope.launch {
-                                    runCatching { graph.credentialRepository.delete(target.id) }
-                                    // Keep the Android-local order/pinned sets clean
-                                    // (same contract as the credential list delete path).
-                                    runCatching {
-                                        graph.credentialOrderStore.pruneCredential(target.id)
-                                    }
-                                    homeViewModel.refreshAll()
-                                    pageDirection = -1
-                                    drawerSide = null
-                                    screen = AppScreen.Home
-                                    backStack.clear()
-                                }
-                            },
-                            modifier = Modifier.weight(1f),
-                            tone = MyTokenButtonTone.Destructive,
-                        )
                     },
                 )
             }
@@ -601,7 +593,7 @@ private fun HomeCredentialSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = colors.canvas,
+        containerColor = colors.overlay,
         shape = RoundedCornerShape(
             topStart = MyTokenRadius.sheetTop,
             topEnd = MyTokenRadius.sheetTop,

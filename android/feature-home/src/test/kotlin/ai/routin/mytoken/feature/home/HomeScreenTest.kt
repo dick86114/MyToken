@@ -2204,7 +2204,7 @@ class HomeScreenTest {
             }
         }
 
-        composeRule.onNodeWithTag("home_grid_4_columns").assertExists()
+        composeRule.onNodeWithTag("home_grid_6_columns").assertExists()
         composeRule.onNodeWithText("5 小时", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithText("周", useUnmergedTree = true).assertIsDisplayed()
         val cardBounds = activeNode("credential_card_${credential.id}")
