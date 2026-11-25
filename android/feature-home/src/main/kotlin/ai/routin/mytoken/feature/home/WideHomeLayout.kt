@@ -6,7 +6,6 @@ import ai.routin.mytoken.core.ui.MyTokenLayoutMode
 import ai.routin.mytoken.core.ui.MyTokenMotion
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
-import ai.routin.mytoken.core.ui.ProviderLogoPlate
 import ai.routin.mytoken.core.ui.rememberMyTokenMotionEnabled
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageCardDensity
@@ -20,8 +19,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.ScrollableState
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -97,6 +96,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -356,11 +356,8 @@ internal fun WideHomeScreen(
     }
     val collapseProgress: () -> Float = { collapseProgressState.value }
 
-    // 全窗背景：画布色 + 随收合进度淡入的票面黄渐变。Brush 只创建一次，
-    // 滚动时 drawBehind 只读状态并画一个整窗矩形，不重组、不逐帧新建 shader。
-    val canvasGradient = remember(colors.canvas, colors.reportTicket) {
-        Brush.verticalGradient(0f to colors.reportTicket, 1f to colors.canvas)
-    }
+    // 全窗背景：顶部（状态栏 + 报告行）整块不透明票面黄，向下渐变到画布色。
+    // 预渲染成整窗位图，滚动时只贴一张图，不逐帧新建 shader。
     val gradientCache = remember(colors.canvas, colors.reportTicket) {
         WideGradientBitmapCache()
     }
@@ -373,27 +370,25 @@ internal fun WideHomeScreen(
         snapshotFlow {
             if (latestDetailId != null) {
                 // 详情遮罩把整窗压暗，系统栏改用浅色图标。
-                Triple(false, false, false)
+                Triple(false, false, true)
             } else {
                 val p = collapseProgressState.value
                 val statusDark = lerp(colors.canvas, colors.reportTicket, p).luminance() > 0.5f
-                // 收合后底部也会铺琥珀色，导航栏图标随底切换为深色。
-                val navAmber = p > 0.5f
-                val navDark = navAmber || colors.canvas.luminance() > 0.5f
-                Triple(statusDark, navDark, navAmber)
+                // 导航栏/手势条始终是画布色，图标深浅只跟画布明暗走，不再跟随收合变琥珀。
+                val navDark = colors.canvas.luminance() > 0.5f
+                Triple(statusDark, navDark, false)
             }
         }
             .distinctUntilChanged()
-            .collect { (statusDark, navDark, navAmber) ->
+            .collect { (statusDark, navDark, detailOpen) ->
                 val controller = WindowCompat.getInsetsController(window, view)
                 controller.isAppearanceLightStatusBars = statusDark
                 controller.isAppearanceLightNavigationBars = navDark
-                // 三键导航的系统栏由 SystemUI 绘制，应用内背景铺不进去；
-                // 直接给导航栏上色，收合后与琥珀沉浸状态栏连成一体。
-                window.navigationBarColor = when {
-                    latestDetailId != null -> colors.scrim.toArgb()
-                    navAmber -> colors.reportTicket.toArgb()
-                    else -> colors.canvas.toArgb()
+                // 系统导航栏也设成画布色；只有详情遮罩打开时才用遮罩色。
+                window.navigationBarColor = if (detailOpen) {
+                    colors.scrim.toArgb()
+                } else {
+                    colors.canvas.toArgb()
                 }
             }
     }
@@ -504,20 +499,26 @@ internal fun WideHomeScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            // 整窗统一背景：左轨、卡片区和系统栏后面都是同一层画布 + 票面黄渐变。
-            // Brush 只创建一次；滚动时 drawBehind 只画一个整窗矩形，不重组。
+            // 整窗统一背景：左轨、卡片区和系统栏后面都是同一张画布 + 票面黄渐变。
+            // 滚动时 drawBehind 只贴一张缓存位图，不重组、不逐帧新建 shader。
             .background(colors.canvas)
             .drawBehind {
                 val p = collapseProgress()
                 if (p > 0.001f) {
-                    // 全窗渐变预渲染成一张位图，逐帧只做一次带 alpha 的贴图；
-                    // 直接在 draw 阶段铺整屏渐变 shader 会明显拉高绘制耗时。
+                    // 顶部状态栏 + 报告行整块保持不透明票面黄，再向下渐变到画布色。
+                    // 整窗同一张背景图：左轨与内容区共用，不会出现左右两条渐变。
+                    val headerPx = systemBarTopDp.toPx() + 48.dp.toPx()
+                    val fadePx = 200.dp.toPx()
                     val target = IntSize(
                         size.width.toInt().coerceAtLeast(1),
                         size.height.toInt().coerceAtLeast(1),
                     )
                     val cached = gradientCache.bitmap
-                    val bitmap = if (cached != null && gradientCache.size == target) {
+                    val bitmap = if (
+                        cached != null &&
+                        gradientCache.size == target &&
+                        gradientCache.headerPx == headerPx
+                    ) {
                         cached
                     } else {
                         val created = ImageBitmap(target.width, target.height)
@@ -527,10 +528,22 @@ internal fun WideHomeScreen(
                             canvas = Canvas(created),
                             size = Size(target.width.toFloat(), target.height.toFloat()),
                         ) {
-                            drawRect(brush = canvasGradient)
+                            val height = size.height.coerceAtLeast(1f)
+                            val solidStop = (headerPx / height).coerceIn(0f, 1f)
+                            val canvasStop = ((headerPx + fadePx) / height)
+                                .coerceIn(solidStop, 1f)
+                            drawRect(
+                                brush = Brush.verticalGradient(
+                                    0f to colors.reportTicket,
+                                    solidStop to colors.reportTicket,
+                                    canvasStop to colors.canvas,
+                                    1f to colors.canvas,
+                                ),
+                            )
                         }
                         gradientCache.bitmap = created
                         gradientCache.size = target
+                        gradientCache.headerPx = headerPx
                         created
                     }
                     drawImage(
@@ -716,7 +729,7 @@ internal fun WideHomeScreen(
         }
 
         if (chromeVisible) {
-            // 收合后系统栏变成不透明琥珀色，滚动内容不会从状态栏/导航栏透出。
+            // 状态栏区域随收合铺满不透明琥珀，滚动内容不会从状态栏透出。
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -730,49 +743,41 @@ internal fun WideHomeScreen(
                     }
                     .testTag("home_wide_status_bar_tint"),
             )
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .height(systemBarBottomDp)
-                    .drawBehind {
-                        drawRect(
-                            color = colors.reportTicket,
-                            alpha = collapseProgress(),
-                        )
-                    }
-                    .testTag("home_wide_nav_bar_tint"),
-            )
-            // 报告收成一行短票，与左轨品牌 logo 同一行对齐。
+            // 收起后的报告与状态栏连成一整块不透明琥珀头，不再是独立圆角票。
+            // 头部右缘与整窗渐变的实色段对齐，下沿直接接渐变，最后落到画布色。
             Box(
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(
-                        start = railWidth + 16.dp,
-                        // 32dp 票高与左轨 30dp logo 同高、同中心：顶边、底边和中心线都齐平，
-                        // 不只是行起点对齐。上下各留 8dp，让票面与琥珀状态栏有清晰分界。
-                        top = systemBarTopDp + 8.dp,
-                        end = 16.dp + systemBarEndDp,
-                    )
+                    .padding(start = railWidth, end = systemBarEndDp)
                     .fillMaxWidth()
-                    .height(32.dp)
+                    .height(systemBarTopDp + 48.dp)
                     .graphicsLayer {
-                        val p = collapseProgress()
-                        val visible = ((p - 0.45f) / 0.55f).coerceIn(0f, 1f)
-                        alpha = visible
-                        translationY = (1f - visible) * 4.dp.toPx()
+                        alpha = ((collapseProgress() - 0.45f) / 0.55f).coerceIn(0f, 1f)
                     }
-                    .clip(RoundedCornerShape(10.dp))
                     .background(colors.reportTicket)
-                    .testTag("home_wide_collapsed_ticket"),
+                    .testTag("home_wide_header_backdrop"),
             ) {
                 WideCollapsedReportTicket(
                     headlineCount = collapsedHeadline,
                     tail = collapsedTail,
                     tone = collapsedTone,
                     syncText = syncLabel,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("home_wide_collapsed_ticket"),
                 )
             }
+            // 底部导航栏/手势条区域保持画布色，收合时也不跟着变琥珀。
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(systemBarBottomDp)
+                    .background(colors.canvas)
+                    .testTag("home_wide_nav_bar_tint"),
+            )
         }
 
         WideDetailDrawer(
@@ -984,12 +989,11 @@ private fun WideCollapsedReportTicket(
     tail: String,
     tone: HomeHealthTone,
     syncText: String,
+    modifier: Modifier = Modifier,
 ) {
     val colors = MyTokenThemeTokens.colors
     Row(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 14.dp),
+        modifier = modifier.padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -1138,12 +1142,12 @@ private fun WideProviderRail(
                         onSelectProvider(if (selectedProvider == provider) null else provider)
                     },
                 ) {
-                    ProviderLogoPlate(
+                    // 供应商图标直接落在整窗渐变上，不垫白色底板。
+                    Image(
                         painter = painterResource(ProviderCatalog.logoRes(provider)),
                         contentDescription = null,
-                        size = 30.dp,
-                        shape = RoundedCornerShape(9.dp),
-                        contentPadding = 3.dp,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.size(30.dp),
                     )
                 }
             }
@@ -1209,19 +1213,15 @@ private fun WideProviderRail(
     }
 }
 
-/** “全部供应商”图标：30dp plate 内放 2×2 网格图标（app.grid.2x2）。 */
+/** “全部供应商”图标：直接显示 2×2 网格（app.grid.2x2），不再垫白色底板。 */
 @Composable
 private fun AllProvidersGlyph(
     selected: Boolean,
 ) {
     val colors = MyTokenThemeTokens.colors
-    val shape = RoundedCornerShape(9.dp)
     Box(
         modifier = Modifier
             .size(30.dp)
-            .clip(shape)
-            .background(colors.controlHandle)
-            .border(1.dp, colors.line, shape)
             .testTag("home_wide_rail_all_icon"),
         contentAlignment = Alignment.Center,
     ) {
@@ -1230,7 +1230,7 @@ private fun AllProvidersGlyph(
             contentDescription = null,
             tint = if (selected) colors.ink else colors.muted,
             modifier = Modifier
-                .size(17.dp)
+                .size(20.dp)
                 .testTag("home_wide_rail_all_grid_icon"),
         )
     }
@@ -1285,7 +1285,7 @@ private fun RailSelectionButton(
         modifier = Modifier
             .size(48.dp)
             .clip(shape)
-            .background(if (selected) colors.subtle else colors.surface)
+            // 不再垫选中/未选中底板：图标直接落在整窗渐变上，只保留左侧选中指示条。
             .clickable(role = Role.RadioButton, onClick = onClick)
             .semantics {
                 this.selected = selected
@@ -1335,8 +1335,9 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     else -> null
 }
 
-/** 全窗渐变的位图缓存；只在窗口尺寸变化时重建。 */
+/** 全窗渐变的位图缓存；只在窗口尺寸或头部高度变化时重建。 */
 private class WideGradientBitmapCache {
     var bitmap: ImageBitmap? = null
     var size: IntSize = IntSize.Zero
+    var headerPx: Float = -1f
 }

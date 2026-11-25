@@ -321,7 +321,7 @@ class WideHomeScreenTest {
             after.top.value < before.top.value,
         )
 
-        // 收起后：一行短票与左轨 brand 同一行，系统栏有琥珀沉浸层。
+        // 收起后：报告行与左轨 brand 同一行，并和状态栏连成一块琥珀头。
         val ticket = composeRule.onNodeWithTag(
             "home_wide_collapsed_ticket",
             useUnmergedTree = true,
@@ -331,23 +331,20 @@ class WideHomeScreenTest {
             useUnmergedTree = true,
         ).getUnclippedBoundsInRoot()
         assertEquals(
-            "短票中心应与左轨 logo 中心齐平",
+            "报告行中心应与左轨 logo 中心齐平",
             (brand.top.value + brand.bottom.value) / 2f,
             (ticket.top.value + ticket.bottom.value) / 2f,
             2f,
         )
-        // 不只是中心线：短票顶/底边也要贴住 logo 的可见上下边，避免视觉上票面偏高。
-        assertEquals(
-            "短票顶边应与 logo 顶边齐平",
-            brand.top.value,
-            ticket.top.value,
-            2f,
-        )
-        assertEquals(
-            "短票底边应与 logo 底边齐平",
-            brand.bottom.value,
-            ticket.bottom.value,
-            2f,
+        // 琥珀头从窗口最顶部（状态栏）开始，不再是一条独立圆角票。
+        val backdrop = composeRule.onNodeWithTag(
+            "home_wide_header_backdrop",
+            useUnmergedTree = true,
+        ).getUnclippedBoundsInRoot()
+        assertEquals("琥珀头应从状态栏顶部开始", 0f, backdrop.top.value, 0.5f)
+        assertTrue(
+            "琥珀头应包住整行报告，backdrop.bottom=${backdrop.bottom} ticket.bottom=${ticket.bottom}",
+            backdrop.bottom.value >= ticket.bottom.value - 0.5f,
         )
         composeRule.onNodeWithTag("home_wide_status_bar_tint", useUnmergedTree = true)
             .assertExists()
