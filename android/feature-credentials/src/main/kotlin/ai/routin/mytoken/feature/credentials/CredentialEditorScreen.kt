@@ -508,7 +508,7 @@ private fun ProviderRow(
             .fillMaxWidth()
             .clickable(role = Role.Button, onClick = onClick)
             .testTag("editor_provider_row"),
-        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Raised,
+        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
         shape = RoundedCornerShape(MyTokenRadius.row),
     ) {
         Row(
@@ -664,11 +664,11 @@ private fun ProviderTile(
     Box(
         modifier = modifier
             .clip(shape)
-            // 供应商选择面板是底部浮层，选项块必须比浮层更亮。
-            .background(colors.raisedSurface)
+            // 供应商选项块属于浮层内的元素。
+            .background(colors.overlay)
             .border(
                 width = 1.dp,
-                color = if (isSelected) colors.actionFill else colors.raisedLine,
+                color = if (isSelected) colors.actionFill else colors.line,
                 shape = shape,
             )
             .clickable(onClick = onClick)

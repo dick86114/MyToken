@@ -157,9 +157,9 @@ private fun ModelDeck(
         Surface(
             onClick = onExpand,
             shape = shape,
-            // 位于详情分节（浮层内的前景块）之上，跟随同一档 raisedSurface，避免比父块更暗。
-            color = colors.raisedSurface,
-            border = BorderStroke(1.dp, colors.raisedLine),
+            // 分节卡（卡片层）之上的内部小卡，属于浮层。
+            color = colors.overlay,
+            border = BorderStroke(1.dp, colors.line),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(60.dp)

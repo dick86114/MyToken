@@ -606,15 +606,17 @@ fun MyTokenSurface(
 
         MyTokenVisualPolicy.SurfaceRole.Modal -> colors.overlay
 
-        // 浮层内部的前景块：比 overlay 亮一档，不能再用 surface。
-        MyTokenVisualPolicy.SurfaceRole.Raised -> colors.raisedSurface
+        // 抽屉是“页面”，与屏幕页面共用 canvas 底色，靠描边/阴影分隔。
+        MyTokenVisualPolicy.SurfaceRole.Drawer -> colors.canvas
 
         MyTokenVisualPolicy.SurfaceRole.Control,
         MyTokenVisualPolicy.SurfaceRole.Metric,
         -> colors.subtle
     }
     val shadow = when (surfaceRole) {
-        MyTokenVisualPolicy.SurfaceRole.Modal -> Modifier.shadow(elevation = 24.dp, shape = shape)
+        MyTokenVisualPolicy.SurfaceRole.Modal,
+        MyTokenVisualPolicy.SurfaceRole.Drawer,
+        -> Modifier.shadow(elevation = 24.dp, shape = shape)
         // 设计稿 §6：0 4dp 14dp、黑 alpha 0.045 的一层很轻的浮起阴影。
         MyTokenVisualPolicy.SurfaceRole.FloatingCard -> Modifier.shadow(
             elevation = MyTokenElevation.floatingCard,
@@ -629,8 +631,6 @@ fun MyTokenSurface(
         // 设计稿 §6：浮起白卡使用 0.5dp 发丝线。
         MyTokenVisualPolicy.SurfaceRole.FloatingCard ->
             Modifier.border(MyTokenSize.hairline, colors.hairline, shape)
-        MyTokenVisualPolicy.SurfaceRole.Raised ->
-            Modifier.border(1.dp, colors.raisedLine, shape)
         else -> Modifier.border(1.dp, colors.line, shape)
     }
     val resolved = modifier
@@ -643,12 +643,7 @@ fun MyTokenSurface(
     }
 }
 
-/**
- * 分节卡片：浮层内的前景块 + hairline + 20dp 圆角，无阴影、无内部分割线。
- *
- * 统一使用 [MyTokenVisualPolicy.SurfaceRole.Raised]：深色下比抽屉/弹层底色再亮一档，
- * 浅色下仍是原来的白卡 + 描边，避免分节卡在浮层里看起来像凹进去的洞。
- */
+/** 分节卡片：页面内的卡片层，surface + hairline + 20dp 圆角，无阴影、无内部分割线。 */
 @Composable
 fun MyTokenSection(
     title: String,
@@ -678,7 +673,7 @@ fun MyTokenSection(
         }
         MyTokenSurface(
             modifier = Modifier.fillMaxWidth(),
-            surfaceRole = MyTokenVisualPolicy.SurfaceRole.Raised,
+            surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
         ) {
             Column(
                 modifier = Modifier

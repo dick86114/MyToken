@@ -2,7 +2,6 @@ package ai.routin.mytoken.feature.home
 
 import android.widget.Toast
 import ai.routin.mytoken.core.ui.MyTokenLayoutMode
-import ai.routin.mytoken.core.ui.MyTokenSurface
 import ai.routin.mytoken.core.ui.MyTokenTextField
 import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
@@ -361,8 +360,8 @@ private fun ShareTemplateOption(
     Column(
         modifier = modifier
             .clip(shape)
-            .background(if (selected) colors.raisedSubtle else Color.Transparent)
-            .border(1.dp, if (selected) colors.actionFill else colors.raisedLine, shape)
+            .background(if (selected) colors.subtle else Color.Transparent)
+            .border(1.dp, if (selected) colors.actionFill else colors.line, shape)
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
             .padding(vertical = 7.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -397,32 +396,32 @@ private fun ShareControlSection(
     action: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    MyTokenSurface(
-        // 分享弹层（overlay）里的分组卡：使用浮层内的前景块。
-        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Raised,
-        shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
+    val colors = MyTokenThemeTokens.colors
+    val shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp)
+    // 分享弹层属于浮层，内部区块同样使用 overlay 底色，靠描边区分。
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(colors.overlay)
+            .border(1.dp, colors.line, shape)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f),
-                )
-                action?.invoke()
-            }
-            content()
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            action?.invoke()
         }
+        content()
     }
 }
 
@@ -449,8 +448,8 @@ private fun ShareToggleChip(
         modifier = Modifier
             .testTag(testTag)
             .clip(shape)
-            .background(if (checked) colors.raisedSubtle else Color.Transparent)
-            .border(1.dp, colors.raisedLine, shape)
+            .background(if (checked) colors.subtle else Color.Transparent)
+            .border(1.dp, colors.line, shape)
             .toggleable(
                 value = checked,
                 role = Role.Checkbox,
@@ -466,8 +465,8 @@ private fun ShareFieldMoreChip(testTag: String, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(8.dp),
-        color = colors.raisedSubtle,
-        border = BorderStroke(1.dp, colors.raisedLine),
+        color = colors.subtle,
+        border = BorderStroke(1.dp, colors.line),
         modifier = Modifier.testTag(testTag),
     ) {
         Text(

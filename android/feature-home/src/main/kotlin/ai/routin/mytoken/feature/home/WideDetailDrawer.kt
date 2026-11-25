@@ -198,7 +198,8 @@ internal fun WideDetailDrawer(
                     contentDescription = "凭证详情，${shownCard.credential.name}"
                 }
                 .testTag("home_wide_detail"),
-            surfaceRole = MyTokenVisualPolicy.SurfaceRole.Modal,
+            // 抽屉是“页面”，与背后页面同用 canvas 底色，靠 1dp 描边和阴影分隔。
+            surfaceRole = MyTokenVisualPolicy.SurfaceRole.Drawer,
             shape = RoundedCornerShape(28.dp),
         ) {
             Column(

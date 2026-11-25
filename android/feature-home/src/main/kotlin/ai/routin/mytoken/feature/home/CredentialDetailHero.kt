@@ -130,7 +130,7 @@ internal fun DetailHero(card: CredentialCardUi, nextRefreshAt: Instant? = null) 
         modifier = Modifier
             .fillMaxWidth()
             .testTag("detail_hero"),
-        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Raised,
+        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
         shape = RoundedCornerShape(MyTokenRadius.card),
     ) {
         Column(

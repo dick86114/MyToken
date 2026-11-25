@@ -113,8 +113,8 @@ fun MyTokenDialog(
                             modifier = Modifier
                                 .size(40.dp)
                                 .clip(RoundedCornerShape(MyTokenRadius.inner))
-                                .background(colors.raisedSubtle)
-                                .border(1.dp, colors.raisedLine, RoundedCornerShape(MyTokenRadius.inner)),
+                                .background(colors.subtle)
+                                .border(1.dp, colors.line, RoundedCornerShape(MyTokenRadius.inner)),
                             contentAlignment = Alignment.Center,
                         ) {
                             Icon(
@@ -161,11 +161,7 @@ fun MyTokenDialog(
     }
 }
 
-/**
- * 弹窗中的信息分组：浮层内的抬升块 + 描边承载关系，组与组之间靠留白区分。
- *
- * 深色下使用比弹窗 overlay 更亮的 raisedSubtle，浅色保持原来的浅灰底。
- */
+/** 弹窗中的信息分组：浮层内的选项块 + 描边承载关系，组与组之间靠留白区分。 */
 @Composable
 fun MyTokenDialogSection(
     title: String? = null,
@@ -177,8 +173,8 @@ fun MyTokenDialogSection(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(colors.raisedSubtle)
-            .border(1.dp, colors.raisedLine, RoundedCornerShape(14.dp))
+            .background(colors.subtle)
+            .border(1.dp, colors.line, RoundedCornerShape(14.dp))
             .padding(horizontal = 13.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(9.dp),
     ) {
@@ -247,8 +243,8 @@ fun MyTokenDialogStatus(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(colors.raisedSubtle)
-            .border(1.dp, colors.raisedLine, RoundedCornerShape(14.dp))
+            .background(colors.subtle)
+            .border(1.dp, colors.line, RoundedCornerShape(14.dp))
             .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(9.dp),
         verticalAlignment = Alignment.Top,

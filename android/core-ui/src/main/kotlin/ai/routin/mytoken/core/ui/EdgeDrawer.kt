@@ -261,7 +261,8 @@ fun MyTokenEdgeDrawerHost(
                             "edge_drawer_end"
                         }
                     ),
-                surfaceRole = MyTokenVisualPolicy.SurfaceRole.Modal,
+                // 抽屉页使用 canvas 背景，靠 1dp 描边与阴影和背后内容分隔。
+                surfaceRole = MyTokenVisualPolicy.SurfaceRole.Drawer,
                 shape = drawerShape,
                 contentAlignment = Alignment.TopStart,
             ) {

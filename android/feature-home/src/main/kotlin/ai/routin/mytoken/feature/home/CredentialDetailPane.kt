@@ -97,8 +97,8 @@ internal fun CredentialDetailPane(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                // 抽屉底部操作区属于浮层内的前景块，深色下必须比抽屉 overlay 更亮。
-                .background(colors.raisedSurface)
+                // 抽屉页里的底部操作区属于卡片层。
+                .background(colors.surface)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {

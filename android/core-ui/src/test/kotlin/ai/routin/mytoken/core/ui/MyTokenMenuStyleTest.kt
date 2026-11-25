@@ -5,14 +5,14 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 锁定下拉菜单的实色表面、hairline 与统一字号。 */
+/** 锁定下拉菜单的浮层底色、hairline 与统一字号。 */
 class MyTokenMenuStyleTest {
     @Test
-    fun 下拉菜单使用实色表面与hairline() {
+    fun 下拉菜单使用浮层底色与hairline() {
         val source = sourceText("MyTokenMenu.kt")
 
         assertTrue(source.contains("shape = RoundedCornerShape(MyTokenRadius.inner)"))
-        assertTrue(source.contains("containerColor = colors.surface"))
+        assertTrue(source.contains("containerColor = colors.overlay"))
         assertTrue(source.contains("tonalElevation = 0.dp"))
         assertTrue(source.contains("shadowElevation = 12.dp"))
         assertTrue(source.contains("border = BorderStroke(1.dp, colors.line)"))

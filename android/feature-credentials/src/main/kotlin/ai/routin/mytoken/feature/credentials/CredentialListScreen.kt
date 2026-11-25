@@ -480,8 +480,8 @@ private fun CredentialRow(
                     Modifier
                 }
             ),
-        // 凭证列表既会整页展示，也会作为左抽屉内容：统一用浮层内的前景块。
-        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Raised,
+        // 凭证行属于页面里的卡片层。
+        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
         shape = RoundedCornerShape(MyTokenRadius.row),
     ) {
         Row(
@@ -548,6 +548,8 @@ private fun CredentialRow(
                 DropdownMenu(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false },
+                    // 菜单属于浮层，使用比卡片更亮的 overlay 底色。
+                    containerColor = colors.overlay,
                 ) {
                     DropdownMenuItem(
                         text = { Text("编辑 ${credential.name}") },

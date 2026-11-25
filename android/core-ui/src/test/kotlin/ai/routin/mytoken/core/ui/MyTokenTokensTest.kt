@@ -16,10 +16,6 @@ class MyTokenTokensTest {
         assertEquals(Color(0xFFEEF0F2), MyTokenLightColors.canvas)
         assertEquals(Color(0xFFFFFFFF), MyTokenLightColors.surface)
         assertEquals(Color(0xFFFFFFFF), MyTokenLightColors.overlay)
-        // 浅色浮层内的抬升块保持白卡 + 描边，浅色层级不变。
-        assertEquals(Color(0xFFFFFFFF), MyTokenLightColors.raisedSurface)
-        assertEquals(Color(0xFFE5E7EB), MyTokenLightColors.raisedLine)
-        assertEquals(Color(0xFFF6F7F9), MyTokenLightColors.raisedSubtle)
         assertEquals(Color(0xFFF6F7F9), MyTokenLightColors.subtle)
         assertEquals(Color(0xFFE5E7EB), MyTokenLightColors.line)
         assertEquals(Color(0xFF17181A), MyTokenLightColors.ink)
@@ -55,10 +51,6 @@ class MyTokenTokensTest {
         assertEquals(Color(0xFFF3CB73), MyTokenDarkColors.actionText)
         assertEquals(Color(0xFF1B1E24), MyTokenDarkColors.surface)
         assertEquals(Color(0xFF252931), MyTokenDarkColors.overlay)
-        // 浮层内前景块比 overlay 亮一档，避免抽屉里的分节卡显得凹进去。
-        assertEquals(Color(0xFF2E333C), MyTokenDarkColors.raisedSurface)
-        assertEquals(Color(0xFF3C424D), MyTokenDarkColors.raisedLine)
-        assertEquals(Color(0xFF2E333C), MyTokenDarkColors.raisedSubtle)
         assertEquals(Color(0xFF121418), MyTokenDarkColors.canvas)
         assertEquals(Color(0xFF252931), MyTokenDarkColors.subtle)
         assertEquals(Color(0xFF2E333C), MyTokenDarkColors.line)
@@ -94,21 +86,21 @@ class MyTokenTokensTest {
     }
 
     @Test
-    fun `dark hierarchy steps brighter from canvas to raised surface`() {
-        fun ratio(fg: Color, bg: Color): Float {
-            val lighter = maxOf(fg.luminance(), bg.luminance())
-            val darker = minOf(fg.luminance(), bg.luminance())
+    fun `dark three layer hierarchy keeps every step visible`() {
+        fun ratio(a: Color, b: Color): Float {
+            val lighter = maxOf(a.luminance(), b.luminance())
+            val darker = minOf(a.luminance(), b.luminance())
             return (lighter + 0.05f) / (darker + 0.05f)
         }
         val colors = MyTokenDarkColors
-        // 深色层级必须逐层变亮：canvas → surface → overlay → raisedSurface。
+        // 三层标准：canvas（页面背景）→ surface（卡片/区块）→ overlay（卡片上的元素/浮层）。
         assertTrue(colors.canvas.luminance() < colors.surface.luminance())
         assertTrue(colors.surface.luminance() < colors.overlay.luminance())
-        assertTrue(colors.overlay.luminance() < colors.raisedSurface.luminance())
-        assertTrue(colors.raisedSurface.luminance() < colors.raisedLine.luminance())
-        // 正文放到抬升块上仍要保持 ≥10:1，不能因抬高底色而掉对比度。
-        assertTrue(ratio(colors.ink, colors.raisedSurface) >= 10f)
-        assertTrue(ratio(colors.muted, colors.raisedSurface) >= 4.5f)
+        // 相邻层要能分辨（深色下约为 1.10 / 1.15）。
+        assertTrue(ratio(colors.surface, colors.canvas) >= 1.08f)
+        assertTrue(ratio(colors.overlay, colors.surface) >= 1.08f)
+        // 正文对页面背景仍保持 ≥15:1。
+        assertTrue(ratio(colors.ink, colors.canvas) >= 15f)
     }
 
     @Test
@@ -146,7 +138,7 @@ class MyTokenTokensTest {
     }
 
     @Test
-    fun `only modal surfaces may cast shadow`() {
+    fun `drawers and floating surfaces may cast shadow`() {
         assertEquals(
             MyTokenVisualPolicy.Material.Solid,
             MyTokenVisualPolicy.materialFor(MyTokenVisualPolicy.SurfaceRole.Card),
@@ -164,13 +156,13 @@ class MyTokenTokensTest {
             MyTokenVisualPolicy.materialFor(MyTokenVisualPolicy.SurfaceRole.Modal),
         )
         assertEquals(
-            MyTokenVisualPolicy.Material.Solid,
-            MyTokenVisualPolicy.materialFor(MyTokenVisualPolicy.SurfaceRole.Raised),
+            MyTokenVisualPolicy.Material.Overlay,
+            MyTokenVisualPolicy.materialFor(MyTokenVisualPolicy.SurfaceRole.Drawer),
         )
         assertTrue(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.Modal))
+        assertTrue(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.Drawer))
         assertTrue(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.FloatingCard))
         assertFalse(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.Card))
-        assertFalse(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.Raised))
         assertFalse(MyTokenVisualPolicy.allowsShadow(MyTokenVisualPolicy.SurfaceRole.Window))
     }
 }
