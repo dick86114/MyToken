@@ -559,10 +559,11 @@ private fun ProviderAllTile(
             .fillMaxWidth()
             .heightIn(min = 54.dp)
             .clip(shape)
-            .background(colors.surface)
+            // 供应商筛选是底部浮层，选项块属于浮层内的前景块。
+            .background(colors.raisedSurface)
             .border(
                 width = if (selected) 2.dp else 1.dp,
-                color = if (selected) colors.actionFill else colors.line,
+                color = if (selected) colors.actionFill else colors.raisedLine,
                 shape = shape,
             )
             .clickable(role = Role.RadioButton, onClick = onClick)
@@ -612,10 +613,10 @@ private fun ProviderSheetTile(
         modifier = modifier
             .heightIn(min = 88.dp)
             .clip(shape)
-            .background(colors.surface)
+            .background(colors.raisedSurface)
             .border(
                 width = if (selected) 2.dp else 1.dp,
-                color = if (selected) colors.actionFill else colors.line,
+                color = if (selected) colors.actionFill else colors.raisedLine,
                 shape = shape,
             )
             .clickable(role = Role.RadioButton, onClick = onClick)

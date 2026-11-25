@@ -18,6 +18,11 @@ object MyTokenVisualPolicy {
         Metric,
         Control,
         Modal,
+        /**
+         * 浮层（抽屉/对话框/底部弹层）内部的前景块：使用 raisedSurface，
+         * 深色下比 Modal 再亮一档，不能退回 surface/canvas。
+         */
+        Raised,
     }
 
     /** 实色表面是默认；浮层与首页浮起白卡允许阴影。 */
@@ -37,6 +42,7 @@ object MyTokenVisualPolicy {
         SurfaceRole.FloatingCard,
         SurfaceRole.Metric,
         SurfaceRole.Control,
+        SurfaceRole.Raised,
         -> Material.Solid
     }
 

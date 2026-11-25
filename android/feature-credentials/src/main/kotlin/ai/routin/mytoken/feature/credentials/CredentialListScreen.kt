@@ -480,7 +480,8 @@ private fun CredentialRow(
                     Modifier
                 }
             ),
-        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
+        // 凭证列表既会整页展示，也会作为左抽屉内容：统一用浮层内的前景块。
+        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Raised,
         shape = RoundedCornerShape(MyTokenRadius.row),
     ) {
         Row(

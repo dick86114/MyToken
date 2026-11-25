@@ -20,6 +20,16 @@ data class MyTokenColors(
     val surface: Color,
     /** 抽屉、对话框、底部弹层等浮层底色，比卡片再亮一档。 */
     val overlay: Color,
+    /**
+     * 浮层内部的前景块（抽屉里的分节卡、弹层里的选项块等）：
+     * 深色下必须比 [overlay] 再亮一档，不能用 [surface]/[canvas]，
+     * 否则区块会像凹进浮层里的洞。
+     */
+    val raisedSurface: Color,
+    /** 浮层内前景块的描边；深色下比 [raisedSurface] 再亮一档。 */
+    val raisedLine: Color,
+    /** 浮层内的凹陷信息块（弹窗分组、状态条）：浅色沿用浅灰，深色与 [raisedSurface] 同档。 */
+    val raisedSubtle: Color,
     val subtle: Color,
     val line: Color,
     val ink: Color,
@@ -68,6 +78,10 @@ internal val MyTokenLightColors = MyTokenColors(
     canvas = Color(0xFFEEF0F2),
     surface = Color(0xFFFFFFFF),
     overlay = Color(0xFFFFFFFF),
+    // 浅色浮层本身就是白卡，抬升块保持白色、靠描边分层，浅色层级不变。
+    raisedSurface = Color(0xFFFFFFFF),
+    raisedLine = Color(0xFFE5E7EB),
+    raisedSubtle = Color(0xFFF6F7F9),
     subtle = Color(0xFFF6F7F9),
     line = Color(0xFFE5E7EB),
     ink = Color(0xFF17181A),
@@ -111,6 +125,11 @@ internal val MyTokenDarkColors = MyTokenColors(
     canvas = Color(0xFF121418),
     surface = Color(0xFF1B1E24),
     overlay = Color(0xFF252931),
+    // 浮层内前景块比 overlay 亮一档：canvas → surface → overlay → raisedSurface
+    // 逐层变亮，浮层里的分节卡不再比浮层更暗。
+    raisedSurface = Color(0xFF2E333C),
+    raisedLine = Color(0xFF3C424D),
+    raisedSubtle = Color(0xFF2E333C),
     subtle = Color(0xFF252931),
     line = Color(0xFF2E333C),
     ink = Color(0xFFE6E8EC),

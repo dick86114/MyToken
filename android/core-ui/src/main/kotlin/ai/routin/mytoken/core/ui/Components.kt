@@ -606,6 +606,9 @@ fun MyTokenSurface(
 
         MyTokenVisualPolicy.SurfaceRole.Modal -> colors.overlay
 
+        // 浮层内部的前景块：比 overlay 亮一档，不能再用 surface。
+        MyTokenVisualPolicy.SurfaceRole.Raised -> colors.raisedSurface
+
         MyTokenVisualPolicy.SurfaceRole.Control,
         MyTokenVisualPolicy.SurfaceRole.Metric,
         -> colors.subtle
@@ -626,6 +629,8 @@ fun MyTokenSurface(
         // 设计稿 §6：浮起白卡使用 0.5dp 发丝线。
         MyTokenVisualPolicy.SurfaceRole.FloatingCard ->
             Modifier.border(MyTokenSize.hairline, colors.hairline, shape)
+        MyTokenVisualPolicy.SurfaceRole.Raised ->
+            Modifier.border(1.dp, colors.raisedLine, shape)
         else -> Modifier.border(1.dp, colors.line, shape)
     }
     val resolved = modifier
@@ -638,7 +643,12 @@ fun MyTokenSurface(
     }
 }
 
-/** 分节卡片：surface + hairline + 20dp 圆角，无阴影、无内部分割线。 */
+/**
+ * 分节卡片：浮层内的前景块 + hairline + 20dp 圆角，无阴影、无内部分割线。
+ *
+ * 统一使用 [MyTokenVisualPolicy.SurfaceRole.Raised]：深色下比抽屉/弹层底色再亮一档，
+ * 浅色下仍是原来的白卡 + 描边，避免分节卡在浮层里看起来像凹进去的洞。
+ */
 @Composable
 fun MyTokenSection(
     title: String,
@@ -668,7 +678,7 @@ fun MyTokenSection(
         }
         MyTokenSurface(
             modifier = Modifier.fillMaxWidth(),
-            surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
+            surfaceRole = MyTokenVisualPolicy.SurfaceRole.Raised,
         ) {
             Column(
                 modifier = Modifier

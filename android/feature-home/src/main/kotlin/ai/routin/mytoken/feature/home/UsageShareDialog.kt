@@ -361,8 +361,8 @@ private fun ShareTemplateOption(
     Column(
         modifier = modifier
             .clip(shape)
-            .background(if (selected) colors.subtle else Color.Transparent)
-            .border(1.dp, if (selected) colors.actionFill else colors.line, shape)
+            .background(if (selected) colors.raisedSubtle else Color.Transparent)
+            .border(1.dp, if (selected) colors.actionFill else colors.raisedLine, shape)
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
             .padding(vertical = 7.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -398,7 +398,8 @@ private fun ShareControlSection(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     MyTokenSurface(
-        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Card,
+        // 分享弹层（overlay）里的分组卡：使用浮层内的前景块。
+        surfaceRole = MyTokenVisualPolicy.SurfaceRole.Raised,
         shape = RoundedCornerShape(MyTokenVisualPolicy.outerRadiusDp),
     ) {
         Column(
@@ -448,8 +449,8 @@ private fun ShareToggleChip(
         modifier = Modifier
             .testTag(testTag)
             .clip(shape)
-            .background(if (checked) colors.subtle else Color.Transparent)
-            .border(1.dp, colors.line, shape)
+            .background(if (checked) colors.raisedSubtle else Color.Transparent)
+            .border(1.dp, colors.raisedLine, shape)
             .toggleable(
                 value = checked,
                 role = Role.Checkbox,
@@ -465,8 +466,8 @@ private fun ShareFieldMoreChip(testTag: String, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(8.dp),
-        color = colors.subtle,
-        border = BorderStroke(1.dp, colors.line),
+        color = colors.raisedSubtle,
+        border = BorderStroke(1.dp, colors.raisedLine),
         modifier = Modifier.testTag(testTag),
     ) {
         Text(
