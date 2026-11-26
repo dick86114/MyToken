@@ -39,6 +39,12 @@ data class MyTokenColors(
     val track: Color,
     /** 首页浮起白卡的发丝描边（设计稿 §6：0.5dp #E7E9EE）。 */
     val hairline: Color,
+    /** 左轨供应商 logo 底盘（上缘）：浅色外观沿用白卡，深色外观使用柔和浅灰。 */
+    val railLogoPlateTop: Color,
+    /** 左轨 logo 底盘（下缘）：与 [railLogoPlateTop] 构成极轻的竖向渐变，像材质而非白贴纸。 */
+    val railLogoPlateBottom: Color,
+    /** 左轨 logo 底盘的描边；浅色沿用发丝线，深色浅底盘使用更柔和的浅灰。 */
+    val railLogoPlateBorder: Color,
     /** 范围滑块未选中轨道（设计稿 §7：#E2E4E9）。 */
     val controlTrack: Color,
     /** 范围滑块手柄描边（设计稿 §7：#D4D7DE）。 */
@@ -91,6 +97,9 @@ internal val MyTokenLightColors = MyTokenColors(
     cat3 = Color(0xFFC9CDD3),
     track = Color(0xFFE9EBEE),
     hairline = Color(0xFFE7E9EE),
+    railLogoPlateTop = Color(0xFFFFFFFF),
+    railLogoPlateBottom = Color(0xFFFFFFFF),
+    railLogoPlateBorder = Color(0xFFE7E9EE),
     controlTrack = Color(0xFFE2E4E9),
     controlBorder = Color(0xFFD4D7DE),
     controlHandle = Color(0xFFFFFFFF),
@@ -138,6 +147,11 @@ internal val MyTokenDarkColors = MyTokenColors(
     cat3 = Color(0xFF4A4F56),
     track = Color(0xFF2A2F38),
     hairline = Color(0xFF343A44),
+    // 深色外观的柔和 logo 底盘：#E2E5E9 → #D9DDE2 的极轻竖向渐变，
+    // 纯黑 logo 对最暗处仍有约 15.4:1；描边同步柔化到 #C9CDD4。
+    railLogoPlateTop = Color(0xFFE2E5E9),
+    railLogoPlateBottom = Color(0xFFD9DDE2),
+    railLogoPlateBorder = Color(0xFFC9CDD4),
     controlTrack = Color(0xFF2A2F38),
     controlBorder = Color(0xFF3C424D),
     controlHandle = Color(0xFFFFFFFF),

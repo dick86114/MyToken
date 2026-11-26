@@ -35,6 +35,9 @@ class MyTokenTokensTest {
         assertEquals(Color(0xFFC9CDD3), MyTokenLightColors.cat3)
         assertEquals(Color(0xFFE9EBEE), MyTokenLightColors.track)
         assertEquals(Color(0xFFE7E9EE), MyTokenLightColors.hairline)
+        assertEquals(Color(0xFFFFFFFF), MyTokenLightColors.railLogoPlateTop)
+        assertEquals(Color(0xFFFFFFFF), MyTokenLightColors.railLogoPlateBottom)
+        assertEquals(Color(0xFFE7E9EE), MyTokenLightColors.railLogoPlateBorder)
         assertEquals(Color(0xFFE2E4E9), MyTokenLightColors.controlTrack)
         assertEquals(Color(0xFFD4D7DE), MyTokenLightColors.controlBorder)
         assertEquals(Color(0xFFFFFFFF), MyTokenLightColors.controlHandle)
@@ -66,6 +69,16 @@ class MyTokenTokensTest {
         assertEquals(Color(0xFFA7ADB7), MyTokenDarkColors.cat2)
         assertEquals(Color(0xFF4A4F56), MyTokenDarkColors.cat3)
         assertEquals(Color(0xFF2A2F38), MyTokenDarkColors.track)
+        assertEquals(Color(0xFFE2E5E9), MyTokenDarkColors.railLogoPlateTop)
+        assertEquals(Color(0xFFD9DDE2), MyTokenDarkColors.railLogoPlateBottom)
+        assertEquals(Color(0xFFC9CDD4), MyTokenDarkColors.railLogoPlateBorder)
+        // 柔和浅底盘上的纯黑 logo 仍需 ≥10:1，取渐变最暗的一端做下限。
+        fun contrast(fg: Color, bg: Color): Float {
+            val lighter = maxOf(fg.luminance(), bg.luminance())
+            val darker = minOf(fg.luminance(), bg.luminance())
+            return (lighter + 0.05f) / (darker + 0.05f)
+        }
+        assertTrue(contrast(Color.Black, MyTokenDarkColors.railLogoPlateBottom) >= 10f)
         assertEquals(Color(0xFF2A2F38), MyTokenDarkColors.controlTrack)
         assertEquals(Color(0xFF8A909A), MyTokenDarkColors.statusDotNormal)
         // 深色外观下报告正文落在画布黑上，Critical 百分比改用浅红保证对比度。
