@@ -8,6 +8,7 @@ import ai.routin.mytoken.core.ui.MyTokenThemeTokens
 import ai.routin.mytoken.core.ui.MyTokenType
 import ai.routin.mytoken.core.ui.ProviderLogoPlate
 import ai.routin.mytoken.core.ui.rememberMyTokenMotionEnabled
+import ai.routin.mytoken.core.ui.rememberProviderLogoIsDark
 import ai.routin.mytoken.domain.model.ProviderId
 import ai.routin.mytoken.domain.model.UsageCardDensity
 import android.app.Activity
@@ -1180,6 +1181,10 @@ private fun WideProviderRail(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             providers.forEach { provider ->
+                val logoRes = ProviderCatalog.logoRes(provider)
+                // 方案 B：运行时按 logo 不透明像素的平均亮度判断是否需要浅色底盘；
+                // 纯黑 logo 才提亮，蓝色、彩色 logo 继续用与卡片一致的 surface。
+                val logoIsDark = rememberProviderLogoIsDark(logoRes)
                 RailSelectionButton(
                     selected = selectedProvider == provider,
                     contentDescription =
@@ -1189,11 +1194,9 @@ private fun WideProviderRail(
                         onSelectProvider(if (selectedProvider == provider) null else provider)
                     },
                 ) {
-                    // 供应商图标垫一层与凭证卡片同 surface 的圆角底盘，
-                    // 避免 GLM 蓝点、Routin 棕标这类品牌色直接落在渐变上糊掉。
-                    RailLogoPlate {
+                    RailLogoPlate(useLightPlateWhenDark = logoIsDark) {
                         Image(
-                            painter = painterResource(ProviderCatalog.logoRes(provider)),
+                            painter = painterResource(logoRes),
                             contentDescription = null,
                             contentScale = ContentScale.Fit,
                             modifier = Modifier.size(30.dp),
@@ -1299,8 +1302,13 @@ private fun BreathingUpdateArrow(
 }
 
 /**
- * 左轨图标底盘：使用与凭证卡片相同的 surface 与发丝描边，只做承托，
+ * 左轨图标底盘：浅色外观使用白卡 surface 与发丝描边，只做承托，
  * 不改变图标尺寸、按钮间距或列宽。
+ *
+ * [useLightPlateWhenDark] 为 true 时（方案 B 判定的深色 logo），深色外观改用
+ * #E2E5E9 → #D9DDE2 的柔和浅灰底盘，并叠一层极轻竖向渐变与 1px 描边，
+ * 让纯黑 logo 按原色显示仍可辨认，同时避免纯白贴纸感；
+ * 其它 logo 继续沿用卡片 surface，深色页面不会出现整列浅色块。
  *
  * 传入 [collapseProgress] 时（顶部品牌入口），底盘颜色随收起进度融回琥珀票面，
  * 收起后与 app bar 同色，不会压住为琥珀底反色出来的黑色商标。
@@ -1308,9 +1316,22 @@ private fun BreathingUpdateArrow(
 @Composable
 private fun RailLogoPlate(
     collapseProgress: (() -> Float)? = null,
+    useLightPlateWhenDark: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val colors = MyTokenThemeTokens.colors
+    val darkTheme = colors.canvas.luminance() < 0.5f
+    val lightPlate = darkTheme && useLightPlateWhenDark
+    val plateColor = if (lightPlate) colors.railLogoPlateBottom else colors.surface
+    val plateBorder = if (lightPlate) colors.railLogoPlateBorder else colors.hairline
+    // 浅底盘画极轻的竖向渐变（#E2E5E9 → #D9DDE2）；品牌入口的收起进度仍走纯色插值。
+    val plateBrush = if (lightPlate && collapseProgress == null) {
+        Brush.verticalGradient(
+            colors = listOf(colors.railLogoPlateTop, colors.railLogoPlateBottom),
+        )
+    } else {
+        null
+    }
     val radius = 12.dp
     Box(
         modifier = Modifier
@@ -1318,13 +1339,17 @@ private fun RailLogoPlate(
             .drawBehind {
                 val progress = collapseProgress?.invoke() ?: 0f
                 val corner = CornerRadius(radius.toPx())
-                drawRoundRect(
-                    color = lerp(colors.surface, colors.reportTicket, progress),
-                    cornerRadius = corner,
-                )
+                if (plateBrush != null) {
+                    drawRoundRect(brush = plateBrush, cornerRadius = corner)
+                } else {
+                    drawRoundRect(
+                        color = lerp(plateColor, colors.reportTicket, progress),
+                        cornerRadius = corner,
+                    )
+                }
                 if (progress < 1f) {
                     drawRoundRect(
-                        color = colors.hairline.copy(alpha = 1f - progress),
+                        color = plateBorder.copy(alpha = 1f - progress),
                         cornerRadius = corner,
                         style = Stroke(width = 1.dp.toPx()),
                     )
