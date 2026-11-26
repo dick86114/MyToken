@@ -161,7 +161,7 @@ private fun displayedPercent(metric: UsageMetric): Double? {
     return amount.toDouble() / limit.toDouble() * 100.0
 }
 
-/** 风险报告：票面始终保持琥珀；只有行内百分比与收起标题按 severity 着色。 */
+/** 风险报告：票面始终保持琥珀；正文随页面明暗（浅色白纸 / 深色画布），行内百分比与收起标题按 severity 着色。 */
 @Composable
 internal fun HomeHealthReport(
     cards: List<CredentialCardUi>,
@@ -284,7 +284,7 @@ internal fun HomeHealthReport(
             ) {
                 // 透明图标直接落在报告票面上，不再套黄色圆形底。
                 ReportRefreshGlyph(
-                    // 报告底部随主题反色，图标使用与之对应的墨水色而不是固定深色。
+                    // 报告底部跟随页面明暗，图标使用与正文一致的墨色。
                     tint = colors.reportInk,
                     modifier = Modifier
                         .size(18.dp)

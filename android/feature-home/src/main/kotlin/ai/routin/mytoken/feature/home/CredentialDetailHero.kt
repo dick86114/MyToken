@@ -502,14 +502,14 @@ private fun DetailWindowRow(metric: UsageMetric) {
                         Box(
                             modifier = Modifier
                                 .fillMaxHeight()
-                                .background(colors.reportSurface)
+                                .background(colors.ticketStubSurface)
                                 .padding(horizontal = 12.dp, vertical = 10.dp),
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
                                 text = formatResetCardCompact(card.expiresAt),
                                 style = MyTokenType.label.copy(fontFamily = FontFamily.Monospace),
-                                color = colors.reportInk,
+                                color = colors.ticketStubInk,
                                 maxLines = 1,
                             )
                         }

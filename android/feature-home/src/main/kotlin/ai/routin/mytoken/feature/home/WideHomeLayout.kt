@@ -78,12 +78,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
@@ -1129,27 +1131,31 @@ private fun WideProviderRail(
                 .testTag("home_wide_rail_all"),
             contentAlignment = Alignment.Center,
         ) {
-            Box(modifier = Modifier.size(30.dp)) {
-                if (darkTheme) {
-                    MyTokenBrandMark(
-                        size = 30.dp,
-                        modifier = Modifier
-                            .graphicsLayer { alpha = 1f - collapseProgress() }
-                            .testTag("home_wide_rail_brand"),
-                    )
-                    // 琥珀底上用深色标，保证收起后仍可读。
-                    MyTokenBrandMark(
-                        size = 30.dp,
-                        darkTheme = false,
-                        modifier = Modifier
-                            .graphicsLayer { alpha = collapseProgress() }
-                            .testTag("home_wide_rail_brand_amber"),
-                    )
-                } else {
-                    MyTokenBrandMark(
-                        size = 30.dp,
-                        modifier = Modifier.testTag("home_wide_rail_brand"),
-                    )
+            // 品牌入口同样是图标：和供应商图标共用一层卡片底盘；
+            // 收起时底盘随进度融回琥珀票面，不压住反色后的黑色商标。
+            RailLogoPlate(collapseProgress = collapseProgress) {
+                Box(modifier = Modifier.size(30.dp)) {
+                    if (darkTheme) {
+                        MyTokenBrandMark(
+                            size = 30.dp,
+                            modifier = Modifier
+                                .graphicsLayer { alpha = 1f - collapseProgress() }
+                                .testTag("home_wide_rail_brand"),
+                        )
+                        // 琥珀底上用深色标，保证收起后仍可读。
+                        MyTokenBrandMark(
+                            size = 30.dp,
+                            darkTheme = false,
+                            modifier = Modifier
+                                .graphicsLayer { alpha = collapseProgress() }
+                                .testTag("home_wide_rail_brand_amber"),
+                        )
+                    } else {
+                        MyTokenBrandMark(
+                            size = 30.dp,
+                            modifier = Modifier.testTag("home_wide_rail_brand"),
+                        )
+                    }
                 }
             }
             if (selectedProvider == null) {
@@ -1183,13 +1189,16 @@ private fun WideProviderRail(
                         onSelectProvider(if (selectedProvider == provider) null else provider)
                     },
                 ) {
-                    // 供应商图标直接落在整窗渐变上，不垫白色底板。
-                    Image(
-                        painter = painterResource(ProviderCatalog.logoRes(provider)),
-                        contentDescription = null,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.size(30.dp),
-                    )
+                    // 供应商图标垫一层与凭证卡片同 surface 的圆角底盘，
+                    // 避免 GLM 蓝点、Routin 棕标这类品牌色直接落在渐变上糊掉。
+                    RailLogoPlate {
+                        Image(
+                            painter = painterResource(ProviderCatalog.logoRes(provider)),
+                            contentDescription = null,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.size(30.dp),
+                        )
+                    }
                 }
             }
         }
@@ -1287,6 +1296,44 @@ private fun BreathingUpdateArrow(
             scaleY = scale
         },
     )
+}
+
+/**
+ * 左轨图标底盘：使用与凭证卡片相同的 surface 与发丝描边，只做承托，
+ * 不改变图标尺寸、按钮间距或列宽。
+ *
+ * 传入 [collapseProgress] 时（顶部品牌入口），底盘颜色随收起进度融回琥珀票面，
+ * 收起后与 app bar 同色，不会压住为琥珀底反色出来的黑色商标。
+ */
+@Composable
+private fun RailLogoPlate(
+    collapseProgress: (() -> Float)? = null,
+    content: @Composable () -> Unit,
+) {
+    val colors = MyTokenThemeTokens.colors
+    val radius = 12.dp
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .drawBehind {
+                val progress = collapseProgress?.invoke() ?: 0f
+                val corner = CornerRadius(radius.toPx())
+                drawRoundRect(
+                    color = lerp(colors.surface, colors.reportTicket, progress),
+                    cornerRadius = corner,
+                )
+                if (progress < 1f) {
+                    drawRoundRect(
+                        color = colors.hairline.copy(alpha = 1f - progress),
+                        cornerRadius = corner,
+                        style = Stroke(width = 1.dp.toPx()),
+                    )
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
+    }
 }
 
 @Composable

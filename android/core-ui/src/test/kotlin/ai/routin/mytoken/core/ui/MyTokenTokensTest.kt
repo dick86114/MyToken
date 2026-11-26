@@ -39,8 +39,8 @@ class MyTokenTokensTest {
         assertEquals(Color(0xFFD4D7DE), MyTokenLightColors.controlBorder)
         assertEquals(Color(0xFFFFFFFF), MyTokenLightColors.controlHandle)
         assertEquals(Color(0xFFA3A9B0), MyTokenLightColors.statusDotNormal)
-        // 报告票面始终保持琥珀；只有折叠行百分比与收起标题按 severity 变红。
-        assertEquals(Color(0xFFFF7A7D), MyTokenLightColors.reportCritical)
+        // 报告票面始终保持琥珀；浅色正文是白纸，折叠行百分比用深红保证对比度。
+        assertEquals(Color(0xFFC0272D), MyTokenLightColors.reportCritical)
         assertEquals(Color(0xFFA3151A), MyTokenLightColors.reportNavCritical)
     }
 
@@ -68,9 +68,27 @@ class MyTokenTokensTest {
         assertEquals(Color(0xFF2A2F38), MyTokenDarkColors.track)
         assertEquals(Color(0xFF2A2F38), MyTokenDarkColors.controlTrack)
         assertEquals(Color(0xFF8A909A), MyTokenDarkColors.statusDotNormal)
-        // 深色外观下报告正文是浅色纸面，Critical 百分比改用深红保证对比度。
-        assertEquals(Color(0xFFC0272D), MyTokenDarkColors.reportCritical)
+        // 深色外观下报告正文落在画布黑上，Critical 百分比改用浅红保证对比度。
+        assertEquals(Color(0xFFFF8A8E), MyTokenDarkColors.reportCritical)
         assertEquals(Color(0xFFA3151A), MyTokenDarkColors.reportNavCritical)
+    }
+
+    @Test
+    fun `home report body uses credential card surface while ticket stub stays inverted`() {
+        // 首页报告正文与凭证卡片共用 surface：浅色卡片白、深色卡片色。
+        assertEquals(MyTokenLightColors.surface, MyTokenLightColors.reportSurface)
+        assertEquals(MyTokenDarkColors.surface, MyTokenDarkColors.reportSurface)
+        assertEquals(MyTokenLightColors.ink, MyTokenLightColors.reportInk)
+        assertEquals(MyTokenDarkColors.ink, MyTokenDarkColors.reportInk)
+        assertEquals(MyTokenLightColors.muted, MyTokenLightColors.reportMuted)
+        assertEquals(MyTokenDarkColors.muted, MyTokenDarkColors.reportMuted)
+        assertEquals(MyTokenLightColors.line, MyTokenLightColors.reportLine)
+        assertEquals(MyTokenDarkColors.line, MyTokenDarkColors.reportLine)
+        // 详情重置卡与设置铭牌的票根仍与主题反相。
+        assertEquals(Color(0xFF17181A), MyTokenLightColors.ticketStubSurface)
+        assertEquals(Color(0xFFF5F6F7), MyTokenLightColors.ticketStubInk)
+        assertEquals(Color(0xFFF5F6F7), MyTokenDarkColors.ticketStubSurface)
+        assertEquals(Color(0xFF17181A), MyTokenDarkColors.ticketStubInk)
     }
 
     @Test
