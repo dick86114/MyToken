@@ -994,7 +994,7 @@ private fun SettingsProfileCard(appVersion: String) {
             .fillMaxWidth()
             .testTag("settings_profile")
             // 与凭证报告同款票据形状：左上、右下圆角，右上、左下切角。
-            .background(colors.reportSurface, MyTokenReportBodyShape),
+            .background(colors.ticketStubSurface, MyTokenReportBodyShape),
     ) {
         Row(
             modifier = Modifier
@@ -1025,13 +1025,13 @@ private fun SettingsProfileCard(appVersion: String) {
             Text(
                 text = "v$appVersion",
                 style = MyTokenType.label.copy(fontWeight = FontWeight.SemiBold),
-                color = colors.reportInk,
+                color = colors.ticketStubInk,
             )
             Spacer(modifier = Modifier.weight(1f))
             Text(
                 text = "凭证只在本机",
                 style = MyTokenType.caption,
-                color = colors.reportMuted,
+                color = colors.ticketStubMuted,
             )
         }
     }

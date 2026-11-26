@@ -74,7 +74,7 @@ class SettingsIconographyTest {
 
         assertTrue(
             "铭牌外形应与凭证报告一致（圆角票据）",
-            profile.contains(".background(colors.reportSurface, MyTokenReportBodyShape)"),
+            profile.contains(".background(colors.ticketStubSurface, MyTokenReportBodyShape)"),
         )
         assertTrue(
             "黄色票面承载 Logo 与名称",
@@ -83,7 +83,7 @@ class SettingsIconographyTest {
         assertTrue("铭牌 Logo 固定使用黑色版本", profile.contains("darkTheme = false"))
         assertTrue("铭牌名称必须固定为黑色", profile.contains("color = colors.reportTicketInk"))
         assertTrue("黑色部分显示版本号", profile.contains("text = \"v\$appVersion\""))
-        assertTrue("版本号使用报告反色墨水", profile.contains("color = colors.reportInk"))
+        assertTrue("版本号使用票根反色墨水", profile.contains("color = colors.ticketStubInk"))
         assertFalse("铭牌不再使用整块黄底", profile.contains("colors.actionFill"))
     }
 

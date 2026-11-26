@@ -122,8 +122,8 @@ class CredentialUsageSurfaceStyleTest {
             .substringBefore("@Composable\nprivate fun", missingDelimiterValue = detail)
         assertTrue("左侧票面使用报告黄", resetBlock.contains("colors.reportTicket"))
         assertTrue("文案使用报告黄上的深色字", resetBlock.contains("colors.reportTicketInk"))
-        assertTrue("右侧时间块使用黑/白反相", resetBlock.contains("colors.reportSurface"))
-        assertTrue("时间文字使用反相字色", resetBlock.contains("colors.reportInk"))
+        assertTrue("右侧时间块使用黑/白反相", resetBlock.contains("colors.ticketStubSurface"))
+        assertTrue("时间文字使用反相字色", resetBlock.contains("colors.ticketStubInk"))
     }
 
     @Test
@@ -278,9 +278,14 @@ class CredentialUsageSurfaceStyleTest {
 
         assertFalse("分页过程中切换组件不应播放颜色加载动画", chrome.contains("animateColorAsState"))
         assertTrue(
-            "选中图标为白底上的深色/浅色前景，未选中用中性色",
-            chrome.contains("tint = if (selected) colors.surface else colors.muted"),
+            "选中图标为琥珀底上的深色 ink，未选中用中性色",
+            chrome.contains("tint = if (selected) colors.reportTicketInk else colors.muted"),
         )
+        val densitySwitch = chrome
+            .substringAfter("internal fun DensityModeSwitch")
+            .substringBefore("@Composable\nprivate fun DensityIconOption")
+        assertTrue("轨道使用凭证卡片 surface", densitySwitch.contains(".background(colors.surface)"))
+        assertTrue("选中块使用报告票头琥珀", densitySwitch.contains(".background(colors.reportTicket)"))
     }
 
     @Test

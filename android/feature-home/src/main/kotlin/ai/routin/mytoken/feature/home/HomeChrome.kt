@@ -731,7 +731,8 @@ internal fun DensityModeSwitch(
             .width(trackWidth)
             .height(trackHeight)
             .clip(RoundedCornerShape(DensitySwitchSpec.trackRadius))
-            .background(colors.track)
+            // 轨道用卡片 surface：浅色白底、深色卡片深色，和页面协调。
+            .background(colors.surface)
             .testTag("usage_density_toggle"),
     ) {
         Box(
@@ -745,7 +746,8 @@ internal fun DensityModeSwitch(
                     if (vertical) translationY = itemTravelPx * p else translationX = itemTravelPx * p
                 }
                 .clip(RoundedCornerShape(DensitySwitchSpec.itemRadius))
-                .background(colors.ink)
+                // 选中块与报告票头同色：两套外观都是琥珀，图标用琥珀上的深色 ink。
+                .background(colors.reportTicket)
                 .testTag("usage_density_thumb"),
         )
         if (vertical) {
@@ -824,7 +826,7 @@ private fun DensityIconOption(
         // 分页过程中滑块已跟手；图标直接使用当前选中态，禁止加载动画。
         DensityGlyph(
             compact = compact,
-            tint = if (selected) colors.surface else colors.muted,
+            tint = if (selected) colors.reportTicketInk else colors.muted,
             emphasized = selected,
         )
     }
